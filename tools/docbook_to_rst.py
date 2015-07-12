@@ -12,7 +12,7 @@ def html_to_rst(file, root, single=False, encoding='UTF-8', html=True):
     original_format= 'html' if html else 'docbook'
     if not file.endswith('.html'):
         return
-    new_file = file[:-4] + '.rst'
+    new_file = file[:-5] + '.rst'
     file_path = "%s/%s" % (root, file)
     if single:
         new_file_path = "%s.rst" % (root)
