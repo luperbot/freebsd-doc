@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>10.5. Online-Kernel-Fehlersuche mit GDB auf einem entfernten System</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="kerneldebug.html" title="Kapitel 10. Kernel-Fehlersuche" /><link rel="prev" href="kerneldebug-online-ddb.html" title="10.4. Online-Kernel-Fehlersuche mit DDB" /><link rel="next" href="kerneldebug-console.html" title="10.6. Fehlersuche bei einem Konsolen-Treiber" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.5. Online-Kernel-Fehlersuche mit GDB auf einem entfernten
+      System</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="kerneldebug-online-ddb.html">Zurück</a> </td><th width="60%" align="center">Kapitel 10. Kernel-Fehlersuche</th><td width="20%" align="right"> <a accesskey="n" href="kerneldebug-console.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kerneldebug-online-gdb"></a>10.5. Online-Kernel-Fehlersuche mit GDB auf einem entfernten
+      System</h2></div></div></div><p>Diese Funktion wird seit FreeBSD 2.2 unterstützt und
+      ist wirklich sehr geschickt.</p><p>GDB unterstützt <span class="emphasis"><em>die Fehlersuche von einem
+      entfernten System aus</em></span> bereits einige Zeit. Dies
+      geschieht unter Benutzung eines sehr einfachen Protokolls
+      über eine serielle Verbindung. Anders als bei den anderen,
+      oben beschriebenen, Vorgehensweisen werden hier zwei Systeme
+      benötigt. Das eine ist das Hostsystem, welches die Umgebung
+      zur Fehlersuche, einschließlich aller Quellen und einer
+      Kopie der Kernel-Binärdatei mit allen Symbolen
+      bereitstellt, und das andere das Zielsystem, welches einfach nur
+      eine Kopie desselben Kernels ausführt (ohne die
+      Informationen zur Fehlersuche).</p><p>Sie sollten den Kernel im Zweifelsfall mit <code class="command">config
+      -g</code> konfigurieren, <code class="option">DDB</code> in die
+      Konfiguration aufnehmen und den Kernel, wie sonst auch,
+      kompilieren. Dies ergibt, aufgrund der zusätzlichen
+      Informationen zur Fehlersuche, eine umfangreiche
+      Binärdatei. Kopieren Sie diesen Kernel auf das Zielsystem,
+      entfernen Sie die Symbole zur Fehlersuche mit <code class="command">strip
+      -x</code> und starten Sie ihn mit der
+      <code class="option">-d</code>-Boot-Option. Stellen Sie die serielle
+      Verbindung zwischen dem Zielsystem, welches "flags 80" für
+      dessen sio-Gerät gesetzt hat, und dem Hostsystem, welches
+      die Fehlersuche übernimmt, her. Nun wechseln Sie auf dem
+      Hostsystem in das Bauverzeichnis des Ziel-Kernels und starten
+      <code class="command">gdb</code>:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kgdb kernel</code></strong>
+GDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "show copying" to see the conditions.
+There is absolutely no warranty for GDB; type "show warranty" for details.
+GDB 4.16 (i386-unknown-freebsd),
+Copyright 1996 Free Software Foundation, Inc...
+<code class="prompt">(kgdb)</code> </pre><p>Stellen Sie die entfernte Sitzung zur Fehlersuche ein mit
+      (angenommen, der erste serielle Port ist in Verwendung):</p><pre class="screen"><code class="prompt">(kgdb)</code> <strong class="userinput"><code>target remote /dev/cuaa0</code></strong></pre><p>Jetzt geben Sie auf dem Zielsystem, welches noch vor Beginn
+      der Gerätesuche in DDB gelangt ist, ein:</p><pre class="screen">Debugger("Boot flags requested debugger")
+Stopped at Debugger+0x35: movb  $0, edata+0x51bc
+<code class="prompt">db&gt;</code> <strong class="userinput"><code>gdb</code></strong></pre><p>DDB antwortet dann mit:</p><pre class="screen">Next trap will enter GDB remote protocol mode</pre><p>Jedesmal wenn Sie <code class="command">gdb</code> eingeben, wird
+      zwischen dem lokalen DDB und entfernten GDB umgeschaltet. Um
+      einen nächsten Trap sofort zu erzwingen, geben Sie einfach
+      <code class="command">s</code> (step) ein. Ihr GDB auf dem Hostsystem
+      erhält nun die Kontrolle über den Ziel-Kernel:</p><pre class="screen">Remote debugging using /dev/cuaa0
+Debugger (msg=0xf01b0383 "Boot flags requested debugger")
+    at ../../i386/i386/db_interface.c:257
+<code class="prompt">(kgdb)</code></pre><p>Sie können mit dieser Sitzung wie mit jeder anderen
+      GDB-Sitzung umgehen, einschließlich vollem Zugriff auf die
+      Quellen, Starten im gud-Modus innerhalb eines Emacs-Fensters
+      (was Ihnen automatische Quelltext-Ausgabe in einem weiteren
+      Emacs-Fenster bietet), usw.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="kerneldebug-online-ddb.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="kerneldebug.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="kerneldebug-console.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">10.4. Online-Kernel-Fehlersuche mit DDB </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 10.6. Fehlersuche bei einem Konsolen-Treiber</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

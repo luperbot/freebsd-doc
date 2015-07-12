@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.4. 配置文件与自动配置期间识别和探测的顺序</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver-device-t.html" title="10.3. Device_t指针" /><link rel="next" href="isa-driver-resources.html" title="10.5. 资源" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.4. 配置文件与自动配置期间识别和探测的顺序</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-device-t.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-resources.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-config"></a>10.4. 配置文件与自动配置期间识别和探测的顺序</h2></div></div></div><a id="idp71644880" class="indexterm"></a><p>ISA设备在内核配置文件中的描述如下：</p><pre class="programlisting">device xxx0 at isa? port 0x300 irq 10 drq 5
+       iomem 0xd0000 flags 0x1 sensitive</pre><a id="idp71646416" class="indexterm"></a><p>端口值、IRQ值和其他值被转换成与设备关联的资源值。根据设备
+	对自动配置需要和支持程度的不同，这些值是可选的。例如，
+	某些设备根本不需要读DRQ，而有些则允许设备从设备配置端口读取
+	IRQ设置。如果机器有多个ISA总线，可以在配置文件中明确指定哪条
+	总线，如<code class="literal">isa0</code>或<code class="literal">isa1</code>，
+	否则将在所有ISA总线上搜索设备。</p><p><code class="literal">敏感(sensitive)</code>是一种资源请求，它指示
+	必须在所有非敏感设备之前探测设备。此特性虽被支持，但似乎从未
+	在目前的任何驱动程序中使用过。</p><p>对于老的ISA设备，很多情况下驱动程序仍然能够侦测配置参数。
+	但是系统中配置的每个设备必须具有一个配置行。如果系统中装有同一
+	类型的两个设备，但对应的驱动程序却只有一个配置行，例如:
+	</p><pre class="programlisting">device xxx0 at isa?</pre><p>
+	那么只有一个设备会被配置。</p><p>但对于支持通过PnP或专有协议进行自动识别的设备，一个配置行
+	就足够配置系统中的所有设备，如上面的配置行，或者简单地：</p><pre class="programlisting">device xxx at isa?</pre><p>如果设备驱动程序既支持能自动识别的设备又支持老设备，并且
+        两类设备同时安装在一台机器上，那么只要在配置文件中描述老设备
+        就足够了。自动识别的设备将被自动添加。</p><p>如果ISA设备是自动配置的，发生的事件如下：</p><p>所有设备驱动程序的识别例程（包括识别所有PnP设备的PnP识别
+        例程）以随机顺序被调用。他们识别出设备后就把设备添加到ISA总线
+        上的列表中。通常驱动程序的识别例程将新设备与它们的驱动
+        程序关联起来。而PnP识别例程并不知道其他驱动程序，因此不能将
+        驱动程序与它所添加的新设备关联起来。</p><p>使用PnP协议让PnP设备进入睡眠，以防止它们被探测为老设备。</p><p>被标记为<code class="literal">敏感(sensitive)</code>的非PnP设备的
+        探测例程被调用。如果探测设备成功，那么就为其调用挂接(attach)
+        例程。</p><p>所有非PnP设备的探测和连接例程以同样的方式被调用。</p><p>PnP设备从睡眠中恢复过来，并给它们分配所请求的资源：I/O、
+        内存地址范围、IRQ和DRQ，所有这些与已连接的老设备不会冲突。</p><p>对于每个PnP设备，所有ISA设备驱动程序的探测例程都会被调用。
+        第一个要求此设备的驱动程序将被连接。多个驱动程序以不同的优先权
+        要求一个设备的情况是可能的，这种情况下，具有最高优先权的驱动程序
+        将获胜。探测例程必须调用<code class="function">ISA_PNP_PROBE()</code>将
+        真实的PnP ID和驱动程序支持的ID列表作比较，如果ID不在表中则返回
+        失败。这意味着每个驱动程序，包括不支持任何PnP设备的驱动程序，
+        都必须对未知的PnP设备无条件调用
+        <code class="function">ISA_PNP_PROBE()</code>，对于未知设备， 至少要用一个
+        空的PnP ID表调用并返回失败。</p><p>探测例程遇到错误时会返回一个正值（错误码），成功时返回
+        零或负值。</p><p>负的返回值用于PnP设备支持多个接口的情况。例如，老的兼容接口
+        和新的高级接口通过不同的驱动程序来提供支持。两个驱动程序
+        都侦测设备。在探测例程中返回较高值的驱动程序优先（换句话说，
+        返回0的驱动程序具有最高的优先级，返回-1的其次，返回-2的更在
+        其后，如此下去）。如果多个驱动程序返回相同的值，那么最先调用的
+        获胜。因此，如果驱动程序返回0，就基本能够确信它获得优先权仲裁。
+      </p><p>设备特定的识别例程也能够将一类而不是单个驱动程序指派给设备。
+        就象使用PnP的情况一样，对于某一设备，会探测这一类中所有的驱动程序。
+        由于这个特性在任何现存的驱动程序中总均未实现，故本文档中不再予以
+        考虑。</p><p>由于探测老设备的时候PnP设备被禁用，它们不会被连接两次
+        （一次作为老设备，一次作为PnP）。但如果识别例程设备相关的，
+        这种情况下设备驱动程序有责任确保同一设备不会被设备驱动程序
+        连接两次：一次作为老的由用户配置的，一次作为自动识别的。</p><p>对于自动识别的设备（包括PnP和设备特定的）的另一个实践结论是，
+        不能从内核配置文件中向它们传递旗标。因此它们必须要么根本不使用
+        旗标，要么为所有自动识别的设备使用单元号为0的设备的旗标，或者
+        使用sysctl接口而不是旗标。</p><p>通过使用函数族<code class="function">resource_query_*()</code>和
+        <code class="function">resource_*_value()</code>直接访问配置资源，
+        从而可以提供其他不常用的配置。它们的实现位于
+        <code class="filename">kern/subr_bus.c</code>。老的IDE磁盘驱动器
+        <code class="filename">i386/isa/wd.c</code>包含这样使用的例子。
+        但必须优先使用配置的标准方法。将解析配置资源这类事情留给
+        总线配置代码。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-device-t.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-resources.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.3. Device_t指针 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.5. 资源</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

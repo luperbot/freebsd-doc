@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>15.6. L'encapsuleur TCP (« TCP Wrappers »)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="security.html" title="Chapitre 15. Sécurité" /><link rel="prev" href="one-time-passwords.html" title="15.5. Mots de passe non réutilisables" /><link rel="next" href="kerberosIV.html" title="15.7. Kerberos" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.6. L'encapsuleur TCP (<span class="quote">« <span class="quote">TCP Wrappers</span> »</span>)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="one-time-passwords.html">Précédent</a> </td><th width="60%" align="center">Chapitre 15. Sécurité</th><td width="20%" align="right"> <a accesskey="n" href="kerberosIV.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="tcpwrappers"></a>15.6. L'encapsuleur TCP (<span class="quote">« <span class="quote">TCP Wrappers</span> »</span>)</h2></div><div><span class="authorgroup">Ecrit par <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp78504144" class="indexterm"></a><p>Toute personne familière avec <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a> a
+      probablement entendu parlé à un moment ou à
+      un autre de l'encapsuleur <acronym class="acronym">TCP</acronym> (<span class="quote">« <span class="quote">TCP
+      Wrappers</span> »</span>).  Mais peu sont ceux qui semblent saisir
+      complètement son intérêt dans un
+      réseau.  Il semble que tout le monde désire
+      installer un coupe-feu pour contrôler les connexions
+      réseaux.  Alors qu'un coupe-feu peut avoir de nombreuses
+      utilisations, il existe des choses qu'un coupe-feu ne peut
+      gérer comme renvoyer un message à l'initiateur
+      d'une connexion.  L'encapsuleur <acronym class="acronym">TCP</acronym> en est
+      capable ainsi que bien d'autres choses.  Dans les sections
+      suivantes plusieurs fonctionnalités de l'encapsuleur
+      <acronym class="acronym">TCP</acronym> seront abordées, et, dès
+      que ce sera possible, un exemple de configuration sera
+      proposé.</p><p>L'encapsuleur <acronym class="acronym">TCP</acronym> étend les
+      capacités d'<span class="application">inetd</span> au niveau du
+      support pour chaque serveur sous son contrôle.  En
+      utilisant cette méthode il est possible d'offrir le
+      support des ouvertures de session, de retourner des messages
+      lors des connexions, de permettre à un
+      <span class="quote">« <span class="quote">daemon</span> »</span> de n'accepter que les connexions internes,
+      etc.  Bien que certaines de ces fonctionnalités peuvent
+      être obtenues par l'implémentation d'un coupe-feu,
+      ce système ajoutera non seulement une couche
+      supplémentaire de protection mais ira plus loin dans le
+      contrôle que ce que peut fournir un coupe-feu.</p><p>Les fonctionnalités apportées par
+      l'encapsuleur <acronym class="acronym">TCP</acronym> ne peuvent se substituer
+      à l'utilisation d'un bon coupe-feu.  L'encapsuleur
+      <acronym class="acronym">TCP</acronym> peut être utilisé de paire
+      avec un coupe-feu ou tout autre système de
+      sécurité et il pourra alors servir comme une
+      couche supplémentaire de protection pour le
+      système.</p><p>Etant donné que ce programme est une extension
+      à la configuration du programme
+      <span class="application">inetd</span>, le lecteur est supposé
+      avoir pris connaissance de la section de <a class="link" href="network-inetd.html" title="29.2. Le &#8220;super-serveur&#8221; inetd">configuration d'inetd</a>.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Bien que les programmes lancés par <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a> ne
+	soient pas tout à fait des <span class="quote">« <span class="quote">daemons</span> »</span>, ils
+	sont traditionnellement appelés <span class="quote">« <span class="quote">daemons</span> »</span>.
+	C'est le terme que nous utiliserons également dans le
+	reste de cette section.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78513872"></a>15.6.1. Configuration initiale</h3></div></div></div><p>Le seul pré-requis à l'utilisation de
+	l'encapsuleur <acronym class="acronym">TCP</acronym> sous FreeBSD est de
+	s'assurer que le serveur <span class="application">inetd</span> est
+	lancé à partir de <code class="filename">rc.conf</code>
+	avec l'option <code class="option">-Ww</code>; c'est la configuration par
+	défaut.  Bien évidemment une configuration
+	correcte du fichier <code class="filename">/etc/hosts.allow</code> est
+	également sous-entendue, mais dans le cas contraire
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> émettra des messages d'avertissement
+	dans les journaux du système.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Contrairement à d'autres implémentations
+	  de l'encapsuleur <acronym class="acronym">TCP</acronym>, l'emploi du fichier
+	  <code class="filename">hosts.deny</code> est obsolète.  Toutes
+	  les options de configuration doivent être
+	  placées dans le fichier
+	  <code class="filename">/etc/hosts.allow</code>.</p></div><p>Dans la configuration la plus simple, la politique de
+	connexion aux <span class="quote">« <span class="quote">daemons</span> »</span> est soit de tout
+	autoriser ou soit de tout bloquer en fonctions des options
+	choisies dans <code class="filename">/etc/hosts.allow</code>.  La
+	configuration par défaut sous FreeBSD est d'autoriser les
+	connexions à chaque <span class="quote">« <span class="quote">daemon</span> »</span> lancé
+	à l'aide d'<span class="application">inetd</span>.  La
+	modification de ce réglage par défaut sera
+	discutée une fois que la configuration de base aura
+	été vue.</p><p>Une configuration de base prend en général
+	la forme <code class="literal">daemon : adresse : action</code>.
+	Où <code class="literal">daemon</code> est le nom du
+	<span class="quote">« <span class="quote">daemon</span> »</span> lancé par
+	<span class="application">inetd</span>.
+	L'<code class="literal">adresse</code> peut être un nom de machine
+	valide, une adresse <acronym class="acronym">IP</acronym> ou une adresse IPv6
+	entre crochets ([ ]).  Le champ <code class="literal">action</code>
+	pourra avoir comme valeur <code class="literal">allow</code> ou
+	<code class="literal">deny</code> pour autoriser ou interdire
+	l'accès.  Gardez à l'esprit que ce type de
+	configuration fonctionne de manière à honorer la
+	première règle sémantique correspondante,
+	cela signifie que le fichier de configuration est parcouru
+	à la recherche d'une règle correspondant
+	à la requête.  Quand une correspondance est
+	trouvée, la règle est appliquée et la
+	recherche s'arrête.</p><p>Plusieurs autres options existent mais elles seront
+	exposées dans une section ultérieure.  Une
+	simple ligne de configuration peut être construite avec
+	peu d'information.  Par exemple, pour autoriser les connexions
+	<acronym class="acronym">POP</acronym>3 via le <span class="quote">« <span class="quote">daemon</span> »</span> <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/qpopper/pkg-descr">mail/qpopper</a>, les lignes suivantes
+	doivent être ajoutées au fichier
+	<code class="filename">hosts.allow</code>:</p><pre class="programlisting"># This line is required for POP3 connections:
+qpopper : ALL : allow</pre><p>Après l'ajout de cette ligne,
+	<span class="application">inetd</span> devra être
+	redémarré.  Cela sera fait en utilisant la
+	commande <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kill&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">kill</span>(1)</span></a>, ou avec le passage du paramètre
+	<em class="parameter"><code>restart</code></em> à la commande
+	<code class="filename">/etc/rc.d/inetd</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78534736"></a>15.6.2. Configuration avancée</h3></div></div></div><p>L'encapsuleur <acronym class="acronym">TCP</acronym> dispose
+	également d'options avancées; elles permettrons
+	plus de contrôle sur la manière dont sont
+	gérées les connexions.  Dans certains cas cela
+	peut être une bonne idée de renvoyer un
+	commentaire à certaines machines ou lors de connexions
+	à certains <span class="quote">« <span class="quote">daemon</span> »</span>s.  Dans d'autres cas,
+	peut-être qu'un fichier journal pourrait être
+	enregistré ou un courrier électronique pourrait
+	être envoyé à l'administrateur.  D'autres
+	situations peuvent nécessiter l'utilisation d'un
+	service uniquement pour les connexions locales.  Tout cela est
+	possible à l'aide des options de configuration connues
+	sous le nom de <code class="literal">jokers</code>, caractères
+	d'expansion et d'exécution de commandes externes.  Les
+	deux sections suivantes abordent ces situations.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78536912"></a>15.6.2.1. Commandes externes</h4></div></div></div><p>Imaginez une situation dans laquelle une connexion doit
+	  être refusée et que la raison de ce refus doit
+	  être envoyée à la personne qui a
+	  tenté d'établir cette connexion.  Comment cela
+	  peut-il être mis en place?  Ce type d'action est rendu
+	  possible par l'emploi de l'option <code class="option">twist</code>.
+	  Quand une tentative de connexion est faite,
+	  <code class="option">twist</code> sera appelée pour
+	  exécuter une commande ou une procédure
+	  d'interpréteur de commande.  Un exemple est
+	  déjà présent dans le fichier
+	  <code class="filename">hosts.allow</code>:</p><pre class="programlisting"># The rest of the daemons are protected.
+ALL : ALL \
+        : severity auth.info \
+        : twist /bin/echo "You are not welcome to use %d from %h."</pre><p>Cet exemple montre que le message <span class="quote">« <span class="quote">You are not
+	  allowed to use <code class="literal">daemon</code> from
+	  <code class="literal">hostname</code>.</span> »</span> sera retourné
+	  pour tout <span class="quote">« <span class="quote">daemon</span> »</span> qui n'a pas
+	  été précédemment
+	  configuré dans le fichier d'accès.  Cette
+	  fonction est très utile pour envoyer une
+	  réponse à l'initiateur de la connexion juste
+	  après le refus de la connexion.  Notez que tout
+	  message à retourner <span class="emphasis"><em>doit</em></span>
+	  être placé entre des guillemets
+	  <code class="literal">"</code>; il n'y a pas d'exception possible
+	  à cette règle.</p><div xmlns="" class="warning"><h3 class="admontitle">Avertissement: </h3><p xmlns="http://www.w3.org/1999/xhtml">Il est possible de lancer une attaque par déni
+	    de service sur le serveur si un agresseur, ou un groupe
+	    d'agresseurs sont en mesure de submerger ces
+	    <span class="quote">« <span class="quote">daemon</span> »</span>s avec des demandes de
+	    connexion.</p></div><p>Une autre possibilité dans ce cas est d'employer
+	  l'option <code class="option">spawn</code>.  Tout comme l'option
+	  <code class="option">twist</code>, <code class="option">spawn</code> interdit
+	  implicitement les connexions et peut être
+	  utilisée pour lancer une commande ou une
+	  procédure externe.  Contrairement à
+	  <code class="option">twist</code>, <code class="option">spawn</code> n'enverra pas
+	  de réponse à la personne qui a établi
+	  la connexion.  Examinons par exemple la ligne de
+	  configuration suivante:</p><pre class="programlisting"># We do not allow connections from example.com:
+ALL : .example.com \
+	: spawn (/bin/echo %a from %h attempted to access %d &gt;&gt; \
+	  /var/log/connections.log) \
+	: deny</pre><p>Cela interdira toute tentative de connexion à
+	  partir du domaine <code class="systemitem">*.example.com</code>, enregistrant
+	  simultanément dans le fichier
+	  <code class="filename">/var/log/connections.log</code> le nom de
+	  machine, l'adresse <acronym class="acronym">IP</acronym> et le
+	  <span class="quote">« <span class="quote">daemon</span> »</span> auquel on tente
+	  d'accéder.</p><p>Il existe d'autres caractères de substitution en
+	  dehors de ceux déjà présentés,
+	  par exemple <code class="literal">%a</code>.  Consultez la page de
+	  manuel <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> pour une liste
+	  complète.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78554192"></a>15.6.2.2. Les options jokers</h4></div></div></div><p>Jusqu'ici l'option <code class="literal">ALL</code> a
+	  été utilisée dans tous les exemples.
+	  Il existe d'autres options pour étendre un peu plus
+	  les fonctionnalités.  Par exemple, l'option
+	  <code class="literal">ALL</code> peut être utilisée pour
+	  prendre en compte chaque instance d'un
+	  <span class="quote">« <span class="quote">daemon</span> »</span>, d'un domaine ou d'une adresse
+	  <acronym class="acronym">IP</acronym>.  Un autre joker disponible est
+	  l'option <code class="literal">PARANOID</code> qui peut être
+	  employée pour prendre en compte toute machine qui
+	  fournirait une adresse <acronym class="acronym">IP</acronym> susceptible
+	  d'être falsifiée.  En d'autres termes, l'option
+	  <code class="literal">PARANOID</code> peut être utilisée
+	  pour définir l'action a effectuer dès qu'une
+	  connexion se fait à partir d'une adresse
+	  <acronym class="acronym">IP</acronym> qui diffère de celle
+	  attachée à une machine.  L'exemple suivant
+	  apporte un éclairage sur cette option:</p><pre class="programlisting"># Block possibly spoofed requests to sendmail:
+sendmail : PARANOID : deny</pre><p>Dans cet exemple, toutes les requêtes de connexion
+	  à <span class="application">sendmail</span> à partir
+	  d'adresses <acronym class="acronym">IP</acronym> différentes de celle
+	  correspondant au nom de la machine seront
+	  refusées.</p><div xmlns="" class="caution"><h3 class="admontitle">Attention: </h3><p xmlns="http://www.w3.org/1999/xhtml">Utiliser l'option <code class="literal">PARANOID</code> peut
+	    gravement paralyser les serveurs si le client ou le
+	    serveur a une configuration de <acronym class="acronym">DNS</acronym>
+	    défectueuse.  Les administrateurs sont maintenant
+	    prévenus.</p></div><p>Pour en apprendre plus sur les jokers et leurs
+	  fonctionnalités associées, consultez la page
+	  de manuel <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a>.</p><p>Avant que n'importe quelle des lignes de configuration
+	  données ci-dessus ne fonctionne, la première
+	  ligne de configuration du fichier
+	  <code class="filename">hosts.allow</code> devra être
+	  dé-commentée.  Cela a été
+	  noté en début de section.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="one-time-passwords.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="kerberosIV.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">15.5. Mots de passe non réutilisables </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 15.7. Kerberos</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

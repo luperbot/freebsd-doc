@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>第 11 章 PCI设备</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="devicedrivers.html" title="部分 II. 设备驱动程序" /><link rel="prev" href="isa-driver-intr.html" title="10.12. xxx_intr" /><link rel="next" href="pci-bus.html" title="11.2. 总线资源" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第 11 章 PCI设备</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-intr.html">上一页</a> </td><th width="60%" align="center">部分 II. 设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="pci-bus.html">下一页</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pci"></a>第 11 章 PCI设备</h2></div><div><span class="authorgroup">翻译：<span xmlns="http://www.w3.org/1999/xhtml" class="author"></span>. </span></div></div></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="pci.html#pci-probe">11.1. 探测与连接</a></span></dt><dt><span class="sect1"><a href="pci-bus.html">11.2. 总线资源</a></span></dt></dl></div><a id="idp72036432" class="indexterm"></a><p>本章将讨论FreeBSD为了给PCI总线上的设备编写驱动程序而提供的机制。</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pci-probe"></a>11.1. 探测与连接</h2></div></div></div><p>这儿的信息是关于PCI总线代码如何迭代通过未连接的设备，并查看新
+      加载的kld是否会连接其中一个。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72038608"></a>11.1.1. 示例驱动程序源代码(<code class="filename">mypci.c</code>)</h3></div></div></div><pre class="programlisting">/*
+ * 与PCI函数进行交互的简单KLD
+ *
+ * Murray Stokely
+ */
+
+#include &lt;sys/param.h&gt;		/* kernel.h中使用的定义 */
+#include &lt;sys/module.h&gt;
+#include &lt;sys/systm.h&gt;
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/kernel.h&gt;		/* 模块初始化中使用的类型 */
+#include &lt;sys/conf.h&gt;		/* cdevsw结构 */
+#include &lt;sys/uio.h&gt;		/* uio结构 */
+#include &lt;sys/malloc.h&gt;
+#include &lt;sys/bus.h&gt;		/* pci总线用到的结构、原型 */
+
+#include &lt;machine/bus.h&gt;
+#include &lt;sys/rman.h&gt;
+#include &lt;machine/resource.h&gt;
+
+#include &lt;dev/pci/pcivar.h&gt;	/* 为了使用get_pci宏! */
+#include &lt;dev/pci/pcireg.h&gt;
+
+/* softc保存我们每个实例的数据。 */
+struct mypci_softc {
+	device_t	my_dev;
+	struct cdev	*my_cdev;
+};
+
+/* 函数原型 */
+static d_open_t		mypci_open;
+static d_close_t	mypci_close;
+static d_read_t		mypci_read;
+static d_write_t	mypci_write;
+
+/* 字符设备入口点 */
+
+static struct cdevsw mypci_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_open =	mypci_open,
+	.d_close =	mypci_close,
+	.d_read =	mypci_read,
+	.d_write =	mypci_write,
+	.d_name =	"mypci",
+};
+
+/*
+ * 在cdevsw例程中，我们通过结构体cdev中的成员si_drv1找出我们的softc。
+ * 当我们建立/dev项时，在我们的已附着的例程中，
+ * 我们设置这个变量指向我们的softc。
+ */
+
+int
+mypci_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
+{
+	struct mypci_softc *sc;
+
+	/* Look up our softc. */
+	sc = dev-&gt;si_drv1;
+	device_printf(sc-&gt;my_dev, "Opened successfully.\n");
+	return (0);
+}
+
+int
+mypci_close(struct cdev *dev, int fflag, int devtype, struct thread *td)
+{
+	struct mypci_softc *sc;
+
+	/* Look up our softc. */
+	sc = dev-&gt;si_drv1;
+	device_printf(sc-&gt;my_dev, "Closed.\n");
+	return (0);
+}
+
+int
+mypci_read(struct cdev *dev, struct uio *uio, int ioflag)
+{
+	struct mypci_softc *sc;
+
+	/* Look up our softc. */
+	sc = dev-&gt;si_drv1;
+	device_printf(sc-&gt;my_dev, "Asked to read %d bytes.\n", uio-&gt;uio_resid);
+	return (0);
+}
+
+int
+mypci_write(struct cdev *dev, struct uio *uio, int ioflag)
+{
+	struct mypci_softc *sc;
+
+	/* Look up our softc. */
+	sc = dev-&gt;si_drv1;
+	device_printf(sc-&gt;my_dev, "Asked to write %d bytes.\n", uio-&gt;uio_resid);
+	return (0);
+}
+
+/* PCI支持函数 */
+
+/*
+ * 将某个设置的标识与这个驱动程序支持的标识相比较。
+ * 如果相符，设置描述字符并返回成功。
+ */
+static int
+mypci_probe(device_t dev)
+{
+
+	device_printf(dev, "MyPCI Probe\nVendor ID : 0x%x\nDevice ID : 0x%x\n",
+	    pci_get_vendor(dev), pci_get_device(dev));
+
+	if (pci_get_vendor(dev) == 0x11c1) {
+		printf("We've got the Winmodem, probe successful!\n");
+		device_set_desc(dev, "WinModem");
+		return (BUS_PROBE_DEFAULT);
+	}
+	return (ENXIO);
+}
+
+/* 只有当探测成功时才调用连接函数 */
+
+static int
+mypci_attach(device_t dev)
+{
+	struct mypci_softc *sc;
+
+	printf("MyPCI Attach for : deviceID : 0x%x\n", pci_get_devid(dev));
+
+	/* Look up our softc and initialize its fields. */
+	sc = device_get_softc(dev);
+	sc-&gt;my_dev = dev;
+
+	/*
+	 * Create a /dev entry for this device.  The kernel will assign us
+	 * a major number automatically.  We use the unit number of this
+	 * device as the minor number and name the character device
+	 * "mypci&lt;unit&gt;".
+	 */
+	sc-&gt;my_cdev = make_dev(<code class="literal">&amp;</code>mypci_cdevsw, device_get_unit(dev),
+	    UID_ROOT, GID_WHEEL, 0600, "mypci%u", device_get_unit(dev));
+	sc-&gt;my_cdev-&gt;si_drv1 = sc;
+	printf("Mypci device loaded.\n");
+	return (0);
+}
+
+/* 分离设备。 */
+
+static int
+mypci_detach(device_t dev)
+{
+	struct mypci_softc *sc;
+
+	/* Teardown the state in our softc created in our attach routine. */
+	sc = device_get_softc(dev);
+	destroy_dev(sc-&gt;my_cdev);
+	printf("Mypci detach!\n");
+	return (0);
+}
+
+/* 系统关闭期间在sync之后调用。 */
+
+static int
+mypci_shutdown(device_t dev)
+{
+
+	printf("Mypci shutdown!\n");
+	return (0);
+}
+
+/*
+ * 设备挂起例程。
+ */
+static int
+mypci_suspend(device_t dev)
+{
+
+	printf("Mypci suspend!\n");
+	return (0);
+}
+
+/*
+ * 设备恢复（重新开始）例程。
+ */
+static int
+mypci_resume(device_t dev)
+{
+
+	printf("Mypci resume!\n");
+	return (0);
+}
+
+static device_method_t mypci_methods[] = {
+	/* 设备接口 */
+	DEVMETHOD(device_probe,		mypci_probe),
+	DEVMETHOD(device_attach,	mypci_attach),
+	DEVMETHOD(device_detach,	mypci_detach),
+	DEVMETHOD(device_shutdown,	mypci_shutdown),
+	DEVMETHOD(device_suspend,	mypci_suspend),
+	DEVMETHOD(device_resume,	mypci_resume),
+
+	{ 0, 0 }
+};
+
+static devclass_t mypci_devclass;
+
+DEFINE_CLASS_0(mypci, mypci_driver, mypci_methods, sizeof(struct mypci_softc));
+DRIVER_MODULE(mypci, pci, mypci_driver, mypci_devclass, 0, 0);</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72040528"></a>11.1.2. 示例驱动程序的<code class="filename">Makefile</code></h3></div></div></div><pre class="programlisting"># 驱动程序mypci的Makefile
+
+KMOD=	mypci
+SRCS=	mypci.c
+SRCS+=	device_if.h bus_if.h pci_if.h
+
+.include &lt;bsd.kmod.mk&gt;</pre><p>如果你将上面的源文件和
+	<code class="filename">Makefile</code>放入一个目录，你可以运行
+	<code class="command">make</code>编译示例驱动程序。
+	还有，你可以运行<code class="command">make load</code>
+	将驱动程序装载到当前正在运行的内核中，而<code class="command">make
+	unload</code>可在装载后卸载驱动程序。
+	</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72043984"></a>11.1.3. 更多资源</h3></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><a class="link" href="http://www.pcisig.org/" target="_top">PCI
+	  Special Interest Group</a></li><li class="listitem">PCI System Architecture, Fourth Edition by
+	  Tom Shanley, et al.</li></ul></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-intr.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="devicedrivers.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="pci-bus.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.12. xxx_intr </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 11.2. 总线资源</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>4.9. The Way Things Work</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="gods.html" title="Chapter 4. PMake for Gods" /><link rel="prev" href="defcon1.html" title="4.8. DEFCON 1 &#8211; Imitation is the Not the Highest Form of Flattery" /><link rel="next" href="answers.html" title="Chapter 5. Answers to Exercises" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4.9. The Way Things Work</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="defcon1.html">Prev</a> </td><th width="60%" align="center">Chapter 4. PMake for Gods</th><td width="20%" align="right"> <a accesskey="n" href="answers.html">Next</a></td></tr></table><hr /></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="theway"></a>4.9. The Way Things Work</h2></div></div></div><p>When <span class="application">PMake</span> reads the makefile, it
+      parses sources and targets into nodes in a graph.  The graph is
+      directed only in the sense that <span class="application">PMake</span>
+      knows which way is up.  Each node contains not only links to all
+      its parents and children (the nodes that depend on it and those
+      on which it depends, respectively), but also a count of the
+      number of its children that have already been processed.</p><p>The most important thing to know about how
+      <span class="application">PMake</span> uses this graph is that the
+      traversal is breadth-first and occurs in two passes.</p><p>After <span class="application">PMake</span> has parsed the
+      makefile, it begins with the nodes the user has told it to make
+      (either on the command line, or via a
+      <code class="buildtarget">.MAIN</code> target, or by the target being
+      the first in the file not labeled with the
+      <code class="literal">.NOTMAIN</code> attribute) placed in a queue.  It
+      continues to take the node off the front of the queue, mark it
+      as something that needs to be made, pass the node to
+      <code class="literal">Suff_FindDeps</code> (mentioned earlier) to find any
+      implicit sources for the node, and place all the node's children
+      that have yet to be marked at the end of the queue.  If any of
+      the children is a <code class="buildtarget">.USE</code> rule, its
+      attributes are applied to the parent, then its commands are
+      appended to the parent's list of commands and its children are
+      linked to its parent.  The parent's unmade children counter is
+      then decremented (since the <code class="buildtarget">.USE</code> node
+      has been processed).  You will note that this allows a
+      <code class="buildtarget">.USE</code> node to have children that are
+      <code class="buildtarget">.USE</code> nodes and the rules will be
+      applied in sequence.  If the node has no children, it is placed
+      at the end of another queue to be examined in the  second pass.
+      This process continues until the first queue is empty.</p><p>At this point, all the leaves of the graph are in the
+      examination queue.  <span class="application">PMake</span> removes the
+      node at the head of the queue and sees if it is out-of-date.  If
+      it is, it is passed to a function that will execute the commands
+      for the node asynchronously.  When the commands have completed,
+      all the node's parents have their unmade children counter
+      decremented and, if the counter is then 0, they are placed on
+      the examination queue.  Likewise, if the node is up-to-date.
+      Only those parents that were marked on the downward pass are
+      processed in this way.  Thus <span class="application">PMake</span>
+      traverses the graph back up to the nodes the user instructed it
+      to create.  When the examination queue is empty and no shells
+      are running to create a target, <span class="application">PMake</span>
+      is finished.</p><p>Once all targets have been processed,
+      <span class="application">PMake</span> executes the commands attached
+      to the <code class="buildtarget">.END</code> target, either explicitly
+      or through the use of an ellipsis in a shell script.  If there
+      were no errors during the entire process but there are still
+      some targets unmade (<span class="application">PMake</span> keeps a
+      running count of how many targets are left to be made), there is
+      a cycle in the graph.  <span class="application">PMake</span> does a
+      depth-first traversal of the graph to find all the targets that
+      were not made and prints them out one by one.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="defcon1.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="gods.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="answers.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">4.8. DEFCON 1 &#8211; Imitation is the Not the Highest Form of
+      Flattery </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Chapter 5. Answers to Exercises</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

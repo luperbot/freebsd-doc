@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>29.11. DNS</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="advanced-networking.html" title="Capítulo 29. Networking avanzado" /><link rel="prev" href="network-dhcp.html" title="29.10. DHCP" /><link rel="next" href="network-ntp.html" title="29.12. NTP" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">29.11. DNS</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-dhcp.html">Anterior</a> </td><th width="60%" align="center">Capítulo 29. Networking avanzado</th><td width="20%" align="right"> <a accesskey="n" href="network-ntp.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-dns"></a>29.11. DNS</h2></div><div><span class="authorgroup">Enviado por  <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Chern</span> <span class="surname">Lee</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83654864"></a>29.11.1. Resumen</h3></div></div></div><a id="idp83655504" class="indexterm"></a><p>FreeBSD utiliza por defecto una versión de BIND (Berkeley
+        Internet Name Domain) que proporciona la implementación
+	más común del protocolo de DNS.  DNS es el protocolo a
+        través del cual los nombres de máquinas se asocian con
+        direcciones IP y viceversa.  Por ejemplo una consulta preguntando por
+        <code class="systemitem">www.FreeBSD.org</code> recibe una respuesta con la
+        dirección IP del servidor web del Proyecto FreeBSD, mientras que
+        una pregunta sobre <code class="systemitem">ftp.FreeBSD.org</code> recibe como
+	respuesta la dirección IP correspondiente al servidor de FTP.
+        El proceso inverso sucede de una forma similar.  Una pregunta
+        relativa a una determinada dirección IP se resuelve al nombre de
+        la máquina que la posee.  No se necesita ejecutar un servidor de
+        DNS para poder realizar consultas y búsquedas de DNS.</p><a id="idp83657168" class="indexterm"></a><p>El DNS se coordina de forma distribuida a través de
+        Internet utilizando un sistema en cierta forma complejo de servidores
+        de nombres raíz autorizados y mediante otros servidores de
+        nombres de menor escala que se encargan de replicar la
+        información de dominios individuales con el objetivo de mejorar
+        los tiempos de respuesta de búsquedas reiteradas de la misma
+        información.</p><p>
+        Este documento hace referencia a la versión estable BIND 8.X.
+        BIND 9.X se puede instalar a través del <span class="quote">&#8220;<span class="quote">port</span>&#8221;</span>
+        <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/bind9/pkg-descr">net/bind9</a>.</p><p>
+        El protocolo de DNS se encuentra definido en la RFC1034 y la RFC1035.
+      </p><p>
+        El <a class="link" href="http://www.isc.org/" target="_top">
+        Internet Software Consortium (www.isc.org)</a> se encarga de
+        de mantener el software de BIND.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83660624"></a>29.11.2. Terminología</h3></div></div></div><p>Para comprender este documento se deben definir los siguientes
+        términos:</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Término</th><th>Definición</th></tr></thead><tbody><tr><td>DNS directo (Forward DNS)</td><td>Asociación de nombres de máquinas con
+	        direcciones IP</td></tr><tr><td>Origen</td><td>Se refiere al dominio cubierto por un determinado fichero
+                de zona</td></tr><tr><td><span class="application">named</span>, BIND, servidor
+                    de nombres (name server)</td><td>Nombres típicos que hacen referencia al paquete
+                    servidor de nombres de BIND de FreeBSD</td></tr><tr><td>
+		<a id="idp83680976" class="indexterm"></a>
+		Resolver</td><td>Un proceso del sistema que utilizan las aplicaciones para
+                hacer preguntas al servidor de nombres.</td></tr><tr><td>
+		<a id="idp83686992" class="indexterm"></a>
+		DNS inverso (Reverse DNS)</td><td>Lo contrario de lo que realiza el DNS directo;
+                    asocia direcciones IP con nombres de máquinas</td></tr><tr><td>
+		<a id="idp83688656" class="indexterm"></a>
+		Zona Raíz</td><td>El comienzo de la jerarquía de zonas de Internet.
+                Todas las zonas surgen a partir de una zona raíz de
+                forma similar a como todos los directorios de un sistema de
+                ficheros se encuentran a partir de un directorio raíz
+		inicial.</td></tr><tr><td>Zona</td><td>Un dominio individual, subdominio o porción del
+                    DNS que se encuentra administrado por la misma autoridad.</td></tr></tbody></table></div><a id="idp83691344" class="indexterm"></a><p>Ejemplos de zonas:
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="systemitem">.</code> es la zona raíz</p></li><li class="listitem"><p><code class="systemitem">org.</code> es una zona localizada bajo la zona
+            raíz</p></li><li class="listitem"><p><code class="systemitem">ejemplo.org</code> es una zona localizada bajo la
+            zona <code class="systemitem">org.</code></p></li><li class="listitem"><p><code class="systemitem">foo.ejemplo.org.</code> es un subdominio o una zona
+            ubicada bajo la zona <code class="systemitem">ejemplo.org.</code></p></li><li class="listitem"><p>
+            <code class="systemitem">1.2.3.in-addr.arpa</code> es una zona que referencia a
+            a todas las direcciones IP que se encuentran dentro del espacio de
+            direcciones de 3.2.1.*.</p></li></ul></div><p>Como se puede observar la parte más específica de una
+        máquina aparece más a la izquierda.  Por ejemplo
+        <code class="systemitem">ejemplo.org</code> es más específico que
+            <code class="systemitem">org.</code> y del mismo modo <code class="systemitem">org.</code> es
+        más específico que la zona raíz.  El formato de
+        cada parte del nombre de la máquina es muy similar al formato
+        de un sistema de ficheros: el directorio
+            <code class="filename">/dev</code> se encuentra dentro del directorio
+        raíz, y así sucesivamente.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83701200"></a>29.11.3. Razones para ejecutar un servidor de nombres</h3></div></div></div><p>Los servidores de nombres normalmente son de dos tipos:
+            autoritarios y de cache.</p><p>Se necesita un servidor de nombres autoritario cuando:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>uno quiere proporcionar información de DNS al resto del
+            mundo respondiendo con información autoritaria a las
+            consultas recibidas.</p></li><li class="listitem"><p>un dominio, por ejemplo
+            <code class="systemitem">ejemplo.org</code>, está  registrado y se
+            necesita añadir nombres de máquinas bajo dicho
+            dominio.</p></li><li class="listitem"><p>un bloque de direcciones IP necesita entradas de DNS inversas
+            (de IP a nombre de máquina).</p></li><li class="listitem"><p>un servidor de nombres de <span class="quote">&#8220;<span class="quote">backup</span>&#8221;</span>, llamado
+	    esclavo, debe responder a consultas cuando el servidor primario se
+            encuentre caído o inaccesible.</p></li></ul></div><p>Se necesita un servidor caché cuando:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>un servidor de DNS local puede responder más
+            rápidamente de lo que se haría si se tuviera que
+            preguntar al servidor de nombres externo.</p></li><li class="listitem"><p>se desea reducir el tráfico global de red (se ha
+            llegado a comprobar que el tráfico de DNS supone un 5% o
+            más del total del tráfico que circula por
+            Internet).</p></li></ul></div><p>Cuando se pregunta por <code class="systemitem">www.FreeBSD.org</code> el <span class="quote">&#8220;<span class="quote">
+        resolver</span>&#8221;</span> normalmente pregunta al servidor de nombres del ISP
+        de nivel superior y se encarga de recibir la respuesta.  Si se utiliza
+        un servidor de DNS caché local la pregunta sólo se dirige
+        una única vez hacia el exterior.  Dicha pregunta la realiza el
+        servidor caché.  Posteriores consultas sobre el mismo nombres
+        son respondidas directamente por este servidor.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83718864"></a>29.11.4. Cómo funciona</h3></div></div></div><p>En FreeBSD el dæmon de BIND se denomina
+	<span class="application">named</span> por razones obvias.</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Fichero</th><th>Descripción</th></tr></thead><tbody><tr><td><span class="application">named</span></td><td>El dæmon de BIND</td></tr><tr><td><code class="command">ndc</code></td><td>El programa de control del dæmon</td></tr><tr><td><code class="filename">/etc/namedb</code></td><td>El directorio donde se almacena la información de
+                las zonas de BIND</td></tr><tr><td><code class="filename">/etc/namedb/named.conf</code></td><td>El archivo de configuración del dæmon</td></tr></tbody></table></div><p>
+        Los ficheros de zonas se encuentran normalmente bajo el directorio
+        <code class="filename">/etc/namedb</code> y contienen la información
+        que proporciona el servidor de nombres al resto de máquinas de
+        Internet.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83729360"></a>29.11.5. Ejecución de BIND</h3></div></div></div><a id="idp83730000" class="indexterm"></a><p>
+        Debido a que BIND se instala por defecto la configuración
+            resulta ser bastante sencilla.
+      </p><p>
+        Para asegurarnos de que el dæmon se ejecuta al inicio del
+         sistema se deben añadir las siguientes modificaciones en
+        <code class="filename">/etc/rc.conf</code>:
+      </p><pre class="programlisting">named_enable="YES"</pre><p>Para arrancar el dæmon de forma manual (una vez
+        configurado)</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ndc start</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83734096"></a>29.11.6. Ficheros de configuración</h3></div></div></div><a id="idp83734736" class="indexterm"></a><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83736016"></a>29.11.6.1. Uso de <code class="command">make-localhost</code></h4></div></div></div><p>Asegúrese de hacer los siguiente
+        </p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/namedb</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>sh make-localhost</code></strong></pre><p>para que se cree el archivo de zona inversa
+          <code class="filename">/etc/namedb/localhost.rev</code> de forma apropiada.
+        </p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83739856"></a>29.11.6.2. <code class="filename">/etc/namedb/named.conf</code></h4></div></div></div><pre class="programlisting">// $FreeBSD$
+//
+// Consulte la pÃ¡gina man de named(8) para mÃ¡s detalles.  tiene
+// alguna vez la necesidad de configurar un servidor primario
+// asegÃºree de que entiende a la perfecciÃ³n los detalles peliagudos
+// del funcionamiento del DNS.  Si hay errores, incluso triviales,
+// puede sufrir pÃ©rdidas de conectividad ogenerar cantidades ingentes
+// de trÃ¡fico inÃºtil hacia o desde Interne
+
+options {
+        directory "/etc/namedb";
+
+// AdemÃ¡s de con la lÃ¡usula "forwarders" puedeobligar a su servidor
+// de nombres a que nunca lance bÃºsquedas por su cuenta sino que
+// se las pida a sus "forwarders". Esto se hace del siguiente modo:
+//
+//      forward only;
+
+// Si su proveedor de acceso tiene a su alcance un servidor DNS
+// escriba aquÃ­ su direcciÃ³n IP y descomente la lÃ­neaPodrÃ¡ usar
+// su cachÃ© y por lo tanto reducir el trÃ¡fico DNS de Internet.
+//
+
+/*
+        forwarders {
+                127.0.0.1;
+        };
+*/</pre><p>
+          Tal y como se dice en los comentarios del ejemplo para beneficiarnos
+          de la caché se puede activar <code class="literal">forwarders</code>.
+          En circunstancias normales un servidor de nombres busca de forma
+          recursiva a través de Internet tratando de localizar un
+          servidor de nombres que sea capaz de responder una determinada
+          pregunta.  Si se activa esta opción por defecto se pasa a
+          preguntar primero al servidor de nombres especificado (servidor o
+          servidores) pudiendo aprovecharse de la información de
+	  caché que dicho servidor tuviera disponible.  Si el servidor
+          de nivel superior al nuestro se encuentra congestionado puede
+          merecer la pena la activación de esta característica de
+          <span class="quote">&#8220;<span class="quote">redirección</span>&#8221;</span> ya que se puede disminuir la carga
+          de tráfico que dicho servidor tiene que soportar.</p><div xmlns="" class="warning"><h3 class="admontitle">Aviso: </h3><p xmlns="http://www.w3.org/1999/xhtml">La dirección IP <code class="systemitem">127.0.0.1</code> <span class="emphasis"><em>no</em></span> funciona
+          aí.  Se debe cambiar esta dirección IP por un
+          servidor de nombres válido.</p></div><pre class="programlisting">        /*
+	 * Si hay un cortafuegos entre usted y los servidores de
+	 * nombres que quiere consultar tendrÃ¡ que descoentar la
+	 * siguiente directiva, "query-source".  Las versiones
+	 * anteriores de BIND siempre hacÃ­an sus consultas a travÃ©s
+	 * del puerto 53 pero BIND 8.1 utiliza por defecto un puerto no
+	 * privilegiado.
+         */
+        // query-source address * port 53;
+
+        /*
+	 * Si lo va a ejecutar en un "cajÃ³n de arena" (o "sandbox")
+	 * tendrÃ¡ que declarar una uicaciÃ³n diferente para el
+	 * fichero de volcado de named.
+         */
+        // dump-file "s/named_dump.db";
+};
+
+// Nota: lo siguiente serÃ¡ incluÃ­do en futuras versiones.
+/*
+host { any; } {
+        topology {
+                127.0.0.0/8;
+        };
+};
+*/
+
+// La configuraciÃ³n de secundarios se explica de modo secillo a
+// partir de aquÃ­.
+//
+// Si activa un servidor de nombres local no olvide incluÃ­r
+// 127.0.0.1 en su /etc/resolv.conf para que sea ese servidor el
+// primero al que se consulte.
+// AsegÃºrese tambiÃ©n de activarlo en /etc/rc.con
+
+zone "." {
+        type hint;
+        file "named.root";
+};
+
+zone "0.0.127.IN-ADDR.ARPA" {
+        type master;
+        file "localhost.rev";
+};
+
+zone
+"0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.IP6.INT" {
+        type master;
+        file "localhost.rev";
+};
+
+// Nota: No use las direcciones IP que se muestran aquÃ­, son falsas
+// y sÃ³lo se usancomo demostraciÃ³n y para una mejor comprensiÃ³n.
+//
+// Ejemplo de entradas en la configuraciÃ³n de secundarios.  Puede ser
+// conveniente convertirse en secundario al menos del dominio en cuya
+// zona estÃ¡ su dominio.  Cnsulte con su administrador de red para
+// que le facilite la direcciÃ³n IP del servidor primario.
+//
+// No olvide incluÃ­r la zona del bucle inverso (IN-ADDR.ARPA).  (Son
+// los primeros bytes de la direcciÃ³n IP correspondiente, en orden
+// inverso, con ".IN-ADDR.ARPA" al final.)
+//
+// Antes de configurar una zona primara asegÃºresede haber comprendido
+// completamente cÃ³mo funcionan DNS y BIND.  Hay errores que no son
+// visibles fÃ¡cilmente.  La configuraciÃ³n de un secundario es, por
+// el contrario, muchÃ­simo mÃ¡s sencilla.
+//
+// Nota: No se limite a copiar los ejemplos de mÃ¡s arriba. :-)
+// Utilice nombres y direcciones reales.
+//
+// ADVERTENCIA: FreeBSD ejecuta bind en un sandbok (observe los
+// parÃ¡meros de named (named_flags) en rc.conf).  El directorio que
+// contiene las zonas secundarias debe tener permisos de escritura
+// para bind.  Le sugerimos la siguiente secuencia de órdenes:
+//
+//      mkdir /etc/namedb/s
+//      chown bind:bind /etc/namedb/s
+//      chmod 750 /etc/namedb/s</pre><p>Si quiere más información sobre cómo
+	  ejecutar BIND en un <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span> consulte
+	  <a class="link" href="network-dns.html#network-named-sandbox" title="29.11.8. Ejecución de named en una &#8220; Sandbox&#8221;">Ejecución de named en
+          un sandbox</a>.
+	</p><pre class="programlisting">/*
+zone "ejemplo.com" {
+        type slave;
+        file "s/ejemplo.com.bak";
+        masters {
+                192.168.1.1;
+        };
+};
+
+zone "0.168.192.in-addr.arpa" {
+        type slave;
+        file "s/0.168.192.in-addr.arpa.bak";
+        masters {
+                192.168.1.1;
+        };
+};
+*/</pre><p>Dentro del fichero <code class="filename">named.conf</code> se muestran
+          ejemplos de entradas de esclavo tanto para las zonas directas como
+          para las inversas.</p><p>Para cada nueva zona administrada se debe crear una entrada de
+          zona dentro del fichero
+	  <code class="filename">named.conf</code></p><p>Por ejemplo la entrada de zona más simple para el dominio
+	  <code class="systemitem">ejemplo.org</code> puede ser algo como
+          esto:</p><pre class="programlisting">zone "ejemplo.org" {
+	type master;
+	file "ejemplo.org";
+};</pre><p>Esta zona es una zona maestra ( observe la línea de
+          <code class="option">type</code>, y mantiene la información de la zona en
+          <code class="filename">/etc/namedb/ejemplo.org</code> tal como se indica en la
+          línea de <code class="option">file</code>.</p><pre class="programlisting">zone "ejemplo.org" {
+	type slave;
+	file "ejemplo.org";
+};</pre><p>En el caso del esclavo la información de la zona se
+          transmite desde el servidor de nombres maestro y se almacena en el
+          fichero especificado.  Cuando el servidor maestro <span class="quote">&#8220;<span class="quote">
+	  muere</span>&#8221;</span> o no puede ser alcanzado el servidor de nombres esclavo
+          puede responder a las peticiones debido a que posee la
+          información de la zona.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83768400"></a>29.11.6.3. Ficheros de zona</h4></div></div></div><p>
+          A continuación se muestra un fichero de una zona maestra para
+          el dominio <code class="systemitem">ejemplo.org</code>, que se encuentra ubicado en
+          <code class="filename">/etc/namedb/ejemplo.org</code>:</p><pre class="programlisting">$TTL 3600
+
+example.org. IN SOA ns1.ejemplo.org. admin.ejemplo.org. (
+                        5               ; Serial
+                        10800           ; Refresh
+                        3600            ; Retry
+                        604800          ; Expire
+                        86400 )         ; Minimum TTL
+
+; DNS Servers
+@       IN NS           ns1.ejemplo.org.
+@       IN NS           ns2.ejemplo.org.
+
+; Machine Names
+localhost       IN A    127.0.0.1
+ns1             IN A    3.2.1.2
+ns2             IN A    3.2.1.3
+mail            IN A    3.2.1.10
+@               IN A    3.2.1.30
+
+; Aliases
+www             IN CNAME        @
+
+; MX Record
+@               IN MX   10      mail.ejemplo.org.</pre><p>
+          Tenga muy en cuenta que todo nombre de máquina que termina en
+          <span class="quote">&#8220;<span class="quote">.</span>&#8221;</span> es tratado como si fuera un nombre de
+          máquina completo mientras que cualquier otro nombre sin el
+          <span class="quote">&#8220;<span class="quote">.</span>&#8221;</span> final se trata como una referencia relativa al
+          dominio de origen de la zona. Por ejemplo <code class="literal">www</code> se
+	  traduce a <code class="literal">www + origen</code>.  En nuestro fichero de
+          zona ficticio nuestro origen es <code class="systemitem">ejemplo.org</code> de forma
+          que <code class="literal">www</code> se convierte en <code class="systemitem">
+          www.ejemplo.org</code>
+        </p><p>
+          El formato de un fichero de zona es el siguiente:
+        </p><pre class="programlisting">nombrederegistro IN tipodeentrada valor</pre><a id="idp83774416" class="indexterm"></a><p>
+          Los registros de DNS que más se utilizan son:
+        </p><div class="variablelist"><dl class="variablelist"><dt><span class="term">SOA</span></dt><dd><p>Comienzo de Zona con Autoridad (Start Of zone Authority)</p></dd><dt><span class="term">NS</span></dt><dd><p>Un servidor de nombres con autoridad para una
+              una determinada zona</p></dd><dt><span class="term">A</span></dt><dd><p>Una dirección IP de una máquina</p></dd><dt><span class="term">CNAME</span></dt><dd><p>El nombre canónico de una máquina para definir un alias</p></dd><dt><span class="term">MX</span></dt><dd><p>mail exchanger</p></dd><dt><span class="term">PTR</span></dt><dd><p>Un puntero a un nombre de dominio (utilizados para
+              definir el DNS inverso)
+	      </p></dd></dl></div><pre class="programlisting">
+ejemplo.org. IN SOA ns1.ejemplo.org. admin.ejemplo.org. (
+                        5               ; Serial
+                        10800           ; Refresh after 3 hours
+                        3600            ; Retry after 1 hour
+                        604800          ; Expire after 1 week
+                        86400 )         ; Minimum TTL of 1 day</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="systemitem">ejemplo.org.</code></span></dt><dd><p>el nomre de dominio, también el origen para
+              el fichero de zona</p></dd><dt><span class="term"><code class="systemitem">ns1.ejemplo.org.</code></span></dt><dd><p>el servidor de nombres
+                    primario/autoritario para esta zona</p></dd><dt><span class="term"><code class="literal">admin.ejemplo.org.</code></span></dt><dd><p>la persona responsable de esta zona; observe que
+              la dirección de correo electrónico aparece con la @
+              sustituida por un punto.  (<code class="email">&lt;<a xmlns="" class="email" href="mailto:admin@ejemplo.org">admin@ejemplo.org</a>&gt;</code> se
+              escribe <code class="literal">admin.ejemplo.org</code>)</p></dd><dt><span class="term"><code class="literal">5</code></span></dt><dd><p>el número de serie del fichero.  Este
+                número se debe incrementar cada vez que se modifique
+                el fichero de zona.  Muchos administradores prefieren un
+                formato expresado del siguiente modo <code class="literal">
+		aaaammddss</code>.  2001041002 significa (según dicho
+                formato) que el fichero se modificó por última
+		vez el 04/10/2001 y se indica con los dos últimos
+                dígitos (02) que es la segunda vez en el día que
+                se ha modificado el fichero.  El número de serie es
+		importante ya que para avisar a los servidores de nombres
+                esclavos de que se ha actualizado la zona.</p></dd></dl></div><pre class="programlisting">
+@       IN NS           ns1.ejemplo.org.</pre><p>
+          Esta es una entrada de tipo <code class="varname">NS</code>.  Cada servidor de
+          nombres que contesta de forma autoritaria a las consultas de un
+          determinado dominio debe tener una de estas entradas.  El caracter
+          <code class="literal">@</code> se sustituye por <code class="systemitem">ejemplo.org.</code>, es decir, se sustituye
+          por el origen.
+        </p><pre class="programlisting">
+localhost       IN A    127.0.0.1
+ns1             IN A    3.2.1.2
+ns2             IN A    3.2.1.3
+mail            IN A    3.2.1.10
+@               IN A    3.2.1.30</pre><p>
+          El registro de tipo A hace referencia a nombres de máquinas .
+          Como puede verse  más arriba <code class="systemitem">
+          ns1.ejemplo.org</code> se resuelve a <code class="systemitem">3.2.1.2</code>.  Vemos que se utiliza otra vez el
+          origen <code class="literal">@</code>, que significa que <code class="systemitem">
+          ejemplo.org</code> se resuelve a <code class="systemitem">3.2.1.30</code>.
+        </p><pre class="programlisting">
+www             IN CNAME        @</pre><p>
+          Los registros de nombres canónicos se utilizan normalmente
+          como alias de máquinas.  En el ejemplo
+          <code class="systemitem">www</code> es un alias de <code class="systemitem">ejemplo.org</code>
+          (<code class="systemitem">3.2.1.30</code>).
+          <code class="varname">CNAME</code>s se puede utilizar para proporcionar alias
+          de nombres de máquinas, o también para proporcionar un
+          mecanismo de vuelta cíclica (<span class="quote">&#8220;<span class="quote">round robin</span>&#8221;</span>)
+          de un nombre de máquina mapeado a un determinado conjunto de
+          máquinas intercambiables.</p><a id="idp83804240" class="indexterm"></a><pre class="programlisting">
+@               IN MX   10      mail.ejemplo.org.</pre><p>
+          El registro <code class="varname">MX</code> indica qué servidores de
+          correo se encargan de recibir correos para esta zona.
+          <code class="systemitem">mail.example.org</code> es el nombre del
+          servidor de correo y 10 significa la prioridad de dicho
+          servidor.
+        </p><p>
+          Se pueden especificar varios servidores de correo con prioridades de,
+          por ejemplo,3, 2 y 1.  Un servidor de correo que intenta entregar
+          correo para el dominio <code class="systemitem">ejemplo.org</code> primero intentará
+          contactar con el servidor especificado en el registro MX de mayor
+          prioridad, después con el siguiente y así sucesivamente
+          hasta que lo logre entregar.
+        </p><p>
+          Para los ficheros de zona de in-addr.arpa (DNS inverso) se utiliza
+          el mismo formato excepto que se especifican registros
+          <code class="varname">PTR</code> en lugar de registros
+              <code class="varname">A</code> o <code class="varname">CNAME</code>.
+        </p><pre class="programlisting">$TTL 3600
+
+1.2.3.in-addr.arpa. IN SOA ns1.ejemplo.org. admin.ejemplo.org. (
+                        5               ; Serial
+                        10800           ; Refresh
+                        3600            ; Retry
+                        604800          ; Expire
+                        3600 )          ; Minimum
+
+@       IN NS   ns1.ejemplo.org.
+@       IN NS   ns2.ejemplo.org.
+
+2       IN PTR  ns1.ejemplo.org.
+3       IN PTR  ns2.ejemplo.org.
+10      IN PTR  mail.ejemplo.org.
+30      IN PTR  ejemplo.org.</pre><p>
+         Este fichero proporciona las asociaciones de direcciones IP con
+         nombres de máquinas adecuadas para nuestro dominio ficticio.
+        </p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83826768"></a>29.11.7. Servidor de nombres de cache</h3></div></div></div><a id="idp83827408" class="indexterm"></a><p>
+        Un servidor de nombres de tipo caché es un servidor de nombres
+        que no es autoritario para ninguna zona. Simplemente realiza consultas
+        por sí mismo y recuerda las respuestas para futuros usos.
+        Para configura uno de estos servidores se configura el servidor de la
+        forma habitual pero se omite la inclusión de zonas.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-named-sandbox"></a>29.11.8. Ejecución de <span class="application">named</span> en una <span class="quote">&#8220;<span class="quote">
+        Sandbox</span>&#8221;</span></h3></div></div></div><a id="idp83834704" class="indexterm"></a><a id="idp83835856" class="indexterm"></a><p>Para obtener una mayor seguridad se puede ejecutar
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> como un usuario sin privilegios y configurarlo mediante
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a> dentro del directorio especificado como el directorio
+        del <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span>.   Esto hace que cualquier cosa que se
+	encuentre fuera de dicho directorio resulte inaccesible para el
+        dæmon <span class="application">named</span>.  En caso de que se
+        comprometiera la seguridad de <span class="application">named</span> esta
+        restricción puede ayudar a limitar el daño sufrido.
+        FreeBSD dispone por defecto de un usuario y un grupo destinado a este
+        uso: <code class="systemitem">bind</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Hay quien recomienda que en lugar de configurar
+        <span class="application">named</span> con <code class="command">chroot</code> es mejor
+        configurarlo dentro de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>.  En esta sección no se va
+        a explicar esa alternativa.</p></div><p>Debido a que <span class="application">named</span> no va a poder
+        acceder a nada que se encuentre fuera del directorio <span class="quote">&#8220;<span class="quote">
+        sandbox</span>&#8221;</span> (y esto incluye cosas tales como bibliotecas
+        compartidas, <span class="quote">&#8220;<span class="quote">sockets</span>&#8221;</span> de <span class="quote">&#8220;<span class="quote">log</span>&#8221;</span>, etc) se
+	debe efectuar una serie de cambios para que <span class="application">
+        named</span> pueda funcionar con normalidad.  En la siguiente
+	lista se supone que la ruta del <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span> es
+        <code class="filename">/etc/namedb</code> y que no se ha modificado
+        anteriormente dicho directorio.  Por favor, ejecute los pasos que se
+        muestran a continuación:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Cree todos los directorios que
+            <span class="application">named</span> espera tener a su
+	    disposición:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/namedb</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir -p bin dev etc var/tmp var/run master slave</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chown bind:bind slave var/*</code></strong><a id="chown-slave"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#chown-slave"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p><span class="application">named</span> sólamente necesita
+                escribir en estos directorios así que eso es todo lo que
+                debemos crear.</p></td></tr></table></div></li><li class="listitem"><p>Reorganizar y crear los archivos de configuración de
+            zona básicos:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /etc/localtime etc</code></strong><a id="localtime"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>mv named.conf etc &amp;&amp; ln -sf etc/named.conf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv named.root master</code></strong>
+
+<code class="prompt">#</code> <strong class="userinput"><code>sh make-localhost &amp;&amp; mv localhost.rev localhost-v6.rev master</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat &gt; master/named.localhost
+$ORIGIN localhost.
+$TTL 6h
+@	IN	SOA	localhost. postmaster.localhost. (
+			1	; serial
+			3600	; refresh
+			1800	; retry
+			604800	; expiration
+			3600 )	; minimum
+	IN	NS	localhost.
+	IN	A		127.0.0.1
+^D</code></strong></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#localtime"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Esto permite que <span class="application">named</span> pueda
+                escribir al archivo de log la hora correcta a través
+                del <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a></p></td></tr></table></div></li><li class="listitem"><p>Si está usando una versión de FreeBSD anterior a
+            4.9-RELEASE se debe construir una copia estáticamente
+            enlazada de <span class="application">named-xfer</span> y copiarla dentro
+            del directorio del <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libisc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make cleandir &amp;&amp; make depend &amp;&amp; make all</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libbind</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make cleandir &amp;&amp; make depend &amp;&amp; make all</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/libexec/named-xfer</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make cleandir &amp;&amp; make depend &amp;&amp; make NOSHARED=yes all</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp named-xfer /etc/namedb/bin &amp;&amp; chmod 555 /etc/namedb/bin/named-xfer</code></strong><a id="clean-cruft"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></pre><p>Despueés de instalar la versión estática
+	    de <code class="command">named-xfer</code> se deben realizar algunas tareas
+            de limpieza para evitar dejar copias de bibliotecas o de programas
+            en nuestros ficheros de fuentes:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libisc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libbind</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/libexec/named-xfer</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#clean-cruft"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>En algunas ocasiones este paso puede fallar.  Si es su caso
+                ejecute lo siguiente:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src &amp;&amp; make cleandir &amp;&amp; make cleandir</code></strong></pre><p>y borre su directorio <code class="filename">/usr/obj</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm -fr /usr/obj &amp;&amp; mkdir /usr/obj</code></strong></pre><p>Esto limpia cualquier <span class="quote">&#8220;<span class="quote">impureza</span>&#8221;</span> del
+		  árbol de fuentes y si se repiten los pasos anteriores
+		  todo debería funcionar.</p></td></tr></table></div><p>Si se está usando FreeBSD version 4.9-RELEASE o posterior
+            el ejecutable de <code class="command">named-xfer</code> del directorio
+	    <code class="filename">/usr/libexec</code> ya se encuentra
+            enlazado estáticamente y se puede utilizar <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cp&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">cp</span>(1)</span></a> para
+            copiarlo directamente en nuestro <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span>.</p></li><li class="listitem"><p>Cree el fichero <code class="filename">dev/null</code> de tal forma
+            que <span class="application">named</span> pueda verlo y pueda escribir
+            sobre él:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/namedb/dev &amp;&amp; mknod null c 2 2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 666 null</code></strong></pre></li><li class="listitem"><p>Enlace simbólicamente <code class="filename"> /var/run/ndc</code>
+	    con <code class="filename">/etc/namedb/var/run/ndc</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -sf /etc/namedb/var/run/ndc /var/run/ndc</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Esto simplemente evita el tener que especificar la
+	      opción <code class="option">-c</code> de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ndc</span>(8)</span></a> cada vez que se
+	      ejecute.  Dado que los contenidos de /var/run se borran al
+              inicio del sistema, si se piensa que esto puede resultar
+              útil, se puede añadir esta orden al <span class="quote">&#8220;<span class="quote">
+              crontab</span>&#8221;</span> del usuario root utilizando la opción
+                  <code class="option">@reboot</code>.  Consulte <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crontab&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">crontab</span>(5)</span></a> para
+              saber más información sobre esto.</p></div></li><li class="listitem"><p>Configure <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> para que cree un <span class="quote">&#8220;<span class="quote">socket</span>&#8221;</span>
+	     de <code class="filename">log</code> adicional de tal forma que
+	    <span class="application">named</span> pueda escribir sobre él.
+            Añada <code class="literal">-l
+                  /etc/namedb/dev/log</code> a la variable
+	    <code class="varname">syslogd_flags</code> dentro del fichero
+	    <code class="filename">/etc/rc.conf</code>.</p></li><li class="listitem"><p>Reorganice la ejecución de las aplicaciones
+            <span class="application">named</span> y
+            <code class="command">chroot</code> para que se ejecuten dentro
+            del <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span> añadiendo lo siguiente al
+	    fichero<code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">named_enable="YES"
+named_flags="-u bind -g bind -t /etc/namedb /etc/named.conf"</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Recuerde que el fichero de configuración
+	      <em class="replaceable"><code>/etc/named.conf</code></em> tiene una ruta
+              completa <span class="emphasis"><em>que comienza en el directorio del
+              <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span></em></span>; por ejemplo, en la
+              línea superior el fichero que aparece es en realidad
+              <code class="filename">/etc/namedb/etc/named.conf</code>.</p></div></li></ul></div><p>El siguiente paso consiste en editar el fichero
+	<code class="filename">/etc/namedb/etc/named.conf</code> de tal forma que
+         <span class="application">named</span> pueda conocer qué zonas cargar
+         y donde encontrarlas en disco.  A continuación se muestra un
+         ejemplo comentado (cualquier cosa que no se comenta en el ejemplo es
+         porque resulta igual que la configuración del servidor de DNS
+         del caso normal):</p><pre class="programlisting">options {
+        directory "/";<a id="directory"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+        named-xfer "/bin/named-xfer";<a id="named-xfer"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+        version "";		// No muestra la versiÃn de BIND
+        query-source address * port 53;
+};
+// ndc control socket
+controls {
+        unix "/var/run/ndc" perm 0600 owner 0 group 0;
+};
+// A partir de aquÃ­van las zonas:
+zone "localhost" IN {
+        type master;
+        file "master/named.localhost";<a id="master"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+        allow-transfer { localhost; };
+        notify no;
+};
+zone "0.0.127.in-addr.arpa" IN {
+        type master;
+        file "master/localhost.rev";
+        allow-transfer { localhost; };
+        notify no;
+};
+zone "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.int" {
+	type master;
+	file "master/localhost-v6.rev";
+	allow-transfer { localhost; };
+	notify no;
+};
+zone "." IN {
+        type hint;
+        file "master/named.root";
+};
+zone "private.example.net" in {
+        type master;
+        file "master/private.example.net.db";
+	allow-transfer { 192.168.10.0/24; };
+};
+zone "10.168.192.in-addr.arpa" in {
+        type slave;
+        masters { 192.168.10.2; };
+        file "slave/192.168.10.db";<a id="slave"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+};</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#directory"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>La línea que contiene
+	    <code class="literal">directory</code> se especifica como
+	    <code class="filename">/</code>, ya que todos los ficheros que
+	    <span class="application">named</span> necesita se encuentran dentro de
+            este directorio (recuerde que esto es equivalente al fichero
+            <code class="filename">/etc/namedb</code> de un usuario
+            <span class="quote">&#8220;<span class="quote">normal</span>&#8221;</span>.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#named-xfer"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Especifica la ruta completa para el binario
+	    <code class="command">named-xfer</code> binary (desde el marco de referencia
+            de <span class="application">named</span>).  Esto resulta necesario ya
+            que por defecto <span class="application">named</span> se compila de tal
+            forma que trata de localizar
+            <code class="command">named-xfer</code> dentro de
+	    <code class="filename">/usr/libexec</code>.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#master"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Especifica el nombre del fichero
+          (relativo a la línea
+          (relativo a la línea ) <code class="literal">directory</code> anterior)
+	  donde <span class="application">named</span> puede encontrar el fichero de
+          zona para esta zona.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#slave"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Especifica el nombre del fichero
+	  (relativo a la líena <code class="literal">directory</code> anterior)
+          donde <span class="application">named</span> debería escribir una
+          copia del archivo de zona para esta zona después de
+          recuperarla exitosamente desde el servidor maestro.  Este es el
+          motivo por el que en las etapas de configuración anteriores
+          necesitábamos cambiar la propiedad del directorio
+          <code class="filename">slave</code> al grupo
+                <code class="systemitem">bind</code>.</p></td></tr></table></div><p>Después de completar los pasos anteriores reinicie el
+        servidor o reinicie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> y ejecute <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a>
+        asegurándose de que se utilicen las nuevas opciones
+        especificadas en <code class="varname">syslogd_flags</code> y
+        <code class="varname">named_flags</code>.  En estos momentos deberíamos
+        estar ejecutando una copia de <span class="application">named</span> dentro
+        de un <span class="quote">&#8220;<span class="quote">sandbox</span>&#8221;</span>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83939408"></a>29.11.9. Seguridad</h3></div></div></div><p>Aunque BIND es la implementación de DNS más
+         utilizada existe siempre el asunto relacionado con la seguridad.  De
+         vez en cuando se encuentran agujeros de seguridad y
+         vulnerabilidades.</p><p>
+        Es una buena idea suscribirse a <a class="link" href="http://www.cert.org/" target="_top">CERT</a> y a <a class="link" href="../handbook/eresources.html#ERESOURCES-MAIL" target="_top">freebsd-security-notifications</a>
+        para estar al día de los problemas de seguridad relacionados
+        con <span class="application">named</span>.</p><div xmlns="" class="tip"><h3 class="admontitle">Sugerencia: </h3><p xmlns="http://www.w3.org/1999/xhtml">Si surge un problema nunca está de más
+        actualizar los fuentes y recompilar los ejecutables desde dichas
+        fuentes.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83955280"></a>29.11.10. Lecturas recomendadas</h3></div></div></div><p>
+        Las páginas del manual de BIND/named:
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ndc</span>(8)</span></a> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">named.conf</span>(5)</span></a>
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="link" href="http://www.isc.org/products/BIND/" target="_top">Página oficial
+            de ISC Bind</a></p></li><li class="listitem"><p><a class="link" href="http://www.nominum.com/getOpenSourceResource.php?id=6" target="_top">
+	  Preguntas más frecuentes sobre BIND</a></p></li><li class="listitem"><p><a class="link" href="http://www.oreilly.com/catalog/dns4/" target="_top">Libro de O'Reilly
+            "DNS and BIND", cuarta edición</a></p></li><li class="listitem"><p><a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1034.txt" target="_top">RFC1034
+	    - Nombre de Dominio - Conceptos y Características</a></p></li><li class="listitem"><p><a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1035.txt" target="_top">RFC1035
+	      - Nombres de Domninio - Implementación y
+	    Especificación</a></p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-dhcp.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="network-ntp.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">29.10. DHCP </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> 29.12. NTP</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

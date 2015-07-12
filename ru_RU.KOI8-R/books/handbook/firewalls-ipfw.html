@@ -1,0 +1,879 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>26.6. IPFW</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="firewalls.html" title="Глава 26. Межсетевые экраны" /><link rel="prev" href="firewalls-ipf.html" title="26.5. * IPFILTER (IPF)" /><link rel="next" href="advanced-networking.html" title="Глава 27. Сложные вопросы работы в сети" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">26.6. IPFW</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="firewalls-ipf.html">Пред.</a> </td><th width="60%" align="center">Глава 26. Межсетевые экраны</th><td width="20%" align="right"> <a accesskey="n" href="advanced-networking.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls-ipfw"></a>26.6. IPFW</h2></div></div></div><a id="idp99213264" class="indexterm"></a><p>IPFIREWALL (<acronym class="acronym">IPFW</acronym>) - представляет
+      собой межсетевой экран, написанный и поддерживаемый добровольными
+      участниками проекта FreeBSD.  Он использует stateless правила, т.е.
+      правила без учета состояния, и наследование техники кодирования
+      правил для получения того, что называется простой логикой с
+      сохранением состояния (stateful).</p><p>Пример простейшего набора правил IPFW (находится в
+      <code class="filename">/etc/rc.firewall</code> и
+      <code class="filename">/etc/rc.firewall6</code>) в стандартной установке
+      FreeBSD достаточно прост и не рассчитан на непосредственное
+      использование без изменений.  В нём не используется фильтрация с
+      сохранением состояния, которая даёт преимущества во многих
+      конфигурациях, поэтому он не может быть взят за основу для этого
+      раздела.</p><p>Синтаксис правил IPFW без сохранения состояния обеспечивает
+      расширенные возможности фильтрации, которые намного превосходят
+      уровень знаний обычного пользователя межсетевого экрана.  IPFW
+      рассчитан на профессиональных пользователей или технически
+      продвинутых любителей, которые предъявляют повышенные требования
+      к фильтрации пакетов.  Чтобы использовать возможности IPFW в
+      полную силу, необходимы углубленные знания того, как в различных
+      протоколах формируются и используются заголовки пакетов.
+      Углубленное изучение работы протоколов выходит за рамки этого
+      раздела Руководства.</p><p>IPFW состоит из семи компонентов, главный из которых -
+      процессор правил фильтрации уровня ядра и интегрированный в него
+      механизм учета пакетов, а также средства протоколирования пакетов,
+      правило <code class="literal">divert</code>, посредством которых вызывается
+      функция <acronym class="acronym">NAT</acronym> и другие возможности специального
+      назначения, средства для ограничения скорости (шейпинга) трафика
+      (dummynet), средства перенаправления <code class="literal">fwd</code>,
+      средства организации сетевого моста bridge и механизм ipstealth.
+      IPFW поддерживает протоколы IPv4 и IPv6.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-enable"></a>26.6.1. Включение IPFW</h3></div></div></div><a id="idp99219152" class="indexterm"></a><p>IPFW включён в базовую установку FreeBSD в виде отдельного
+	подгружаемого модуля.  Система динамически загружает модуль
+	ядра, когда в <code class="filename">rc.conf</code> присутствует строка
+	<code class="literal">firewall_enable="YES"</code>.  Если использовать
+	функциональность <acronym class="acronym">NAT</acronym> не планируется, то в
+	этом случае дополнительно компилировать IPFW в состав ядра
+	FreeBSD не требуется.</p><p>После перезагрузки системы с
+	<code class="literal">firewall_enable="YES"</code> в
+	<code class="filename">rc.conf</code> на экране в процессе загрузки
+	отобразится выделенное белым сообщение:</p><pre class="screen">ipfw2 initialized, divert disabled, rule-based forwarding disabled, default to deny, logging disabled</pre><p>Загружаемый модуль скомпилирован с возможностью
+	протоколирования информации о трафике.  Для включения
+	протоколирования и установки уровня его детализации имеется
+	переключатель, значение которого можно установить в
+	конфигурационном файле <code class="filename">/etc/sysctl.conf</code>.
+	При добавлении следующих двух строк протоколирование будет
+	включено при следующей загрузке системы:</p><pre class="programlisting">net.inet.ip.fw.verbose=1
+net.inet.ip.fw.verbose_limit=5</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-kernel"></a>26.6.2. Параметры ядра</h3></div></div></div><a id="idp99233744" class="indexterm"></a><a id="idp99234896" class="indexterm"></a><a id="idp99236048" class="indexterm"></a><a id="idp99237200" class="indexterm"></a><p>Включение следующих параметров в ядро FreeBSD не является
+	обязательным, если дополнительно не требуется функциональность
+	<acronym class="acronym">NAT</acronym>.  Эти параметры представлены здесь в
+	качестве справочной информации для дальнейших примеров.</p><pre class="programlisting">options    IPFIREWALL</pre><p>Этот параметр включает IPFW в состав ядра.</p><pre class="programlisting">options    IPFIREWALL_VERBOSE</pre><p>Этот параметр включает протоколирование пакетов, которые
+	проходят через IPFW по правилам с ключевым словом
+	<code class="literal">log</code>.</p><pre class="programlisting">options    IPFIREWALL_VERBOSE_LIMIT=5</pre><p>Ограничение числа пакетов, прошедших через <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>,
+	отдельно для каждого правила.  Этот параметр имеет смысл
+	использовать в недружественной среде, когда необходимо
+	отслеживать активность межсетевого экрана.  Это закрывает
+	возможность атак типа <span class="quote"><<<span class="quote">отказ в обслуживании</span>>></span>
+	через флуд сообщениями syslog.</p><a id="idp99243088" class="indexterm"></a><pre class="programlisting">options    IPFIREWALL_DEFAULT_TO_ACCEPT</pre><p>Этот параметр включает для IPFW разрешающую политику по
+	умолчанию.  Это удобно на первых этапах настройки IPFW.</p><a id="idp99245008" class="indexterm"></a><pre class="programlisting">options    IPDIVERT</pre><p>Включение функциональности <acronym class="acronym">NAT</acronym>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Межсетевой экран будет блокировать все входящие и
+	  исходящие пакеты, если отсутствует параметр ядра
+	  <code class="literal">IPFIREWALL_DEFAULT_TO_ACCEPT</code> или правило,
+	  явно разрешающее эти соединения.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rc"></a>26.6.3. Параметры <code class="filename">/etc/rc.conf</code></h3></div></div></div><p>Включение межсетевого экрана:</p><pre class="programlisting">firewall_enable="YES"</pre><p>Для выбора одного из стандартных режимов работы
+	межсетевого экрана, предоставляемых FreeBSD, выберите наиболее
+	подходящий в файле <code class="filename">/etc/rc.firewall</code> и
+	разместите так, как указано ниже:</p><pre class="programlisting">firewall_type="open"</pre><p>Возможны следующие значения для этого параметра:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">open</code> - пропускать весь
+	    трафик.</p></li><li class="listitem"><p><code class="literal">client</code> - защищать только эту
+	    машину.</p></li><li class="listitem"><p><code class="literal">simple</code> - защищать всю
+	    сеть.</p></li><li class="listitem"><p><code class="literal">closed</code> - полностью запретить
+	    IP трафик, за исключением loopback интерфейса.</p></li><li class="listitem"><p><code class="literal">UNKNOWN</code> - отключить загрузку
+	    правил межсетевого экрана.</p></li><li class="listitem"><p><code class="filename"><em class="replaceable"><code>filename</code></em></code>
+	    - абсолютный путь к файлу, содержащему правила
+	    межсетевого экрана.</p></li></ul></div><p>Есть два варианта загрузки собственных правил в
+	межсетевой экран <span class="application">ipfw</span>.  Первый
+	способ - задать переменную <code class="literal">firewall_type</code>
+	в виде абсолютного пути файла, содержащего <span class="emphasis"><em>правила
+	межсетевого экрана</em></span> без каких-либо параметров
+	командной строки для самого <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>.  Ниже приведён
+	простой пример набора правил, который блокирует весь входящий
+	и исходящий трафик:</p><pre class="programlisting">add deny in
+add deny out</pre><p>Второй способ - установить значение переменной
+	<code class="literal">firewall_script</code> в виде абсолютного пути
+	исполняемого скрипта, содержащего команды <code class="command">ipfw</code>,
+	которые будут выполнены во время загрузки операционной системы.
+	Правильный формат правил исполняемого скрипта должен
+	соответствовать формату файла, приведённому ниже:</p><pre class="programlisting">#!/bin/sh
+
+ipfw -q flush
+
+ipfw add deny in
+ipfw add deny out</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Если переменной <code class="literal">firewall_type</code> присвоено
+	  значение <code class="literal">client</code> или <code class="literal">simple</code>,
+	  то правила, расположенные по умолчанию в
+	  <code class="filename">/etc/rc.firewall</code>, должны быть приведены
+	  в соответствие с конфигурацией данной машины.  Также заметим,
+	  что для используемых в этой главе примеров в качестве значения
+	  переменной <code class="literal">firewall_script</code> используется
+	  <code class="filename">/etc/ipfw.rules</code>.</p></div><p>Включение протоколирования:</p><pre class="programlisting">firewall_logging="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Единственное, что делает параметр
+	  <code class="varname">firewall_logging</code>, - присвоение
+	  логической единицы (<code class="literal">1</code>) переменной sysctl
+	  <code class="varname">net.inet.ip.fw.verbose</code> (смотрите <a class="xref" href="firewalls-ipfw.html#firewalls-ipfw-enable" title="26.6.1. Включение IPFW">Раздел 26.6.1, <<Включение IPFW>></a>).  В <code class="filename">rc.conf</code>
+	  нет переменной для ограничения протоколирования, но это можно
+	  сделать через переменную sysctl вручную либо используя файл
+	  <code class="filename">/etc/sysctl.conf</code>:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">net.inet.ip.fw.verbose_limit=5</pre></div><p>Если ваша машина выполняет роль шлюза, т.е. обеспечивает
+	трансляцию сетевых адресов (NAT) с помощью <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>, имеет
+	смысл сразу перейти к чтению <a class="xref" href="network-natd.html" title="27.8. Даемон преобразования сетевых адресов (natd)">Раздел 27.8, <<Даемон преобразования сетевых адресов (natd)>></a>
+	для уточнения информации относительно параметров
+	<code class="filename">/etc/rc.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-cmd"></a>26.6.4. Команда IPFW</h3></div></div></div><a id="idp99290064" class="indexterm"></a><p>Команда <code class="command">ipfw</code> - это стандартный
+	механизм для ручного добавления/удаления отдельных правил в
+	активной цепочке правил межсетевого экрана.  Основная проблема
+	при использовании этого метода состоит в том, что при перезагрузке
+	операционной системы все изменения, сделанные с помощью данной
+	команды, будут утеряны.  Вместо этого рекомендуется записать
+	все правила в файл, из которого они будут считываться во время
+	загрузки операционной системы, а также для полной замены текущего
+	набора правил на содержимое из файла.</p><p>Тем не менее, команду <code class="command">ipfw</code> удобно
+	использовать для отображения текущей конфигурации правил на
+	экране консоли.  Учетный модуль IPFW динамически создаёт счётчики
+	для каждого правила, которые подсчитывают количество пакетов,
+	соответствующих условиям срабатывания правила.  В процессе
+	тестирования отображение правила со своим счётчиком является
+	одним из способов проверки, срабатывает ли правило при прохождении
+	через него пакета или нет.</p><p>Вывод полного списка правил:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw list</code></strong></pre><p>Вывод полного списка правил с маркером времени последнего
+	срабатывания правила:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -t list</code></strong></pre><p>Следующий пример выводит учетную информацию, количество
+	совпавших пакетов и сами правила.  Первым столбцом идет номер
+	правила, за ним следует число совпавших исходящих пакетов,
+	третий столбец - число соответствующих входящих пакетов,
+	и затем само правило.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -a list</code></strong></pre><p>Вывод динамических правил вместе со статическими:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d list</code></strong></pre><p>Отобразить статические и динамические правила, в т.ч.
+	с истекшим временем действия:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d -e list</code></strong></pre><p>Обнуление счетчиков:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero</code></strong></pre><p>Обнулить счетчики для правила под номером
+	<em class="replaceable"><code>NUM</code></em>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero <em class="replaceable"><code>NUM</code></em></code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules"></a>26.6.5. Набор правил IPFW</h3></div></div></div><p>Набор правил (ruleset) представляет собой группу правил
+	IPFW, которые разрешают или запрещают прохождение пакета через
+	межсетевой экран на основании значений, содержащихся в пакете.
+	Двунаправленный обмен пакетов между машинами является сессией.
+	Набор правил межсетевого экрана анализирует как пакеты,
+	приходящие из глобальной сети, так и ответные пакеты, исходящие
+	из системы.  Каждый <acronym class="acronym">TCP/IP</acronym> сервис (такой как
+	telnet, www, mail, и т.д.) принадлежит определенному протоколу
+	и привилегированному (прослушиваемому) порту.  Пакеты,
+	предназначенные для конкретного сервиса, передаются с
+	непривилегированного (с высоким значением) порта по адресу
+	назначения на указанный порт сервиса.  Все эти параметры (т.е.
+	порты и адреса) могут быть использованы в качестве критериев
+	фильтрации при создании правил, которые пропускают или блокируют
+	сервисы.</p><a id="idp99311824" class="indexterm"></a><p>Когда пакет попадает в межсетевой экран, он сравнивается
+	с каждым правилом, начиная с первого, двигаясь по множеству
+	правил верху вниз в порядке увеличения номера правил.  Когда
+	пакет совпадает с критерием выбора правила, выполняется действие,
+	указанное в правиле, и на этом поиск правил прекращается.
+	Такой метод поиска известен как <span class="quote"><<<span class="quote">выигрыш первого
+	совпадения</span>>></span>, т.е. после срабатывания правила оставшиеся
+	не просматриваются.  Если содержимое пакета не соответствует
+	ни одному из правил, он принудительно попадает на встроенное
+	правило по умолчанию, заданное под номером 65535, которое
+	запрещает и отбрасывает все пакеты без какого-либо отклика
+	в сторону отправителя.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Поиск продолжается после правил <code class="literal">count</code>,
+	  <code class="literal">skipto</code> и <code class="literal">tee</code>.</p></div><p>Упомянутые здесь инструкции основаны на использовании
+	правил, содержащих параметры с сохранением состояния
+	<code class="literal">keep state</code>, <code class="literal">limit</code>,
+	<code class="literal">in</code>, <code class="literal">out</code> и
+	<code class="literal">via</code>.  Это основной механизм для кодирования
+	набора правил межсетевого экрана закрытого типа.</p><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Будьте осторожны, когда работаете с правилами
+	  межсетевого экрана, так как вы можете легко заблокировать
+	  самого себя.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-syntax"></a>26.6.5.1. Синтаксис правил</h4></div></div></div><a id="idp99323728" class="indexterm"></a><p>Представленный здесь синтаксис правил был упрощен для
+	  создания стандартного набора правил межсетевого экрана
+	  закрытого типа.  Для полного описания синтаксиса правил
+	  смотрите страницу Справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>.</p><p>Правила содержат ключевые слова: эти ключевые слова
+	  записываются в строке в определенном порядке слева направо.
+	  Ключевые слова выделены полужирным шрифтом.  Некоторые
+	  ключевые слова имеют дополнительные параметры, которые могут
+	  являться ключевыми словами для них самих и также содержать
+	  вложенные дополнительные параметры.</p><p>Символ <code class="literal">#</code> используется для обозначения
+	  начала комментария и может быть расположен в конце строки с
+	  правилом или в начале строки над правилом.  Пустые строки
+	  игнорируются.</p><p><em class="replaceable"><code>CMD RULE_NUMBER ACTION LOGGING SELECTION
+	    STATEFUL</code></em></p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99360592"></a>26.6.5.1.1. CMD</h5></div></div></div><p>Каждое новое правило должно начинаться с префикса
+	    <em class="parameter"><code>add</code></em> для добавления во внутреннюю
+	    таблицу.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99362128"></a>26.6.5.1.2. RULE_NUMBER</h5></div></div></div><p>Каждое правило обозначено номером в диапазоне
+	    1..65535.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99363280"></a>26.6.5.1.3. ACTION</h5></div></div></div><p>При соответствии пакета описанным в правиле критериям
+	    фильтрации будет выполнено одно из следующих действий.</p><p><em class="parameter"><code>allow | accept | pass |
+	      permit</code></em></p><p>Все эти действия означают одно и то же - пакеты,
+	    совпадающие с правилом, могут покинуть обработку правил
+	    межсетевого экрана.  На этом поиск прекращается.</p><p><em class="parameter"><code>check-state</code></em></p><p>Проверяет пакет на соответствие динамической таблице
+	    правил.  Если совпадение найдено, выполняется действие,
+	    содержащееся в правиле, породившем данное динамическое
+	    правило, иначе выполняется переход к следующему правилу.
+	    Правило check-state не имеет критериев фильтрации.  При
+	    отсутствии правила check-state в наборе правил проверка
+	    по динамической таблице происходит на первом правиле
+	    keep-state или limit.</p><p><em class="parameter"><code>deny | drop</code></em></p><p>Оба слова означают отбрасывание пакетов, совпавших с
+	    правилом.  Поиск прекращается.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99371344"></a>26.6.5.1.4. Протоколирование</h5></div></div></div><p><em class="parameter"><code>log</code></em> или
+	    <em class="parameter"><code>logamount</code></em></p><p>Когда пакет совпадает с правилом, содержащим ключевое
+	    слово <code class="literal">log</code>, информация об этом событии
+	    записывается в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> с пометкой SECURITY.  Запись
+	    в журнал происходит только в том случае, если число
+	    срабатываний для данного правила не превышает значения
+	    параметра <code class="literal">logamount</code>.  Если значение
+	    <code class="literal">logamount</code> не объявлено, то ограничение
+	    берется из значения переменной sysctl
+	    <code class="literal">net.inet.ip.fw.verbose_limit</code>.  В обоих
+	    случаях обнуление значения отменяет ограничение.  По
+	    достижению установленного лимита запись в журнал может быть
+	    повторно включена путем сброса счетчика срабатываний или
+	    счетчика пакетов для этого правила; смотрите описание
+	    команды <code class="command">ipfw reset log</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Протоколирование осуществляется после проверки на
+	      соответствие всем условиям в правиле и перед выполнением
+	      окончательного действия (accept, deny) над пакетом.  Вы
+	      должны выбрать сами, какие действия правил вы хотите
+	      включить в журнал.</p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99376976"></a>26.6.5.1.5. Условия отбора</h5></div></div></div><p>Ключевые слова, представленные в этом разделе,
+	    используются для описания атрибутов пакета, по которым
+	    проверяется условие срабатывания того или иного правила.
+	    Для совпадения используется следующая последовательность
+	    атрибутов общего назначения:</p><p><em class="parameter"><code>udp | tcp | icmp</code></em></p><p>Также могут быть использованы имена протоколов, описанные
+	    в <code class="filename">/etc/protocols</code>.  Указанное значение
+	    обозначает протокол для совпадения.  Это является обязательным
+	    требованием.</p><p><em class="parameter"><code>from src to dst</code></em></p><p>Ключевые слова <code class="literal">from</code> и <code class="literal">to</code>
+	    служат для фильтрации по IP адресам.  Обязательно должны
+	    быть указаны и источник, и получатель.  <code class="literal">any</code>
+	    - это специальное ключевое слово, которое соответствует
+	    любому IP адресу.  <code class="literal">me</code> - это
+	    специальное ключевое слово, которое соответствует любому из
+	    IP адресов, сконфигурированных на интерфейсе вашей системы
+	    FreeBSD, и служит для указания компьютера, на котором работает
+	    межсетевой экран (т.е. этот компьютер), как показано на
+	    примерах <code class="literal">from me to any</code>,
+	    <code class="literal">from any to me</code>,
+	    <code class="literal">from 0.0.0.0/0 to any</code>,
+	    <code class="literal">from any to 0.0.0.0/0</code>,
+	    <code class="literal">from 0.0.0.0 to any</code>,
+	    <code class="literal">from any to 0.0.0.0</code> и
+	    <code class="literal">from me to 0.0.0.0</code>.  IP адрес указывается
+	    в виде четырёх чисел, разделённых точками, или дополнительно
+	    с префиксом сети (нотация CIDR).  Это является обязательным
+	    требованием.  Для упрощения вычислений, связанных с IP
+	    адресами, используйте порт <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/ipcalc/pkg-descr">net-mgmt/ipcalc</a>.  Более подробную
+	    информацию можно посмотреть на странице программы: <code class="uri"><a class="uri" href="http://jodies.de/ipcalc" target="_top">http://jodies.de/ipcalc</a></code>.</p><p><em class="parameter"><code>port number</code></em></p><p>Для протоколов, работающих с портами (такие как
+	    <acronym class="acronym">TCP</acronym> и <acronym class="acronym">UDP</acronym>), обязательным
+	    требованием является указание номера порта соответствующего
+	    сервиса.  Вместо номера порта можно использовать имя сервиса
+	    (из <code class="filename">/etc/services</code>).</p><p><em class="parameter"><code>in | out</code></em></p><p>Отбор соответственно по входящим и исходящим пакетам.
+	    Присутствие одного из этих ключевым слов в правиле обязательно
+	    для формирования критерия фильтрации.</p><p><em class="parameter"><code>via IF</code></em></p><p>Совпадает с пакетами, проходящими через указанный
+	    интерфейс.  Ключевое слово <code class="literal">via</code> включает
+	    обязательную проверку на указанном интерфейсе в общий
+	    процесс поиска совпадений.</p><p><em class="parameter"><code>setup</code></em></p><p>Это обязательное ключевое слово определяет начало
+	    запроса сессии для <acronym class="acronym">TCP</acronym> пакетов.</p><p><em class="parameter"><code>keep-state</code></em></p><p>Это обязательное ключевое слово.  При совпадении
+	    межсетевой экран создает динамическое правило, которое по
+	    умолчанию будет совпадать с двунаправленным трафиком между
+	    отправителем и получателем для данной пары IP/порт по
+	    указанному протоколу.</p><p><em class="parameter"><code>limit {src-addr | src-port | dst-addr |
+	      dst-port}</code></em></p><p>Межсетевой экран разрешит только <em class="replaceable"><code>N</code></em>
+	    соединений с одинаковым набором параметров, указанных в
+	    правиле.  Можно задавать один или несколько адресов и
+	    портов отправителя и получателя.  В одном и том же правиле
+	    использование <code class="literal">limit</code> и
+	    <code class="literal">keep-state</code> не допускается.  Параметр
+	    <code class="literal">limit</code> предоставляет такую же функцию с
+	    сохранением состояний, что и <code class="literal">keep-state</code>,
+	    плюс свои собственные.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99399376"></a>26.6.5.2. Параметры для правил с сохранением состояния</h4></div></div></div><a id="idp99400016" class="indexterm"></a><p>С точки зрения фильтрации по правилам с сохранением
+	  состояния весь трафик выглядит как двусторонний обмен
+	  пакетами, включая данные о сессиях.  При такой фильтрации
+	  у нас есть средства сопоставления и определения корректности
+	  процедуры двустороннего обмена пакетами между стороной,
+	  породившей пакет, и стороной-получателем.  Любые пакеты,
+	  которые не подходят под шаблон сессии, автоматически
+	  отбрасываются как злонамеренные.</p><p>Параметр <code class="literal">check-state</code> служит для
+	  указания места в наборе правил IPFW, в котором пакет будет
+	  передан на поиск соответствий динамическим правилам.  В
+	  случае совпадения пакет пропускается, при этом создается
+	  новое динамическое правило для следующего пакета,
+	  принадлежащего данной двусторонней сессии.  В противном
+	  случае пакет движется по обычным правилам, начиная со
+	  следующей позиции.</p><p>Динамические правила уязвимы к атаке SYN-пакетами, которые
+	  могут породить гигантское количество динамических правил.
+	  Для предотвращения такого рода атак во FreeBSD предусмотрен
+	  еще один параметр - <code class="literal">limit</code>.  Этот
+	  параметр служит для ограничения количества одновременно
+	  установленных сессий путём проверки полей отправителя и
+	  получателя, в зависимости от параметра <code class="literal">limit</code>,
+	  с использованием IP адреса пакета для поиска открытых
+	  динамических правил, которые представляют собой счетчик
+	  количества совпадений для данного IP адреса и этого правила.
+	  Если это количество превышает значение, указанное в параметре
+	  <code class="literal">limit</code>, то такой пакет отбрасывается.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99404112"></a>26.6.5.3. Протоколирование сообщений межсетевого экрана</h4></div></div></div><a id="idp99404752" class="indexterm"></a><p>Преимущества протоколирования очевидны: это предоставляет
+	  возможность отслеживать постфактум, прохождение каких пакетов
+	  было отклонено, откуда эти пакеты пришли и куда они назначались
+	  для тех правил, в которых включена функция записи в журнал.
+	  Это замечательный инструмент для отслеживания атак на вашу
+	  систему.</p><p>Даже при включенной функции ведения журнала само по себе
+	  оно производиться не будет.  Администратор межсетевого экрана
+	  определяет, для каких правил будет включена функция ведения
+	  журнала, и добавляет к этим правилам <code class="literal">log</code>.
+	  Обычно в журнал пишутся только запрещающие правила, такие как
+	  правила deny для входящего <acronym class="acronym">ICMP</acronym> ping.
+	  Довольно часто  конец списка добавляют дублирующее правило
+	  вида <span class="quote"><<<span class="quote">ipfw default deny everything</span>>></span> с приставкой
+	  <code class="literal">log</code>.  Это позволяет отслеживать все пакеты,
+	  не совпадающие ни с одним из правил в вашем наборе.</p><p>Будьте крайне осмотрительны при использовании функции
+	  ведения журнала, так как это чревато несоразмерным разрастанием
+	  файла журнала, вплоть до полного заполнения им места на жестком
+	  диске.  DoS атаки, направленные на переполнение свободного
+	  пространства жесткого диска, являются одними из самых старейших.
+	  Помимо заполнения жесткого диска это неприятно еще и тем,
+	  что сообщения журнала пишутся не только в
+	  <span class="application">syslogd</span>, но также отображаются
+	  на экране системной консоли, и это вскоре начинает сильно
+	  раздражать.</p><p>Параметр ядра <code class="literal">IPFIREWALL_VERBOSE_LIMIT=5</code>
+	  ограничивает число идущих подряд сообщений в системный
+	  регистратор <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>, касающихся пакетов, совпавших
+	  с правилом.  Когда этот параметр включен в ядро, число
+	  последовательно идущих сообщений для определенного правила
+	  обрезается указанным числом.  От записи 200 идентичных
+	  сообщений особого прока нет.  В данном случае для сработавшего
+	  правила в журнале <span class="application">syslogd</span> будут
+	  зафиксированы 5 сообщений подряд, остальные идентичные сообщения
+	  будут подсчитаны и отправлены в <span class="application">syslogd</span>
+	  как одно сообщение такого вида:</p><pre class="programlisting">last message repeated 45 times</pre><p>Путь к файлу, в который пишутся сообщения, задается в
+	  файле <code class="filename">/etc/syslog.conf</code>.  По умолчанию
+	  это файл <code class="filename">/var/log/security</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-script"></a>26.6.5.4. Написание скрипта правил</h4></div></div></div><p>Наиболее опытные пользователи IPFW создают скрипт,
+	  содержащий в себе правила, оформленные таким образом, что
+	  они могут быть исполнены как обыкновенный sh-скрипт.
+	  Основное преимущество такого подхода в том, что правила
+	  можно полностью заменить на новые без необходимости в
+	  перезагрузке системы для их активации.  Это крайне удобно
+	  на этапе разработки и тестирования набора правил, т.к.
+	  перезагружать весь список правил можно сколь угодно часто.
+	  Помимо того, поскольку это скрипт, то здесь можно объявить
+	  некие часто используемые значения в виде переменной, и
+	  использовать её во множестве правил, как показано в примере
+	  ниже.</p><p>Синтаксис примера, приведенного ниже, совместим с тремя
+	  командными оболочками: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcsh</span>(1)</span></a>.
+	  Для использования значения ранее объявленной переменной имя
+	  переменной предваряется символом $.  Во время
+	  присвоения имя переменной не имеет префикса $,
+	  присваиваемое значение должно быть заключено в "двойные
+	  кавычки".</p><p>Так выглядит файл с правилами, с которого вы можете
+	  начать:</p><pre class="programlisting">############### начало примера скрипта с правилами ipfw #############
+#
+ipfw -q -f flush	# Сброс всех правил.
+# Установки по умолчанию
+oif="tun0"		# наш интерфейс
+odns="192.0.2.11"	# IP DNS сервера провайдера
+cmd="ipfw -q add "	# префикс для создания правил
+ks="keep-state"		# просто лень вводить каждый раз
+$cmd 00500 check-state
+$cmd 00502 deny all from any to any frag
+$cmd 00501 deny tcp from any to any established
+$cmd 00600 allow tcp from any to any 80 out via $oif setup $ks
+$cmd 00610 allow tcp from any to $odns 53 out via $oif setup $ks
+$cmd 00611 allow udp from any to $odns 53 out via $oif $ks
+################### конец примера скрипта с правилами ipfw ############</pre><p>Вот и все, что нужно сделать.  Сами правила в этом примере
+	  не столь важны, они написаны ради того, чтобы продемонстрировать
+	  использование подстановки значения переменной по ее имени.</p><p>Если бы этот скрипт находился в файле
+	  <code class="filename">/etc/ipfw.rules</code>, то правила можно было
+	  бы перезагрузить следующей командой.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /etc/ipfw.rules</code></strong></pre><p>Имя и расположение файла <code class="filename">/etc/ipfw.rules</code>
+	  могут быть какими угодно.</p><p>Такой же результат можно получить, выполнив вручную
+	  следующие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -q -f flush</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add check-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add deny all from any to any frag</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add deny tcp from any to any established</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add allow tcp from any to any 80 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add allow tcp from any to 192.0.2.11 53 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00611 allow udp from any to 192.0.2.11 53 out via tun0 keep-state</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99463760"></a>26.6.5.5. Набор правил с сохранением состояния</h4></div></div></div><p>Следующий набор правил, не включающий в себя правила
+	  трансляции адресов <acronym class="acronym">NAT</acronym>, является примером
+	  того, как создавать правила для межсетевого экрана закрытого
+	  типа высокого уровня защиты.  Закрытый межсетевой экран
+	  разрешает трафик, описанный в разрешающих правилах, и по
+	  умолчанию блокирует всё остальное.  Межсетевой экран,
+	  предназначенный для защиты сегментов сети, имеет как минимум
+	  два интерфейса, для которых должны быть написаны правила для
+	  работы межсетевого экрана.</p><p>Все разновидности операционных систем <span class="trademark">UNIX</span>(R), включая FreeBSD,
+	  используют интерфейс <code class="filename">lo0</code> и IP адрес
+	  <code class="systemitem">127.0.0.1</code> для передачи данных
+	  внутри операционной системы.  Правила межсетевого экрана должны
+	  содержать в своем составе правила, разрешающие беспрепятственное
+	  прохождение трафика по этому интерфейсу.</p><p>Интерфейс, подключенный к Интернет, является местом для
+	  размещения правил авторизации и контроля доступа исходящих
+	  и входящих соединений.  Это может быть туннельный интерфейс
+	  <acronym class="acronym">PPP</acronym> <code class="filename">tun0</code> или
+	  сетевой адаптер, подключенный к DSL или кабельному модему.</p><p>В случае, когда за межсетевым экраном один и более интерфейсов
+	  подсоединён к локальной сети, должны присутствовать правила
+	  для беспрепятственного прохождения исходящих пакетов с этих
+	  интерфейсов LAN.</p><p>Правила изначально разделяются на три основных раздела:
+	  интерфейсы, не ограниченные правилами, правила для исходящего
+	  трафика на внешнем интерфейсе и правила для входящего
+	  трафика на внешнем интерфейсе.</p><p>В каждом из разделов, относящихся к внешнему интерфейсу,
+	  правила должны быть упорядоченны по следующему принципу:
+	  наиболее используемые расположены в начале, наименее
+	  используемые - в конце.  Последним должно идти правило
+	  блокирования и занесения в журнал информации о пакетах на
+	  этом интерфейсе, не попавших под предыдущие правила.</p><p>Раздел, описывающий правила для исходящего трафика на
+	  внешнем интерфейсе, содержит только разрешающие правила
+	  <code class="literal">allow</code>, состоящие из значений фильтрации,
+	  которые однозначно определяют сервис, которому разрешен
+	  доступ в Интернет.  Все правила включают в себя поля
+	  <code class="literal">proto</code>, <code class="literal">port</code>,
+	  <code class="literal">in/out</code>, <code class="literal">via</code> и
+	  <code class="literal">keep state</code>.  Правила, содержащие
+	  <code class="literal">proto tcp</code>, имеют также параметр
+	  <code class="literal">setup</code>, который служит для определения
+	  начала сессии, которое в дальнейшем передается как условие
+	  срабатывания в динамическую таблицу.</p><p>В разделе, описывающем правила для входящего трафика на
+	  внешнем интерфейсе, в самом начале должны стоять правила,
+	  блокирующие нежелательные пакеты.  Так должно быть по двум
+	  причинам.  Первая состоит в том, что пакеты, сформированные
+	  злоумышленником, могут частично или полностью соответствовать
+	  разрешающим правилам <code class="literal">allow</code>.  Вторая причина
+	  состоит в том, что заведомо не интересующие нас пакеты могут
+	  быть просто отклонены, вместо того, чтобы быть перехваченными
+	  и записанными в файл журнала по последнему правилу.  Последнее
+	  правило в каждом разделе блокирует и регистрирует в журнале
+	  все пакеты и может быть использовано для юридических
+	  обоснований в ходе разбирательств против злоумышленников,
+	  атаковавших вашу систему.</p><p>Также следует убедиться в том, что ваш сервер не отвечает
+	  ни на какие другие формы непредусмотренного трафика.
+	  Некорректные пакеты должны быть просто отброшены.  В
+	  результате атакующие не получат информацию о том, достиг ли
+	  его пакет вашего сервера.  Чем меньше атакующие будут знать
+	  о вашей системе, тем более она защищена.  Назначение
+	  нераспознанного номера порта можно посмотреть в файле
+	  <code class="filename">/etc/services/</code> или по адресу <code class="uri"><a class="uri" href="http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers" target="_top">http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers</a></code>.
+	  Рекомендуем ознакомиться с содержимым ссылки относительно
+	  номеров портов, используемых троянами: <code class="uri"><a class="uri" href="http://www.sans.org/security-resources/idfaq/oddports.php" target="_top">http://www.sans.org/security-resources/idfaq/oddports.php</a></code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99475536"></a>26.6.5.6. Пример правил для межсетевого экрана закрытого типа.</h4></div></div></div><p>Следующие правила, не включающие поддержку
+	  <acronym class="acronym">NAT</acronym>, являются логически полным набором
+	  правил для межсетевого экрана закрытого типа.  При использовании
+	  этого набора правил вы вполне можете быть уверены в безопасности
+	  вашей системы.  Просто закомментируйте некоторые из правил
+	  <code class="literal">pass</code> для тех служб, которые вам не требуются.
+	  Чтобы избежать занесения в журнал нежелательных сообщений,
+	  добавьте правило <code class="literal">deny</code> в раздел, описывающий
+	  входящий трафик на интерфейсе.  Замените название интерфейса
+	  <code class="filename">dc0</code>, упоминающегося в правилах ниже,
+	  на название интерфейса (NIC), который соединяет вашу систему
+	  с глобальной сетью.  Для <acronym class="acronym">PPP</acronym> соединений
+	  это будет <code class="filename">tun0</code>.</p><p>Примечание по использованию этих правил.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Все запросы начала сессии с внешней сетью используют
+	      параметр <code class="literal">keep-state</code>.</p></li><li class="listitem"><p>Все разрешенные сервисы внешней сети имеют параметр
+	      <code class="literal">limit</code> для защиты от флуда.</p></li><li class="listitem"><p>Все правила используют параметры <code class="literal">in</code>
+	      или <code class="literal">out</code> для указания направления
+	      трафика.</p></li><li class="listitem"><p>Все правила используют параметр <code class="literal">via</code>
+	      <em class="replaceable"><code>имя-интерфейса</code></em> для уточнения
+	      интерфейса, через который проходит пакет.</p></li></ul></div><p>Следующие правила записываются в
+	  <code class="filename">/etc/ipfw.rules</code>.</p><pre class="programlisting">################ Начало файла с правилами IPFW ###############################
+# Сброс всех правил перед началом работы скрипта.
+ipfw -q -f flush
+
+# Префикс для создания правил
+cmd="ipfw -q add"
+pif="dc0"		# название внешнего интерфейса,
+			# принадлежащего глобальной сети
+
+#################################################################
+# Нет ограничений на внутреннем интерфейсе локальной сети
+# Нет необходимости в этом, если у вас нет локальной сети.
+# Замените xl0 на название интерфейса вашей локальной сети
+#################################################################
+#$cmd 00005 allow all from any to any via xl0
+
+#################################################################
+# Нет ограничений на интерфейсе Loopback
+#################################################################
+$cmd 00010 allow all from any to any via lo0
+
+#################################################################
+# Разрешить пакет, если он был ранее добавлен в "динамическую"
+# таблицу при помощи выражения allow keep-state
+#################################################################
+$cmd 00015 check-state
+
+#################################################################
+# Раздел правил для исходящего трафика на внешнем интерфейсе
+# Анализ запросов начала сессии, идущих из-за межсетевого экрана
+# в локальную сеть или от этого шлюза в интернет.
+#################################################################
+
+# Разрешить исходящий трафик к DNS серверу провайдера
+# x.x.x.x должен быть IP адресом DNS сервера вашего провайдера
+# Продублируйте эти строки, если у вас больше одного DNS сервера
+# Эти IP адреса можно взять из файла /etc/resolv.conf
+$cmd 00110 allow tcp from any to x.x.x.x 53 out via $pif setup keep-state
+$cmd 00111 allow udp from any to x.x.x.x 53 out via $pif keep-state
+
+# Разрешить исходящий трафик к DHCP серверу провайдера для cable/DSL конфигураций.
+# Это правило не нужно для .user ppp. соединений с глобальной сетью
+# в этом случае вы можете удалить эти правила.
+# Используйте это правило для записи необходимого нам IP адреса в лог-файл.
+# Затем укажите IP адрес в закомментированном правиле и удалите первое правило.
+$cmd 00120 allow log udp from any to any 67 out via $pif keep-state
+#$cmd 00120 allow udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Разрешить исходящий трафик для незащищенного www соединения
+$cmd 00200 allow tcp from any to any 80 out via $pif setup keep-state
+
+# Разрешить исходящий трафик для защищенного www соединения
+# https с поддержкой TLS и SSL
+$cmd 00220 allow tcp from any to any 443 out via $pif setup keep-state
+
+# Разрешить исходящий POP/SMTP
+$cmd 00230 allow tcp from any to any 25 out via $pif setup keep-state
+$cmd 00231 allow tcp from any to any 110 out via $pif setup keep-state
+
+# Разрешить исходящий трафик для FreeBSD (make install &amp; CVSUP)
+# По сути назначаем пользователю root полные привилегии.
+$cmd 00240 allow tcp from me to any out via $pif setup keep-state uid root
+
+# Разрешаем исходящий icmp ping
+$cmd 00250 allow icmp from any to any out via $pif keep-state
+
+# Разрешаем исходящий трафик Time
+$cmd 00260 allow tcp from any to any 37 out via $pif setup keep-state
+
+# Разрешаем исходящий трафик nntp news
+$cmd 00270 allow tcp from any to any 119 out via $pif setup keep-state
+
+# Разрешаем исходящий защищённый трафик FTP, Telnet и SCP
+# Эта функция использует SSH (secure shell)
+$cmd 00280 allow tcp from any to any 22 out via $pif setup keep-state
+
+# Разрешаем исходящий трафик whois
+$cmd 00290 allow tcp from any to any 43 out via $pif setup keep-state
+
+# Запрещаем и заносим в журнал остальной исходящий трафик.
+# Обеспечивает политику межсетевого экрана закрытого типа
+$cmd 00299 deny log all from any to any out via $pif
+
+#################################################################
+# Раздел правил для входящего трафика на внешнем интерфейсе
+# Анализ пакетов, приходящих из глобальной сети,
+# предназначенных для этого шлюза или локальной сети
+########################################################################
+
+# Запрещаем весь входящий трафик с немаршрутизируемых сетей
+$cmd 00300 deny all from 192.168.0.0/16 to any in via $pif  #RFC 1918 private IP
+$cmd 00301 deny all from 172.16.0.0/12 to any in via $pif     #RFC 1918 private IP
+$cmd 00302 deny all from 10.0.0.0/8 to any in via $pif          #RFC 1918 private IP
+$cmd 00303 deny all from 127.0.0.0/8 to any in via $pif        #loopback
+$cmd 00304 deny all from 0.0.0.0/8 to any in via $pif            #loopback
+$cmd 00305 deny all from 169.254.0.0/16 to any in via $pif   #DHCP auto-config
+$cmd 00306 deny all from 192.0.2.0/24 to any in via $pif       #reserved for docs
+$cmd 00307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster interconnect
+$cmd 00308 deny all from 224.0.0.0/3 to any in via $pif         #Class D &amp; E multicast
+
+# Запрещаем пинг извне
+$cmd 00310 deny icmp from any to any in via $pif
+
+# Запрещаем ident
+$cmd 00315 deny tcp from any to any 113 in via $pif
+
+# Запрещаем все Netbios службы. 137=name, 138=datagram, 139=session
+# Netbios это MS/Windows сервис обмена.
+# Блокируем MS/Windows hosts2 запросы сервера имен на порту 81
+$cmd 00320 deny tcp from any to any 137 in via $pif
+$cmd 00321 deny tcp from any to any 138 in via $pif
+$cmd 00322 deny tcp from any to any 139 in via $pif
+$cmd 00323 deny tcp from any to any 81 in via $pif
+
+# Запрещаем любые опоздавшие пакеты
+$cmd 00330 deny all from any to any frag in via $pif
+
+# Запрещаем ACK пакеты, которые не соответствуют динамической таблице правил.
+$cmd 00332 deny tcp from any to any established in via $pif
+
+# Разрешаем входящий трафик с DHCP сервера провайдера.  Это правило
+# должно содержать IP адрес DHCP сервера вашего провайдера, поскольку
+# только ему разрешено отправлять пакеты данного типа.  Необходимо только
+# для проводных и DSL соединений.  Для 'user ppp' соединений с глобальной
+# сетью использовать это правило нет необходимости.  Это тот же IP адрес,
+# выбранный и используемый вами в разделе правил для исходящего трафика.
+#$cmd 00360 allow udp from any to x.x.x.x 67 in via $pif keep-state
+
+# Разрешить входящий трафик для www, так как я использую сервер apache
+$cmd 00400 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Разрешить входящий трафик безопасных FTP, Telnet и SCP из глобальной сети
+$cmd 00410 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Разрешить входящий нешифрованный трафик Telnet из глобальной сети
+# считается небезопасным, потому что ID и PW передаются через глобальную
+# сеть в открытом виде.
+# Удалите этот шаблон, если вы не используете telnet.
+$cmd 00420 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Отбрасываем и заносим в журнал все входящие соединения снаружи
+$cmd 00499 deny log all from any to any in via $pif
+
+# Всё остальное запрещено по умолчанию
+# Запрещаем и заносим в журнал все пакеты для дальнейшего анализа
+$cmd 00999 deny log all from any to any
+################ Конец файла правил IPFW ###############################</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99503056"></a>26.6.5.7. Пример правил с сохранением состояний и поддержкой
+	  <acronym class="acronym">NAT</acronym></h4></div></div></div><a id="idp99503952" class="indexterm"></a><p>Здесь перечислены некоторые дополнительные конфигурационные
+	  параметры, которые нужно включить, чтобы активировать
+	  функцию <acronym class="acronym">NAT</acronym> в IPFW.  В файл конфигурации
+	  ядра к остальным параметрам IPFIREWALL нужно добавить строку
+	  <code class="literal">option IPDIVERT</code>.</p><p>В дополнение к обычным параметрам IPFW в
+	  <code class="filename">/etc/rc.conf</code> добавим следующее:</p><pre class="programlisting">natd_enable="YES"		# Включить функцию <acronym class="acronym">NAT</acronym>D
+natd_interface="rl0"		# Название внешнего сетевого интерфейса
+natd_flags="-dynamic -m"	# -m = по возможности сохранить номера портов</pre><p>Использование динамических правил с правилом
+	  <code class="literal">divert natd</code> (Network Address Translation)
+	  значительно затрудняет логику составления правил.  Расположение
+	  <code class="literal">check-state</code> и <code class="literal">divert natd</code>
+	  в таблице правил влияет на поведение межсетевого экрана.
+	  Это уже не просто последовательный логический поток.  При
+	  применении вышеозначенных параметров становится доступным
+	  новый тип действия <code class="literal">skipto</code>.  При использовании
+	  <code class="literal">skipto</code> нумерация правил становится
+	  обязательной.  В качестве аргумента <code class="literal">skipto</code>
+	  используется номер правила, к которому нужно перейти.</p><p>Ниже последует пример метода кодирования, не снабженный
+	  комментариями, приведенный здесь для внесения ясности
+	  относительно последовательности прохождения пакетов через
+	  набор правил.</p><p>Обработка правил начинается с первого по счету и идет
+	  последовательно, по правилу за раз, до достижения конца файла,
+	  либо если проверяемый пакет соответствует критериям фильтрации;
+	  в последнем случае пакет покидает межсетевой экран.  Для правил
+	  под номерами 100, 101, 450, 500 и 510 важен порядок их
+	  расположения.  Эти правила управляют трансляцией исходящих и
+	  входящих пакетов, таким образом в таблицу keep-state заносятся
+	  только приватные IP адреса локальной сети.  Обратите внимание,
+	  что все правила allow и deny указывают направление, по которому
+	  передается пакет (исходящее или входящее) и сетевой интерфейс.
+	  Также стоит отметить, что все запросы начала исходящей сессии
+	  передаются с использованием <code class="literal">skipto rule 500</code>
+	  для трансляции адресов.</p><p>Предположим, что пользователь локальной сети запрашивает
+	  страницу через браузер.  Веб-страницы передаются по порту 80.
+	  Пакет входит в межсетевой экран.  Этот пакет не попадает под
+	  правило 100, потому что в критериях фильтрации этого правила
+	  указан параметр <code class="literal">in</code>.  Этот пакет не попадает
+	  под правило 101, потому что это первый пакет сессии и он еще
+	  не был занесен в динамическую таблицу keep-state.  Достигнув,
+	  наконец, правила 125, пакет удовлетворяет всем критериям
+	  фильтрации.  Этот пакет является выходящим из интерфейса,
+	  взаимодействующим с глобальной сетью.  На данном этапе у
+	  пакета в качестве исходящего адреса всё еще указан приватный
+	  IP адрес локальной сети.  По условию этого правила к пакету
+	  применяются два действия.  Параметр <code class="literal">keep-state</code>
+	  создаст новую запись в динамической таблице keep-state, и
+	  выполнится действие, указанное в правиле.  Указанное действие
+	  является частью информации, заносимой в динамическую таблицу.
+	  В данном случае это <code class="literal">skipto rule 500</code>.
+	  Правило 500 транслирует (<acronym class="acronym">NAT</acronym>) адреса пакета
+	  и отпускает его наружу.  Данное замечание очень важно.  Этот
+	  пакет идет к цели, где генерируется ответный пакет и отправляется
+	  обратно.  Этот новый пакет входит в начало списка правил.
+	  На этот раз пакет соответствует правилу 100 и его IP адрес
+	  назначения транслируется обратно на соответствующий IP адрес
+	  локальной сети.  Затем он обрабатывается правилом
+	  <code class="literal">check-state</code>, и поскольку для него уже
+	  присутствует в динамической таблице правило, соответствующее
+	  данной сессии, пакет пропускается в локальную сеть.  Дальше
+	  пакет приходит к отправившему его компьютеру локальной сети,
+	  и генерируется новый пакет, запрашивающий новую порцию данных
+	  с удаленного сервера.  На этот раз пакет сразу проверяется
+	  правилом <code class="literal">check-state</code>, и в случае присутствия
+	  исходящей записи данного пакета выполняется действие
+	  <code class="literal">skipto 500</code>.  Пакет переходит к правилу
+	  500, транслируется и пропускается во внешнюю сеть.</p><p>Для входящего трафика все пакеты, являющиеся частью уже
+	  установленной сессии, автоматически разбираются правилом
+	  <code class="literal">check-state</code> и правильно расположенными
+	  правилами <code class="literal">divert natd</code>.  Всё, что нам
+	  остается сделать, это запретить все плохие пакеты и разрешить
+	  прохождение внутрь сети пакетов только для разрешенных сервисов.
+	  Допустим, на сервере с межсетевым экраном запущен apache, и
+	  мы хотим разрешить людям из глобальной сети доступ на локальный
+	  веб-сайт.  Новый входящий пакет, запрашивающий начало сессии,
+	  соответствует правилу 100, и его IP адрес транслируется как
+	  локальный IP системы с межсетевым экраном.  Далее пакет
+	  проверяется на соответствие вредоносному трафику и в случае
+	  отсутствия соответствия попадает на правило 425.  В случае
+	  соответствия данному правилу происходят две вещи.  Пакет
+	  правил помещается в динамическую таблицу keep-state, но в
+	  этот раз любая новая сессия запросов, порожденных с этого IP,
+	  ограничена 2 одновременными соединениями.  Это защищает от
+	  перегрузки сервис, работающей по указанному номеру порта.
+	  В качестве действия в правиле указан <code class="literal">allow</code>,
+	  следовательно пакет пропускается в локальную сеть.  Пакет,
+	  сформированный в качестве ответа, попадает под
+	  <code class="literal">check-state</code> и распознается им как
+	  принадлежащий существующей сессии.  Далее он передаётся на
+	  правило 500, где происходит обратная трансляция, после чего
+	  пакет пропускается на внешний интерфейс.</p><p>Пример файла правил #1:</p><pre class="programlisting">#!/bin/sh
+cmd="ipfw -q add"
+skip="skipto 500"
+pif=rl0
+ks="keep-state"
+good_tcpo="22,25,37,43,53,80,443,110,119"
+
+ipfw -q -f flush
+
+$cmd 002 allow all from any to any via xl0  # разрешаем трафик на локальном интерфейсе
+$cmd 003 allow all from any to any via lo0  # разрешаем трафик на интерфейсе loopback
+
+$cmd 100 divert natd ip from any to any in via $pif
+$cmd 101 check-state
+
+# Разрешенные исходящие пакеты
+$cmd 120 $skip udp from any to xx.168.240.2 53 out via $pif $ks
+$cmd 121 $skip udp from any to xx.168.240.5 53 out via $pif $ks
+$cmd 125 $skip tcp from any to any $good_tcpo out via $pif setup $ks
+$cmd 130 $skip icmp from any to any out via $pif $ks
+$cmd 135 $skip udp from any to any 123 out via $pif $ks
+
+
+# Запрещаем весь входящий трафик с немаршрутизируемых адресных пространств
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 для локальных IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 для локальных IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 для локальных IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP авто-конфигурации
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #Зарезервировано для документации
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Class D &amp; E multicast
+
+# Разрешаем входящие пакеты
+$cmd 400 allow udp from xx.70.207.54 to any 68 in $ks
+$cmd 420 allow tcp from any to me 80 in via $pif setup limit src-addr 1
+
+
+$cmd 450 deny log ip from any to any
+
+# Раздел skipto для правил с сохранением состояния для исходящих пакетов
+$cmd 500 divert natd ip from any to any out via $pif
+$cmd 510 allow ip from any to any
+
+######################## Окончание файла правил ##################</pre><p>Следующий пример во многом повторяет то, что приведено
+	  выше, но использует самодокументирующий стиль записи с
+	  исчерпывающими комментариями для того, чтобы помочь начинающему
+	  составителю правил IPFW лучше понимать, для чего предназначено
+	  то или иное правило.</p><p>Пример файла правил #2:</p><pre class="programlisting">#!/bin/sh
+################ Начало файла правил IPFW ###############################
+# Сброс всех правил перед началом работы скрипта.
+ipfw -q -f flush
+
+# Задание стандартных переменных
+cmd="ipfw -q add"
+skip="skipto 800"
+pif="rl0"		# название внешнего интерфейса,
+			# принадлежащего глобальной сети
+
+#################################################################
+# Нет ограничений на внутреннем интерфейсе локальной сети
+# Замените xl0 на название интерфейса вашей локальной сети
+#################################################################
+$cmd 005 allow all from any to any via xl0
+
+#################################################################
+# Нет ограничений на интерфейсе Loopback
+#################################################################
+$cmd 010 allow all from any to any via lo0
+
+#################################################################
+# Трансляция адреса, если пакет является входящим
+#################################################################
+$cmd 014 divert natd ip from any to any in via $pif
+
+#################################################################
+# Разрешить пакет, если он был ранее добавлен в динамическую
+# таблицу при помощи выражения allow keep-state
+#################################################################
+$cmd 015 check-state
+
+#################################################################
+# Раздел правил для исходящего трафика на внешнем интерфейсе
+# Анализ запросов начала сессии, идущих из-за межсетевого экрана
+# в локальную сеть или от этого шлюза в интернет.
+#################################################################
+
+# Разрешить исходящий трафик к DNS серверу провайдера
+# x.x.x.x должен быть IP адресом DNS сервера вашего провайдера
+# Продублируйте эти строки, если у вас больше одного DNS сервер
+# Эти IP адреса можно взять из файла /etc/resolv.conf
+$cmd 020 $skip tcp from any to x.x.x.x 53 out via $pif setup keep-state
+
+
+# Разрешить исходящий трафик к DHCP серверу провайдера для cable/DSL конфигураций.
+$cmd 030 $skip udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Разрешить исходящий трафик для незащищенного www соединения
+$cmd 040 $skip tcp from any to any 80 out via $pif setup keep-state
+
+# Разрешить исходящий трафик для защищенного www соединения
+# https с поддержкой TLS и SSL
+$cmd 050 $skip tcp from any to any 443 out via $pif setup keep-state
+
+# Разрешить исходящий POP/SMTP
+$cmd 060 $skip tcp from any to any 25 out via $pif setup keep-state
+$cmd 061 $skip tcp from any to any 110 out via $pif setup keep-state
+
+# Разрешить исходящий трафик для FreeBSD (make install &amp; CVSUP)
+# По сути назначаем пользователю root полные привилегии.
+$cmd 070 $skip tcp from me to any out via $pif setup keep-state uid root
+
+# Разрешаем исходящий icmp ping
+$cmd 080 $skip icmp from any to any out via $pif keep-state
+
+# Разрешаем исходящий трафик Time
+$cmd 090 $skip tcp from any to any 37 out via $pif setup keep-state
+
+# Разрешаем исходящий трафик nntp news (т.е. news groups)
+$cmd 100 $skip tcp from any to any 119 out via $pif setup keep-state
+
+# Разрешаем исходящий защищённый трафик FTP, Telnet и SCP
+# Эта функция использует SSH (secure shell)
+$cmd 110 $skip tcp from any to any 22 out via $pif setup keep-state
+
+# Разрешаем исходящий трафик whois
+$cmd 120 $skip tcp from any to any 43 out via $pif setup keep-state
+
+# Разрешаем исходящий трафик ntp
+$cmd 130 $skip udp from any to any 123 out via $pif keep-state
+
+#################################################################
+# Раздел правил для входящего трафика на внешнем интерфейсе
+# Анализ пакетов, приходящих из глобальной сети,
+# предназначенных для этого шлюза или локальной сети
+#################################################################
+
+# Запрещаем весь входящий трафик с немаршрутизируемых сетей
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 private IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 private IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 private IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #reserved for docs
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Class D &amp; E multicast
+
+# Запрещаем ident
+$cmd 315 deny tcp from any to any 113 in via $pif
+
+# Запрещаем все Netbios службы. 137=name, 138=datagram, 139=session
+# Netbios это MS/Windows сервис обмена.
+# Блокируем MS/Windows hosts2 запросы сервера имен на порту 81
+$cmd 320 deny tcp from any to any 137 in via $pif
+$cmd 321 deny tcp from any to any 138 in via $pif
+$cmd 322 deny tcp from any to any 139 in via $pif
+$cmd 323 deny tcp from any to any 81  in via $pif
+
+# Запрещаем любые опоздавшие пакеты
+$cmd 330 deny all from any to any frag in via $pif
+
+# Запрещаем ACK пакеты, которые не соответствуют динамической таблице правил.
+$cmd 332 deny tcp from any to any established in via $pif
+
+# Разрешаем входящий трафик с DHCP сервера провайдера. Это правило
+# должно содержать IP адрес DHCP сервера вашего провайдера, поскольку
+# только ему разрешено отправлять пакеты данного типа. Необходимо только
+# для проводных и DSL соединений. Для 'user ppp' соединений с глобальной
+# сетью использовать это правило нет необходимости. Это тот же IP адрес,
+# выбранный и используемый вами в разделе правил для исходящего трафика.
+$cmd 360 allow udp from x.x.x.x to any 68 in via $pif keep-state
+
+# Разрешить входящий трафик для www, т.к. я использую Apache сервер.
+$cmd 370 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Разрешить входящий трафик безопасных FTP, Telnet и SCP из глобальной сети
+$cmd 380 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Разрешить входящий нешифрованный трафик Telnet из глобальной сети
+# считается небезопасным, потому что ID и PW передаются через глобальную
+# сеть в открытом виде.
+# Удалите этот шаблон, если вы не используете telnet.
+$cmd 390 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Отбрасываем и заносим в журнал все неразрешенные входящие соединения из глобальной сети
+$cmd 400 deny log all from any to any in via $pif
+
+# Отбрасываем и заносим в журнал все неразрешенные исходящие соединения в глобальную сеть
+$cmd 450 deny log all from any to any out via $pif
+
+# Место для skipto в правилах с сохранением состояния для исходящих соединений
+$cmd 800 divert natd ip from any to any out via $pif
+$cmd 801 allow ip from any to any
+
+# Всё остальное запрещено по умолчанию
+# Запрещаем и заносим в журнал все пакеты для дальнейшего анализа
+$cmd 999 deny log all from any to any
+################ Окончание файла правил IPFW ###############################</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="firewalls-ipf.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="firewalls.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="advanced-networking.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">26.5. * IPFILTER (IPF) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 27. Сложные вопросы работы в сети</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

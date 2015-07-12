@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.17. Chiffrage de l'espace de pagination</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="disks.html" title="Chapitre 19. Stockage des données" /><link rel="prev" href="disks-encrypting.html" title="19.16. Chiffrer les partitions d'un disque" /><link rel="next" href="GEOM.html" title="Chapitre 20. GEOM: architecture modulaire de gestion des disques" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.17. Chiffrage de l'espace de pagination</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="disks-encrypting.html">Précédent</a> </td><th width="60%" align="center">Chapitre 19. Stockage des données</th><td width="20%" align="right"> <a accesskey="n" href="GEOM.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="swap-encrypting"></a>19.17. Chiffrage de l'espace de pagination</h2></div><div><span class="authorgroup">Ecrit par <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Christian</span> <span class="surname">Brüffer</span></span>. </span></div></div></div><a id="idp81198928" class="indexterm"></a><p>Sous FreeBSD, le chiffrement de l'espace de pagination est
+      simple à mettre en place et est possible depuis FreeBSD
+      5.3-RELEASE.  En fonction de la version de FreeBSD utilisée,
+      différentes options sont disponibles et la configuration
+      peut légèrement varier.  Depuis FreeBSD 6.0-RELEASE,
+      les systèmes de chiffrage <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> ou <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>
+      peuvent être utilisé à cet effet.  Avec les
+      versions antérieures, seul <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> est disponible.
+      Les deux systèmes utilisent la procédure <a class="link" href="configtuning-rcd.html" title="12.7. Utilisation du système rc sous FreeBSD">rc.d</a> nommée
+      <code class="filename">encswap</code>.</p><p>La section précédente, <a class="link" href="disks-encrypting.html" title="19.16. Chiffrer les partitions d'un disque">Chiffrer les partitions d'un
+      disque</a>, contient une courte explication sur les
+      différents systèmes de chiffrage.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81212880"></a>19.17.1. Pourquoi l'espace de pagination devrait être
+	chiffré?</h3></div></div></div><p>Comme pour le chiffrage des partitions d'un disque,
+	chiffrer l'espace de pagination a pour but la protection des
+	informations sensibles.  Imaginez une application qui, par
+	exemple, traite des mots de passe.  Tant que ces mots de passe
+	résident en mémoire tout va pour le mieux.
+	Cependant, si le système d'exploitation commence
+	à transférer des pages mémoires vers
+	l'espace de pagination en vue de libérer de la
+	mémoire pour d'autres applications, les mots de passe
+	peuvent être écrits en clair sur les plateaux du
+	disque et seront faciles à récupérer par
+	une personne malveillante.  Chiffrer l'espace de pagination
+	peut être une solution contre ce scénario.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81214160"></a>19.17.2. Préparation</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Pour le reste de cette section,
+	  <code class="filename">ad0s1b</code> sera la partition
+	  réservée à l'espace de
+	  pagination.</p></div><p>Jusqu'ici l'espace de pagination n'a jamais
+	été chiffré.  Il est fort possible qu'il
+	y ait déjà des mots de passe ou toute autre
+	donnée sensible de présents en clair sur les
+	plateaux du disque.  Afin d'y remédier, les
+	données de la partition de pagination doivent
+	être écrasées avec des données
+	aléatoires:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/dev/ad0s1b bs=1m</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81217488"></a>19.17.3. Chiffrer de l'espace de pagination avec
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a></h3></div></div></div><p>Si FreeBSD 6.0-RELEASE ou une version plus récente est
+	utilisée, le suffixe <code class="literal">.bde</code> doit
+	être ajouté au nom de périphérique
+	sur la ligne du fichier <code class="filename">/etc/fstab</code>
+	correspondant à cet espace de pagination:</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/ad0s1b.bde         none            swap    sw              0       0</pre><p>Pour les systèmes antérieurs à FreeBSD
+	6.0-RELEASE, la ligne suivante doit également
+	être ajoutée à
+	<code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">gbde_swap_enable="YES"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81221712"></a>19.17.4. Chiffrage de l'espace de pagination avec
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a></h3></div></div></div><p>La procédure pour le chiffrage de l'espace de
+	pagination avec <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> est similaire à celle pour
+	l'utilisation de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a>.  Le suffixe
+	<code class="literal">.eli</code> doit être ajouté au nom
+	de périphérique sur la ligne du fichier
+	<code class="filename">/etc/fstab</code> correspondant à cet
+	espace de pagination:</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/ad0s1b.eli         none            swap    sw              0       0</pre><p>Par défaut, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> utilise l'algorithme
+	<acronym class="acronym">AES</acronym> avec une longueur de clé de
+	256bits.</p><p>Les valeurs par défaut peuvent être
+	modifiées en utilisant l'option
+	<code class="literal">geli_swap_flags</code> dans le fichier
+	<code class="filename">/etc/rc.conf</code>.  La ligne suivante demande
+	à la procédure rc.d <code class="filename">encswap</code>
+	de créer des partitions de pagination en utilisant
+	l'algorithme Blowfish avec une clé de 128 bits de
+	longueur, une taille de secteur de 4 kilo-octets et avec
+	l'option <span class="quote">« <span class="quote">detach on last close</span> »</span> (détacher
+	après démontage de la partition)
+	activée:</p><pre class="programlisting">geli_swap_flags="-a blowfish -l 128 -s 4096 -d"</pre><p>Veuillez vous référer à la
+	description de la commande <code class="command">onetime</code> dans la
+	page de manuel <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> pour une liste des options
+	possibles.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81240144"></a>19.17.5. Vérifier que cela fonctionne</h3></div></div></div><p>Une fois que le système a été
+	redémarré, le fonctionnement correct de l'espace
+	de pagination peut être vérifié en
+	utilisant la commande <code class="command">swapinfo</code>.</p><p>Si <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> est utilisé:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>swapinfo</code></strong>
+Device          1K-blocks     Used    Avail Capacity
+/dev/ad0s1b.bde    542720        0   542720     0%</pre><p>Si <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> est utilisé:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>swapinfo</code></strong>
+Device          1K-blocks     Used    Avail Capacity
+/dev/ad0s1b.eli    542720        0   542720     0%</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="disks-encrypting.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">19.16. Chiffrer les partitions d'un disque </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Chapitre 20. GEOM: architecture modulaire de gestion des disques</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

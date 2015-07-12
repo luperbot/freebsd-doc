@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>3.4. Target Attributes</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="shortcuts.html" title="Chapter 3. Short-cuts and Other Nice Things" /><link rel="prev" href="savingcmds.html" title="3.3. Saving Commands" /><link rel="next" href="specialtargets.html" title="3.5. Special Targets" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">3.4. Target Attributes</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="savingcmds.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Short-cuts and Other Nice Things</th><td width="20%" align="right"> <a accesskey="n" href="specialtargets.html">Next</a></td></tr></table><hr /></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="targetattr"></a>3.4. Target Attributes</h2></div></div></div><p><span class="application">PMake</span> allows you to give
+      attributes to targets by means of special sources.  Like
+      everything else <span class="application">PMake</span> uses, these
+      sources begin with a period and are made up of all upper-case
+      letters.  There are various reasons for using them, and I will
+      try to give examples for most of them.  Others you will have to
+      find uses for yourself.  Think of it as <span class="quote">&#8220;<span class="quote">an exercise for
+      the reader</span>&#8221;</span>.  By placing one (or more) of these as a
+      source on a dependency line, you are <span class="quote">&#8220;<span class="quote">marking the
+      target(s) with that attribute</span>&#8221;</span>.  That is just the way I
+      phrase it, so you know.</p><p>Any attributes given as sources for a transformation
+      rule are applied to the target of the transformation rule
+      when the rule is applied.</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr valign="top"><td valign="top"><code class="literal">.DONTCARE</code></td><td valign="top">If a target is marked with this attribute and
+	      <span class="application">PMake</span> can not figure out
+	      how to create it, it will ignore this fact and assume
+	      the file is not really needed or actually exists and
+	      <span class="application">PMake</span> just can not find
+	      it.  This may prove wrong, but the error will be
+	      noted later on, not when  <span class="application">PMake</span>
+	      tries to create the target so marked.  This attribute also
+	      prevents <span class="application">PMake</span> from attempting
+	      to touch the target if it is given the
+	      <code class="option">-t</code> flag.</td></tr><tr valign="top"><td valign="top"><code class="literal">.EXEC</code></td><td valign="top"><p>This attribute causes its shell script to be
+		executed while having no effect on targets that depend
+		on it.  This makes the target into a sort of subroutine.
+		An example.  Say you have some LISP files that need to
+		be compiled and loaded into a LISP process.  To do this,
+		you echo LISP commands into a file and execute a LISP
+		with this file as its input when  everything is
+		done. Say also that you have to load
+		other files from another system before you can compile
+		your files and further, that you do not want to go
+		through the loading and dumping unless one of your
+		files has changed.  Your makefile might look a little
+		bit like this (remember, this is an  educational example,
+		and do not worry about the <code class="buildtarget">COMPILE</code>
+		rule, all will soon become clear, grasshopper):
+
+		</p><pre class="programlisting">system          : init a.fasl b.fasl c.fasl
+	for i in $(.ALLSRC);
+	do
+		echo -n '(load "' &gt;&gt; input
+		echo -n ${i} &gt;&gt; input
+		echo '")' &gt;&gt; input
+	done
+	echo '(dump "$(.TARGET)")' &gt;&gt; input
+	lisp &lt; input
+
+a.fasl          : a.l init COMPILE
+b.fasl          : b.l init COMPILE
+c.fasl          : c.l init COMPILE
+COMPILE         : .USE
+	echo '(compile "$(.ALLSRC)")' &gt;&gt; input
+init            : .EXEC
+	echo '(load-system)' &gt; input</pre><p>
+
+		<code class="literal">.EXEC</code> sources, do not appear in the
+		local variables of targets that depend on them (nor are
+		they touched if <span class="application">PMake</span> is
+		given the <code class="option">-t</code>
+		flag).  Note that all the rules, not just that for
+		system, include init as a source.  This is because
+		none of the other targets can be made until init
+		has been made, thus they depend on it.</p></td></tr><tr valign="top"><td valign="top"><code class="literal">.EXPORT</code></td><td valign="top">This is used to mark those targets whose
+	      creation should be sent to another machine if at
+	      all possible.  This may be used by some exportation
+	      schemes if the exportation is expensive.  You
+	      should ask your system administrator if it is
+	      necessary.</td></tr><tr valign="top"><td valign="top"><code class="literal">.EXPORTSAME</code></td><td valign="top">Tells the export system that the job
+	      should be exported to a machine of the same
+	      architecture as the current  one.  Certain
+	      operations (e.g. running text through nroff) can be
+	      performed the same on any architecture (CPU and
+	      operating system type), while others (e.g. compiling
+	      a program with cc) must be performed on a
+	      machine with the same architecture.  Not all export
+	      systems will support this attribute.</td></tr><tr valign="top"><td valign="top"><code class="literal">.IGNORE</code></td><td valign="top">Giving a target the
+	      <code class="literal">.IGNORE</code> attribute causes
+	      <span class="application">PMake</span> to ignore errors
+	      from any of the target's commands, as if they all
+	      had <code class="literal">-</code> before them.</td></tr><tr valign="top"><td valign="top"><code class="literal">.INVISIBLE</code></td><td valign="top"><p>This allows you to specify one target as a
+		source for another without the one affecting the
+		other's local variables.  Useful if, say, you
+		have a makefile that creates two  programs, one
+		of which is used to create the other, so it must
+		exist before the other is created. You could say
+
+		</p><pre class="programlisting">prog1           : $(PROG1OBJS) prog2 MAKEINSTALL
+prog2           : $(PROG2OBJS) .INVISIBLE MAKEINSTALL</pre><p>
+
+		where <code class="literal">MAKEINSTALL</code>
+		is some complex <code class="literal">.USE</code> rule (see
+		below) that depends on the <code class="varname">.ALLSRC</code>
+		variable containing the right things.  Without the
+		<code class="literal">.INVISIBLE</code>
+		attribute for <code class="buildtarget">prog2</code>,
+		the <code class="literal">MAKEINSTALL</code> rule
+		could not be applied.  This is not as useful as it
+		should be, and the semantics may change (or the
+		whole thing go away) in the not-too-distant
+		future.</p></td></tr><tr valign="top"><td valign="top"><code class="literal">.JOIN</code></td><td valign="top"><p>This is another way to avoid performing some
+		operations in parallel while permitting
+		everything else to be done so.  Specifically it forces
+		the target's shell script to be executed only if
+		one or more of the sources was out-of-date.  In
+		addition, the target's name, in both its
+		<code class="varname">.TARGET</code>
+		variable and all the local variables of any
+		target that depends on it, is replaced by the value
+		of its <code class="varname">.ALLSRC</code> variable.  As an
+		example, suppose you have a program that has
+		four libraries that
+		compile in the same directory along with, and at
+		the same time as, the program.  You again have
+		the problem with ranlib that I mentioned
+		earlier, only this time it is more severe: you can not
+		just put the ranlib off to the end since the
+		program will need those libraries before it can
+		be re-created.  You can do something like this:
+
+		</p><pre class="programlisting">program         : $(OBJS) libraries
+	cc -o $(.TARGET) $(.ALLSRC)
+
+libraries       : lib1.a lib2.a lib3.a lib4.a .JOIN
+	ranlib $(.OODATE)</pre><p>
+
+		In this case, <span class="application">PMake</span> will re-create
+		the <code class="literal">$(OBJS)</code>
+		as necessary, along with <code class="filename">lib1.a</code>,
+		<code class="filename">lib2.a</code>, <code class="filename">lib3.a</code>
+		and <code class="filename">lib4.a</code>.  It will then
+		execute ranlib on any library that was changed and set
+		program's <code class="varname">.ALLSRC</code> variable to contain
+		what's in <code class="literal">$(OBJS)</code>
+		followed by <span class="quote">&#8220;<span class="quote"><code class="filename">lib1.a</code>
+		  <code class="filename">lib2.a</code>
+		  <code class="filename">lib3.a</code>
+		  <code class="filename">lib4.a</code>.</span>&#8221;</span>  In
+		case you are wondering, it is called
+		<code class="literal">.JOIN</code> because
+		it joins together different threads of the
+		<span class="quote">&#8220;<span class="quote">input graph</span>&#8221;</span> at the target marked
+		with the attribute.  Another aspect of the
+		<code class="literal">.JOIN</code>
+		attribute is it keeps the target from being
+		created if the <code class="option">-t</code> flag was
+		given.</p></td></tr><tr valign="top"><td valign="top"><code class="literal">.MAKE</code></td><td valign="top"><p>The <code class="literal">.MAKE</code>
+	      attribute marks its target as being a
+	      recursive invocation of PMake.  This forces
+	      <span class="application">PMake</span> to execute the
+	      script associated with the
+	      target (if it is out-of-date) even if you gave
+	      the <code class="option">-n</code> or
+	      <code class="option">-t</code> flag.  By doing this, you can start
+	      at the top of a system and type
+
+	      </p><div class="literallayout"><p><code class="command">pmake -n</code></p></div><p>
+
+	      and have it descend the directory tree (if your
+	      makefiles are set up correctly), printing what
+	      it would have executed if you had not included
+	      the <code class="option">-n</code> flag.</p></td></tr><tr valign="top"><td valign="top"><code class="literal">.NOEXPORT</code></td><td valign="top">If possible,
+	      <span class="application">PMake</span> will attempt to
+	      export the creation of all targets to another machine
+	      (this depends on how <span class="application">PMake</span>
+	      was configured).  Sometimes, the creation is so
+	      simple, it is pointless to send it to another machine.
+	      If you give the target the
+	      <code class="literal">.NOEXPORT</code> attribute, it will be run
+	      loally, even if you have given
+	      <span class="application">PMake</span> the <code class="option">-L
+	      0</code> flag.</td></tr><tr valign="top"><td valign="top"><code class="literal">.NOTMAIN</code></td><td valign="top">Normally, if you do not specify a target to
+	      make in any other way,
+	      <span class="application">PMake</span> will take the first
+	      target on the first dependency line of a makefile as
+	      the target to create.  That target is known as the
+	      <span class="quote">&#8220;<span class="quote">Main Target</span>&#8221;</span> and is labeled as such if
+	      you print the dependencies out using the
+	      <code class="option">-p</code> flag.  Giving a target this
+	      attribute tells <span class="application">PMake</span> that
+	      the target is definitely not the Main Target.  This
+	      allows you to place targets in an included makefile
+	      and have <span class="application">PMake</span> create
+	      something else by default.</td></tr><tr valign="top"><td valign="top"><code class="literal">.PRECIOUS</code></td><td valign="top">When <span class="application">PMake</span> is
+	      interrupted (you type control-C at the keyboard), it will
+	      attempt to clean up after itself by removing any
+	      half-made targets.  If a target has the
+	      <code class="literal">.PRECIOUS</code> attribute, however,
+	      <span class="application">PMake</span> will leave it alone.
+	      An additional side effect of the <code class="literal">::</code>
+	      operator is to mark the targets as
+	      <code class="literal">.PRECIOUS</code>.</td></tr><tr valign="top"><td valign="top"><code class="literal">.SILENT</code></td><td valign="top">Marking a target with this attribute keeps its
+	      commands from being printed when they are
+	      executed, just as if they had an <code class="literal">@</code>
+	      in front of them.</td></tr><tr valign="top"><td valign="top"><code class="literal">.USE</code></td><td valign="top"><p>By giving a target this attribute, you turn it
+		into <span class="application"></span>PMake's equivalent of
+		a macro.  When the target is
+		used as a source for another target, the other target
+		acquires the commands, sources and attributes (except
+		<code class="literal">.USE</code>) of the source.  If the target
+		already has commands, the <code class="literal">.USE</code> target's
+		commands are added to the end.  If more than one
+		<code class="literal">.USE</code>-marked source is given to a
+		target, the rules are applied sequentially.  The typical
+		<code class="literal">.USE</code> rule (as I call them) will use
+		the sources of the target to which it is applied (as
+		stored in the <code class="varname">.ALLSRC</code> variable for
+		the target) as its <span class="quote">&#8220;<span class="quote">arguments,</span>&#8221;</span> if you
+		will.  For example, you probably noticed that the
+		commands for creating <code class="filename">lib1.a</code> and
+		<code class="filename">lib2.a</code> in the example in section
+		<a class="xref" href="savingcmds.html" title="3.3. Saving Commands">Section 3.3, &#8220;Saving Commands&#8221;</a> were exactly the same.
+		You can use the <code class="literal">.USE</code> attribute to
+		eliminate the repetition, like so:
+
+		</p><pre class="programlisting">lib1.a          : $(LIB1OBJS) MAKELIB
+lib2.a          : $(LIB2OBJS) MAKELIB
+
+MAKELIB         : .USE
+	rm -f $(.TARGET)
+	ar cr $(.TARGET) $(.ALLSRC)
+	...
+	ranlib $(.TARGET)</pre><p>
+
+		Several system makefiles (not to be confused
+		with The System Makefile) make use of these
+		<code class="literal">.USE</code> rules to make your life
+		easier (they are in the default, system makefile
+		directory...take a look).  Note that the
+		<code class="literal">.USE</code> rule source itself
+		(<code class="buildtarget">MAKELIB</code>) does not appear in
+		any of the targets's local variables.  There is no limit
+		to the number of times I could use the
+		<code class="buildtarget">MAKELIB</code> rule.  If there were
+		more libraries, I could continue with
+		<code class="literal">lib3.a : $(LIB3OBJS) MAKELIB</code>
+		and so on and so forth.</p></td></tr></tbody></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="savingcmds.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="shortcuts.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="specialtargets.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">3.3. Saving Commands </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 3.5. Special Targets</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

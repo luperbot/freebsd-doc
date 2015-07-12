@@ -1,0 +1,1087 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>21.4. zfs Administration</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="zfs.html" title="Kapitel 21. Das Z-Dateisystem (ZFS)" /><link rel="prev" href="zfs-zpool.html" title="21.3. zpool Administration" /><link rel="next" href="zfs-zfs-allow.html" title="21.5. Delegierbare Administration" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.4. <code class="command">zfs</code> Administration</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="zfs-zpool.html">Zurück</a> </td><th width="60%" align="center">Kapitel 21. Das Z-Dateisystem (<acronym class="acronym">ZFS</acronym>)</th><td width="20%" align="right"> <a accesskey="n" href="zfs-zfs-allow.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="zfs-zfs"></a>21.4. <code class="command">zfs</code> Administration</h2></div></div></div><p>Das <code class="command">zfs</code>-Werkzeug ist dafür
+      verantwortlich, alle <acronym class="acronym">ZFS</acronym> Datasets innerhalb
+      eines Pools zu erstellen, zerstören und zu verwalten.  Der Pool
+      selbst wird durch <a class="link" href="zfs-zpool.html" title="21.3. zpool Administration"><code class="command">zpool</code></a>
+      verwaltet.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-create"></a>21.4.1. Datasets erstellen und zerstören</h3></div></div></div><p>Anders als in traditionellen Festplatten- und
+	Volumenmanagern wird der Plattenplatz in
+	<acronym class="acronym">ZFS</acronym> <span class="emphasis"><em>nicht</em></span>
+	vorher allokiert.  Bei traditionellen Dateisystemen gibt es,
+	nachdem der Plattenplatz partitioniert und
+	zugeteilt wurde, keine Möglichkeit, ein zusätzliches
+	Dateisystem hinzuzufügen, ohne eine neue Platte
+	anzuschließen.  Mit
+	<acronym class="acronym">ZFS</acronym> lassen sich neue Dateisysteme zu jeder
+	Zeit anlegen.  Jedes <a class="link" href="zfs-term.html#zfs-term-dataset"><span class="emphasis"><em>Dataset</em></span></a>
+	besitzt Eigenschaften wie Komprimierung, Deduplizierung,
+	Zwischenspeicher (caching), Quotas, genauso wie andere
+	nützliche Einstellungen wie Schreibschutz, Unterscheidung
+	zwischen Groß- und Kleinschreibung, Netzwerkfreigaben und
+	einen Einhängepunkt.  Datasets können ineinander verschachtelt
+	werden und Kind-Datasets erben die Eigenschaften ihrer Eltern.
+	Jedes Dataset kann als eine Einheit verwaltet,
+	<a class="link" href="zfs-zfs-allow.html" title="21.5. Delegierbare Administration">delegiert</a>,
+	<a class="link" href="zfs-zfs.html#zfs-zfs-send" title="21.4.7. Replikation">repliziert</a>,
+	<a class="link" href="zfs-zfs.html#zfs-zfs-snapshot" title="21.4.5. Verwalten von Schnappschüssen">mit Schnappschüssen
+	versehen</a>, <a class="link" href="zfs-zfs.html#zfs-zfs-jail" title="21.4.12. ZFS und Jails">in Jails
+	gesteckt</a> und zerstört werden.  Es gibt viele Vorteile,
+	ein separates Dataset für jede Art von Dateien anzulegen.  Der
+	einzige Nachteil einer großen Menge an Datasets ist, dass
+	manche Befehle wie <code class="command">zfs list</code> langsamer sind
+	und dass das Einhängen von hunderten oder hunderttausenden von
+	Datasets de FreeBSD-Bootvorgang verzögert.</p><p>Erstellen eines neuen Datasets und aktivieren von <a class="link" href="zfs-term.html#zfs-term-compression-lz4">LZ4
+	Komprimierung</a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                  USED  AVAIL  REFER  MOUNTPOINT
+mypool                781M  93.2G   144K  none
+mypool/ROOT           777M  93.2G   144K  none
+mypool/ROOT/default   777M  93.2G   777M  /
+mypool/tmp            176K  93.2G   176K  /tmp
+mypool/usr            616K  93.2G   144K  /usr
+mypool/usr/home       184K  93.2G   184K  /usr/home
+mypool/usr/ports      144K  93.2G   144K  /usr/ports
+mypool/usr/src        144K  93.2G   144K  /usr/src
+mypool/var           1.20M  93.2G   608K  /var
+mypool/var/crash      148K  93.2G   148K  /var/crash
+mypool/var/log        178K  93.2G   178K  /var/log
+mypool/var/mail       144K  93.2G   144K  /var/mail
+mypool/var/tmp        152K  93.2G   152K  /var/tmp
+<code class="prompt">#</code> <strong class="userinput"><code>zfs create -o compress=lz4 <em class="replaceable"><code>mypool/usr/mydataset</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+mypool                 781M  93.2G   144K  none
+mypool/ROOT            777M  93.2G   144K  none
+mypool/ROOT/default    777M  93.2G   777M  /
+mypool/tmp             176K  93.2G   176K  /tmp
+mypool/usr             704K  93.2G   144K  /usr
+mypool/usr/home        184K  93.2G   184K  /usr/home
+mypool/usr/mydataset  87.5K  93.2G  87.5K  /usr/mydataset
+mypool/usr/ports       144K  93.2G   144K  /usr/ports
+mypool/usr/src         144K  93.2G   144K  /usr/src
+mypool/var            1.20M  93.2G   610K  /var
+mypool/var/crash       148K  93.2G   148K  /var/crash
+mypool/var/log         178K  93.2G   178K  /var/log
+mypool/var/mail        144K  93.2G   144K  /var/mail
+mypool/var/tmp         152K  93.2G   152K  /var/tmp</pre><p>Ein Dataset zu zerstören ist viel schneller, als alle
+	Dateien zu löschen, die sich in dem Dataset befindet, da es
+	keinen Scan aller Dateien und aktualisieren der dazugehörigen
+	Metadaten erfordert.</p><p>Zerstören des zuvor angelegten Datasets:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+mypool                 880M  93.1G   144K  none
+mypool/ROOT            777M  93.1G   144K  none
+mypool/ROOT/default    777M  93.1G   777M  /
+mypool/tmp             176K  93.1G   176K  /tmp
+mypool/usr             101M  93.1G   144K  /usr
+mypool/usr/home        184K  93.1G   184K  /usr/home
+mypool/usr/mydataset   100M  93.1G   100M  /usr/mydataset
+mypool/usr/ports       144K  93.1G   144K  /usr/ports
+mypool/usr/src         144K  93.1G   144K  /usr/src
+mypool/var            1.20M  93.1G   610K  /var
+mypool/var/crash       148K  93.1G   148K  /var/crash
+mypool/var/log         178K  93.1G   178K  /var/log
+mypool/var/mail        144K  93.1G   144K  /var/mail
+mypool/var/tmp         152K  93.1G   152K  /var/tmp
+<code class="prompt">#</code> <strong class="userinput"><code>zfs destroy <em class="replaceable"><code>mypool/usr/mydataset</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                  USED  AVAIL  REFER  MOUNTPOINT
+mypool                781M  93.2G   144K  none
+mypool/ROOT           777M  93.2G   144K  none
+mypool/ROOT/default   777M  93.2G   777M  /
+mypool/tmp            176K  93.2G   176K  /tmp
+mypool/usr            616K  93.2G   144K  /usr
+mypool/usr/home       184K  93.2G   184K  /usr/home
+mypool/usr/ports      144K  93.2G   144K  /usr/ports
+mypool/usr/src        144K  93.2G   144K  /usr/src
+mypool/var           1.21M  93.2G   612K  /var
+mypool/var/crash      148K  93.2G   148K  /var/crash
+mypool/var/log        178K  93.2G   178K  /var/log
+mypool/var/mail       144K  93.2G   144K  /var/mail
+mypool/var/tmp        152K  93.2G   152K  /var/tmp</pre><p>In modernen Versionen von <acronym class="acronym">ZFS</acronym> ist
+	<code class="command">zfs destroy</code> asynchron und der freie
+	Speicherplatz kann erst nach ein paar Minuten im Pool
+	auftauchen.  Verwenden Sie <code class="command">zpool get freeing
+	  <em class="replaceable"><code>poolname</code></em></code>, um die
+	Eigenschaft <code class="literal">freeing</code> aufzulisten, die
+	angibt, bei wievielen Datasets die Blöcke im Hintergrund
+	freigegeben werden.  Sollte es Kind-Datasets geben,
+	<a class="link" href="zfs-term.html#zfs-term-snapshot">Schnappschüsse</a> oder
+	andere Datasets, dann lässt sich der Elternknoten nicht
+	zerstören.  Um ein Dataset und all seine Kinder zu zerstören,
+	verwenden Sie die Option <code class="option">-r</code>, um das Dataset
+	und all seine Kinder rekursiv zu entfernen.  Benutzen Sie die
+	Option <code class="option">-n</code> und <code class="option">-v</code>, um
+	Datasets und Snapshots anzuzeigen, die durch diese Aktion
+	zerstört werden würden, dies jedoch nur zu simulieren und
+	nicht wirklich durchzuführen.  Speicherplatz, der dadurch
+	freigegeben würde, wird ebenfalls angezeigt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-volume"></a>21.4.2. Volumes erstellen und zerstören</h3></div></div></div><p>Ein Volume ist ein spezieller Typ von Dataset.  Anstatt
+	dass es als Dateisystem eingehängt wird, stellt es ein
+	Block-Gerät unter
+	<code class="filename">/dev/zvol/<em class="replaceable"><code>poolname</code></em>/<em class="replaceable"><code>dataset</code></em></code>
+	dar.  Dies erlaubt es, das Volume für andere Dateisysteme zu
+	verwenden, die Festplatten einer virtuellen Maschine
+	bereitzustellen oder über Protokolle wie
+	<acronym class="acronym">iSCSI</acronym> oder <acronym class="acronym">HAST</acronym>
+	exportiert zu werden.</p><p>Ein Volume kann mit einem beliebigen Dateisystem
+	formatiert werden oder auch ohne ein Dateisystem als reiner
+	Datenspeicher fungieren.  Für den Benutzer erscheint ein
+	Volume als eine gewöhnliche Platte.  Indem gewöhnliche
+	Dateisysteme auf diesen <span class="emphasis"><em>zvols</em></span> angelegt
+	werden, ist es möglich, diese mit Eigenschaften auszustatten,
+	welche diese normalerweise nicht besitzen.  Beispielsweise
+	wird durch Verwendung der Komprimierungseigenschaft auf einem
+	250 MB Volume das Erstellen eines komprimierten
+	<acronym class="acronym">FAT</acronym> Dateisystems möglich.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create -V 250m -o compression=on tank/fat32</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list tank</code></strong>
+NAME USED AVAIL REFER MOUNTPOINT
+tank 258M  670M   31K /tank
+<code class="prompt">#</code> <strong class="userinput"><code>newfs_msdos -F32 /dev/zvol/tank/fat32</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount -t msdosfs /dev/zvol/tank/fat32 /mnt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>df -h /mnt | grep fat32</code></strong>
+Filesystem           Size Used Avail Capacity Mounted on
+/dev/zvol/tank/fat32 249M  24k  249M     0%   /mnt
+<code class="prompt">#</code> <strong class="userinput"><code>mount | grep fat32</code></strong>
+/dev/zvol/tank/fat32 on /mnt (msdosfs, local)</pre><p>Ein Volume zu zerstören ist sehr ähnlich wie ein
+	herkömmliches Dataset zu entfernen.  Die Operation wird
+	beinahe sofort durchgeführt, jedoch kann es mehrere Minuten
+	dauern, bis der freie Speicherplatz im Hintergrund wieder
+	freigegeben ist.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-rename"></a>21.4.3. Umbenennen eines Datasets</h3></div></div></div><p>Der Name eines Datasets lässt sich durch
+	<code class="command">zfs rename</code> ändern.  Das Eltern-Dataset kann
+	ebenfalls mit diesem Kommando umbenannt werden.  Ein Dataset
+	unter einem anderen Elternteil umzubenennen wird den Wert
+	dieser Eigenschaft verändern, die vom Elternteil vererbt
+	wurden.  Wird ein Dataset umbenannt, wird es abgehängt und
+	dann erneut unter der neuen Stelle eingehängt (welche vom
+	neuen Elternteil geerbt wird).  Dieses Verhalten kann durch
+	die Option <code class="option">-u</code> verhindert werden.</p><p>Ein Dataset umbenennen und unter einem anderen
+	Elterndataset verschieben:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+mypool                 780M  93.2G   144K  none
+mypool/ROOT            777M  93.2G   144K  none
+mypool/ROOT/default    777M  93.2G   777M  /
+mypool/tmp             176K  93.2G   176K  /tmp
+mypool/usr             704K  93.2G   144K  /usr
+mypool/usr/home        184K  93.2G   184K  /usr/home
+mypool/usr/mydataset  87.5K  93.2G  87.5K  /usr/mydataset
+mypool/usr/ports       144K  93.2G   144K  /usr/ports
+mypool/usr/src         144K  93.2G   144K  /usr/src
+mypool/var            1.21M  93.2G   614K  /var
+mypool/var/crash       148K  93.2G   148K  /var/crash
+mypool/var/log         178K  93.2G   178K  /var/log
+mypool/var/mail        144K  93.2G   144K  /var/mail
+mypool/var/tmp         152K  93.2G   152K  /var/tmp
+<code class="prompt">#</code> <strong class="userinput"><code>zfs rename <em class="replaceable"><code>mypool/usr/mydataset</code></em> <em class="replaceable"><code>mypool/var/newname</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                  USED  AVAIL  REFER  MOUNTPOINT
+mypool                780M  93.2G   144K  none
+mypool/ROOT           777M  93.2G   144K  none
+mypool/ROOT/default   777M  93.2G   777M  /
+mypool/tmp            176K  93.2G   176K  /tmp
+mypool/usr            616K  93.2G   144K  /usr
+mypool/usr/home       184K  93.2G   184K  /usr/home
+mypool/usr/ports      144K  93.2G   144K  /usr/ports
+mypool/usr/src        144K  93.2G   144K  /usr/src
+mypool/var           1.29M  93.2G   614K  /var
+mypool/var/crash      148K  93.2G   148K  /var/crash
+mypool/var/log        178K  93.2G   178K  /var/log
+mypool/var/mail       144K  93.2G   144K  /var/mail
+mypool/var/newname   87.5K  93.2G  87.5K  /var/newname
+mypool/var/tmp        152K  93.2G   152K  /var/tmp</pre><p>Schnappschüsse können auf diese Weise ebenfalls umbenannt
+	werden.  Aufgrund der Art von Schnappschüssen können diese
+	nicht unter einem anderen Elterndataset eingehängt werden.  Um
+	einen rekursiven Schnappschuss umzubenennen, geben Sie die
+	Option <code class="option">-r</code> an, um alle Schnappschüsse mit dem
+	gleichen Namen im Kind-Dataset ebenfalls umzubenennen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -t snapshot</code></strong>
+NAME                                USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/newname@first_snapshot      0      -  87.5K  -
+<code class="prompt">#</code> <strong class="userinput"><code>zfs rename <em class="replaceable"><code>mypool/var/newname@first_snapshot</code></em> <em class="replaceable"><code>new_snapshot_name</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -t snapshot</code></strong>
+NAME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/newname@new_snapshot_name      0      -  87.5K  -</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-set"></a>21.4.4. Festlegen von Dataset-Eigenschaften</h3></div></div></div><p>Jedes <acronym class="acronym">ZFS</acronym>-Dataset besitzt eine Menge
+	von Eigenschaften, die sein Verhalten beeinflussen.  Die
+	meisten Eigenschaften werden automatisch vom Eltern-Dataset
+	vererbt, können jedoch lokal überschrieben werden.  Sie legen
+	eine Eigenschaft durch <code class="command">zfs set
+	  <em class="replaceable"><code>property</code></em>=<em class="replaceable"><code>value</code></em>
+	  <em class="replaceable"><code>dataset</code></em></code> fest.  Die
+	meisten Eigenschaften haben eine begrenzte Menge von gültigen
+	Werten.  <code class="command">zfs get</code> stellt diese dar und zeigt
+	jede mögliche Eigenschaft und gültige Werte an.  Die meisten
+	Eigenschaften können über <code class="command">zfs inherit</code>
+	wieder auf ihren Ausgangswert zurückgesetzt werden.</p><p>Benutzerdefinierte Eigenschaften lassen sich ebenfalls
+	setzen.  Diese werden Teil der Konfiguration des Datasets und
+	können dazu verwendet werden, zusätzliche Informationen über
+	das Dataset oder seine Bestandteile zu speichern.  Um diese
+	benutzerdefinierten Eigenschaften von den
+	<acronym class="acronym">ZFS</acronym>-eigenen zu unterscheiden, wird ein
+	Doppelpunkt (<code class="literal">:</code>) verwendet, um einen eigenen
+	Namensraum für diese Eigenschaft zu erstellen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set <em class="replaceable"><code>custom</code></em>:<em class="replaceable"><code>costcenter</code></em>=<em class="replaceable"><code>1234</code></em> <em class="replaceable"><code>tank</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs get <em class="replaceable"><code>custom</code></em>:<em class="replaceable"><code>costcenter</code></em> <em class="replaceable"><code>tank</code></em></code></strong>
+NAME PROPERTY           VALUE SOURCE
+tank custom:costcenter  1234  local</pre><p>Um eine selbstdefinierte Eigenschaft umzubenennen,
+	verwenden Sie <code class="command">zfs inherit</code> mit der Option
+	<code class="option">-r</code>.  Wenn die benutzerdefinierte Eigenschaft
+	nicht in einem der Eltern-Datasets definiert ist, wird diese
+	komplett entfernt (obwohl diese Änderungen natürlich in der
+	Historie des Pools noch aufgezeichnet sind).</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs inherit -r <em class="replaceable"><code>custom</code></em>:<em class="replaceable"><code>costcenter</code></em> <em class="replaceable"><code>tank</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs get <em class="replaceable"><code>custom</code></em>:<em class="replaceable"><code>costcenter</code></em> <em class="replaceable"><code>tank</code></em></code></strong>
+NAME    PROPERTY           VALUE              SOURCE
+tank    custom:costcenter  -                  -
+<code class="prompt">#</code> <strong class="userinput"><code>zfs get all <em class="replaceable"><code>tank</code></em> | grep <em class="replaceable"><code>custom</code></em>:<em class="replaceable"><code>costcenter</code></em></code></strong>
+<code class="prompt">#</code></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-snapshot"></a>21.4.5. Verwalten von Schnappschüssen</h3></div></div></div><p><a class="link" href="zfs-term.html#zfs-term-snapshot">Schnappschüsse</a>
+	sind eine der mächtigen Eigenschaften von
+	<acronym class="acronym">ZFS</acronym>.  Ein Schnappschuss bietet einen
+	nur-Lese Zustand eines Datasets zu einem bestimmten Zeitpunkt.
+	Mit Kopieren-beim-Schreiben (Copy-On-Write
+	<acronym class="acronym">COW</acronym>), können Schnappschüsse schnell
+	erstellt werden durch das Aufheben der älteren Version der
+	Daten auf der Platte.  Falls kein Snapshot existiert, wird der
+	Speicherplatz wieder für zukünftige Verwendung freigegeben
+	wenn Daten geschrieben oder gelöscht werden.  Schnappschüsse
+	sparen Speicherplatz, indem diese nur die Unterschiede
+	zwischen dem momentanen Dataset und der vorherigen Version
+	aufzeichnen.  Schnappschüsse sind nur auf ganzen Datasets
+	erlaubt, nicht auf individuellen Dateien oder Verzeichnissen.
+	Wenn ein Schnappschuss eines Datasets erstellt wird, wird
+	alles was darin enthalten ist, dupliziert.  Das beinhaltet
+	Dateisystemeigenschaften, Dateien, Verzeichnisse, Rechte und
+	so weiter.  Schnappschüsse benötigen keinen zusätzlichen
+	Speicherplatz wenn diese erstmals angelegt werden, nur wenn
+	Blöcke, die diese referenzieren, geändert werden.  Rekursive
+	Schnappschüsse, die mit der Option <code class="option">-r</code>
+	erstellt, erzeugen einen mit dem gleichen Namen des Datasets
+	und all seinen Kindern, was eine konsistente Momentaufnahme
+	aller Dateisysteme darstellt.  Dies kann wichtig sein, wenn
+	eine Anwendung Dateien auf mehreren Datasets ablegt, die
+	miteinander in Verbindung stehen oder voneinander abhängig
+	sind.  Ohne Schnappschüsse würde ein Backup Kopien dieser
+	Dateien zu unterschiedlichen Zeitpunkten enthalten.</p><p>Schnappschüsse in <acronym class="acronym">ZFS</acronym> bieten eine
+	Vielzahl von Eigenschaften, die selbst in anderen
+	Dateisystemen mit Schnappschussfunktion nicht vorhanden sind.
+	Ein typisches Beispiel zur Verwendung von Schnappschüssen ist,
+	den momentanen Stand des Dateisystems zu sichern,
+	wenn eine riskante Aktion wie das Installieren von Software
+	oder eine Systemaktualisierung durchgeführt wird.  Wenn diese
+	Aktion fehlschlägt, so kann der Schnappschuss zurückgerollt
+	werden und das System befindet sich wieder in dem gleichen
+	Zustand, wie zu dem, als der Schnappschuss erstellt wurde.
+	Wenn die Aktualisierung jedoch erfolgreich war, kann der
+	Schnappschuss gelöscht werden, um Speicherplatz frei zu geben.
+	Ohne Schnappschüsse, wird durch ein fehlgeschlagenes Update
+	eine Wiederherstellung der Sicherung fällig, was oft mühsam
+	und zeitaufwändig ist, außerdem ist währenddessen das System
+	nicht verwendbar.  Schnappschüsse lassen sich schnell
+	und mit wenig bis gar keiner Ausfallzeit zurückrollen, selbst
+	wenn das System im normalen Betrieb läuft.  Die Zeitersparnis
+	ist enorm, wenn mehrere Terabyte große Speichersysteme
+	eingesetzt werden und viel Zeit für das Kopieren der Daten vom
+	Sicherungssystem benötigt wird.  Schnappschüsse sind jedoch
+	keine Ersatz für eine Vollsicherung des Pools, können jedoch
+	als eine schnelle und einfache Sicherungsmethode verwendet
+	werden, um eine Kopie eines Datasets zu einem bestimmten
+	Zeitpunkt zu sichern.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-snapshot-creation"></a>21.4.5.1. Schnappschüsse erstellen</h4></div></div></div><p>Schnappschüsse werden durch das Kommando
+	  <code class="command">zfs snapshot
+	    <em class="replaceable"><code>dataset</code></em>@<em class="replaceable"><code>snapshotname</code></em></code>
+	  angelegt.  Durch Angabe der Option <code class="option">-r</code>
+	  werden Schnappschüsse rekursive angelegt, mit dem gleichen
+	  Namen auf allen Datasets.</p><p>Einen rekursiven Schnappschuss des gesamten Pools
+	  erzeugen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -t all</code></strong>
+NAME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool                                 780M  93.2G   144K  none
+mypool/ROOT                            777M  93.2G   144K  none
+mypool/ROOT/default                    777M  93.2G   777M  /
+mypool/tmp                             176K  93.2G   176K  /tmp
+mypool/usr                             616K  93.2G   144K  /usr
+mypool/usr/home                        184K  93.2G   184K  /usr/home
+mypool/usr/ports                       144K  93.2G   144K  /usr/ports
+mypool/usr/src                         144K  93.2G   144K  /usr/src
+mypool/var                            1.29M  93.2G   616K  /var
+mypool/var/crash                       148K  93.2G   148K  /var/crash
+mypool/var/log                         178K  93.2G   178K  /var/log
+mypool/var/mail                        144K  93.2G   144K  /var/mail
+mypool/var/newname                    87.5K  93.2G  87.5K  /var/newname
+mypool/var/newname@new_snapshot_name      0      -  87.5K  -
+mypool/var/tmp                         152K  93.2G   152K  /var/tmp
+<code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot -r <em class="replaceable"><code>mypool@my_recursive_snapshot</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -t snapshot</code></strong>
+NAME                                        USED  AVAIL  REFER  MOUNTPOINT
+mypool@my_recursive_snapshot                   0      -   144K  -
+mypool/ROOT@my_recursive_snapshot              0      -   144K  -
+mypool/ROOT/default@my_recursive_snapshot      0      -   777M  -
+mypool/tmp@my_recursive_snapshot               0      -   176K  -
+mypool/usr@my_recursive_snapshot               0      -   144K  -
+mypool/usr/home@my_recursive_snapshot          0      -   184K  -
+mypool/usr/ports@my_recursive_snapshot         0      -   144K  -
+mypool/usr/src@my_recursive_snapshot           0      -   144K  -
+mypool/var@my_recursive_snapshot               0      -   616K  -
+mypool/var/crash@my_recursive_snapshot         0      -   148K  -
+mypool/var/log@my_recursive_snapshot           0      -   178K  -
+mypool/var/mail@my_recursive_snapshot          0      -   144K  -
+mypool/var/newname@new_snapshot_name           0      -  87.5K  -
+mypool/var/newname@my_recursive_snapshot       0      -  87.5K  -
+mypool/var/tmp@my_recursive_snapshot           0      -   152K  -</pre><p>Schnappschüsse werden nicht durch einen
+	  <code class="command">zfs list</code>-Befehl angezeigt.  Um
+	  Schnappschüsse mit aufzulisten, muss
+	  <code class="option">-t snapshot</code> an das Kommando
+	  <code class="command">zfs list</code> angehängt werden.  Durch
+	  <code class="option">-t all</code> werden sowohl Dateisysteme als auch
+	  Schnappschüsse nebeneinander angezeigt.</p><p>Schnappschüsse werden nicht direkt eingehängt, deshalb
+	  wird auch kein Pfad in der Spalte
+	  <code class="literal">MOUNTPOINT</code> angezeigt.  Ebenso wird kein
+	  freier Speicherplatz in der Spalte <code class="literal">AVAIL</code>
+	  aufgelistet, da Schnappschüsse nicht mehr geschrieben werden
+	  können, nachdem diese angelegt wurden.  Vergleichen Sie den
+	  Schnappschuss mit dem ursprünglichen Dataset von dem es
+	  abstammt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt all <em class="replaceable"><code>mypool/usr/home</code></em></code></strong>
+NAME                                    USED  AVAIL  REFER  MOUNTPOINT
+mypool/usr/home                         184K  93.2G   184K  /usr/home
+mypool/usr/home@my_recursive_snapshot      0      -   184K  -</pre><p>Durch das Darstellen des Datasets und des
+	  Schnappschusses nebeneinander zeigt deutlich, wie
+	  Schnappschüsse in <a class="link" href="zfs-term.html#zfs-term-cow">COW</a>
+	  Manier funktionieren.  Sie zeichnen nur die Änderungen
+	  (<span class="emphasis"><em>delta</em></span>) auf, die währenddessen
+	  entstanden sind und nicht noch einmal den gesamten Inhalt
+	  des Dateisystems.  Das bedeutet, dass Schnappschüsse nur
+	  wenig Speicherplatz benötigen, wenn nur kleine Änderungen
+	  vorgenommen werden.  Der Speicherverbrauch kann sogar noch
+	  deutlicher gemacht werden, wenn eine Datei auf das Dataset
+	  kopiert wird und anschließend ein zweiter Schnappschuss
+	  angelegt wird:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp <em class="replaceable"><code>/etc/passwd</code></em> <em class="replaceable"><code>/var/tmp</code></em></code></strong>
+<code class="prompt">#</code> zfs snapshot <em class="replaceable"><code>mypool/var/tmp</code></em>@<em class="replaceable"><code>after_cp</code></em>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt all <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+NAME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/tmp                         206K  93.2G   118K  /var/tmp
+mypool/var/tmp@my_recursive_snapshot    88K      -   152K  -
+mypool/var/tmp@after_cp                   0      -   118K  -</pre><p>Der zweite Schnappschuss enthält nur die Änderungen am
+	  Dataset, die nach der Kopieraktion gemacht wurden.  Dies
+	  bedeutet enorme Einsparungen von Speicherplatz.  Beachten
+	  Sie, dass sich die Größe des Schnappschusses
+	  <em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em>
+	  in der Spalte <code class="literal">USED</code> ebenfalls
+	  geändert hat, um die Änderungen von sich selbst und dem
+	  Schnappschuss, der im Anschluss angelegt wurde,
+	  anzuzeigen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-snapshot-diff"></a>21.4.5.2. Schnappschüsse vergleichen</h4></div></div></div><p>ZFS enthält ein eingebautes Kommando, um die
+	  Unterschiede zwischen zwei Schnappschüssen miteinander zu
+	  vergleichen.  Das ist hilfreich, wenn viele Schnappschüsse
+	  über längere Zeit angelegt wurden und der Benutzer sehen
+	  will, wie sich das Dateisystem über diesen Zeitraum
+	  verändert hat.  Beispielsweise kann
+	  <code class="command">zfs diff</code> den letzten Schnappschuss
+	  finden, der noch eine Datei enthält, die aus Versehen
+	  gelöscht wurde.  Wenn dies für die letzten beiden
+	  Schnappschüsse aus dem vorherigen Abschnitt durchgeführt
+	  wird, ergibt sich folgende Ausgabe:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt all <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+NAME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/tmp                         206K  93.2G   118K  /var/tmp
+mypool/var/tmp@my_recursive_snapshot    88K      -   152K  -
+mypool/var/tmp@after_cp                   0      -   118K  -
+<code class="prompt">#</code> <strong class="userinput"><code>zfs diff <em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em></code></strong>
+M       /var/tmp/
++       /var/tmp/passwd</pre><p>Das Kommando zeigt alle Änderungen zwischen dem
+	  angegebenen Schnappschuss (in diesem Fall
+	  <code class="literal"><em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em></code>)
+	  und dem momentan aktuellen Dateisystem.  Die erste Spalte
+	  zeigt die Art der Änderung an:</p><div class="informaltable"><table width="100%" border="1"><colgroup><col /><col /></colgroup><tbody valign="top"><tr><td valign="top">+</td><td valign="top">Das Verzeichnis oder die Datei wurde
+		  hinzugefügt.</td></tr><tr><td valign="top">-</td><td valign="top">Das Verzeichnis oder die Datei wurde
+		  gelöscht.</td></tr><tr><td valign="top">M</td><td valign="top">Das Verzeichnis oder die Datei wurde
+		  geändert.</td></tr><tr><td valign="top">R</td><td valign="top">Das Verzeichnis oder die Datei wurde
+		  umbenannt.</td></tr></tbody></table></div><p>Vergleicht man die Ausgabe mit der Tabelle, wird klar,
+	  dass <code class="filename"><em class="replaceable"><code>passwd</code></em></code>
+	  hinzugefügt wurde, nachdem der Schnappschuss
+	  <code class="literal"><em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em></code>
+	  erstellt wurde.  Das resultierte ebenfalls in einer Änderung
+	  am darüberliegenden Verzeichnis, das unter
+	  <code class="literal"><em class="replaceable"><code>/var/tmp</code></em></code>
+	  eingehängt ist.</p><p>Zwei Schnappschüsse zu vergleichen ist hilfreich, wenn
+	  die Replikationseigenschaft von <acronym class="acronym">ZFS</acronym>
+	  verwendet wird, um ein Dataset auf einen anderen Host zu
+	  Sicherungszwecken übertragen.</p><p>Zwei Schnappschüsse durch die Angabe des kompletten
+	  Namens des Datasets und dem Namen des Schnappschusses beider
+	  Datasets vergleichen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /var/tmp/passwd /var/tmp/passwd.copy</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot <em class="replaceable"><code>mypool/var/tmp@diff_snapshot</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs diff <em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em> <em class="replaceable"><code>mypool/var/tmp@diff_snapshot</code></em></code></strong>
+M       /var/tmp/
++       /var/tmp/passwd
++       /var/tmp/passwd.copy
+<code class="prompt">#</code> <strong class="userinput"><code>zfs diff <em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em> <em class="replaceable"><code>mypool/var/tmp@after_cp</code></em></code></strong>
+M       /var/tmp/
++       /var/tmp/passwd</pre><p>Ein Administrator, der für die Sicherung zuständig ist,
+	  kann zwei Schnappschüsse miteinander vergleichen, die vom
+	  sendenden Host empfangen wurden, um festzustellen, welche
+	  Änderungen am Dataset vorgenommen wurden.  Lesen Sie dazu
+	  den Abschnitt <a class="link" href="zfs-zfs.html#zfs-zfs-send" title="21.4.7. Replikation">Replication</a> um weitere
+	  Informationen zu erhalten.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-snapshot-rollback"></a>21.4.5.3. Schnappschüsse zurückrollen</h4></div></div></div><p>Wenn zumindest ein Schnappschuss vorhanden ist, kann
+	  dieser zu einem beliebigen Zeitpunkt zurückgerollt werden.
+	  In den meisten Fällen passiert dies, wenn der aktuelle
+	  Zustand des Datasets nicht mehr benötigt wird und eine
+	  ältere Version bevorzugt wird.  Szenarien wie lokale
+	  Entwicklungstests, die fehlgeschlagen sind, defekte
+	  Systemaktualisierungen, welche die Funktionalität des
+	  Gesamtsystems einschränken oder die Anforderung,
+	  versehentlich gelöschte Dateien oder Verzeichnisse
+	  wiederherzustellen, sind allgegenwärtig.  Glücklicherweise
+	  ist das zurückrollen eines Schnappschusses so leicht wie die
+	  Eingabe von
+	  <code class="command">zfs rollback
+	    <em class="replaceable"><code>snapshotname</code></em></code>.
+	  Abhängig davon, wie viele Änderungen betroffen sind, wird
+	  diese Operation innerhalb einer gewissen Zeit abgeschlossen
+	  sein.  Während dieser Zeit bleibt das Dataset in einem
+	  konsistenten Zustand, sehr ähnlich den ACID-Prinzipien, die
+	  eine Datenbank beim Zurückrollen entspricht.  Während all
+	  dies passiert, ist das Dataset immer noch aktiv und
+	  erreichbar ohne dass eine Ausfallzeit nötig wäre.  Sobald
+	  der Schnappschuss zurückgerollt wurde, besitzt das Dataset
+	  den gleichen Zustand, den es besaß, als der Schnappschuss
+	  angelegt wurde.  Alle anderen Daten in diesem Dataset, die
+	  nicht Teil des Schnappschusses sind, werden verworfen.
+	  Einen Schnappschuss des aktuellen Zustandes des Datasets vor
+	  dem Zurückrollen anzulegen ist eine gute Idee, wenn
+	  hinterher noch Daten benötigt werden.  Auf diese Weise kann
+	  der Benutzer vor und zurück zwischen den Schnappschüssen
+	  springen, ohne wertvolle Daten zu verlieren.</p><p>Im ersten Beispiel wird ein Schnappschuss aufgrund eines
+	  unvorsichtigen <code class="command">rm</code>-Befehls zurückgerollt,
+	  der mehr Daten gelöscht hat, als vorgesehen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt all <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+NAME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/tmp                         262K  93.2G   120K  /var/tmp
+mypool/var/tmp@my_recursive_snapshot    88K      -   152K  -
+mypool/var/tmp@after_cp               53.5K      -   118K  -
+mypool/var/tmp@diff_snapshot              0      -   120K  -
+<code class="prompt">%</code> <strong class="userinput"><code>ls /var/tmp</code></strong>
+passwd          passwd.copy
+<code class="prompt">%</code> <strong class="userinput"><code>rm /var/tmp/passwd*</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ls /var/tmp</code></strong>
+vi.recover
+<code class="prompt">%</code></pre><p>Zu diesem Zeitpunkt bemerkt der Benutzer, dass zuviele
+	  Dateien gelöscht wurden und möchte diese zurück haben.
+	  <acronym class="acronym">ZFS</acronym> bietet eine einfache Möglichkeit,
+	  diese durch zurückrollen zurück zu bekommen, allerdings nur,
+	  wenn Schnappschüsse von wichtigen Daten regelmäßig angelegt
+	  werden.  Um die Dateien zurückzuerhalten und vom letzten
+	  Schnappschuss wieder zu beginnen, geben Sie ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs rollback <em class="replaceable"><code>mypool/var/tmp@diff_snapshot</code></em></code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ls /var/tmp</code></strong>
+passwd          passwd.copy     vi.recover</pre><p>Die Operation zum Zurückrollen versetzt das Dataset in
+	  den Zustand des letzten Schnappschusses zurück.  Es ist
+	  ebenfalls möglich, zu einem Schnappschuss zurückzurollen,
+	  der viel früher angelegt wurde und es noch Schnappschüsse
+	  nach diesem gibt.  Wenn Sie dies versuchen, gibt
+	  <acronym class="acronym">ZFS</acronym> die folgende Warnung aus:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt snapshot <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+AME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/tmp@my_recursive_snapshot    88K      -   152K  -
+mypool/var/tmp@after_cp               53.5K      -   118K  -
+mypool/var/tmp@diff_snapshot              0      -   120K  -
+<code class="prompt">#</code> <strong class="userinput"><code>zfs rollback <em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em></code></strong>
+cannot rollback to 'mypool/var/tmp@my_recursive_snapshot': more recent snapshots exist
+use '-r' to force deletion of the following snapshots:
+mypool/var/tmp@after_cp
+mypool/var/tmp@diff_snapshot</pre><p>Diese Warnung bedeutet, dass noch Schnappschüsse
+	  zwischen dem momentanen Stand des Datasets und dem
+	  Schnappschuss, zu dem der Benutzer zurückrollen möchte,
+	  existieren.  Um das Zurückrollen durchzuführen, müssen die
+	  Schnappschüsse gelöscht werden.  <acronym class="acronym">ZFS</acronym> kann
+	  nicht alle Änderungen zwischen verschiedenen Zuständen
+	  eines Datasets verfolgen, da Schnappschüsse nur gelesen
+	  werden können.  <acronym class="acronym">ZFS</acronym> wird nicht die
+	  betroffenen Schnappschüsse löschen, es sei denn, der
+	  Benutzer verwendet die Option <code class="option">-r</code>, um
+	  anzugeben, dass dies die gewünschte Aktion ist.  Falls dies
+	  der Fall ist und die Konsequenzen alle dazwischenliegenden
+	  Schnappschüsse zu verlieren verstanden wurden, kann der
+	  Befehl abgesetzt werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs rollback -r <em class="replaceable"><code>mypool/var/tmp@my_recursive_snapshot</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt snapshot <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+NAME                                   USED  AVAIL  REFER  MOUNTPOINT
+mypool/var/tmp@my_recursive_snapshot     8K      -   152K  -
+<code class="prompt">%</code> <strong class="userinput"><code>ls /var/tmp</code></strong>
+vi.recover</pre><p>Die Ausgabe von <code class="command">zfs list -t snapshot</code>
+	  bestätigt, dass die dazwischenliegenden Schnappschüsse als
+	  Ergebnis von <code class="command">zfs rollback -r</code> entfernt
+	  wurden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-snapshot-snapdir"></a>21.4.5.4. Individuelle Dateien aus Schnappschüssen
+	  wiederherstellen</h4></div></div></div><p>Schnappschüsse sind unter einem versteckten Verzeichnis
+	  unter dem Eltern-Dataset eingehängt:
+	  <code class="filename">.zfs/snapshots/<em class="replaceable"><code>snapshotname</code></em></code>.
+	  Standardmäßig werden diese Verzeichnisse nicht von einem
+	  gewöhnlichen <code class="command">ls -a</code> angezeigt.  Obwohl
+	  diese Verzeichnisse nicht angezeigt werden, sind diese
+	  trotzdem vorhanden und der Zugriff darauf erfolgt wie auf
+	  jedes andere Verzeichnis.  Die Eigenschaft
+	  <code class="literal">snapdir</code> steuert, ob diese Verzeichnisse
+	  beim Auflisten eines Verzeichnisses angezeigt werden oder
+	  nicht.  Das Einstellen der Eigenschaft auf den Wert
+	  <code class="literal">visible</code> erlaubt es, diese in der Ausgabe
+	  von <code class="command">ls</code> und anderen Kommandos, die
+	  mit Verzeichnisinhalten umgehen können, anzuzeigen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get snapdir <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+NAME            PROPERTY  VALUE    SOURCE
+mypool/var/tmp  snapdir   hidden   default
+<code class="prompt">%</code> <strong class="userinput"><code>ls -a /var/tmp</code></strong>
+.               ..              passwd          vi.recover
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set snapdir=visible <em class="replaceable"><code>mypool/var/tmp</code></em></code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ls -a /var/tmp</code></strong>
+.               ..              .zfs            passwd          vi.recover</pre><p>Einzelne Dateien lassen sich einfach auf einen
+	  vorherigen Stand wiederherstellen, indem diese aus dem
+	  Schnappschuss zurück in das Eltern-Dataset kopiert werden.
+	  Die Verzeichnisstruktur unterhalb von
+	  <code class="filename">.zfs/snapshot</code> enthält ein Verzeichnis,
+	  das exakt wie der Schnappschuss benannt ist, der zuvor
+	  angelegt wurde, um es einfacher zu machen, diese zu
+	  identifizieren.  Im nächsten Beispiel wird angenommen, dass
+	  eine Datei aus dem versteckten
+	  <code class="filename">.zfs</code> Verzeichnis durch kopieren aus dem
+	  Schnappschuss, der die letzte Version dieser Datei enthielt,
+	  wiederhergestellt wird:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm /var/tmp/passwd</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ls -a /var/tmp</code></strong>
+.               ..              .zfs            vi.recover
+<code class="prompt">#</code> <strong class="userinput"><code>ls /var/tmp/.zfs/snapshot</code></strong>
+after_cp                my_recursive_snapshot
+<code class="prompt">#</code> <strong class="userinput"><code>ls /var/tmp/.zfs/snapshot/<em class="replaceable"><code>after_cp</code></em></code></strong>
+passwd          vi.recover
+<code class="prompt">#</code> <strong class="userinput"><code>cp /var/tmp/.zfs/snapshot/<em class="replaceable"><code>after_cp/passwd</code></em> <em class="replaceable"><code>/var/tmp</code></em></code></strong></pre><p>Als <code class="command">ls .zfs/snapshot</code> ausgeführt
+	  wurde, war die <code class="literal">snapdir</code>-Eigenschaft
+	  möglicherweise nicht auf hidden gesetzt, trotzdem ist es
+	  immer noch möglich, den Inhalt dieses Verzeichnisses
+	  aufzulisten.  Es liegt am Administrator zu entscheiden, ob
+	  diese Verzeichnisse angezeigt werden soll.  Es ist möglich,
+	  diese für bestimmte Datasets anzuzeigen und für andere zu
+	  verstecken.  Das Kopieren von Dateien oder Verzeichnissen
+	  aus diesem versteckten <code class="filename">.zfs/snapshot</code>
+	  Verzeichnis ist einfach genug.  Jedoch führt der umgekehrte
+	  Weg zu einem Fehler:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp <em class="replaceable"><code>/etc/rc.conf</code></em> /var/tmp/.zfs/snapshot/<em class="replaceable"><code>after_cp/</code></em></code></strong>
+cp: /var/tmp/.zfs/snapshot/after_cp/rc.conf: Read-only file system</pre><p>Der Fehler erinnert den Benutzer daran, dass
+	  Schnappschüsse nur gelesen aber nicht mehr geändert werden
+	  können, nachdem diese angelegt wurden.  Es können keine
+	  Dateien in diese Schnappschuss-Verzeichnisse kopiert oder
+	  daraus gelöscht werden, da dies sonst den Zustand des
+	  Datasets verändern würde, den sie repräsentieren.</p><p>Schnappschüsse verbrauchen Speicherplatz basierend auf
+	  der Menge an Änderungen, die am Eltern-Dataset durchgeführt
+	  wurden, seit der Zeit als der Schnappschuss erstellt wurde.
+	  Die Eigenschaft <code class="literal">written</code> eines
+	  Schnappschusses verfolgt, wieviel Speicherplatz vom
+	  Schnappschuss belegt wird.</p><p>Schnappschüsse werden zerstört und der belegte Platz
+	  wieder freigegeben durch den Befehl
+	  <code class="command">zfs destroy
+	    <em class="replaceable"><code>dataset</code></em>@<em class="replaceable"><code>snapshot</code></em></code>.
+	  Durch hinzufügen von <code class="option">-r</code> werden alle
+	  Schnappschüsse rekursiv gelöscht, die den gleichen Namen wie
+	  das Eltern-Dataset besitzen.  Mit der Option
+	  <code class="option">-n -v</code> wird eine Liste von Schnappschüssen,
+	  die gelöscht werden würden, zusammen mit einer geschätzten
+	  Menge an zurückgewonnenem Speicherplatz angezeigt, ohne die
+	  eigentliche Zerstöroperation wirklich durchzuführen.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-clones"></a>21.4.6. Klone verwalten</h3></div></div></div><p>Ein Klon ist eine Kopie eines Schnappschusses, der mehr
+	wie ein reguläres Dataset behandelt wird.  Im Gegensatz zu
+	Schnappschüssen kann man von einem Klon nicht nur lesen, er
+	ist eingehängt und kann seine eigenen Eigenschaften haben.
+	Sobald ein Klon mittels <code class="command">zfs clone</code> erstellt
+	wurde, lässt sich der zugrundeliegende Schnappschuss nicht
+	mehr zerstören.  Die Eltern-/Kindbeziehung zwischen dem Klon
+	und dem Schnappschuss kann über
+	<code class="command">zfs promote</code> aufgelöst werden.  Nachdem ein
+	Klon auf diese Weise befördert wurde, wird der Schnappschuss
+	zum Kind des Klons, anstatt des ursprünglichen Datasets.  Dies
+	wird die Art und Weise, wie der Speicherplatz berechnet wird,
+	verändern, jedoch nicht den bereits belegten Speicher
+	anpassen.  Der Klon kann an einem beliebigen Punkt innerhalb
+	der <acronym class="acronym">ZFS</acronym>-Dateisystemhierarchie eingehängt
+	werden, nur nicht unterhalb der ursprünglichen Stelle des
+	Schnappschusses.</p><p>Um diese Klon-Funktionalität zu demonstrieren, wird dieses
+	Beispiel-Dataset verwendet:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs list -rt all <em class="replaceable"><code>camino/home/joe</code></em></code></strong>
+NAME                    USED  AVAIL  REFER  MOUNTPOINT
+camino/home/joe         108K   1.3G    87K  /usr/home/joe
+camino/home/joe@plans    21K      -  85.5K  -
+camino/home/joe@backup    0K      -    87K  -</pre><p>Ein typischer Einsatzzweck für Klone ist das
+	experimentieren mit einem bestimmten Dataset, während der
+	Schnappschuss beibehalten wird für den Fall, dass etwas
+	schiefgeht.  Da Schnappschüsse nicht verändert werden können,
+	wird ein Lese-/Schreibklon des Schnappschusses angelegt.
+	Nachdem das gewünschte Ergebnis im Klon erreicht wurde, kann
+	der Klon zu einem Dataset ernannt und das alte Dateisystem
+	entfernt werden.  Streng genommen ist das nicht nötig, da der
+	Klon und das Dataset ohne Probleme miteinander koexistieren
+	können.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs clone <em class="replaceable"><code>camino/home/joe</code></em>@<em class="replaceable"><code>backup</code></em> <em class="replaceable"><code>camino/home/joenew</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls /usr/home/joe*</code></strong>
+/usr/home/joe:
+backup.txz     plans.txt
+
+/usr/home/joenew:
+backup.txz     plans.txt
+<code class="prompt">#</code> <strong class="userinput"><code>df -h /usr/home</code></strong>
+Filesystem          Size    Used   Avail Capacity  Mounted on
+usr/home/joe        1.3G     31k    1.3G     0%    /usr/home/joe
+usr/home/joenew     1.3G     31k    1.3G     0%    /usr/home/joenew</pre><p>Nachdem ein Klon erstellt wurde, stellt er eine exakte
+	Kopie des Datasets zu dem Zeitpunkt dar, als der Schnappschuss
+	angelegt wurde.  Der Klon kann nun unabhängig vom
+	ursprünglichen Dataset geändert werden.  Die einzige
+	Verbindung zwischen den beiden ist der Schnappschuss.
+	<acronym class="acronym">ZFS</acronym> zeichnet diese Verbindung in der
+	Eigenschaft namens <code class="literal">origin</code> auf.  Sobald die
+	Abhängigkeit zwischen dem Schnappschuss und dem Klon durch das
+	Befördern des Klons mittels <code class="command">zfs promote</code>
+	entfernt wurde, wird auch die
+	<code class="literal">origin</code>-Eigenschaft des Klons entfernt, da
+	es sich nun um ein eigenständiges Dataset handelt.  Dieses
+	Beispiel demonstriert dies:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get origin <em class="replaceable"><code>camino/home/joenew</code></em></code></strong>
+NAME                  PROPERTY  VALUE                     SOURCE
+camino/home/joenew    origin    camino/home/joe@backup    -
+<code class="prompt">#</code> <strong class="userinput"><code>zfs promote <em class="replaceable"><code>camino/home/joenew</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs get origin <em class="replaceable"><code>camino/home/joenew</code></em></code></strong>
+NAME                  PROPERTY  VALUE   SOURCE
+camino/home/joenew    origin    -       -</pre><p>Nachdem ein paar Änderungen, wie beispielsweise das
+	Kopieren von <code class="filename">loader.conf</code> auf den
+	beförderten Klon vorgenommen wurden, wird das alte Verzeichnis
+	in diesem Fall überflüssig.  Stattdessen kann der beförderte
+	Klon diesen ersetzen.  Dies kann durch zwei
+	aufeinanderfolgende Befehl geschehen: <code class="command">zfs
+	  destroy</code> auf dem alten Dataset und <code class="command">zfs
+	  rename</code> auf dem Klon, um diesen genauso wie das
+	alte Dataset zu benennen (es kann auch einen ganz anderen
+	Namen erhalten).</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp <em class="replaceable"><code>/boot/defaults/loader.conf</code></em> <em class="replaceable"><code>/usr/home/joenew</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs destroy -f <em class="replaceable"><code>camino/home/joe</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs rename <em class="replaceable"><code>camino/home/joenew</code></em> <em class="replaceable"><code>camino/home/joe</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls /usr/home/joe</code></strong>
+backup.txz     loader.conf     plans.txt
+<code class="prompt">#</code> <strong class="userinput"><code>df -h <em class="replaceable"><code>/usr/home</code></em></code></strong>
+Filesystem          Size    Used   Avail Capacity  Mounted on
+usr/home/joe        1.3G    128k    1.3G     0%    /usr/home/joe</pre><p>Der geklonte Schnappschuss wird jetzt wie ein
+	gewöhnliches Dataset behandelt.  Es enthält alle Daten aus dem
+	ursprünglichen Schnappschuss inklusive der Dateien, die
+	anschließend hinzugefügt wurden, wie
+	<code class="filename">loader.conf</code>.  Klone können in
+	unterschiedlichen Szenarien eingesetzt werden, um nützliche
+	Eigenschaften für ZFS-Anwender zur Verfügung zu stellen.
+	Zum Beispiel können Jails als Schnappschüsse bereitgestellt
+	werden, die verschiedene Arten von installierten Anwendungen
+	anbieten.  Anwender können diese Schnappschüsse klonen und
+	ihre eigenen Anwendungen nach Belieben hinzufügen.  Sobald
+	sie mit den Änderungen zufrieden sind, können die Klone zu
+	vollständigen Datasets ernannt werden und dem Anwender zur
+	Verfügung gestellt werden, als würde es sich um echte
+	Datasets handeln.  Das spart Zeit und Administrationsaufwand,
+	wenn diese Jails auf diese Weise zur Verfügung gestellt
+	werden.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-send"></a>21.4.7. Replikation</h3></div></div></div><p>Daten auf einem einzigen Pool an einem Platz
+	aufzubewahren, setzt diese dem Risiko aus, gestohlen oder
+	Opfer von Naturgewalten zu werden, sowie menschlichem
+	Versagen auszusetzen.   Regelmäßige Sicherungen des gesamten
+	Pools ist daher unerlässlich.  <acronym class="acronym">ZFS</acronym> bietet
+	eine Reihe von eingebauten Serialisierungsfunktionen an, die
+	in der Lage ist, eine Repräsentation der Daten als Datenstrom
+	auf die Standardausgabe zu schreiben.  Mit dieser Methode ist
+	es nicht nur möglich, die Daten auf einen anderen Pool zu
+	schicken, der an das lokale System angeschlossen ist, sondern
+	ihn auch über ein Netzwerk an ein anderes System zu senden.
+	Schnappschüsse stellen dafür die Replikationsbasis bereit
+	(lesen Sie dazu den Abschnitt zu <a class="link" href="zfs-zfs.html#zfs-zfs-snapshot" title="21.4.5. Verwalten von Schnappschüssen"><acronym class="acronym">ZFS</acronym>
+	  snapshots</a>).  Die Befehle, die für die Replikation
+	verwendet werden, sind <code class="command">zfs send</code> und
+	<code class="command">zfs receive</code>.</p><p>Diese Beispiele demonstrieren die Replikation von
+	<acronym class="acronym">ZFS</acronym> anhand dieser beiden Pools:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME    SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+backup  960M    77K   896M     0%  1.00x  ONLINE  -
+mypool  984M  43.7M   940M     4%  1.00x  ONLINE  -</pre><p>Der Pool namens <em class="replaceable"><code>mypool</code></em> ist der
+	primäre Pool, auf den regelmäßig Daten geschrieben und auch
+	wieder gelesen werden.  Ein zweiter Pool, genannt
+	<em class="replaceable"><code>backup</code></em> wird verwendet, um als
+	Reserve zu dienen im Falle, dass der primäre Pool nicht zur
+	Verfügung steht.  Beachten Sie, dass diese Ausfallsicherung
+	nicht automatisch von <acronym class="acronym">ZFS</acronym> durchgeführt
+	wird, sondern manuell von einem Systemadministrator bei Bedarf
+	eingerichtet werden muss.  Ein Schnappschuss wird verwendet,
+	um einen konsistenten Zustand des Dateisystems, das repliziert
+	werden soll, zu erzeugen.  Sobald ein Schnappschuss von
+	<em class="replaceable"><code>mypool</code></em> angelegt wurde, kann er auf
+	den <em class="replaceable"><code>backup</code></em>-Pool abgelegt werden.
+	Nur Schnappschüsse lassen sich auf diese Weise replizieren.
+	Änderungen, die seit dem letzten Schnappschuss entstanden
+	sind, werden nicht mit repliziert.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>backup1</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -t snapshot</code></strong>
+NAME                    USED  AVAIL  REFER  MOUNTPOINT
+mypool@backup1             0      -  43.6M  -</pre><p>Da nun ein Schnappschuss existiert, kann mit
+	<code class="command">zfs send</code> ein Datenstrom, der den Inhalt des
+	Schnappschusses repräsentiert, erstellt werden.  Dieser
+	Datenstrom kann als Datei gespeichert oder von einem
+	anderen Pool empfangen werden.  Der Datenstrom wird auf die
+	Standardausgabe geschrieben, muss jedoch in eine Datei oder
+	in eine Pipe umgeleitet werden, sonst wird ein Fehler
+	produziert:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs send <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>backup1</code></em></code></strong>
+Error: Stream can not be written to a terminal.
+You must redirect standard output.</pre><p>Um ein Dataset mit <code class="command">zfs send</code> zu
+	replizieren, leiten Sie dieses in eine Datei auf dem
+	eingehängten Backup-Pool um.  Stellen Sie sicher, dass der
+	Pool genug freien Speicherplatz besitzt, um die Größe des
+	gesendeten Schnappschusses aufzunehmen.  Das beinhaltet alle
+	Daten im Schnappschuss, nicht nur die Änderungen zum
+	vorherigen Schnappschuss.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs send <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>backup1</code></em> &gt; <em class="replaceable"><code>/backup/backup1</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME    SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+backup  960M  63.7M   896M     6%  1.00x  ONLINE  -
+mypool  984M  43.7M   940M     4%  1.00x  ONLINE  -</pre><p>Das Kommando <code class="command">zfs send</code> transferierte
+	alle Daten im <em class="replaceable"><code>backup1</code></em>-Schnappschuss
+	auf den Pool namens <em class="replaceable"><code>backup</code></em>.
+	Erstellen und senden eines Schnappschusses kann automatisch
+	von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a> durchgeführt werden.</p><p>Anstatt die Sicherungen als Archivdateien zu speichern,
+	kann <acronym class="acronym">ZFS</acronym> diese auch als aktives Dateisystem
+	empfangen, was es erlaubt, direkt auf die gesicherten Daten
+	zuzugreifen.  Um an die eigentlichen Daten in diesem Strom zu
+	gelangen, wird <code class="command">zfs receive</code> benutzt, um den
+	Strom wieder in Dateien und Verzeichnisse umzuwandeln.  Das
+	Beispiel unten kombiniert <code class="command">zfs send</code> und
+	<code class="command">zfs receive</code> durch eine Pipe, um die Daten
+	von einem Pool auf den anderen zu kopieren.  Die Daten können
+	direkt auf dem empfangenden Pool verwendet werden, nachdem der
+	Transfer abgeschlossen ist.  Ein Dataset kann nur auf ein
+	leeres Dataset repliziert werden.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>replica1</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs send -v <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>replica1</code></em> | zfs receive <em class="replaceable"><code>backup/mypool</code></em></code></strong>
+send from @ to mypool@replica1 estimated size is 50.1M
+total estimated size is 50.1M
+TIME        SENT   SNAPSHOT
+
+<code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME    SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+backup  960M  63.7M   896M     6%  1.00x  ONLINE  -
+mypool  984M  43.7M   940M     4%  1.00x  ONLINE  -</pre><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-send-incremental"></a>21.4.7.1. Inkrementelle Sicherungen</h4></div></div></div><p>Die Unterschiede zwischen zwei Schnappschüssen kann
+	  <code class="command">zfs send</code> ebenfalls erkennen und nur diese
+	  übertragen.  Dies spart Speicherplatz und Übertragungszeit.
+	  Beispielsweise:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>replica2</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -t snapshot</code></strong>
+NAME                    USED  AVAIL  REFER  MOUNTPOINT
+mypool@replica1         5.72M      -  43.6M  -
+mypool@replica2             0      -  44.1M  -
+<code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME    SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+backup  960M  61.7M   898M     6%  1.00x  ONLINE  -
+mypool  960M  50.2M   910M     5%  1.00x  ONLINE  -</pre><p>Ein zweiter Schnappschuss genannt
+	  <em class="replaceable"><code>replica2</code></em> wurde angelegt.  Dieser
+	  zweite Schnappschuss enthält nur die Änderungen, die
+	  zwischen dem jetzigen Stand des Dateisystems und dem
+	  vorherigen Schnappschuss,
+	  <em class="replaceable"><code>replica1</code></em>, vorgenommen wurden.
+	  Durch <code class="command">zfs send -i</code> und die Angabe des
+	  Schnappschusspaares wird ein inkrementeller
+	  Replikationsstrom erzeugt, welcher nur die Daten enthält,
+	  die sich geändert haben.  Das kann nur erfolgreich sein,
+	  wenn der initiale Schnappschuss bereits auf der
+	  Empfängerseite vorhanden ist.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs send -v -i <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>replica1</code></em> <em class="replaceable"><code>mypool</code></em>@<em class="replaceable"><code>replica2</code></em> | zfs receive <em class="replaceable"><code>/backup/mypool</code></em></code></strong>
+send from @replica1 to mypool@replica2 estimated size is 5.02M
+total estimated size is 5.02M
+TIME        SENT   SNAPSHOT
+
+<code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME    SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+backup  960M  80.8M   879M     8%  1.00x  ONLINE  -
+mypool  960M  50.2M   910M     5%  1.00x  ONLINE  -
+
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME                         USED  AVAIL  REFER  MOUNTPOINT
+backup                      55.4M   240G   152K  /backup
+backup/mypool               55.3M   240G  55.2M  /backup/mypool
+mypool                      55.6M  11.6G  55.0M  /mypool
+
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list -t snapshot</code></strong>
+NAME                                         USED  AVAIL  REFER  MOUNTPOINT
+backup/mypool@replica1                       104K      -  50.2M  -
+backup/mypool@replica2                          0      -  55.2M  -
+mypool@replica1                             29.9K      -  50.0M  -
+mypool@replica2                                 0      -  55.0M  -</pre><p>Der inkrementelle Datenstrom wurde erfolgreich
+	  übertragen.  Nur die Daten, die verändert wurden, sind
+	  übertragen worden, anstatt das komplette
+	  <em class="replaceable"><code>replica1</code></em>.  Nur die Unterschiede
+	  wurden gesendet, was weniger Zeit und Speicherplatz in
+	  Anspruch genommen hat, statt jedesmal den gesamten Pool zu
+	  kopieren.  Das ist hilfreich wenn langsame Netzwerke oder
+	  Kosten für die übertragene Menge Bytes in Erwägung gezogen
+	  werden müssen.</p><p>Ein neues Dateisystem,
+	  <em class="replaceable"><code>backup/mypool</code></em>, ist mit allen
+	  Dateien und Daten vom Pool
+	  <em class="replaceable"><code>mypool</code></em> verfügbar.  Wenn die
+	  Option <code class="option">-P</code> angegeben wird, werden die
+	  Eigenschaften des Datasets kopiert, einschließlich der
+	  Komprimierungseinstellungen, Quotas und Einhängepunkte.
+	  Wird die Option <code class="option">-R</code> verwendet, so werden
+	  alle Kind-Datasets des angegebenen Datasets kopiert,
+	  zusammen mit ihren Eigenschaften.  Senden und Empfangen kann
+	  automatisiert werden, so dass regelmäßig Sicherungen auf
+	  dem zweiten Pool angelegt werden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-send-ssh"></a>21.4.7.2. Verschlüsselte Sicherungen über
+	  <span class="application">SSH</span> senden</h4></div></div></div><p>Datenströme über das Netzwerk zu schicken ist eine gute
+	  Methode, um Sicherungen außerhalb des Systems anzulegen.
+	  Jedoch ist dies auch mit einem Nachteil verbunden.  Daten,
+	  die über die Leitung verschickt werden, sind nicht
+	  verschlüsselt, was es jedem erlaubt, die Daten abzufangen
+	  und die Ströme wieder zurück in Daten umzuwandeln, ohne dass
+	  der sendende Benutzer davon etwas merkt.  Dies ist eine
+	  unerwünschte Situation, besonders wenn die Datenströme über
+	  das Internet auf ein entferntes System gesendet werden.
+	  <span class="application">SSH</span> kann benutzt werden, um
+	  durch Verschlüsselung geschützte Daten über eine
+	  Netzwerkverbindung zu übertragen.  Da <acronym class="acronym">ZFS</acronym>
+	  nur die Anforderung hat, dass der Strom von der
+	  Standardausgabe umgeleitet wird, ist es relativ einfach,
+	  diesen durch <span class="application">SSH</span> zu leiten.  Um
+	  den Inhalt des Dateisystems während der Übertragung und auf
+	  dem entfernten System weiterhin verschlüsselt zu lassen,
+	  denken Sie über den Einsatz von <a class="link" href="http://wiki.freebsd.org/PEFS" target="_top">PEFS</a>
+	  nach.</p><p>Ein paar Einstellungen und Sicherheitsvorkehrungen
+	  müssen zuvor abgeschlossen sein.  Es werden hier nur die
+	  nötigen Schritte für die <code class="command">zfs send</code>-Aktion
+	  gezeigt.  Weiterführende Informationen zu
+	  <span class="application">SSH</span>, gibt es im Kapitel
+	  <a class="xref" href="openssh.html" title="15.10. OpenSSH">Abschnitt 15.10, &#8222;OpenSSH&#8220;</a>.</p><p>Die folgende Konfiguration wird benötigt:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Passwortloser <span class="application">SSH</span>-Zugang
+	      zwischen dem sendenden und dem empfangenden Host durch
+	      den Einsatz von
+	      <span class="application">SSH</span>-Schlüsseln.</p></li><li class="listitem"><p>Normalerweise werden die Privilegien des <code class="systemitem">root</code>-Benutzers
+	      gebraucht, um Strom zu senden und zu empfangen.  Das
+	      beinhaltet das Anmelden auf dem empfangenden System als
+	      <code class="systemitem">root</code>.
+	      Allerdings ist das Anmelden als <code class="systemitem">root</code> aus
+	      Sicherheitsgründen standardmäßig deaktiviert.  Mit
+	      <a class="link" href="zfs-zfs-allow.html" title="21.5. Delegierbare Administration">ZFS Delegation</a>
+	      lassen sich nicht-<code class="systemitem">root</code>-Benutzer auf jedem
+	      System einrichten, welche die nötigen Rechte besitzen,
+	      um die Sende- und Empfangsoperation
+	      durchzuführen.</p></li><li class="listitem"><p>Auf dem sendenden System:</p><pre class="screen"><code class="prompt">#</code> <code class="command">zfs allow -u someuser send,snapshot <em class="replaceable"><code>mypool</code></em></code></pre></li><li class="listitem"><p>Um den Pool einzuhängen, muss der unprivilegierte
+	      Benutzer das Verzeichnis besitzen und gewöhnliche
+	      Benutzern muss die Erlaubnis gegeben werden, das
+	      Dateisystem einzuhängen.  Auf dem empfangenden System
+	      nehmen Sie dazu die folgenden Einstellungen vor:</p><pre class="screen"><code class="prompt">#</code> sysctl vfs.usermount=1
+vfs.usermount: 0 -&gt; 1
+<code class="prompt">#</code> echo vfs.usermount=1 &gt;&gt; /etc/sysctl.conf
+<code class="prompt">#</code> <strong class="userinput"><code>zfs create <em class="replaceable"><code>recvpool/backup</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs allow -u <em class="replaceable"><code>someuser</code></em> create,mount,receive <em class="replaceable"><code>recvpool/backup</code></em></code></strong>
+<code class="prompt">#</code> chown <em class="replaceable"><code>someuser</code></em> <em class="replaceable"><code>/recvpool/backup</code></em></pre></li></ul></div><p>Der unprivilegierte Benutzer hat jetzt die Fähigkeit,
+	  Datasets zu empfangen und einzuhängen und das
+	  <em class="replaceable"><code>home</code></em>-Dataset auf das entfernte
+	  System zu replizieren:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>zfs snapshot -r <em class="replaceable"><code>mypool/home</code></em>@<em class="replaceable"><code>monday</code></em></code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>zfs send -R <em class="replaceable"><code>mypool/home</code></em>@<em class="replaceable"><code>monday</code></em> | ssh <em class="replaceable"><code>someuser@backuphost</code></em> zfs recv -dvu <em class="replaceable"><code>recvpool/backup</code></em></code></strong></pre><p>Ein rekursiver Schnappschuss namens
+	  <em class="replaceable"><code>monday</code></em> wird aus dem Dataset
+	  <em class="replaceable"><code>home</code></em> erstellt, dass auf dem Pool
+	  <em class="replaceable"><code>mypool</code></em> liegt.  Es wird dann mit
+	  <code class="command">zfs send -R</code> gesendet, um das Dataset,
+	  alle seine Kinder, Schnappschüsse, Klone und Einstellungen
+	  in den Strom mit aufzunehmen.  Die Ausgabe wird an das
+	  wartende System <em class="replaceable"><code>backuphost</code></em>
+	  mittels <code class="command">zfs receive</code> durch
+	  <span class="application">SSH</span> umgeleitet.  Die Verwendung
+	  des Fully Qulified Domänennamens oder der IP-Adresse wird
+	  empfohlen.  Die empfangende Maschine schreibt die Daten auf
+	  das <em class="replaceable"><code>backup</code></em>-Dataset im
+	  <em class="replaceable"><code>recvpool</code></em>-Pool.  Hinzufügen der
+	  Option <code class="option">-d</code> zu <code class="command">zfs recv</code>
+	  überschreibt den Namen des Pools auf der empfangenden Seite
+	  mit dem Namen des Schnappschusses.  Durch Angabe von
+	  <code class="option">-u</code> wird das Dateisystem nicht auf der
+	  Empfängerseite eingehängt.  Wenn <code class="option">-v</code>
+	  enthalten ist, werden mehr Details zum Transfer angezeigt
+	  werden, einschließlich der vergangenen Zeit und der Menge
+	  an übertragenen Daten.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-quota"></a>21.4.8. Dataset-, Benutzer- und Gruppenquotas</h3></div></div></div><p><a class="link" href="zfs-term.html#zfs-term-quota">Dataset-Quotas</a>
+	werden eingesetzt, um den Speicherplatz einzuschränken, den
+	ein bestimmtes Dataset verbrauchen kann.  <a class="link" href="zfs-term.html#zfs-term-refquota">Referenz-Quotas</a>
+	funktionieren auf eine ähnliche Weise, jedoch wird dabei der
+	Speicherplatz des Datasets selbst gezählt, wobei
+	Schnappschüsse und Kind-Datasets dabei ausgenommen sind.
+	Ähnlich dazu werden <a class="link" href="zfs-term.html#zfs-term-userquota">Benutzer</a>- und <a class="link" href="zfs-term.html#zfs-term-groupquota">Gruppen</a>-Quotas
+	dazu verwendet, um Benutzer oder Gruppen daran zu hindern, den
+	gesamten Speicherplatz im Pool oder auf dem Dataset zu
+	verbrauchen.</p><p>Um ein 10 GB großes Quota auf dem Dataset
+	<code class="filename">storage/home/bob</code> zu erzwingen, verwenden
+	Sie folgenden Befehl:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set quota=10G storage/home/bob</code></strong></pre><p>Um ein Referenzquota von 10 GB für
+	<code class="filename">storage/home/bob</code> festzulegen, geben Sie
+	ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set refquota=10G storage/home/bob</code></strong></pre><p>Um das Quota für <code class="filename">storage/home/bob</code>
+	wieder zu entfernen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set quota=none storage/home/bob</code></strong></pre><p>Das generelle Format ist
+	<code class="literal">userquota@<em class="replaceable"><code>user</code></em>=<em class="replaceable"><code>size</code></em></code>
+	und der Name des Benutzers muss in einem der folgenden Formate
+	vorliegen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><acronym class="acronym">POSIX</acronym>-kompatibler Name wie
+	    <em class="replaceable"><code>joe</code></em>.</p></li><li class="listitem"><p><acronym class="acronym">POSIX</acronym>-numerische ID wie
+	    <em class="replaceable"><code>789</code></em>.</p></li><li class="listitem"><p><acronym class="acronym">SID</acronym>-Name wie
+	    <em class="replaceable"><code>joe.bloggs@example.com</code></em>.</p></li><li class="listitem"><p><acronym class="acronym">SID</acronym>-numerische ID wie
+	    <em class="replaceable"><code>S-1-123-456-789</code></em>.</p></li></ul></div><p>Um beispielsweise ein Benutzerquota von 50 GB für
+	den Benutzer names <em class="replaceable"><code>joe</code></em> zu
+	erzwingen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set userquota@joe=50G</code></strong></pre><p>Um jegliche Quotas zu entfernen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set userquota@joe=none</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Benutzerquota-Eigenschaften werden nicht von
+	  <code class="command">zfs get all</code> dargestellt.
+	  Nicht-<code class="systemitem">root</code>-Benutzer können nur ihre
+	  eigenen Quotas sehen, ausser ihnen wurde das
+	  <code class="literal">userquota</code>-Privileg zugeteilt.  Benutzer
+	  mit diesem Privileg sind in der Lage, jedermanns Quota zu
+	  sehen und zu verändern.</p></div><p>Das generelle Format zum Festlegen einer Gruppenquota
+	lautet:
+	<code class="literal">groupquota@<em class="replaceable"><code>group</code></em>=<em class="replaceable"><code>size</code></em></code>.</p><p>Um ein Quota für die Gruppe
+	<em class="replaceable"><code>firstgroup</code></em> von 50 GB zu
+	setzen, geben Sie ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set groupquota@firstgroup=50G</code></strong></pre><p>Um eine Quota für die Gruppe
+	<em class="replaceable"><code>firstgroup</code></em>zu setzen oder
+	sicherzustellen, dass diese nicht gesetzt ist, verwenden Sie
+	stattdessen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set groupquota@firstgroup=none</code></strong></pre><p>Genau wie mit der Gruppenquota-Eigenschaft, werden
+	nicht-<code class="systemitem">root</code>-Benutzer
+	nur die Quotas sehen, die den Gruppen zugeordnet ist, in denen
+	Sie Mitglied sind.  Allerdings ist <code class="systemitem">root</code> oder ein Benutzer mit dem
+	<code class="literal">groupquota</code>-Privileg in der Lage, die Quotas
+	aller Gruppen zu sehen und festzusetzen.</p><p>Um die Menge an Speicherplatz zusammen mit der Quota
+	anzuzeigen, die von jedem Benutzer auf dem Dateisystem oder
+	Schnappschuss verbraucht wird, verwenden Sie
+	<code class="command">zfs userspace</code>.  Für Gruppeninformationen,
+	nutzen Sie <code class="command">zfs groupspace</code>.  Für weitere
+	Informationen zu unterstützten Optionen oder wie sich nur
+	bestimmte Optionen anzeigen lassen, lesen Sie
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zfs&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">zfs</span>(1)</span></a>.</p><p>Benutzer mit ausreichenden Rechten sowie <code class="systemitem">root</code> können das Quota für
+	<code class="filename">storage/home/bob</code> anzeigen lassen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get quota storage/home/bob</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-reservation"></a>21.4.9. Reservierungen</h3></div></div></div><p><a class="link" href="zfs-term.html#zfs-term-reservation">Reservierungen</a>
+	garantieren ein Minimum an Speicherplatz, der immer auf dem
+	Dataset verfügbar sein wird.  Der reservierte Platz wird nicht
+	für andere Datasets zur Verfügung stehen.  Diese Eigenschaft
+	kann besonders nützlich sein, um zu gewährleisten, dass freier
+	Speicherplatz für ein wichtiges Dataset oder für Logdateien
+	bereit steht.</p><p>Das generelle Format der
+	<code class="literal">reservation</code>-Eigenschaft ist
+	<code class="literal">reservation=<em class="replaceable"><code>size</code></em></code>.
+	Um also eine Reservierung von 10 GB auf
+	<code class="filename">storage/home/bob</code> festzulegen, geben Sie
+	Folgendes ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set reservation=10G storage/home/bob</code></strong></pre><p>Um die Reservierung zu beseitigen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set reservation=none storage/home/bob</code></strong></pre><p>Das gleiche Prinzip kann auf die
+	<code class="literal">refreservation</code>-Eigenschaft angewendet
+	werden, um eine <a class="link" href="zfs-term.html#zfs-term-refreservation">Referenzreservierung</a>
+	mit dem generellen Format
+	<code class="literal">refreservation=<em class="replaceable"><code>size</code></em></code>
+	festzulegen.</p><p>Dieser Befehl zeigt die Reservierungen oder
+	Referenzreservierungen an, die auf
+	<code class="filename">storage/home/bob</code> existieren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get reservation storage/home/bob</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs get refreservation storage/home/bob</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-compression"></a>21.4.10. Komprimierung</h3></div></div></div><p><acronym class="acronym">ZFS</acronym> bietet transparente Komprimierung.
+	Datenkomprimierung auf Blockebene während diese gerade
+	geschrieben werden, spart nicht nur Plattenplatz ein, sondern
+	kann auch den Durchsatz der Platte steigern.  Falls Daten zu
+	25% komprimiert sind, jedoch die komprimierten Daten im
+	gleichen Tempo wie ihre unkomprimierte Version, resultiert das
+	in einer effektiven Schreibgeschwindigkeit von 125%.
+	Komprimierung kann auch eine Alternative zu <a class="link" href="zfs-zfs.html#zfs-zfs-deduplication" title="21.4.11. Deduplizierung">Deduplizierung</a>
+	darstellen, da es viel weniger zusätzlichen Hauptspeicher
+	benötigt.</p><p><acronym class="acronym">ZFS</acronym> bietet mehrere verschiedene
+	Kompressionsalgorithmen an, jede mit unterschiedlichen
+	Kompromissen.  Mit der Einführung von
+	<acronym class="acronym">LZ4</acronym>-Komprimierung in <acronym class="acronym">ZFS</acronym>
+	v5000, ist es möglich, Komprimierung für den gesamten Pool zu
+	aktivieren, ohne die großen Geschwindigkeitseinbußen der
+	anderen Algorithmen.  Der größte Vorteil von
+	<acronym class="acronym">LZ4</acronym> ist die Eigenschaft <span class="emphasis"><em>früher
+	Abbruch</em></span>.  Wenn <acronym class="acronym">LZ4</acronym> nicht
+	mindestens 12,5% Komprimierung im ersten Teil der Daten
+	erreicht, wird der Block unkomprimiert geschrieben, um die
+	Verschwendung von CPU-Zyklen zu vermeiden, weil die Daten
+	entweder bereits komprimiert sind oder sich nicht komprimieren
+	lassen.  Für Details zu den verschiedenen verfügbaren
+	Komprimierungsalgorithmen in <acronym class="acronym">ZFS</acronym>, lesen Sie
+	den Eintrag <a class="link" href="zfs-term.html#zfs-term-compression">Komprimierung</a> im
+	Abschnitt Terminologie</p><p>Der Administrator kann die Effektivität der Komprimierung
+	über eine Reihe von Dataset-Eigenschaften überwachen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get used,compressratio,compression,logicalused <em class="replaceable"><code>mypool/compressed_dataset</code></em></code></strong>
+NAME        PROPERTY          VALUE     SOURCE
+mypool/compressed_dataset  used              449G      -
+mypool/compressed_dataset  compressratio     1.11x     -
+mypool/compressed_dataset  compression       lz4       local
+mypool/compressed_dataset  logicalused       496G      -</pre><p>Dieses Dataset verwendet gerade 449 GB Plattenplatz
+	(used-Eigenschaft.  Ohne Komprimierung würde es stattdessen
+	496 GB Plattenplatz belegen
+	(<code class="literal">logicalused</code>).  Das ergibt eine
+	Kompressionsrate von 1,11:1.</p><p>Komprimierung kann einen unerwarteten Nebeneffekt haben,
+	wenn diese mit <a class="link" href="zfs-term.html#zfs-term-userquota">Benutzerquotas</a>
+	kombiniert wird.  Benutzerquotas beschränken, wieviel
+	Speicherplatz ein Benutzer auf einem Dataset verbrauchen kann.
+	Jedoch basieren die Berechnungen darauf, wieviel Speicherplatz
+	<span class="emphasis"><em>nach der Komprimierung</em></span> belegt ist.  Wenn
+	also ein Benutzer eine Quota von10 GB besitzt und
+	10 GB von komprimierbaren Daten schreibt, wird dieser
+	immer noch in der Lage sein, zusätzliche Daten zu speichern.
+	Wenn später eine Datei aktualisiert wird, beispielsweise eine
+	Datenbank, mit mehr oder weniger komprimierbaren Daten, wird
+	sich die Menge an verfügbarem Speicherplatz ändern.  Das
+	kann in einer merkwürdigen Situation resultieren, in welcher
+	der Benutzer nicht die eigentliche Menge an Daten (die
+	Eigenschaft <code class="literal">logicalused</code>) überschreitet,
+	jedoch die Änderung in der Komprimierung dazu führt, dass das
+	Quota-Limit erreicht ist.</p><p>Kompression kann ebenso unerwartet mit Sicherungen
+	interagieren.  Quotas werden oft verwendet, um einzuschränken,
+	wieviele Daten gespeichert werden können um sicherzustellen,
+	dass ausreichend Speicherplatz für die Sicherung vorhanden
+	ist.  Wenn jedoch Quotas Komprimierung nicht berücksichtigen,
+	werden womöglich mehr Daten geschrieben als in der
+	unkomprimierten Sicherung Platz ist.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-deduplication"></a>21.4.11. Deduplizierung</h3></div></div></div><p>Wenn aktiviert, verwendet <a class="link" href="zfs-term.html#zfs-term-deduplication">Deduplizierung</a> die
+	Prüfsumme jedes Blocks, um Duplikate dieses Blocks zu
+	ermitteln.  Sollte ein neuer Block ein Duplikat eines
+	existierenden Blocks sein, dann schreibt
+	<acronym class="acronym">ZFS</acronym> eine zusätzliche Referenz auf die
+	existierenden Daten anstatt des kompletten duplizierten
+	Blocks.  Gewaltige Speicherplatzeinsparungen sind möglich wenn
+	die Daten viele Duplikate von Dateien oder wiederholte
+	Informationen enthalten.  Seien Sie gewarnt: Deduplizierung
+	benötigt eine extrem große Menge an Hauptspeicher und die
+	meistens Einsparungen können stattdessen durch das Aktivieren
+	von Komprimierung erreicht werden.</p><p>Um Deduplizierung zu aktivieren, setzen Sie die
+	<code class="literal">dedup</code>-Eigenschaft auf dem Zielpool:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set dedup=on <em class="replaceable"><code>pool</code></em></code></strong></pre><p>Nur neu auf den Pool geschriebene Daten werden
+	dedupliziert.  Daten, die bereits auf den Pool geschrieben
+	wurden, werden nicht durch das Aktivieren dieser Option
+	dedupliziert.  Ein Pool mit einer gerade aktivierten
+	Deduplizierung wird wie in diesem Beispiel aussehen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME  SIZE ALLOC  FREE CAP DEDUP HEALTH ALTROOT
+pool 2.84G 2.19M 2.83G  0% 1.00x ONLINE -</pre><p>Die Spalte <code class="literal">DEDUP</code> zeigt das aktuelle
+	Verhältnis der Deduplizierung für diesen Pool an.  Ein Wert
+	von <code class="literal">1.00x</code> zeigt an, dass die Daten noch
+	nicht dedupliziert wurden.  Im nächsten Beispiel wird die
+	Ports-Sammlung dreimal in verschiedene Verzeichnisse auf dem
+	deduplizierten Pool kopiert.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+for d in dir1 dir2 dir3; do
+for&gt; mkdir $d &amp;&amp; cp -R /usr/ports $d &amp;
+for&gt; done</pre><p>Redundante Daten werden erkannt und dedupliziert:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME SIZE  ALLOC FREE CAP DEDUP HEALTH ALTROOT
+pool 2.84G 20.9M 2.82G 0% 3.00x ONLINE -</pre><p>Die <code class="literal">DEDUP</code>-Spalte zeigt einen Faktor von
+	<code class="literal">3.00x</code>.  Mehrere Kopien der Ports-Sammlung
+	wurden erkannt und dedupliziert, was nur ein Drittel des
+	Speicherplatzes benötigt.  Das Potential für Einsparungen beim
+	Speicherplatz ist enorm, wird jedoch damit erkauft, dass
+	genügend Speicher zur Verfügung stehen muss, um die
+	deduplizierten Blöcke zu verwalten.</p><p>Deduplizierung ist nicht immer gewinnbringend, besonders
+	wenn die Daten auf dem Pool nicht redundant sind.
+	<acronym class="acronym">ZFS</acronym> kann potentielle
+	Speicherplatzeinsparungen durch Deduplizierung auf einem Pool
+	simulieren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zdb -S <em class="replaceable"><code>pool</code></em></code></strong>
+Simulated DDT histogram:
+
+bucket              allocated                       referenced
+______   ______________________________   ______________________________
+refcnt   blocks   LSIZE   PSIZE   DSIZE   blocks   LSIZE   PSIZE   DSIZE
+------   ------   -----   -----   -----   ------   -----   -----   -----
+     1    2.58M    289G    264G    264G    2.58M    289G    264G    264G
+     2     206K   12.6G   10.4G   10.4G     430K   26.4G   21.6G   21.6G
+     4    37.6K    692M    276M    276M     170K   3.04G   1.26G   1.26G
+     8    2.18K   45.2M   19.4M   19.4M    20.0K    425M    176M    176M
+    16      174   2.83M   1.20M   1.20M    3.33K   48.4M   20.4M   20.4M
+    32       40   2.17M    222K    222K    1.70K   97.2M   9.91M   9.91M
+    64        9     56K   10.5K   10.5K      865   4.96M    948K    948K
+   128        2   9.50K      2K      2K      419   2.11M    438K    438K
+   256        5   61.5K     12K     12K    1.90K   23.0M   4.47M   4.47M
+    1K        2      1K      1K      1K    2.98K   1.49M   1.49M   1.49M
+ Total    2.82M    303G    275G    275G    3.20M    319G    287G    287G
+
+dedup = 1.05, compress = 1.11, copies = 1.00, dedup * compress / copies = 1.16</pre><p>Nachdem <code class="command">zdb -S</code> die Analyse des Pool
+	abgeschlossen hat, zeigt es die Speicherplatzeinsparungen, die
+	durch aktivierte Deduplizierung erreichbar sind, an.  In
+	diesem Fall ist <code class="literal">1.16</code> ein sehr schlechter
+	Faktor, der größtenteils von Einsparungen durch Komprimierung
+	beeinflusst wird.  Aktivierung von Deduplizierung auf diesem
+	Pool würde also keine signifikante Menge an Speicherplatz
+	einsparen und ist daher nicht die Menge an Speicher wert, die
+	nötig sind, um zu deduplizieren.  Über die Formel
+	<span class="emphasis"><em>ratio = dedup * compress / copies</em></span> kann
+	ein Systemadministrator die Speicherplatzbelegung planen und
+	entscheiden, ob es sich lohnt, den zusätzlichen Hauptspeicher
+	für die Deduplizierung anhand des späteren Workloads
+	aufzuwenden.  Wenn sich die Daten verhältnismäßig gut
+	komprimieren lassen, sind die Speicherplatzeinsparungen sehr
+	gut.  Es wird empfohlen, in dieser Situation zuerst die
+	Komprimierung zu aktivieren, da diese auch erhöhte
+	Geschwindigkeit mit sich bringt.  Aktivieren Sie
+	Deduplizierung nur in solchen Fällen, bei denen die
+	Einsparungen beträchtlich sind und genug Hauptspeicher zur
+	Verfügung steht, um die <a class="link" href="zfs-term.html#zfs-term-deduplication"><acronym class="acronym">DDT</acronym></a>
+	aufzunehmen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zfs-jail"></a>21.4.12. <acronym class="acronym">ZFS</acronym> und Jails</h3></div></div></div><p>Um ein <acronym class="acronym">ZFS</acronym>-Dataset einem
+	<a class="link" href="jails.html" title="Kapitel 16. Jails">Jail</a> zuzuweisen, wird der Befehl
+	<code class="command">zfs jail</code> und die dazugehörige Eigenschaft
+	<code class="literal">jailed</code> verwendet.  Durch Angabe von
+	<code class="command">zfs jail <em class="replaceable"><code>jailid</code></em></code>
+	wird ein Dataset dem spezifizierten Jail zugewiesen und kann
+	mit <code class="command">zfs unjail</code> wieder abgehängt werden.
+	Damit das Dataset innerhalb der Jail kontrolliert werden kann,
+	muss die Eigenschaft <code class="literal">jailed</code> gesetzt sein.
+	Sobald ein Dataset sich im Jail befindet, kann es nicht mehr
+	länger auf dem Hostsystem eingehängt werden, da es
+	Einhängepunkte aufweisen könnte, welche die Sicherheit des
+	Systems gefährden.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="zfs-zpool.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="zfs.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="zfs-zfs-allow.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">21.3. <code class="command">zpool</code> Administration </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 21.5. Delegierbare Administration</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

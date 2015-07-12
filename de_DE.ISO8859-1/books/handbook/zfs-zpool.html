@@ -1,0 +1,926 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>21.3. zpool Administration</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="zfs.html" title="Kapitel 21. Das Z-Dateisystem (ZFS)" /><link rel="prev" href="zfs-quickstart.html" title="21.2. Schnellstartanleitung" /><link rel="next" href="zfs-zfs.html" title="21.4. zfs Administration" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.3. <code class="command">zpool</code> Administration</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="zfs-quickstart.html">Zurück</a> </td><th width="60%" align="center">Kapitel 21. Das Z-Dateisystem (<acronym class="acronym">ZFS</acronym>)</th><td width="20%" align="right"> <a accesskey="n" href="zfs-zfs.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="zfs-zpool"></a>21.3. <code class="command">zpool</code> Administration</h2></div></div></div><p>Administration von <acronym class="acronym">ZFS</acronym> ist unterteilt
+      zwischen zwei Hauptkommandos.  Das
+      <code class="command">zpool</code>-Werkzeug steuert die Operationen des
+      Pools und kümmert sich um das Hinzufügen, entfernen, ersetzen
+      und verwalten von Platten.  Mit dem <a class="link" href="zfs-zfs.html" title="21.4. zfs Administration"><code class="command">zfs</code></a>-Befehl können
+      Datasets erstellt, zerstört und verwaltet werden, sowohl
+      <a class="link" href="zfs-term.html#zfs-term-filesystem">Dateisysteme</a> als
+      auch <a class="link" href="zfs-term.html#zfs-term-volume">Volumes</a>.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-create"></a>21.3.1. Pools anlegen und zerstören</h3></div></div></div><p>Einen <acronym class="acronym">ZFS</acronym>-Pool
+	(<span class="emphasis"><em>zpool</em></span>) anzulegen beinhaltet das Treffen
+	von einer Reihe von Entscheidungen, die relativ dauerhaft
+	sind, weil die Struktur des Pools nachdem er angelegt wurde,
+	nicht mehr geändert werden kann.  Die wichtigste Entscheidung
+	ist, welche Arten von vdevs als physische Platten
+	zusammengefasst werden soll.  Sehen Sie sich dazu die Liste
+	von <a class="link" href="zfs-term.html#zfs-term-vdev">vdev-Arten</a> an, um
+	Details zu möglichen Optionen zu bekommen.  Nachdem der Pool
+	angelegt wurde, erlauben die meisten vdev-Arten es nicht mehr,
+	weitere Geräte zu diesem vdev hinzuzufügen.  Die Ausnahme sind
+	Spiegel, die das Hinzufügen von weiteren Platten zum vdev
+	gestatten, sowie stripes, die zu Spiegeln umgewandelt werden
+	können, indem man zusätzliche Platten zum vdev anhängt.
+	Obwohl weitere vdevs eingefügt werden können, um einen Pool zu
+	vergrößern, kann das Layout des Pools nach dem Anlegen nicht
+	mehr verändert werden.  Stattdessen müssen die Daten
+	gesichert, der Pool zerstört und danach neu erstellt
+	werden.</p><p>Erstellen eines einfachen gespiegelten Pools:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create <em class="replaceable"><code>mypool</code></em> mirror <em class="replaceable"><code>/dev/ada1</code></em> <em class="replaceable"><code>/dev/ada2</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada1    ONLINE       0     0     0
+            ada2    ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Mehrere vdevs können gleichzeitig angelegt werden.  Geben
+	Sie zusätzliche Gruppen von Platten, getrennt durch das
+	vdev-Typ Schlüsselwort, in diesem Beispiel
+	<code class="literal">mirror</code>, an:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create <em class="replaceable"><code>mypool</code></em> mirror <em class="replaceable"><code>/dev/ada1</code></em> <em class="replaceable"><code>/dev/ada2</code></em> mirror <em class="replaceable"><code>/dev/ada3</code></em> <em class="replaceable"><code>/dev/ada4</code></em></code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada1    ONLINE       0     0     0
+            ada2    ONLINE       0     0     0
+          mirror-1  ONLINE       0     0     0
+            ada3    ONLINE       0     0     0
+            ada4    ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Pools lassen sich auch durch die Angabe von Partitionen
+	anstatt von ganzen Platten erzeugen.  Durch die Verwendung von
+	<acronym class="acronym">ZFS</acronym> in einer separaten Partition ist es
+	möglich, dass die gleiche Platte andere Partitionen für andere
+	Zwecke besitzen kann.  Dies ist besonders von Interesse, wenn
+	Partitionen mit Bootcode und Dateisysteme, die zum starten
+	benötigt werden, hinzugefügt werden können.  Das erlaubt es,
+	von Platten zu booten, die auch Teil eines Pools sind.  Es
+	gibt keinen Geschwindigkeitsnachteil unter FreeBSD wenn eine
+	Partition anstatt einer ganzen Platte verwendet wird.  Durch
+	den Einsatz von Partitionen kann der Administrator die Platten
+	<span class="emphasis"><em>unter provisionieren</em></span>, indem weniger als
+	die volle Kapazität Verwendung findet.  Wenn in Zukunft eine
+	Ersatzfestplatte mit der gleichen Größe als die
+	Originalplatte eine kleinere Kapazität aufweist, passt die
+	kleinere Partition immer noch und die Ersatzplatte kann immer
+	noch verwendet werden.</p><p>Erstellen eines <a class="link" href="zfs-term.html#zfs-term-vdev-raidz">RAID-Z2</a>-Pools mit
+	Partitionen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create <em class="replaceable"><code>mypool</code></em> raidz2 <em class="replaceable"><code>/dev/ada0p3</code></em> <em class="replaceable"><code>/dev/ada1p3</code></em> <em class="replaceable"><code>/dev/ada2p3</code></em> <em class="replaceable"><code>/dev/ada3p3</code></em> <em class="replaceable"><code>/dev/ada4p3</code></em> <em class="replaceable"><code>/dev/ada5p3</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          raidz2-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+            ada3p3  ONLINE       0     0     0
+            ada4p3  ONLINE       0     0     0
+            ada5p3  ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Ein Pool, der nicht länger benötigt wird, kann zerstört
+	werden, so dass die Platten für einen anderen Einsatzzweck
+	Verwendung finden können.  Um einen Pool zu zerstören, müssen
+	zuerst alle Datasets in diesem Pool abgehängt werden.  Wenn
+	die Datasets verwendet werden, wird das Abhängen fehlschlagen
+	und der Pool nicht zerstört.  Die Zerstörung des Pools kann
+	erzwungen werden durch die Angabe der Option
+	<code class="option">-f</code>, jedoch kann dies undefiniertes Verhalten
+	in den Anwendungen auslösen, die noch offene Dateien auf
+	diesen Datasets hatten.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-attach"></a>21.3.2. Hinzufügen und Löschen von Geräten</h3></div></div></div><p>Es gibt zwei Fälle für das Hinzufügen von Platten zu einem
+	Pool: einhängen einer Platte zu einem existierenden vdev mit
+	<code class="command">zpool attach</code> oder einbinden von vdevs zum
+	Pool mit <code class="command">zpool add</code>.  Nur manche <a class="link" href="zfs-term.html#zfs-term-vdev">vdev-Arten</a> gestatten es,
+	Platten zum vdev hinzuzufügen, nachdem diese angelegt
+	wurden.</p><p>Ein Pool mit nur einer einzigen Platte besitzt keine
+	Redundanz.  Datenverfälschung kann erkannt, aber nicht
+	repariert werden, weil es keine weiteren Kopien der Daten
+	gibt.  Die Eigenschaft <a class="link" href="zfs-term.html#zfs-term-copies">copies</a> kann genutzt werden,
+	um einen geringen Fehler wie einen beschädigtem Sektor
+	auszumerzen, enthält aber nicht die gleiche Art von Schutz,
+	die Spiegelung oder <acronym class="acronym">RAID-Z</acronym> bieten.  Wenn
+	man mit einem Pool startet, der nur aus einer einzigen
+	vdev-Platte besteht, kann mit dem Kommando
+	<code class="command">zpool attach</code> eine zustätzliche Platte dem
+	vdev hinzugefügt werden, um einen Spiegel zu erzeugen.  Mit
+	<code class="command">zpool attach</code> können auch zusätzliche
+	Platten zu einer Spiegelgruppe eingefügt werden, was die
+	Redundanz und Lesegeschwindigkeit steigert.  Wenn die Platten,
+	aus denen der Pool besteht, partitioniert sind,
+	replizieren Sie das Layout der ersten Platte auf die Zweite.
+	Verwenden Sie dazu <code class="command">gpart backup</code> und
+	<code class="command">gpart restore</code>, um diesen Vorgang
+	einfacher zu gestalten.</p><p>Umwandeln eines (stripe) vdevs namens
+	<em class="replaceable"><code>ada0p3</code></em> mit einer einzelnen Platte
+	zu einem Spiegel durch das Einhängen von
+	<em class="replaceable"><code>ada1p3</code></em>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          ada0p3    ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool attach <em class="replaceable"><code>mypool</code></em> <em class="replaceable"><code>ada0p3</code></em> <em class="replaceable"><code>ada1p3</code></em></code></strong>
+Make sure to wait until resilver is done before rebooting.
+
+If you boot from pool 'mypool', you may need to update
+boot code on newly attached disk 'ada1p3'.
+
+Assuming you use GPT partitioning und 'da0' is your new boot disk
+you may use the following command:
+
+        gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 da0
+<code class="prompt">#</code> <strong class="userinput"><code>gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 <em class="replaceable"><code>ada1</code></em></code></strong>
+bootcode written to ada1
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+status: One or more devices is currently being resilvered.  The pool will
+        continue to function, possibly in a degraded state.
+action: Wait for the resilver to complete.
+  scan: resilver in progress since Fri May 30 08:19:19 2014
+        527M scanned out of 781M at 47.9M/s, 0h0m to go
+        527M resilvered, 67.53% done
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0  (resilvering)
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: resilvered 781M in 0h0m with 0 errors on Fri May 30 08:15:58 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Wenn das Hinzufügen von Platten zu einem vdev keine Option
+	wie für <acronym class="acronym">RAID-Z</acronym> ist, gibt es eine
+	Alternative, nämlich einen anderen vdev zum Pool hinzuzufügen.
+	Zusätzliche vdevs bieten höhere Geschwindigkeit, indem
+	Schreibvorgänge über die vdevs verteilt werden.  Jedes vdev
+	ist dafür verantwortlich, seine eigene Redundanz
+	sicherzustellen.  Es ist möglich, aber nicht empfehlenswert,
+	vdev-Arten zu mischen, wie zum Beispiel
+	<code class="literal">mirror</code> und <code class="literal">RAID-Z</code>.
+	Durch das Einfügen eines nicht-redundanten vdev zu einem
+	gespiegelten Pool oder einem <acronym class="acronym">RAID-Z</acronym> vdev
+	riskiert man die Daten des gesamten Pools.  Schreibvorgänge
+	werden verteilt, deshalb ist der Ausfall einer
+	nicht-redundanten Platte mit dem Verlust eines Teils von jedem
+	Block verbunden, der auf den Pool geschrieben wird.</p><p>Daten werden über jedes vdev gestriped.  Beispielsweise
+	sind zwei Spiegel-vdevs effektiv ein <acronym class="acronym">RAID</acronym>
+	10, dass über zwei Sets von Spiegeln die Daten schreibt.
+	Speicherplatz wird so allokiert, dass jedes vdev zur gleichen
+	Zeit vollgeschrieben wird.  Es gibt einen
+	Geschwindigkeitsnachteil wenn die vdevs unterschiedliche Menge
+	von freiem Speicher aufweisen, wenn eine
+	unproportionale Menge an Daten auf das weniger volle vdev
+	geschrieben wird.</p><p>Wenn zusätzliche Geräte zu einem Pool, von dem gebootet
+	wird, hinzugefügt werden, muss der Bootcode aktualisiert
+	werden.</p><p>Einbinden einer zweiten Spiegelgruppe
+	(<code class="filename">ada2p3</code> und <code class="filename">ada3p3</code>)
+	zu einem bestehenden Spiegel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: resilvered 781M in 0h0m with 0 errors on Fri May 30 08:19:35 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool add <em class="replaceable"><code>mypool</code></em> mirror <em class="replaceable"><code>ada2p3</code></em> <em class="replaceable"><code>ada3p3</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 <em class="replaceable"><code>ada2</code></em></code></strong>
+bootcode written to ada2
+<code class="prompt">#</code> <strong class="userinput"><code>gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 <em class="replaceable"><code>ada3</code></em></code></strong>
+bootcode written to ada3
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: scrub repaired 0 in 0h0m with 0 errors on Fri May 30 08:29:51 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+          mirror-1  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+            ada3p3  ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Momentan können vdevs nicht von einem Pool entfernt und
+	Platten nur von einem Spiegel ausgehängt werden, wenn genug
+	Redundanz übrig bleibt.  Wenn auch nur eine Platte in einer
+	Spiegelgruppe bestehen bleibt, hört der Spiegel auf zu
+	existieren und wird zu einem stripe, was den gesamten Pool
+	riskiert, falls diese letzte Platte ausfällt.</p><p>Entfernen einer Platte aus einem Spiegel mit drei
+	Platten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: scrub repaired 0 in 0h0m with 0 errors on Fri May 30 08:29:51 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool detach <em class="replaceable"><code>mypool</code></em> <em class="replaceable"><code>ada2p3</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: scrub repaired 0 in 0h0m with 0 errors on Fri May 30 08:29:51 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+
+errors: No known data errors</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-status"></a>21.3.3. Den Status eines Pools überprüfen</h3></div></div></div><p>Der Status eines Pools ist wichtig.  Wenn ein Gerät sich
+	abschaltet oder ein Lese-, Schreib- oder Prüfsummenfehler
+	festgestellt wird, wird der dazugehörige Fehlerzähler erhöht.
+	Die <code class="command">status</code>-Ausgabe zeigt die Konfiguration
+	und den Status von jedem Gerät im Pool und den Gesamtstatus
+	des Pools.  Aktionen, die durchgeführt werden sollten und
+	Details zum letzten <a class="link" href="zfs-zpool.html#zfs-zpool-scrub" title="21.3.7. Einen Pool überprüfen"><code class="command">scrub</code></a>
+	werden ebenfalls angezeigt.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: scrub repaired 0 in 2h25m with 0 errors on Sat Sep 14 04:25:50 2013
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          raidz2-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+            ada3p3  ONLINE       0     0     0
+            ada4p3  ONLINE       0     0     0
+            ada5p3  ONLINE       0     0     0
+
+errors: No known data errors</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-clear"></a>21.3.4. Fehler beseitigen</h3></div></div></div><p>Wenn ein Fehler erkannt wurde, werden die Lese-, Schreib-
+	oder Prüfsummenzähler erhöht.  Die Fehlermeldung kann
+	beseitigt und der Zähler mit
+	<code class="command">zpool clear
+	  <em class="replaceable"><code>mypool</code></em></code> zurückgesetzt
+	werden.  Den Fehlerzustand zurückzusetzen kann wichtig sein,
+	wenn automatisierte Skripte ablaufen, die den Administrator
+	informieren, sobald der Pool Fehler anzeigt.  Weitere Fehler
+	werden nicht gemeldet, wenn der alte Fehlerbericht nicht
+	entfernt wurde.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-replace"></a>21.3.5. Ein funktionierendes Gerät ersetzen</h3></div></div></div><p>Es gibt eine Reihe von Situationen, in denen es nötig
+	ist, eine Platte mit einer anderen auszutauschen.
+	Wenn eine funktionierende Platte ersetzt wird, hält der
+	Prozess die alte Platte während des Ersetzungsvorganges noch
+	aktiv.  Der Pool wird nie den Zustand <a class="link" href="zfs-term.html#zfs-term-degraded">degraded</a> erhalten, was
+	das Risiko eines Datenverlustes minimiert.  Alle Daten der
+	alten Platte werden durch das Kommando
+	<code class="command">zpool replace</code> auf die Neue übertragen.
+	Nachdem die Operation abgeschlossen ist, wird die alte Platte
+	vom vdev getrennt.  Falls die neue Platte grösser ist als die
+	alte Platte , ist es möglich den Pool zu vergrößern, um den
+	neuen Platz zu nutzen.  Lesen Sie dazu <a class="link" href="zfs-zpool.html#zfs-zpool-online" title="21.3.9. Einen Pool vergrössern">Einen Pool vergrößern</a>.</p><p>Ersetzen eines funktionierenden Geräts in einem
+	Pool:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool replace <em class="replaceable"><code>mypool</code></em> <em class="replaceable"><code>ada1p3</code></em> <em class="replaceable"><code>ada2p3</code></em></code></strong>
+Make sure to wait until resilver is done before rebooting.
+
+If you boot from pool 'zroot', you may need to update
+boot code on newly attached disk 'ada2p3'.
+
+Assuming you use GPT partitioning und 'da0' is your new boot disk
+you may use the following command:
+
+        gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 da0
+<code class="prompt">#</code> <strong class="userinput"><code>gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 <em class="replaceable"><code>ada2</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+status: One or more devices is currently being resilvered.  The pool will
+        continue to function, possibly in a degraded state.
+action: Wait for the resilver to complete.
+  scan: resilver in progress since Mon Jun  2 14:21:35 2014
+        604M scanned out of 781M at 46.5M/s, 0h0m to go
+        604M resilvered, 77.39% done
+config:
+
+        NAME             STATE     READ WRITE CKSUM
+        mypool           ONLINE       0     0     0
+          mirror-0       ONLINE       0     0     0
+            ada0p3       ONLINE       0     0     0
+            replacing-1  ONLINE       0     0     0
+              ada1p3     ONLINE       0     0     0
+              ada2p3     ONLINE       0     0     0  (resilvering)
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: resilvered 781M in 0h0m with 0 errors on Mon Jun  2 14:21:52 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+
+errors: No known data errors</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-resilver"></a>21.3.6. Behandlung von fehlerhaften Geräten</h3></div></div></div><p>Wenn eine Platte in einem Pool ausfällt, wird das vdev zu
+	dem diese Platte gehört, den Zustand <a class="link" href="zfs-term.html#zfs-term-degraded">degraded</a> erhalten.  Alle
+	Daten sind immer noch verfügbar, jedoch wird die
+	Geschwindigkeit möglicherweise reduziert, weil die fehlenden
+	Daten aus der verfügbaren Redundanz heraus berechnet werden
+	müssen.  Um das vdev in einen funktionierenden Zustand zurück
+	zu versetzen, muss das physikalische Gerät ersetzt werden.
+	<acronym class="acronym">ZFS</acronym> wird dann angewiesen, den <a class="link" href="zfs-term.html#zfs-term-resilver">resilver</a>-Vorgang zu
+	beginnen.  Daten, die sich auf dem defekten Gerät befanden,
+	werden neu aus der vorhandenen Prüfsumme berechnet und auf das
+	Ersatzgerät geschrieben.  Nach Beendigung dieses Prozesses
+	kehrt das vdev zum Status <a class="link" href="zfs-term.html#zfs-term-online">online</a> zurück.</p><p>Falls das vdev keine Redundanz besitzt oder wenn mehrere
+	Geräte ausgefallen sind und es nicht genug Redundanz gibt, um
+	dies zu kompensieren, geht der Pool in den Zustand <a class="link" href="zfs-term.html#zfs-term-faulted">faulted</a> über.  Wenn keine
+	ausreichende Anzahl von Geräten wieder an den Pool
+	angeschlossen wird, fällt der Pool aus und die Daten
+	müssen von Sicherungen wieder eingespielt werden.</p><p>Wenn eine defekte Platte ausgewechselt wird, wird der Name
+	dieser defekten Platte mit der <acronym class="acronym">GUID</acronym> des
+	Geräts ersetzt.  Ein neuer Gerätename als Parameter für
+	<code class="command">zpool replace</code> wird nicht benötigt, falls
+	das Ersatzgerät den gleichen Gerätenamen besitzt.</p><p>Ersetzen einer defekten Platte durch
+	<code class="command">zpool replace</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist for
+        the pool to continue functioning in a degraded state.
+action: Attach the missing device und online it using 'zpool online'.
+   see: http://illumos.org/msg/ZFS-8000-2Q
+  scan: none requested
+config:
+
+        NAME                    STATE     READ WRITE CKSUM
+        mypool                  DEGRADED     0     0     0
+          mirror-0              DEGRADED     0     0     0
+            ada0p3              ONLINE       0     0     0
+            316502962686821739  UNAVAIL      0     0     0  was /dev/ada1p3
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool replace <em class="replaceable"><code>mypool</code></em> <em class="replaceable"><code>316502962686821739</code></em> <em class="replaceable"><code>ada2p3</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: DEGRADED
+status: One or more devices is currently being resilvered.  The pool will
+        continue to function, possibly in a degraded state.
+action: Wait for the resilver to complete.
+  scan: resilver in progress since Mon Jun  2 14:52:21 2014
+        641M scanned out of 781M at 49.3M/s, 0h0m to go
+        640M resilvered, 82.04% done
+config:
+
+        NAME                        STATE     READ WRITE CKSUM
+        mypool                      DEGRADED     0     0     0
+          mirror-0                  DEGRADED     0     0     0
+            ada0p3                  ONLINE       0     0     0
+            replacing-1             UNAVAIL      0     0     0
+              15732067398082357289  UNAVAIL      0     0     0  was /dev/ada1p3/old
+              ada2p3                ONLINE       0     0     0  (resilvering)
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: resilvered 781M in 0h0m with 0 errors on Mon Jun  2 14:52:38 2014
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+
+errors: No known data errors</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-scrub"></a>21.3.7. Einen Pool überprüfen</h3></div></div></div><p>Es wird empfohlen, dass Pools regelmäßig geprüft (<a class="link" href="zfs-term.html#zfs-term-scrub">scrubbed</a>) werden,
+	idealerweise mindestens einmal pro Monat.  Der
+	<code class="command">scrub</code>-Vorgang ist beansprucht die Platte
+	sehr und reduziert die Geschwindigkeit während er läuft.
+	Vermeiden Sie Zeiten, in denen großer Bedarf besteht, wenn
+	Sie <code class="command">scrub</code> starten oder benutzen Sie <a class="link" href="zfs-advanced.html#zfs-advanced-tuning-scrub_delay"><code class="varname">vfs.zfs.scrub_delay</code></a>,
+	um die relative Priorität vom <code class="command">scrub</code>
+	einzustellen, um zu verhindern, dass es mit anderen Aufgaben
+	kollidiert.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool scrub <em class="replaceable"><code>mypool</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+  scan: scrub in progress since Wed Feb 19 20:52:54 2014
+        116G scanned out of 8.60T at 649M/s, 3h48m to go
+        0 repaired, 1.32% done
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          raidz2-0  ONLINE       0     0     0
+            ada0p3  ONLINE       0     0     0
+            ada1p3  ONLINE       0     0     0
+            ada2p3  ONLINE       0     0     0
+            ada3p3  ONLINE       0     0     0
+            ada4p3  ONLINE       0     0     0
+            ada5p3  ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Falls eine Überrpüfaktion abgebrochen werden muss, geben
+	Sie <code class="command">zpool scrub -s
+	  <em class="replaceable"><code>mypool</code></em></code> ein.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-selfheal"></a>21.3.8. Selbstheilung</h3></div></div></div><p>Die Prüfsummen, welche zusammen mit den Datenblöcken
+	gespeichert werden, ermöglichen dem Dateisystem, sich
+	<span class="emphasis"><em>selbst zu heilen</em></span>.  Diese Eigenschaft wird
+	automatisch Daten korrigieren, deren Prüfsumme nicht mit der
+	Gespeicherten übereinstimmt, die auf einem anderen Gerät, das
+	Teil des Pools ist, vorhanden ist.  Beispielsweise bei
+	einem Spiegel aus zwei Platten, von denen eine anfängt, Fehler
+	zu produzieren und nicht mehr länger Daten speichern kann.
+	Dieser Fall ist sogar noch schlimmer, wenn auf die Daten seit
+	einiger Zeit nicht mehr zugegriffen wurde, zum Beispiel bei
+	einem Langzeit-Archivspeicher.  Traditionelle Dateisysteme
+	müssen dann Algorithmen wie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> ablaufen lassen,
+	welche die Daten überprüfen und reparieren.  Diese Kommandos
+	benötigen einige Zeit und in gravierenden Fällen muss ein
+	Administrator manuelle Entscheidungen treffen, welche
+	Reparaturoperation vorgenommen werden soll.  Wenn
+	<acronym class="acronym">ZFS</acronym> einen defekten Datenblock mit einer
+	Prüfsumme erkennt, die nicht übereinstimmt, versucht es die
+	Daten von der gespiegelten Platte zu lesen.  Wenn diese Platte
+	die korrekten Daten liefern kann, wird nicht nur dieser
+	Datenblock an die anfordernde Applikation geschickt, sondern
+	auch die falschen Daten auf der Disk reparieren, welche die
+	falsche Prüfsumme erzeugt hat.  Dies passiert während des
+	normalen Betriebs des Pools, ohne dass eine
+	Interaktion vom Systemadministrator notwendig wäre.</p><p>Das nächste Beispiel demonstriert dieses Verhalten zur
+	Selbstheilung.  Ein gespiegelter Pool mit den beiden Platten
+	<code class="filename">/dev/ada0</code> und
+	<code class="filename">/dev/ada1</code> wird angelegt.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create <em class="replaceable"><code>healer</code></em> mirror <em class="replaceable"><code>/dev/ada0</code></em> <em class="replaceable"><code>/dev/ada1</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status <em class="replaceable"><code>healer</code></em></code></strong>
+  pool: healer
+ state: ONLINE
+  scan: none requested
+config:
+
+    NAME        STATE     READ WRITE CKSUM
+    healer      ONLINE       0     0     0
+      mirror-0  ONLINE       0     0     0
+       ada0     ONLINE       0     0     0
+       ada1     ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool list</code></strong>
+NAME     SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+healer   960M  92.5K   960M     0%  1.00x  ONLINE  -</pre><p>Ein paar wichtige Daten, die es vor Datenfehlern mittels
+	der Selbstheilungsfunktion zu schützen gilt, werden auf den
+	Pool kopiert.  Eine Prüfsumme wird zum späteren Vergleich
+	berechnet.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /some/important/data /healer</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+NAME     SIZE  ALLOC   FREE    CAP  DEDUP  HEALTH  ALTROOT
+healer   960M  67.7M   892M     7%  1.00x  ONLINE  -
+<code class="prompt">#</code> <strong class="userinput"><code>sha1 /healer &gt; checksum.txt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat checksum.txt</code></strong>
+SHA1 (/healer) = 2753eff56d77d9a536ece6694bf0a82740344d1f</pre><p>Datenfehler werden durch das Schreiben von zufälligen
+	Daten an den Anfang einer Platte des Spiegels simuliert.  Um
+	<acronym class="acronym">ZFS</acronym> daran zu hindern, die Daten so schnell
+	zu reparieren, wie es diese entdeckt, wird der Pool vor der
+	Veränderung exportiert und anschließend wieder
+	importiert.</p><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Dies ist eine gefährliche Operation, die wichtige Daten
+	  zerstören kann.  Es wird hier nur zu Demonstrationszwecken
+	  gezeigt und sollte nicht während des normalen Betriebs des
+	  Pools versucht werden.  Dieses vorsätzliche
+	  Korrumpierungsbeispiel sollte auf gar keinen Fall auf einer
+	  Platte mit einem anderen Dateisystem durchgeführt werden.
+	  Verwenden Sie keine anderen Gerätenamen als diejenigen, die
+	  hier gezeigt werden, die Teil des Pools sind.  Stellen Sie
+	  sicher, dass die passende Sicherungen angefertigt haben,
+	  bevor Sie dieses Kommando ausführen!</p></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool export <em class="replaceable"><code>healer</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/dev/ada1 bs=1m count=200</code></strong>
+200+0 records in
+200+0 records out
+209715200 bytes transferred in 62.992162 secs (3329227 bytes/sec)
+<code class="prompt">#</code> <strong class="userinput"><code>zpool import healer</code></strong></pre><p>Der Status des Pools zeigt an, dass bei einem Gerät ein
+	Fehler aufgetreten ist.  Wichtig zu wissen ist, dass
+	Anwendungen, die Daten vom Pool lesen keine ungültigen Daten
+	erhalten haben.  <acronym class="acronym">ZFS</acronym> lieferte Daten vom
+	<code class="filename">ada0</code>-Gerät mit der korrekten Prüfsumme
+	aus.  Das Gerät mit der fehlerhaften Prüfsumme kann sehr
+	einfach gefunden werden, da die Spalte
+	<code class="literal">CKSUM</code> einen Wert ungleich Null
+	enthält.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status <em class="replaceable"><code>healer</code></em></code></strong>
+    pool: healer
+   state: ONLINE
+  status: One or more devices has experienced an unrecoverable error.  An
+          attempt was made to correct the error.  Applications are unaffected.
+  action: Determine if the device needs to be replaced, und clear the errors
+          using 'zpool clear' or replace the device with 'zpool replace'.
+     see: http://www.sun.com/msg/ZFS-8000-9P
+    scan: none requested
+  config:
+
+      NAME        STATE     READ WRITE CKSUM
+      healer      ONLINE       0     0     0
+        mirror-0  ONLINE       0     0     0
+         ada0     ONLINE       0     0     0
+         ada1     ONLINE       0     0     1
+
+errors: No known data errors</pre><p>Der Fehler wurde erkannt und korrigiert durch die
+	vorhandene Redundanz, welche aus der nicht betroffenen Platte
+	<code class="filename">ada0</code> des Spiegels gewonnen wurde.
+	Ein Vergleich der Prüfsumme mit dem Original wird zeigen, ob
+	sich der Pool wieder in einem konsistenten Zustand
+	befindet.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sha1 /healer &gt;&gt; checksum.txt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat checksum.txt</code></strong>
+SHA1 (/healer) = 2753eff56d77d9a536ece6694bf0a82740344d1f
+SHA1 (/healer) = 2753eff56d77d9a536ece6694bf0a82740344d1f</pre><p>Die beiden Prüfsummen, die vor und nach der vorsätzlichen
+	Korrumpierung der Daten des Pools angelegt wurden, stimmen
+	immer noch überein.  Dies zeigt wie <acronym class="acronym">ZFS</acronym> in
+	der Lage ist, Fehler automatisch zu erkennen und zu
+	korrigieren, wenn die Prüfsummen nicht übereinstimmen.
+	Beachten Sie, dass dies nur möglich ist, wenn genug Redundanz
+	im Pool vorhanden ist.  Ein Pool, der nur aus einer einzigen
+	Platte besteht besitzt keine Selbstheilungsfunktion.  Dies ist
+	auch der Grund warum Prüfsummen bei <acronym class="acronym">ZFS</acronym> so
+	wichtig sind und deshalb aus keinem Grund deaktiviert werden
+	sollten.  Kein <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> ist nötig, um diese Fehler zu
+	erkennen und zu korrigieren und der Pool war während der
+	gesamten Zeit, in der das Problem bestand, verfügbar.  Eine
+	scrub-Aktion ist nun nötig, um die fehlerhaften Daten auf
+	<code class="filename">ada1</code> zu beheben.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool scrub <em class="replaceable"><code>healer</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status <em class="replaceable"><code>healer</code></em></code></strong>
+  pool: healer
+ state: ONLINE
+status: One or more devices has experienced an unrecoverable error.  An
+            attempt was made to correct the error.  Applications are unaffected.
+action: Determine if the device needs to be replaced, und clear the errors
+            using 'zpool clear' or replace the device with 'zpool replace'.
+   see: http://www.sun.com/msg/ZFS-8000-9P
+  scan: scrub in progress since Mon Dec 10 12:23:30 2012
+        10.4M scanned out of 67.0M at 267K/s, 0h3m to go
+        9.63M repaired, 15.56% done
+config:
+
+    NAME        STATE     READ WRITE CKSUM
+    healer      ONLINE       0     0     0
+      mirror-0  ONLINE       0     0     0
+       ada0     ONLINE       0     0     0
+       ada1     ONLINE       0     0   627  (repairing)
+
+errors: No known data errors</pre><p>Durch das scrub werden die Daten von
+	<code class="filename">ada0</code> gelesen und alle Daten mit einer
+	falschen durch diejenigen mit der richtigen Prüfsumme auf
+	<code class="filename">ada1</code> ersetzt.  Dies wird durch die
+	Ausgabe <code class="literal">(repairing)</code> des Kommandos
+	<code class="command">zpool status</code> angezeigt.  Nachdem die
+	Operation abgeschlossen ist, ändert sich der Poolstatus
+	zu:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status <em class="replaceable"><code>healer</code></em></code></strong>
+  pool: healer
+ state: ONLINE
+status: One or more devices has experienced an unrecoverable error.  An
+        attempt was made to correct the error.  Applications are unaffected.
+action: Determine if the device needs to be replaced, und clear the errors
+             using 'zpool clear' or replace the device with 'zpool replace'.
+   see: http://www.sun.com/msg/ZFS-8000-9P
+  scan: scrub repaired 66.5M in 0h2m with 0 errors on Mon Dec 10 12:26:25 2012
+config:
+
+    NAME        STATE     READ WRITE CKSUM
+    healer      ONLINE       0     0     0
+      mirror-0  ONLINE       0     0     0
+       ada0     ONLINE       0     0     0
+       ada1     ONLINE       0     0 2.72K
+
+errors: No known data errors</pre><p>Nach der scrub-Operation und der anschliessenden
+	Synchronisation der Daten von <code class="filename">ada0</code> nach
+	<code class="filename">ada1</code>, kann die Fehlermeldung vom
+	Poolstatus durch die Eingabe von
+	<code class="command">zpool clear</code>
+	<a class="link" href="zfs-zpool.html#zfs-zpool-clear" title="21.3.4. Fehler beseitigen">bereinigt</a> werden.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool clear <em class="replaceable"><code>healer</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool status <em class="replaceable"><code>healer</code></em></code></strong>
+  pool: healer
+ state: ONLINE
+  scan: scrub repaired 66.5M in 0h2m with 0 errors on Mon Dec 10 12:26:25 2012
+config:
+
+    NAME        STATE     READ WRITE CKSUM
+    healer      ONLINE       0     0     0
+      mirror-0  ONLINE       0     0     0
+       ada0     ONLINE       0     0     0
+       ada1     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Der Pool ist jetzt wieder in einem voll funktionsfähigen
+	Zustand versetzt worden und alle Fehler wurden
+	beseitigt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-online"></a>21.3.9. Einen Pool vergrössern</h3></div></div></div><p>Die verwendbare Größe eines redundant ausgelegten Pools
+	ist durch die Kapazität des kleinsten Geräts in jedem vdev
+	begrenzt.  Das kleinste Gerät kann durch ein größeres Gerät
+	ersetzt werden.  Nachdem eine <a class="link" href="zfs-zpool.html#zfs-zpool-replace" title="21.3.5. Ein funktionierendes Gerät ersetzen">replace</a> oder <a class="link" href="zfs-term.html#zfs-term-resilver">resilver</a>-Operation
+	abgeschlossen wurde, kann der Pool anwachsen, um die Kapazität
+	des neuen Geräts zu nutzen.  Nehmen wir als Beispiel einen
+	Spiegel mit einer 1 TB und einer 2 TB Platte.  Der
+	verwendbare Plattenplatz beträgt 1 TB.  Wenn die
+	1 TB Platte mit einer anderen 2 TB Platte ersetzt
+	wird, kopiert der resilver-Prozess die existierenden Daten auf
+	die neue Platte.  Da beide Geräte nun 2 TB Kapazität
+	besitzen, kann auch der verfügbare Plattenplatz auf die Größe
+	von 2 TB anwachsen.</p><p>Die Erweiterung wird durch das Kommando
+	<code class="command">zpool online -e</code> auf jedem Gerät ausgelöst.
+	Nachdem alle Geräte expandiert wurden, wird der Speicher im
+	Pool zur Verfügung gestellt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-import"></a>21.3.10. Importieren und Exportieren von Pools</h3></div></div></div><p>Pools werden <span class="emphasis"><em>exportiert</em></span> bevor diese
+	an ein anderes System angeschlossen werden.  Alle Datasets
+	werden abgehängt und jedes Gerät wird als exportiert markiert,
+	ist jedoch immer noch gesperrt, so dass es nicht von anderen
+	Festplattensubsystemen verwendet werden kann.  Dadurch können
+	Pools auf anderen Maschinen <span class="emphasis"><em>importiert</em></span>
+	werden, die <acronym class="acronym">ZFS</acronym> und sogar andere
+	Hardwarearchitekturen (bis auf ein paar Ausnahmen, siehe
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zpool&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zpool</span>(8)</span></a>) unterstützen.  Besitzt ein Dataset offene
+	Dateien, kann <code class="command">zpool export -f</code> den Export
+	des Pools erzwingen.  Verwenden Sie dies mit Vorsicht.  Die
+	Datasets werden dadurch gewaltsam abgehängt, was bei
+	Anwendungen, die noch offene Dateien auf diesem Dataset
+	hatten, möglicherweise zu unerwartetem Verhalten führen
+	kann.</p><p>Einen nichtverwendeten Pool exportieren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool export mypool</code></strong></pre><p>Beim Importieren eines Pool werden auch automatisch alle
+	Datasets eingehängt.  Dies ist möglicherweise nicht das
+	bevorzugte Verhalten und wird durch
+	<code class="command">zpool import -N</code> verhindert.  Durch
+	<code class="command">zpool import -o</code> temporäre Eigenschaften nur
+	für diesen Import gesetzt.  Mit dem Befehl
+	<code class="command">zpool import altroot=</code> ist es möglich, einen
+	Pool mit einem anderen Basiseinhängepunkt anstatt der Wurzel
+	des Dateisystems einzubinden.  Wenn der Pool zuletzt auf einem
+	anderen System verwendet und nicht korrekt exportiert
+	wurde, muss unter Umständen ein Import erzwungen werden durch
+	<code class="command">zpool import -f</code>.  Alle Pools, die momentan
+	nicht durch ein anderes System verwendet werden, lassen sich
+	mit <code class="command">zpool import -a</code> importieren.</p><p>Alle zum Import verfügbaren Pools auflisten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool import</code></strong>
+   pool: mypool
+     id: 9930174748043525076
+  state: ONLINE
+ action: The pool can be imported using its name or numeric identifier.
+ config:
+
+        mypool      ONLINE
+          ada2p3    ONLINE</pre><p>Den Pool mit einem anderen Wurzelverzeichnis
+	importieren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool import -o altroot=<em class="replaceable"><code>/mnt</code></em> <em class="replaceable"><code>mypool</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs list</code></strong>
+zfs list
+NAME                 USED  AVAIL  REFER  MOUNTPOINT
+mypool               110K  47.0G    31K  /mnt/mypool</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-upgrade"></a>21.3.11. Einen Pool aktualisieren</h3></div></div></div><p>Nachdem FreeBSD aktualisiert wurde oder wenn der Pool von
+	einem anderen System, das eine ältere Version von
+	<acronym class="acronym">ZFS</acronym> einsetzt, lässt sich der Pool manuell
+	auf den aktuellen Stand von <acronym class="acronym">ZFS</acronym> bringen, um
+	die neuesten Eigenschaften zu unterstützen.  Bedenken Sie, ob
+	der Pool jemals wieder von einem älteren System eingebunden
+	werden muss, bevor Sie die Aktualisierung durchführen.  Das
+	aktualisieren eines Pools ist ein nicht umkehrbarer Prozess.
+	ältere Pools lassen sich aktualisieren, jedoch lassen sich
+	Pools mit neueren Eigenschaften nicht wieder auf eine ältere
+	Version bringen.</p><p>Aktualisierung eines v28-Pools, um
+	<code class="literal">Feature Flags</code> zu unterstützen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+status: The pool is formatted using a legacy on-disk format.  The pool can
+        still be used, but some features are unavailable.
+action: Upgrade the pool using 'zpool upgrade'.  Once this is done, the
+        pool will no longer be accessible on software that does not support feat
+        flags.
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+	    ada0    ONLINE       0     0     0
+	    ada1    ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool upgrade</code></strong>
+This system supports ZFS pool feature flags.
+
+The following pools are formatted with legacy version numbers und can
+be upgraded to use feature flags.  After being upgraded, these pools
+will no longer be accessible by software that does not support feature
+flags.
+
+VER  POOL
+---  ------------
+28   mypool
+
+Use 'zpool upgrade -v' for a list of available legacy versions.
+Every feature flags pool has all supported features enabled.
+<code class="prompt">#</code> <strong class="userinput"><code>zpool upgrade mypool</code></strong>
+This system supports ZFS pool feature flags.
+
+Successfully upgraded 'mypool' from version 28 to feature flags.
+Enabled the following features on 'mypool':
+  async_destroy
+  empty_bpobj
+  lz4_compress
+  multi_vdev_crash_dump</pre><p>Die neueren Eigenschaften von <acronym class="acronym">ZFS</acronym>
+	werden nicht verfügbar sein, bis
+	<code class="command">zpool upgrade</code> abgeschlossen ist.
+	<code class="command">zpool upgrade -v</code> kann verwendet werden, um
+	zu sehen, welche neuen Eigenschaften durch die Aktualisierung
+	bereitgestellt werden, genauso wie diejenigen, die momentan
+	schon verfügbar sind.</p><p>Einen Pool um zusätzliche Feature Flags erweitern:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status</code></strong>
+  pool: mypool
+ state: ONLINE
+status: Some supported features are not enabled on the pool. The pool can
+        still be used, but some features are unavailable.
+action: Enable all features using 'zpool upgrade'. Once this is done,
+        the pool may no longer be accessible by software that does not support
+        the features. See zpool-features(7) for details.
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        mypool      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+	    ada0    ONLINE       0     0     0
+	    ada1    ONLINE       0     0     0
+
+errors: No known data errors
+<code class="prompt">#</code> <strong class="userinput"><code>zpool upgrade</code></strong>
+This system supports ZFS pool feature flags.
+
+All pools are formatted using feature flags.
+
+
+Some supported features are not enabled on the following pools. Once a
+feature is enabled the pool may become incompatible with software
+that does not support the feature. See zpool-features(7) for details.
+
+POOL  FEATURE
+---------------
+zstore
+      multi_vdev_crash_dump
+      spacemap_histogram
+      enabled_txg
+      hole_birth
+      extensible_dataset
+      bookmarks
+      filesystem_limits
+<code class="prompt">#</code> <strong class="userinput"><code>zpool upgrade mypool</code></strong>
+This system supports ZFS pool feature flags.
+
+Enabled the following features on 'mypool':
+  spacemap_histogram
+  enabled_txg
+  hole_birth
+  extensible_dataset
+  bookmarks
+  filesystem_limits</pre><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Der Bootcode muss auf Systemen, die von dem Pool
+	  starten, aktualisiert werden, um diese neue Version zu
+	  unterstützen.  Verwenden Sie
+	 <code class="command">gpart bootcode</code> auf der Partition, die den
+	  Bootcode enthält.  Lesen Sie für weitere Informationen
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gpart&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gpart</span>(8)</span></a>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-history"></a>21.3.12. Aufgezeichnete Historie des Pools anzeigen</h3></div></div></div><p>Befehle, die den Pool in irgendeiner Form verändern,
+	werden aufgezeichnet.  Diese Befehle beinhalten das Erstellen
+	von Datasets, verändern von Eigenschaften oder das Ersetzen
+	einer Platte.  Diese Historie ist nützlich um
+	nachzuvollziehen, wie ein Pool aufgebaut ist und welcher
+	Benutzer eine bestimmte Aktion wann und wie getätigt hat.  Die
+	aufgezeichnete Historie wird nicht in einer Logdatei
+	festgehalten, sondern ist Teil des Pools selbst.  Das Kommando
+	zum darstellen dieser Historie lautet passenderweise
+	<code class="command">zpool history</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool history</code></strong>
+History for 'tank':
+2013-02-26.23:02:35 zpool create tank mirror /dev/ada0 /dev/ada1
+2013-02-27.18:50:58 zfs set atime=off tank
+2013-02-27.18:51:09 zfs set checksum=fletcher4 tank
+2013-02-27.18:51:18 zfs create tank/backup</pre><p>Die Ausgabe zeigt <code class="command">zpool</code> und
+	<code class="command">zfs</code>-Befehle, die ausgeführt wurden zusammen
+	mit einem Zeitstempel.  Nur Befehle, die den Pool verändern
+	werden aufgezeichnet.  Befehle wie
+	<code class="command">zfs list</code> sind dabei nicht enthalten.  Wenn
+	kein Name angegeben wird, erscheint die gesamte Historie aller
+	Pools.</p><p>Der Befehl <code class="command">zpool history</code> kann sogar
+	noch mehr Informationen ausgeben, wenn die Optionen
+	<code class="option">-i</code> oder <code class="option">-l</code> angegeben
+	werden.  Durch <code class="option">-i</code> zeigt
+	<acronym class="acronym">ZFS</acronym> vom Benutzer eingegebene, als auch
+	interne Ereignisse an.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool history -i</code></strong>
+History for 'tank':
+2013-02-26.23:02:35 [internal pool create txg:5] pool spa 28; zfs spa 28; zpl 5;uts  9.1-RELEASE 901000 amd64
+2013-02-27.18:50:53 [internal property set txg:50] atime=0 dataset = 21
+2013-02-27.18:50:58 zfs set atime=off tank
+2013-02-27.18:51:04 [internal property set txg:53] checksum=7 dataset = 21
+2013-02-27.18:51:09 zfs set checksum=fletcher4 tank
+2013-02-27.18:51:13 [internal create txg:55] dataset = 39
+2013-02-27.18:51:18 zfs create tank/backup</pre><p>Weitere Details lassen sich durch die Angabe von
+	<code class="option">-l</code> entlocken.  Historische Einträge werden in
+	einem langen Format ausgegeben, einschließlich Informationen
+	wie der Name des Benutzers, welcher das Kommando eingegeben
+	hat und der Hostname, auf dem die Änderung erfolgte.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool history -l</code></strong>
+History for 'tank':
+2013-02-26.23:02:35 zpool create tank mirror /dev/ada0 /dev/ada1 [user 0 (root) on :global]
+2013-02-27.18:50:58 zfs set atime=off tank [user 0 (root) on myzfsbox:global]
+2013-02-27.18:51:09 zfs set checksum=fletcher4 tank [user 0 (root) on myzfsbox:global]
+2013-02-27.18:51:18 zfs create tank/backup [user 0 (root) on myzfsbox:global]</pre><p>Die Ausgabe zeigt, dass der Benutzer <code class="systemitem">root</code> den gespiegelten Pool mit
+	den beiden Platten
+	<code class="filename">/dev/ada0</code> und
+	<code class="filename">/dev/ada1</code> angelegt hat.  Der Hostname
+	<code class="systemitem">myzfsbox</code> wird
+	ebenfalls in den Kommandos angezeigt, nachdem der Pool erzeugt
+	wurde.  Die Anzeige des Hostnamens wird wichtig, sobald der
+	Pool von einem System exportiert und auf einem anderen
+	importiert wird.  Die Befehle, welche auf dem anderen System
+	verwendet werden, können klar durch den Hostnamen, der bei
+	jedem Kommando mit verzeichnet wird, unterschieden
+	werden.</p><p>Beide Optionen für <code class="command">zpool history</code> lassen
+	sich auch kombinieren, um die meisten Details zur Historie
+	eines Pools auszugeben.  Die Pool Historie liefert wertvolle
+	Informationen, wenn Aktionen nachverfolgt werden müssen oder
+	zur Fehlerbeseitigung mehr Informationen gebraucht
+	werden.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-iostat"></a>21.3.13. Geschwindigkeitsüberwachung</h3></div></div></div><p>Ein eingebautes Überwachungssystem kann
+	<acronym class="acronym">I/O</acronym>-Statistiken in Echtzeit liefern.  Es
+	zeigt die Menge von freiem und belegtem Speicherplatz auf dem
+	Pool an, wieviele Lese- und Schreiboperationen pro Sekunde
+	durchgeführt werden und die aktuell verwendete
+	<acronym class="acronym">I/O</acronym>-Bandbreite.  Standardmäßig werden alle
+	Pools in einem System überwacht und angezeigt.  Ein Poolname
+	kann angegeben werden, um die Anzeige auf diesen Pool zu
+	beschränken.  Ein einfaches Beispiel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool iostat</code></strong>
+               capacity     operations    bundwidth
+pool        alloc   free   read  write   read  write
+----------  -----  -----  -----  -----  -----  -----
+data         288G  1.53T      2     11  11.3K  57.1K</pre><p>Um kontinuierlich die <acronym class="acronym">I/O</acronym>-Aktivität zu
+	überprüfen, kann eine Zahl als letzter Parameter angegeben
+	werden, die ein Intervall in Sekunden angibt, die zwischen den
+	Aktualisierungen vergehen soll.  Die nächste Zeile mit
+	Statistikinformationen wird dann nach jedem Intervall
+	ausgegeben.  Drücken Sie
+	<span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>C</strong></span>, um diese kontinuierliche Überwachung zu stoppen.
+	Alternativ lässt sich auch eine zweite Zahl nach dem
+	Intervall auf der Kommandozeile angeben, welche die Obergrenze
+	von Statistikausgaben darstellt, die angezeigt werden
+	sollen.</p><p>Noch mehr Informationen zu
+	<acronym class="acronym">I/O</acronym>-Statistiken können durch Angabe der
+	Option <code class="option">-v</code> angezeigt werden.  Jedes Gerät im
+	Pool wird dann mit einer eigenen Statistikzeile aufgeführt.
+	Dies ist hilfreich um zu sehen, wieviele Lese- und
+	Schreiboperationen von jedem Gerät durchgeführt werden und
+	kann bei der Diagnose eines langsamen Geräts, das den Pool
+	ausbremst, hilfreich sein.  Dieses Beispiel zeigt einen
+	gespiegelten Pool mit zwei Geräten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool iostat -v </code></strong>
+                            capacity     operations    bundwidth
+pool                     alloc   free   read  write   read  write
+-----------------------  -----  -----  -----  -----  -----  -----
+data                      288G  1.53T      2     12  9.23K  61.5K
+  mirror                  288G  1.53T      2     12  9.23K  61.5K
+    ada1                     -      -      0      4  5.61K  61.7K
+    ada2                     -      -      1      4  5.04K  61.7K
+-----------------------  -----  -----  -----  -----  -----  -----</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="zfs-zpool-split"></a>21.3.14. Einen Pool aufteilen</h3></div></div></div><p>Ein Pool, der aus einem oder mehreren gespiegelten vdevs
+	besteht, kann in zwei Pools aufgespalten werden.  Falls nicht
+	anders angegeben, wird das letzte Mitglied eines Spiegels
+	abgehängt und dazu verwendet, einen neuen Pool mit den
+	gleichen Daten zu erstellen.  Die Operation sollte zuerst mit
+	der Option <code class="option">-n</code> versucht werden.  Die Details
+	der vorgeschlagenen Option werden dargestellt, ohne die Aktion
+	in Wirklichkeit durchzuführen.  Das hilft dabei zu bestätigen,
+	ob die Aktion das tut, was der Benutzer damit vor
+	hatte.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="zfs-quickstart.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="zfs.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="zfs-zfs.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">21.2. Schnellstartanleitung </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 21.4. <code class="command">zfs</code> Administration</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

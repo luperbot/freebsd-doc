@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>19.4. RAID1 - Tükrözés</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="GEOM.html" title="19. fejezet - GEOM: A moduláris lemezszervező rendszer" /><link rel="prev" href="GEOM-striping.html" title="19.3. RAID0 - Csíkozás" /><link rel="next" href="geom-ggate.html" title="19.5. Eszközök hálózati illesztése a GEOM-ban" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.4. RAID1 - Tükrözés</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-striping.html">Vissza</a> </td><th width="60%" align="center">19. fejezet - GEOM: A moduláris lemezszervező rendszer</th><td width="20%" align="right"> <a accesskey="n" href="geom-ggate.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-mirror"></a>19.4. RAID1 - Tükrözés</h2></div></div></div><a id="idp91414352" class="indexterm"></a><a id="idp91414864" class="indexterm"></a><p>A tükrözés számos
+      vállalatnál és háztartásban
+      alkalmazott technológia, amely az adatok
+      megszakítás nélküli
+      lementésére használatos.  Amikor
+      tükrözést használunk, az egyszerűen
+      csak arra utal, hogy a B lemez ugyanazokat az adatokat
+      tartalmazza, mint az A lemez.  Vagy amikor a C és D lemez
+      tartalma egyezik meg az A és B lemezekével.
+      Függetlenül a lemezek kiosztásától,
+      itt az a lényeg, hogy az egyik lemez teljes területe
+      vagy az egyik partíciója le van másolva.
+      Később az ezen a módon lementett adatok
+      könnyen visszaállíthatóak
+      anélkül, hogy ez a szolgáltatásban vagy
+      az elérhetőségben bármilyen
+      kimaradást okozna, és akár még
+      fizikailag is biztonságosan tárolhatóak.</p><p>Először is szereznünk kell két egyforma
+      méretű lemezt, valamint a példák
+      feltételezik, hogy ezek a lemezek közvetlen
+      elérésű (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=da&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">da</span>(4)</span></a>)
+      <acronym class="acronym">SCSI</acronym>-lemezek.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91417296"></a>19.4.1. Az elsődleges lemezek
+	tükrözése</h3></div></div></div><p>Tegyük fel, hogy a FreeBSD az első,
+	<code class="filename">da0</code> nevű lemezmeghajtón
+	található, és a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a>
+	számára ezt szeretnénk megadni az
+	elsődleges adatok tárolásához.</p><p>A tükrözés
+	létrehozásának megkezdése előtt a
+	<code class="varname">kern.geom.debugflags</code> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a>
+	változó megfelelő
+	beállításával
+	engedélyezzünk további
+	nyomkövetési információkat és
+	hozzáférést az eszközhöz:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl kern.geom.debugflags=17</code></strong></pre><p>Most építsük fel a
+	tükrözést.  Kezdjük az egészet a
+	metaadatok elhelyezésével az elsődleges
+	lemezmeghajtón, tehát tulajdonképpen az
+	alábbi parancs segítségével hozzuk
+	létre a <code class="filename">/dev/mirror/gm</code>
+	eszközt:</p><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">A rendszerindító meghajtóról
+	  készített tükrözés
+	  adatvesztést okozhat a lemez utolsó
+	  szektorában.  Ennek kockázata
+	  csökkenthető, ha közvetlenül a FreeBSD friss
+	  telepítése után állítjuk be
+	  a tükrözést.</p></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror label -vb round-robin gm0 /dev/da0</code></strong></pre><p>Erre a rendszernek a következő módon kell
+	reagálnia:</p><pre class="screen">Metadata value stored on /dev/da0.
+Done.</pre><p>A GEOM inicializálásához
+	szükségünk lesz a
+	<code class="filename">/boot/kernel/geom_mirror.ko</code> modul
+	betöltésére:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror load</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A parancs sikeres lefutása után a <code class="filename">/dev/mirror</code>
+	  könyvtárban létrehoz egy
+	  <code class="filename">gm0</code>
+	  eszközleírót.</p></div><p>A <code class="filename">geom_mirror.ko</code> modul
+	betöltését így tudjuk
+	engedélyezni a rendszer indításakor:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_mirror_load="YES"' &gt;&gt; /boot/loader.conf</code></strong></pre><p>Nyissuk meg az <code class="filename">/etc/fstab</code>
+	állományt, és cseréljük le
+	benne az összes korábbi <code class="filename">da0</code>
+	hivatkozást az újonnan kialakított
+	<code class="filename">gm0</code> tükrözés
+	eszközleírójával.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ha <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> szövegszerkesztőt
+	  használjuk, akkor a következő módon
+	  tudjuk ezt egyszerűen megtenni:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vi /etc/fstab</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> indítása után a
+	  <strong class="userinput"><code>:w /etc/fstab.bak</code></strong>
+	  kiadásával készítsünk az
+	  <code class="filename">fstab</code> állomány jelenlegi
+	  tartalmáról másolatot.  Ezután a
+	  <strong class="userinput"><code>:%s/da/mirror\/gm/g</code></strong> parancs
+	  használatával cseréljük ki az
+	  összes <code class="filename">da0</code> hivatkozást a
+	  <code class="filename">gm0</code> eszköz nevére.</p></div><p>Az így keletkező <code class="filename">fstab</code>
+	állomány nagyjából következő
+	módon fog kinézni.  Most teljesen független,
+	hogy <acronym class="acronym">SCSI</acronym> vagy <acronym class="acronym">ATA</acronym>
+	meghajtókkal dolgozunk, a <acronym class="acronym">RAID</acronym>
+	eszköz neve mindig <code class="filename">gm</code> lesz:</p><pre class="programlisting"># Eszköz                Csatlakozási pont   Típus   Beállítások  Dump   Menet
+/dev/mirror/gm0s1b      none                swap    sw           0      0
+/dev/mirror/gm0s1a      /                   ufs     rw           1      1
+/dev/mirror/gm0s1d      /usr                ufs     rw           0      0
+/dev/mirror/gm0s1f      /home               ufs     rw           2      2
+#/dev/mirror/gm0s2d     /store              ufs     rw           2      2
+/dev/mirror/gm0s1e      /var                ufs     rw           2      2
+/dev/acd0               /cdrom              cd9660  ro,noauto    0      0</pre><p>Indítsuk újra a rendszert:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown -r now</code></strong></pre><p>Ennek megfelelően a rendszer indítása
+	közben a <code class="filename">da0</code> eszköz helyett a
+	<code class="filename">gm0</code> eszközt fogjuk
+	használni.  Miután sikeresen
+	befejeződött a rendszerindítás, a
+	<code class="command">mount</code> parancs kiadásával a
+	saját szemünkkel is meggyőződhetünk
+	az eredményről:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/mirror/gm0s1a   1012974  224604   707334    24%    /
+devfs                      1       1        0   100%    /dev
+/dev/mirror/gm0s1f  45970182   28596 42263972     0%    /home
+/dev/mirror/gm0s1d   6090094 1348356  4254532    24%    /usr
+/dev/mirror/gm0s1e   3045006 2241420   559986    80%    /var
+devfs                      1       1        0   100%    /var/named/dev</pre><p>A parancs kimenete az elvárásainknak
+	megfelelően remekül néz ki.
+	Zárásképpen a szinkronizálás
+	megkezdéséhez a következő paranccsal
+	illesszük be a <code class="filename">da1</code> eszközt a
+	tükrözésbe:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da1</code></strong></pre><p>A tükrözés állapota a
+	létrejöttét követően az alábbi
+	paranccsal ellenőrizhető:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror status</code></strong></pre><p>Az iménti parancs eredményének
+	nagyjából a következőnek kell lennie
+	miután a felépítettük a
+	tükrözést és szinkronizáltuk az
+	adatokat:</p><pre class="screen">      Name    Status  Components
+mirror/gm0  COMPLETE  da0
+                      da1</pre><p>Hiba esetén a tükrözés
+	továbbra is folytatódik, azonban ilyenkor a
+	példában szereplő <code class="literal">COMPLETE</code>
+	helyett a <code class="literal">DEGRADED</code> jelzést fogjuk
+	látni.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91457616"></a>19.4.2. Hibakeresés</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91458256"></a>19.4.2.1. A rendszer nem hajlandó elindulni</h4></div></div></div><p>Ha a rendszerünk ehhez hasonló módon
+	  indul:</p><pre class="programlisting">ffs_mountroot: can't find rootvp
+Root mount failed: 6
+mountroot&gt;</pre><p>Indítsuk újra a gépünket a
+	  kikapcsoló gomb vagy a reset
+	  segítségével.  A
+	  rendszerindító menüben válasszuk a
+	  hatodik opciót (6).  Ennek
+	  eredményeképpen megkapjuk a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>
+	  parancssorát.  Töltsük be a modult
+	  manuálisan:</p><pre class="screen">OK? <strong class="userinput"><code>load geom_mirror</code></strong>
+OK? <strong class="userinput"><code>boot</code></strong></pre><p>Ha ez beválik, akkor valamiért a modult nem
+	  sikerült rendesen betölteni.
+	  Ellenőrizzük, hogy a
+	  <code class="filename">/boot/loader.conf</code>
+	  állományban a neki szereplő megfelelő
+	  bejegyzés helyesen szerepel.  Amennyiben a
+	  probléma továbbra is fennáll,
+	  helyezzük el a következő sort a rendszermag
+	  konfigurációs állományába,
+	  majd fordítsuk újra és
+	  telepítsük:</p><pre class="programlisting">options	GEOM_MIRROR</pre><p>Ezzel várhatóan orvosoltuk a
+	  problémát.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91463888"></a>19.4.3. A meghibásodott lemezek cseréje</h3></div></div></div><p>A lemezek tükrözésének egyik
+	legcsodálatosabb előnye, hogy a menet közben
+	meghibásodott meghajtókat gond, és
+	így feltehetően adatvesztés
+	nélkül ki tudjuk cserélni.</p><p>Vegyük az iménti <acronym class="acronym">RAID</acronym>-1
+	konfigurációt, és tételezzük fel,
+	hogy a <code class="filename">da1</code> eszköz felmondta a
+	szolgáltatot és cserére szorul.  A
+	meghajtó leváltásához keressük
+	meg a hibás eszközt, majd állítsuk le
+	a rendszert.  Tegyük be a helyére az újat
+	és indítsuk újra a rendszerünket.
+	Miután elindult az operációs rendszer, a
+	következő parancsok kiadásával tudjuk
+	logikailag is lecserélni a meghibásodott
+	lemezt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror forget gm0</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da1</code></strong></pre><p>Innen a <code class="command">gmirror</code> <code class="option">status</code>
+	parancsával kísérhetjük figyelemmel a
+	tükrözés újraszervezésének
+	menetét.  Csupán ennyi az egész.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-striping.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="geom-ggate.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">19.3. RAID0 - Csíkozás </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 19.5. Eszközök hálózati illesztése a
+      GEOM-ban</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

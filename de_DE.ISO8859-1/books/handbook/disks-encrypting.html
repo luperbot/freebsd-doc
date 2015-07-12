@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.16. Partitionen verschlüsseln</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="disks.html" title="Kapitel 19. Speichermedien" /><link rel="prev" href="quotas.html" title="19.15. Dateisystem-Quotas" /><link rel="next" href="swap-encrypting.html" title="19.17. Den Auslagerungsspeicher verschlüsseln" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.16. Partitionen verschlüsseln</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="quotas.html">Zurück</a> </td><th width="60%" align="center">Kapitel 19. Speichermedien</th><td width="20%" align="right"> <a accesskey="n" href="swap-encrypting.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-encrypting"></a>19.16. Partitionen verschlüsseln</h2></div><div><span class="authorgroup">Beigetragen von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Lucky</span> <span class="surname">Green</span></span>. </span></div></div></div><a id="idp81937104" class="indexterm"></a><p>FreeBSD bietet ausgezeichnete Möglichkeiten, Daten vor
+      unberechtigten Zugriffen zu schützen.  Wenn das
+      Betriebssystem läuft, schützen Zugriffsrechte und
+      vorgeschriebene Zugriffskontrollen (MAC) (siehe <a class="xref" href="mac.html" title="Kapitel 17. Verbindliche Zugriffskontrolle">Kapitel 17, <em>Verbindliche Zugriffskontrolle</em></a>)
+      die Daten.  Die Zugriffskontrollen des Betriebssystems
+      schützen allerdings nicht vor einem Angreifer, der
+      Zugriff auf den Rechner hat.  Der Angreifer
+      kann eine Festplatte einfach in ein anderes System einbauen
+      und dort die Daten analysieren.</p><p>Die für FreeBSD verfügbaren kryptografischen
+      Subsysteme <span class="application">GEOM Based Disk Encryption (gbde)</span>
+      und <code class="command">geli</code> sind in der Lage, Daten auf
+      Dateisystemen auch vor hoch motivierten Angreifern zu
+      schützen,  die über erhebliche Mittel verfügen.
+      Dieser Schutz ist unabhängig von der Art und Weise, durch
+      die ein Angreifer Zugang zu einer Festplatte oder zu einem
+      Rechner erlangt hat.  Im Gegensatz zu schwerfälligen
+      Systemen, die einzelne Dateien verschlüsseln,
+      verschlüsseln <span class="application">gbde</span> und
+      <code class="command">geli</code> transparent ganze Dateisysteme.  Auf der
+      Festplatte werden dabei keine Daten im Klartext gespeichert.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81945168"></a>19.16.1. Plattenverschlüsselung mit
+        <span class="application">gbde</span></h3></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Wechseln sie zu <code class="systemitem">root</code></strong></p><p>Sie benötigen Superuser-Rechte, um
+	    <span class="application">gbde</span> einzurichten.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su -</code></strong>
+Password:</pre></li><li class="step"><p class="title"><strong>Aktivieren Sie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a> in
+	    der Kernelkonfigurationsdatei</strong></p><p>Fügen Sie folgende Zeile in Ihre
+	    Kernelkonfigurationsdatei ein:</p><p><code class="literal">options GEOM_BDE</code></p><p>Übersetzen und installieren Sie den FreeBSD-Kernel
+	    wie in <a class="xref" href="kernelconfig.html" title="Kapitel 9. Konfiguration des FreeBSD-Kernels">Kapitel 9, <em>Konfiguration des FreeBSD-Kernels</em></a> beschrieben.</p><p>Starten sie das System neu, um den neuen Kernel
+	    zu benutzen.</p></li><li class="step"><p>Alternativ zur Neukompilierung des Kernels können
+	    Sie auch <code class="command">kldload</code> verwenden, um das
+	    Kernelmodul <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a> zu laden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_bde</code></strong></pre></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81960016"></a>19.16.1.1. Einrichten eines verschlüsselten Dateisystems</h4></div></div></div><p>Das folgende Beispiel beschreibt, wie ein Dateisystem
+	auf einer neuen Festplatte verschlüsselt wird.  Das
+	Dateisystem wird in <code class="filename">/private</code> eingehangen.
+	Mit <span class="application">gbde</span> könnten auch
+	<code class="filename">/home</code> und <code class="filename">/var/mail</code>
+	verschlüsselt werden.  Die dazu nötigen Schritte
+	können allerdings in dieser Einführung
+	nicht behandelt werden.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Installieren der Festplatte</strong></p><p>Installieren Sie die Festplatte wie in
+	    <a class="xref" href="disks-adding.html" title="19.3. Hinzufügen von Laufwerken">Abschnitt 19.3, &#8222;Hinzufügen von Laufwerken&#8220;</a> beschrieben.  Im Beispiel
+	    verwenden wir die Partition <code class="filename">/dev/ad4s1c</code>.
+	    Die Gerätedateien
+	    <code class="filename">/dev/ad0s1*</code>
+	    sind Standard-Partitionen des FreeBSD-Systems.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4</pre></li><li class="step"><p class="title"><strong>Verzeichnis für gbde-Lock-Dateien anlegen</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/gbde</code></strong></pre><p>Die Lock-Dateien sind für den Zugriff von
+	    <span class="application">gbde</span> auf verschlüsselte
+	    Partitionen notwendig.  Ohne die Lock-Dateien können
+	    die Daten nur mit erheblichem manuellen Aufwand wieder
+	    entschlüsselt werden (dies wird auch von der Software
+	    nicht unterstützt).  Jede verschlüsselte
+	    Partition benötigt eine gesonderte Lock-Datei.</p></li><li class="step"><p class="title"><strong>Vorbereiten der gbde-Partition</strong></p><p>Eine von <span class="application">gbde</span> benutzte
+	    Partition muss einmalig vorbereitet werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde init /dev/ad4s1c -i -L /etc/gbde/ad4s1c.lock</code></strong></pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> öffnet eine Vorlage in Ihrem Editor,
+	    in der Sie verschiedene Optionen einstellen können.
+	    Setzen Sie <code class="varname">sector_size</code> auf
+	    <code class="literal">2048</code>, wenn Sie
+	    UFS1 oder UFS2 benutzen.</p><pre class="programlisting"># $FreeBSD: src/sbin/gbde/template.txt,v 1.1.36.1 2009/08/03 08:13:06 kensmith Exp $
+#
+# Sector size is the smallest unit of data which can be read or written.
+# Making it too small decreases performance and decreases available space.
+# Making it too large may prevent filesystems from working.  512 is the
+# minimum and always safe.  For UFS, use the fragment size
+#
+sector_size     =       2048
+[...]</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> fragt dann zweimal eine Passphrase
+	    zum Schutz der Daten ab.  Die Passphrase muss beides
+	    Mal gleich eingegeben werden.  Die Sicherheit der
+	    Daten hängt alleine von der Qualität der
+	    gewählten Passphrase ab.
+	    <a href="#ftn.idp81978320" class="footnote" id="idp81978320"><sup class="footnote">[12]</sup></a></p><p>Mit <code class="command">gbde init</code> wurde im Beispiel
+	    auch die Lock-Datei <code class="filename">/etc/gbde/ad4s1c.lock</code>
+	    angelegt.  <span class="application">gbde</span>-Lockdateien
+	    müssen die Dateiendung <span class="quote">&#8222;<span class="quote">.lock</span>&#8220;</span> aufweisen,
+	    damit sie von <code class="filename">/etc/rc.d/gbde</code>, dem
+	    Startskript von <span class="application">gbde</span>, erkannt
+	    werden.</p><div xmlns="" class="caution"><h3 class="admontitle">Achtung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Sichern Sie die Lock-Dateien von
+	      <span class="application">gbde</span> immer zusammen mit den
+	      verschlüsselten Dateisystemen.  Ein entschlossener
+	      Angreifer kann die Daten vielleicht auch ohne die
+	      Lock-Datei entschlüsseln.  Ohne die Lock-Datei
+	      können Sie allerdings nicht auf die
+	      verschlüsselten Daten zugreifen.  Dies ist nur noch
+	      mit erheblichem manuellen Aufwand möglich, der
+	      weder von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> noch seinem Entwickler
+	      unterstützt wird.</p></div></li><li class="step"><p class="title"><strong>Einbinden der verschlüsselten Partition
+	    in den Kernel</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c.lock</code></strong></pre><p>Das Kommando fragt die Passphrase ab, die Sie
+	    beim Vorbereiten der Partition eingegeben haben.  Das
+	    neue Gerät erscheint danach als
+	    <code class="filename">/dev/device_name.bde</code> im
+	    Verzeichnis <code class="filename">/dev</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4        /dev/ad4s1c.bde</pre></li><li class="step"><p class="title"><strong>Dateisystem auf dem verschlüsselten Gerät
+	    anlegen</strong></p><p>Wenn der Kernel die verschlüsselte Partition
+	    kennt, können Sie ein Dateisystem auf ihr anlegen.
+	    Benutzen Sie dazu den Befehl <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a>.  Da ein
+	    Dateisystem vom Typ UFS2 sehr viel schneller als eins
+	    vom Typ UFS1 angelegt wird, empfehlen wir Ihnen, die
+	    Option <code class="option">-O2</code> zu benutzen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U -O2 /dev/ad4s1c.bde</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml"><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> muss auf einer dem Kernel bekannten
+	      <span class="application">gbde</span>-Partition (einem
+	      Gerät mit dem Namen
+	      <code class="filename">*.bde</code>
+	      laufen.</p></div></li><li class="step"><p class="title"><strong>Einhängen der verschlüsselten Partition</strong></p><p>Legen Sie einen Mountpunkt für das
+	    verschlüsselte Dateisystem an:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /private</code></strong></pre><p>Hängen Sie das verschlüsselte Dateisystem
+	    ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre></li><li class="step"><p class="title"><strong>Überprüfen des verschlüsselten
+	    Dateisystem</strong></p><p>Das verschlüsselte Dateisystem sollte jetzt
+	    von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> erkannt werden und benutzt werden
+	    können.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem        Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a      1037M    72M   883M     8%    /
+/devfs            1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f       8.1G    55K   7.5G     0%    /home
+/dev/ad0s1e      1037M   1.1M   953M     0%    /tmp
+/dev/ad0s1d       6.1G   1.9G   3.7G    35%    /usr
+/dev/ad4s1c.bde   150G   4.1K   138G     0%    /private</pre></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82012752"></a>19.16.1.2. Einhängen eines existierenden verschlüsselten
+	Dateisystems</h4></div></div></div><p>Nach jedem Neustart müssen verschlüsselte
+	Dateisysteme dem Kernel wieder bekannt gemacht werden,
+	auf Fehler überprüft werden und eingehangen
+	werden.  Die dazu nötigen Befehle müssen als
+	<code class="systemitem">root</code> durchgeführt werden.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>gbde-Partition im Kernel bekannt geben</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c.lock</code></strong></pre><p>Das Kommando fragt nach der Passphrase, die Sie
+	    beim Vorbereiten der verschlüsselten
+	    <span class="application">gbde</span>-Partition festgelegt
+	    haben.</p></li><li class="step"><p class="title"><strong>Prüfen des Dateisystems</strong></p><p>Das verschlüsselte Dateisystem kann noch nicht
+	    automatisch über <code class="filename">/etc/fstab</code>
+	    eingehangen werden.  Daher muss es vor dem Einhängen
+	    mit <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> geprüft werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -p -t ffs /dev/ad4s1c.bde</code></strong></pre></li><li class="step"><p class="title"><strong>Einhängen des verschlüsselten
+	    Dateisystems</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre><p>Das verschlüsselte Dateisystem steht danach
+	    zur Verfügung.</p></li></ol></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82022608"></a>19.16.1.2.1. Verschlüsselte Dateisysteme automatisch
+	  einhängen</h5></div></div></div><p>Mit einem Skript können verschlüsselte
+	  Dateisysteme automatisch bekannt gegeben, geprüft
+	  und eingehangen werden.  Wir raten Ihnen allerdings
+	  aus Sicherheitsgründen davon ab.  Starten Sie das
+	  Skript manuell an der Konsole oder in einer
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a>-Sitzung.</p><p>Zu diesem Zweck existiert ein
+	  <code class="filename">rc.d</code>-Skript, an das über
+	  Einträge in der Datei <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>
+	  Argumente übergeben werden können.  Dazu ein
+	  Beispiel:</p><pre class="programlisting">gbde_autoattach_all="YES"
+gbde_devices="ad4s1c"
+gbde_lockdir="/etc/gbde"</pre><p>Durch diese Argumente muss beim Systemstart die
+	  <span class="application">gbde</span>-Passphrase eingegeben werden.
+	  Erst nach Eingabe der korrekten Passphrase wird die
+	  <span class="application">gbde</span>-verschlüsselte
+	  Partition automatisch in den Verzeichnisbaum
+	  eingehängt.  Dieses Vorgehen ist insbesondere dann
+	  nützlich, wenn Sie <span class="application">gbde</span> auf
+	  einem Notebook einsetzen wollen.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82032464"></a>19.16.1.3. Kryptografische Methoden von gbde</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> benutzt den 128-Bit AES im CBC-Modus,
+	um die Daten eines Sektors zu verschlüsseln.  Jeder
+	Sektor einer Festplatte wird mit einem unterschiedlichen
+	AES-Schlüssel verschlüsselt.  Mehr Informationen,
+	unter anderem wie die Schlüssel für einen Sektor
+	aus der gegebenen Passphrase ermittelt werden, erhalten
+	Sie in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82035024"></a>19.16.1.4. Kompatibilität</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> kann nicht mit verschlüsselten
+	<span class="application">gbde</span>-Geräten umgehen.  Vor
+	dem Start von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> sind alle
+	<code class="filename">*.bde</code>-Geräte
+	zu deaktivieren, da <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> sonst bei der
+	Gerätesuche abstürzt.  Das im Beispiel verwendete
+	Gerät wird mit dem folgenden Befehl deaktiviert:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde detach /dev/ad4s1c</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Sie können <span class="application">gbde</span>
+	  nicht zusammen mit <span class="application">vinum</span>
+	  benutzen, da <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">vinum</span>(4)</span></a> das <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">geom</span>(4)</span></a>-Subsystem
+	  nicht benutzt.</p></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82047568"></a>19.16.2. Plattenverschlüsselung mit <code class="command">geli</code></h3></div><div><span class="authorgroup">Beigetragen von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p><code class="command">geli</code> ist als alternative kryptografische
+	GEOM-Klasse verfügbar und wird derzeit
+	von Pawel Jakub Dawidek weiterentwickelt.  <code class="command">geli</code>
+	unterscheidet sich von <code class="command">gbde</code> durch
+	unterschiedliche Fähigkeiten und einen unterschiedlichen
+	Ansatz für die Verschlüsselung von Festplatten.</p><p>Die wichtigsten Merkmale von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> sind:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Der Einsatz des <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crypto&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">crypto</span>(9)</span></a>-Frameworks &#8211;
+	    verfügt das System über kryptografische Hardware,
+	    wird diese von <code class="command">geli</code> automatisch
+	    verwendet.</p></li><li class="listitem"><p>Die Unterstützung verschiedener kryptografischer
+	    Algorithmen (derzeit AES, Blowfish, sowie 3DES).</p></li><li class="listitem"><p>Die Möglichkeit, die root-Partition zu
+	    verschlüsseln.  Um auf die verschlüsselte
+	    root-Partition zugreifen zu können, muss beim
+	    Systemstart die Passphrase eingegeben werden.</p></li><li class="listitem"><p><code class="command">geli</code> erlaubt den Einsatz von zwei
+	    voneinander unabhängigen Schlüsseln (etwa einem
+	    privaten <span class="quote">&#8222;<span class="quote">Schlüssel</span>&#8220;</span> und einem
+	    <span class="quote">&#8222;<span class="quote">Unternehmens-Schlüssel</span>&#8220;</span>).</p></li><li class="listitem"><p><code class="command">geli</code> ist durch einfache
+	    Sektor-zu-Sektor-Verschlüsselung sehr schnell.</p></li><li class="listitem"><p>Die Möglichkeit, Master-Keys zu sichern und
+	    wiederherzustellen.  Wenn ein Benutzer seinen Schlüssel
+	    zerstört, kann er über seinen zuvor gesicherten
+	    Schlüssel wieder auf seine Daten zugreifen.</p></li><li class="listitem"><p><code class="command">geli</code> erlaubt es, Platten mit
+	    einem zufälligen Einmal-Schlüssel einzusetzen,
+	    was insbesondere für Swap-Partitionen und
+	    temporäre Dateisysteme interessant ist.</p></li></ul></div><p>Weitere Informationen zu den Fähigkeiten von
+	<code class="command">geli</code> finden Sie in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.</p><p>Die folgenden Schritte beschreiben, wie Sie
+	<code class="command">geli</code> im FreeBSD-Kernel aktivieren und einen
+	<code class="command">geli</code>-Verschlüsselungs-Provider
+	anlegen können.</p><p>Da Sie Ihren Kernel anpassen müssen,
+	benötigen Sie außerdem
+	<code class="systemitem">root</code>-Privilegien.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Aufnahme der <code class="command">geli</code>-Unterstützung
+	    in Ihre Kernelkonfigurationsdatei</strong></p><p>Fügen Sie die folgenden Zeilen in Ihre
+	    Kernelkonfigurationsdatei ein:</p><pre class="programlisting">options GEOM_ELI
+device crypto</pre><p>Bauen und installieren Sie Ihren neuen Kernel wie in
+	    <a class="xref" href="kernelconfig.html" title="Kapitel 9. Konfiguration des FreeBSD-Kernels">Kapitel 9, <em>Konfiguration des FreeBSD-Kernels</em></a> beschrieben.</p><p>Alternativ können Sie aber auch das
+	    <code class="command">geli</code>-Kernelmodul beim Systemstart laden.
+	    Dazu fügen Sie die folgende Zeile in
+	    <code class="filename">/boot/loader.conf</code> ein:</p><pre class="programlisting">geom_eli_load="YES"</pre><p>Ab sofort wird <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> vom Kernel
+	    unterstützt.</p></li><li class="step"><p class="title"><strong>Erzeugen des Master-Keys</strong></p><p>Das folgende Beispiel beschreibt, wie Sie eine
+	    Schlüsseldatei erzeugen, die als Teil des
+	    Master-Keys für den Verschlüsselungs-Provider
+	    verwendet wird, der unter <code class="filename">/private</code> in den
+	    Verzeichnisbaum eingehängt (<span class="quote">&#8222;<span class="quote">gemountet</span>&#8220;</span>)
+	    wird.  Diese Schlüsseldatei liefert zufällige
+	    Daten, die für die Verschlüsselung des
+	    Master-Keys benötigt werden.  Zusätzlich wird
+	    der Master-Key durch eine Passphrase geschützt.  Die
+	    Sektorgröße des Providers beträgt 4 KB.
+	    Außerdem wird beschrieben, wie Sie einen
+	    <code class="command">geli</code>-Provider aktivieren, ein vom ihm
+	    verwaltetes Dateisystem erzeugen, es mounten, mit ihm
+	    arbeiten und wie Sie es schließlich wieder unmounten
+	    und den Provider deaktivieren.</p><p>Um eine bessere Leistung zu erzielen, sollten Sie eine
+	    größere Sektorgröße (beispielsweise
+	    4 KB) verwenden.</p><p>Der Master-Key wird durch eine Passphrase sowie die
+	    Daten der Schlüsseldatei (die von
+	    <code class="filename">/dev/random</code> stammen) geschützt.
+	    Die Sektorgröße von
+	    <code class="filename">/dev/da2.eli</code> (das als Provider
+	    bezeichnet wird) beträgt 4 KB.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/root/da2.key bs=64 count=1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli init -s 4096 -K /root/da2.key /dev/da2</code></strong>
+Enter new passphrase:
+Reenter new passphrase:</pre><p>Es ist nicht zwingend nötig, sowohl eine Passphrase
+	    als auch eine Schlüsseldatei zu verwenden.  Die
+	    einzelnen Methoden können auch unabhängig
+	    voneinander eingesetzt werden.</p><p>Wird für die Schlüsseldatei der Wert
+	    <span class="quote">&#8222;<span class="quote">-</span>&#8220;</span> angegeben, wird dafür die
+	    Standardeingabe verwendet.  Das folgende Beispiel zeigt,
+	    dass Sie auch mehr als eine Schlüsseldatei verwenden
+	    können.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat keyfile1 keyfile2 keyfile3 | geli init -K - /dev/da2</code></strong></pre></li><li class="step"><p class="title"><strong>Aktivieren des Providers mit dem erzeugten
+	    Schlüssel</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>geli attach -k /root/da2.key /dev/da2</code></strong>
+Enter passphrase:</pre><p>Dadurch wird die (Normaltext-)Gerätedatei
+	    <code class="filename">/dev/da2.eli</code>
+	    angelegt.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/da2*</code></strong>
+/dev/da2  /dev/da2.eli</pre></li><li class="step"><p class="title"><strong>Das neue Dateisystem erzeugen</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/dev/da2.eli bs=1m</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/da2.eli</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da2.eli /private</code></strong></pre><p>Das verschlüsselte Dateisystem wird nun von
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> angezeigt und kann ab sofort eingesetzt werden.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem     Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a    248M    89M   139M    38%    /
+/devfs         1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f    7.7G   2.3G   4.9G    32%    /usr
+/dev/ad0s1d    989M   1.5M   909M     0%    /tmp
+/dev/ad0s1e    3.9G   1.3G   2.3G    35%    /var
+/dev/da2.eli   150G   4.1K   138G     0%    /private</pre></li><li class="step"><p class="title"><strong>Das Dateisystem unmounten und den Provider deaktivieren</strong></p><p>Wenn Sie nicht mehr mit dem verschlüsselten
+	    Dateisystem arbeiten und die unter <code class="filename">/private</code> eingehängte
+	    Partition daher nicht mehr benötigen,  sollten
+	    Sie diese unmounten und den
+	    <code class="command">geli</code>-Verschlüsselungs-Provider
+	    wieder deaktivieren.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /private</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli detach da2.eli</code></strong></pre></li></ol></div><p>Weitere Informationen zum Einsatz von <code class="command">geli</code>
+        finden Sie in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82109648"></a>19.16.2.1. Der Einsatz des <code class="filename">geli</code>-
+	  <code class="filename">rc.d</code>-Skripts</h4></div></div></div><p><code class="command">geli</code> verfügt über ein
+	  <code class="filename">rc.d</code>-Skript,
+	  das den Einsatz von <code class="command">geli</code>
+	  deutlich vereinfacht.  Es folgt nun ein Beispiel, in dem
+	  <code class="command">geli</code> über die Datei
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> konfiguriert wird:</p><pre class="programlisting">geli_devices="da2"
+geli_da2_flags="-p -k /root/da2.key"</pre><p>Durch diese Einträge wird
+	  <code class="filename">/dev/da2</code> als
+	  <code class="command">geli</code>-Provider festgelegt.  Der Master-Key
+	  befindet sich in <code class="filename">/root/da2.key</code>.  Beim
+	  Aktivieren des <code class="command">geli</code>-Providers wird keine
+	  Passphrase abgefragt (beachten Sie, dass dies nur dann
+	  möglich ist, wenn Sie <code class="command">geli</code> mit dem
+	  Parameter <code class="option">-P</code> initialisieren).  Wird das
+	  System heruntergefahren, wird der
+	  <code class="literal">geli</code>-Provider zuvor deaktiviert.</p><p>Weitere Informationen zur Konfiguration der
+	  <code class="filename">rc.d</code>-Skripten
+	  finden Sie im Abschnitt <a class="link" href="configtuning-rcd.html" title="12.7. Das rc-System für Systemdienste">rc.d</a> des Handbuchs.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp81978320" class="footnote"><p><a href="#idp81978320" class="para"><sup class="para">[12] </sup></a>Die Auswahl einer sicheren und leicht zu merkenden
+	        Passphrase wird auf der Webseite <a class="link" href="http://world.std.com/~reinhold/diceware.html" target="_top">Diceware
+	          Passphrase</a> beschrieben.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="quotas.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="swap-encrypting.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">19.15. Dateisystem-Quotas </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 19.17. Den Auslagerungsspeicher verschlüsseln</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

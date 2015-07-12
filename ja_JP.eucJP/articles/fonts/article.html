@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="euc-jp"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>フォントと FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="ここでは FreeBSD の syscons ドライバや X11, Ghostscript, Groff で利用することができるさまざまなフォントファイルについて説明しています。 また、syscons ディスプレイを 80x60 行モードに切り替える方法や、 上述のアプリケーションでタイプ 1 フォントを利用する方法を例示します。" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="ja" class="article" lang="ja"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp74205520"></a>フォントと FreeBSD</h1></div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="subtitle"><em>A Tutorial</em></h3></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="surname">Bodenstab</span> <span class="firstname">Dave</span> [FAMILY Given]</h3><div class="affiliation"><div class="address"><p><br />
+	〓〓〓〓<code class="email">&lt;<a xmlns="" class="email" href="mailto:imdave@synet.net">imdave@synet.net</a>&gt;</code><br />
+	〓〓</p></div></div></div></div></div><div>改訂: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD は
+  The FreeBSD Foundation の登録商標です。</p><p>Adobe, Acrobat, Acrobat Reader, Flash および
+  PostScript は アメリカ合衆国および/またはその他の国の
+  Adobe Systems Incorporated の登録商標または商標です。</p><p>Apple, AirPort, FireWire,
+  iMac, iPhone, iPad,
+  Mac, Macintosh, Mac OS,
+  Quicktime および TrueType は Apple Inc. の商標で、
+  アメリカ合衆国およびその他の国で登録されています。</p><p>Linux は
+  Linus Torvalds の登録商標です。</p><p>Microsoft, IntelliMouse, MS-DOS,
+  Outlook, Windows, Windows Media および Windows NT は
+  アメリカ合衆国および/またはその他の国における
+  Microsoft Corporation の登録商標または商標です。</p><p>Motif, OSF/1 および UNIX は
+  アメリカ合衆国およびその他の国における The Open Group の登録商標で、
+  IT DialTone および The Open Group は同じく商標です。</p><p>製造者および販売者が製品を区別するのに
+  用いている表示の多くは、商標とされています。
+  この文書に登場する表示のうち FreeBSD Project
+  がその商標を確認しているものには、その表示に続いて
+  <span class="quote">「<span class="quote">™</span>」</span> または
+  <span class="quote">「<span class="quote">®</span>」</span> 記号がおかれています。</p></div></div><div>  1996 年 8 月 7 日 (水) ： .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">概要</div><p>ここでは FreeBSD の syscons ドライバや
+	<span class="application">X11</span>, <span class="application">Ghostscript</span>,
+	<span class="application">Groff</span>
+        で利用することができるさまざまなフォントファイルについて説明しています。
+	また、syscons ディスプレイを 80x60 行モードに切り替える方法や、
+	上述のアプリケーションでタイプ 1 フォントを利用する方法を例示します。</p></div></div></div><hr /></div><div class="toc"><div class="toc-title">目次</div><dl class="toc"><dt><span class="sect1"><a href="#intro">1. はじめに</a></span></dt><dt><span class="sect1"><a href="#terminology">2. 基本用語</a></span></dt><dt><span class="sect1"><a href="#font-formats">3. どのフォント形式を利用できますか?</a></span></dt><dt><span class="sect1"><a href="#virtual-console">4. 仮想コンソールを 80x60 行モードに設定する</a></span></dt><dt><span class="sect1"><a href="#type1-fonts-x11">5. タイプ 1 フォントを <span class="application">X11</span> で利用する</a></span></dt><dt><span class="sect1"><a href="#type1-fonts-ghostscript">6. タイプ 1 フォントを Ghostscript で利用する</a></span></dt><dt><span class="sect1"><a href="#type1-fonts-groff">7. タイプ 1 フォントを Groff で利用する</a></span></dt><dt><span class="sect1"><a href="#convert-truetype">8. TrueType フォントを groff 用に groff/PostScript
+      フォーマットに変換する</a></span></dt><dt><span class="sect1"><a href="#truetype-for-other-programs">9. TrueType フォントを他のプログラムで使うことができますか?</a></span></dt><dt><span class="sect1"><a href="#obtaining-additional-fonts">10. どこでフォントを入手できますか?</a></span></dt><dt><span class="sect1"><a href="#additional-questions">11. その他の質問</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="intro"></a>1. はじめに</h2></div></div></div><p>数多くのフォントのソースを入手することができますが、これらを
+      FreeBSD でどのようにして使うかはあまりよく知られていないかもしれません。
+      その答えは、使いたいと思う構成要素の説明書を注意深く探すことによって見つけることができます。
+      しかし、これはとても時間がかかる作業です。本チュートリアルは、
+      フォントに関して興味がある向きに、
+      その近道を教えようと試みるものであります。</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="terminology"></a>2. 基本用語</h2></div></div></div><p>フォント形式の種類やそれに関連したフォントファイルの拡張子は多数存在します。
+      その内でここで解説するものは以下の通りです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="filename">.pfa</code>、<code class="filename">.pfb</code></span></dt><dd><p><span class="trademark">PostScript</span>® タイプ 1 フォント。拡張子
+	    <code class="filename">.pfa</code> は
+	    <span class="emphasis"><em>A</em></span>scii 形式のそして拡張子
+	    <code class="filename">.pfb</code> は <span class="emphasis"><em>B</em></span>inary
+	    形式を意味する。</p></dd><dt><span class="term"><code class="filename">.afm</code></span></dt><dd><p>タイプ 1 フォントに関連するフォントメトリック情報。</p></dd><dt><span class="term"><code class="filename">.pfm</code></span></dt><dd><p>タイプ 1 フォントに関連するプリンタ用フォントメトリック情報。</p></dd><dt><span class="term"><code class="filename">.ttf</code></span></dt><dd><p><span class="trademark">TrueType</span>® フォント。</p></dd><dt><span class="term"><code class="filename">.fot</code></span></dt><dd><p>TrueType フォントへの間接的な参照ファイル
+	    (実際にはフォントファイルではない)。</p></dd><dt><span class="term"><code class="filename">.fon</code>、<code class="filename">.fnt</code></span></dt><dd><p>スクリーン表示用ビットマップフォント。</p></dd></dl></div><p><code class="filename">.fot</code> ファイルは、<span class="trademark">Windows</span>® で用いられ、
+      実際の <span class="trademark">TrueType</span>® フォント (<code class="filename">.ttf</code>)
+      ファイルへのシンボリックリンクに類する役割を果たします。
+      <code class="filename">.fon</code> フォントも Windows で用いられていますが、
+      FreeBSD でこの形式のフォントを利用する方法を筆者は知りません。</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="font-formats"></a>3. どのフォント形式を利用できますか?</h2></div></div></div><p>どのフォントファイル形式が有用であるかは、
+      利用するアプリケーションに依ります。
+      FreeBSD 自身はフォントファイルは利用しません。
+      アプリケーションプログラムやドライバ (あるいはその両方) によっては、
+      あるフォントファイルを利用するようにできるかもしれません。
+      以下は、アプリケーション、及び、
+      ドライバとそれが利用できるフォントタイプの拡張子の対応表を簡単に示します。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">ドライバ</span></dt><dd><div class="variablelist"><dl class="variablelist"><dt><span class="term">syscons</span></dt><dd><p><code class="filename">.fnt</code></p></dd></dl></div></dd><dt><span class="term">アプリケーション</span></dt><dd><div class="variablelist"><dl class="variablelist"><dt><span class="term"><span class="application">Ghostscript</span></span></dt><dd><p><code class="filename">.pfa</code>、
+		  <code class="filename">.pfb</code>、
+		  <code class="filename">.ttf</code></p></dd><dt><span class="term"><span class="application">X11</span></span></dt><dd><p><code class="filename">.pfa</code>、
+		  <code class="filename">.pfb</code></p></dd><dt><span class="term"><span class="application">Groff</span></span></dt><dd><p><code class="filename">.pfa</code>、
+		  <code class="filename">.afm</code></p></dd><dt><span class="term"><span class="application">Povray</span></span></dt><dd><p><code class="filename">.ttf</code></p></dd></dl></div></dd></dl></div><p>拡張子 <code class="filename">.fnt</code> は極めて頻繁に使われています。
+      (訳注: この拡張子がフォント (font) という名前から連想しやすいので)
+      あるアプリケーションに特化したフォントを作成しようとした際にはいつでも、
+      この拡張子が選択される方がそうでないときよりもかなり多いのではないかと著者は疑っています。
+      このため、この拡張子を持つファイル全てが同じ形式にはなっていないようです。
+      特に、<code class="filename">.fnt</code> ファイルは
+      FreeBSD 上では syscons によって利用されていますが、これと <span class="trademark">MS-DOS</span>® や
+      <span class="trademark">Windows</span>® 環境で出会った <code class="filename">.fnt</code>
+      とは同じ形式ではないかもしれません。
+      筆者は FreeBSD で提供されている以外の <code class="filename">.fnt</code>
+      ファイルを利用する試みは一切行っていません。</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="virtual-console"></a>4. 仮想コンソールを 80x60 行モードに設定する</h2></div></div></div><p>まず、8x8 サイズのフォントがロードされていなくてはなりません。
+      そのためには、<code class="filename">/etc/rc.conf</code>
+      に以下の行が含まれているべきです
+      (フォントの名称をあなたの locale に対応するものに書き換えてください)。</p><div class="informalexample"><pre class="programlisting">font8x8="iso-8x8"		# font 8x8 from /usr/share/syscons/fonts/* (or NO).</pre></div><p>実際にモードを切り替えるコマンドは
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vidcontrol&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vidcontrol</span>(1)</span></a> です。</p><div class="informalexample"><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>vidcontrol VGA_80x60</code></strong></pre></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> のような、さまざまなスクリーン指向のプログラムに対して、
+      現在の画面サイズが分かるようにしておかなくてはなりません。これは
+      <code class="command">ioctl</code> を通じて (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syscons&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">syscons</span>(4)</span></a> などの)
+      コンソールドライバに呼び掛けることで行われ、</p><p>これらを一度に済ませるために、
+      これらのコマンドを起動用のスクリプトに書いておき、
+      これをシステム起動時に実行するかもしれません。
+      この方法では <code class="filename">/etc/rc.conf</code> に以下の行を追加します
+    </p><div class="informalexample"><pre class="programlisting">allscreens_flags="VGA_80x60"	# Set this vidcontrol mode for all virtual screens
+	  </pre></div><p>参考文献: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vidcontrol&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vidcontrol</span>(1)</span></a></p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="type1-fonts-x11"></a>5. タイプ 1 フォントを <span class="application">X11</span> で利用する</h2></div></div></div><p><span class="application">X11</span> では、
+      <code class="filename">.pfa</code> 形式、もしくは、
+      <code class="filename">.pfb</code> 形式のフォントのどちらでも利用できます。
+      <span class="application">X11</span> では、フォントは
+      <code class="filename">/usr/X11R6/lib/X11/fonts</code>
+      以下のさまざまなサブディレクトリに置かれています。
+      それぞれのディレクトリにある
+      <code class="filename">fonts.dir</code> ファイルの内容によって、
+      それぞれのフォントのファイルと <span class="application">X11</span>
+      上でのフォント名が関連付けられています。</p><p><code class="filename">Type1</code>
+      という名前のディレクトリが既に存在しています。
+      新しいフォントを追加する最も簡単な方法は、
+      このディレクトリのそのフォントファイルを置くことです。
+      新しいフォントは別なディレクトリに置いておき、<code class="filename">Type1</code>
+      ディレクトリに追加フォントへのシンボリックリンクを張る方がより優れています。
+      なぜなら、この方法をとることでオリジナルで供給されているフォントと混乱することなく、
+      これらのフォントを追加した跡を残すことがより簡単にできるからです。
+      この方法は、例えば、次のように行います。</p><div class="informalexample"><pre class="screen"><em class="lineannotation"><span class="lineannotation">フォントファイルを入れるディレクトリを作成します。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>mkdir -p /usr/local/share/fonts/type1</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>cd /usr/local/share/fonts/type1</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">ここに .pfa または .pfb ファイルと .afm ファイルを置きます。</span></em>
+<em class="lineannotation"><span class="lineannotation">フォントの readme ファイルやその他のドキュメントをこのディ</span></em>
+<em class="lineannotation"><span class="lineannotation">レクトリに置いても構いません。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cp /cdrom/fonts/atm/showboat/showboat.pfb .</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>cp /cdrom/fonts/atm/showboat/showboat.afm .</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">フォントのクロスリファレンスのためにインデックスを変更します。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>echo showboat - InfoMagic CICA, Dec 1994, /fonts/atm/showboat &gt;&gt;INDEX</code></strong></pre></div><p>さて、新しいフォントを <span class="application">X11</span> で利用するためには、
+      そのフォントファイルを利用できるようにして、
+      フォント名のファイルを更新する必要があります。
+      <span class="application">X11</span> のフォント名は次のようになっています。</p><div class="informalexample"><pre class="screen">-bitstream-charter-medium-r-normal-xxx-0-0-0-0-p-0-iso8859-1
+     |        |      |    |   |     |  | | | | | |    \    \
+     |        |      |    |   |     \  \ \ \ \ \ \     +----+- character set
+     |        |      |    |   \      \  \ \ \ \ \ +- average width
+     |        |      |    |    \      \  \ \ \ \ +- spacing
+     |        |      |    \     \      \  \ \ \ +- vertical res.
+     |        |      |     \     \      \  \ \ +- horizontal res.
+     |        |      |      \     \      \  \ +- points
+     |        |      |       \     \      \  +- pixels
+     |        |      |        \     \      \
+  foundry  family  weight   slant  width  additional style</pre></div><p>新しいフォントそれぞれに対して、新しい名前を付ける必要があります。
+      フォント付属のドキュメントにフォントに関する情報があれば、
+      名前を作る際の基になるかもしれません。そのような情報がない場合は、
+      フォントに対して <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=strings&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">strings</span>(1)</span></a>
+      を使うと何らかのアイデアが得ることができます。例えば、</p><div class="informalexample"><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>strings showboat.pfb | more</code></strong>
+%!FontType1-1.0: Showboat 001.001
+%%CreationDate: 1/15/91 5:16:03 PM
+%%VMusage: 1024 45747
+% Generated by Fontographer 3.1
+% Showboat
+ 1991 by David Rakowski.  Alle Rechte Vorbehalten.
+FontDirectory/Showboat known{/Showboat findfont dup/UniqueID known{dup
+/UniqueID get 4962377 eq exch/FontType get 1 eq and}{pop false}ifelse
+{save true}{false}ifelse}{false}ifelse
+12 dict begin
+/FontInfo 9 dict dup begin
+ /version (001.001) readonly def
+ /FullName (Showboat) readonly def
+ /FamilyName (Showboat) readonly def
+ /Weight (Medium) readonly def
+ /ItalicAngle 0 def
+ /isFixedPitch false def
+ /UnderlinePosition -106 def
+ /UnderlineThickness 16 def
+ /Notice (Showboat
+ 1991 by David Rakowski.  Alle Rechte Vorbehalten.) readonly def
+end readonly def
+/FontName /Showboat def
+--stdin--</pre></div><p>この情報から、次のような名前が考えられます:</p><div class="informalexample"><pre class="screen">-type1-Showboat-medium-r-normal-decorative-0-0-0-0-p-0-iso8859-1</pre></div><p>この名前の構成は次の通りです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">型 (foundry)</span></dt><dd><p>新フォントは <code class="literal">type1</code>
+	    と名付けることにしましょう。</p></dd><dt><span class="term">族 (family)</span></dt><dd><p>フォントの名前です。</p></dd><dt><span class="term">重み (weight)</span></dt><dd><p>normal (普通)、bold (太い)、medium (中間)、
+	    semibold (やや太め) などがあります。上記の
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=strings&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">strings</span>(1)</span></a> の出力より、
+	    フォントの重みは <span class="emphasis"><em>medium</em></span>
+	    であると考えられます。</p></dd><dt><span class="term">傾斜 (slant)</span></dt><dd><p><span class="emphasis"><em>r</em></span>oman (ローマン体)、<span class="emphasis"><em>i</em></span>talic (イタリック体)、<span class="emphasis"><em>o</em></span>blique (斜字体) などがあります。
+	    <span class="emphasis"><em>ItalicAngle</em></span> が0になっていることにより、
+	    <span class="emphasis"><em>roman</em></span> を使っています。</p></dd><dt><span class="term">幅</span></dt><dd><p>normal (普通)、wide (幅広)、condensed (圧縮)、extended(拡張)
+	    などがあります。上記で調べた結果から、
+	    <span class="emphasis"><em>normal</em></span> を仮定します。</p></dd><dt><span class="term">追加スタイル</span></dt><dd><p>通常は省略されますが、フォントに装飾用 (decorative)
+	    英大文字が含まれていることをここで示します。</p></dd><dt><span class="term">スペーシング</span></dt><dd><p>proportional (プロポーショナル (訳注:
+	    字形に応じて幅が変化するフォント)) または monospaced
+	    (単一幅フォント) があります。ここでは
+	    <span class="emphasis"><em>Proportional</em></span> としてありますが、これは
+	    <span class="emphasis"><em>isFixedPitch</em></span> が false (偽)
+	    になっているためです。</p></dd></dl></div><p>これらの名前は全て任意なのですが、
+      既存の慣習と互換性を保つよう努力すべきでしょう。
+      <span class="application">X11</span> プログラムでは、
+      フォントはワイルドカードを含んだ名前で参照されます。ですから、
+      フォント名は何らかの意味づけを持って選択されるべきでしょう。
+      (訳注 : 適当なフォントを探すとき、)
+      ある人は単純に以下の名前を使うことから始めるかもしれません。
+
+      </p><div class="informalexample"><pre class="screen">…-normal-r-normal-…-p-…
+	</pre></div><p>
+
+      そして、
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=xfontsel&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">xfontsel</span>(1)</span></a>
+      で該当するフォントを調べてみて、そのフォントの形を見ながら、
+      名前を調節するかもしれません。</p><p>それでは、ここまでの例を完結させることにしましょう。</p><div class="informalexample"><pre class="screen"><em class="lineannotation"><span class="lineannotation">X11 に対してフォントをアクセスできるようにします。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cd /usr/X11R6/lib/X11/fonts/Type1</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ln -s /usr/local/share/fonts/type1/showboat.pfb .</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">fonts.dir と fonts.scale を編集して、フォントを記述する行を追加し、最初の行にある総フォント数を増やします。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>ex fonts.dir
+:1p
+25
+:1c
+26
+.
+:$a
+showboat.pfb -type1-showboat-medium-r-normal-decorative-0-0-0-0-p-0-iso8859-1
+.
+:wq</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">fonts.scale は fonts.dirと同一内容のようですので…</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cp fonts.dir fonts.scale</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">X11 に内容が変更されたことを伝えます。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>xset fp rehash</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">新しいフォントを試してみます。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>xfontsel -pattern -type1-*</code></strong></pre></div><p>参考文献: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=xfontsel&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">xfontsel</span>(1)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=xset&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">xset</span>(1)</span></a>、<em class="citetitle">The X
+	Windows System in a Nutshell</em>、<a class="link" href="http://www.ora.com/" target="_top">O'Reilly &amp;
+	Associates</a></p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="type1-fonts-ghostscript"></a>6. タイプ 1 フォントを Ghostscript で利用する</h2></div></div></div><p><span class="application">Ghostscript</span> では、
+      <code class="filename">Fontmap</code> ファイルに従ってフォントを参照して
+      います。このファイルを <span class="application">X11</span> の
+      <code class="filename">fonts.dir</code>
+      ファイルと同様な方法で変更しなくてはなりません。
+      <span class="application">Ghostscript</span> では、
+      <code class="filename">.pfa</code> 形式または <code class="filename">.pfb</code>
+      形式のフォントのいずれか一方を使用することができます。
+      前章の例で登場したフォントを使って、ここではこのフォントを
+      <span class="application">Ghostscript</span>
+      で使用する方法について述べます。</p><div class="informalexample"><pre class="screen"><em class="lineannotation"><span class="lineannotation">フォントを Ghostscript のフォントディレクトリに置きます。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cd /usr/local/share/ghostscript/fonts</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ln -s /usr/local/share/fonts/type1/showboat.pfb .</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">Ghostscript にフォントを認識させるために Fontmap を編集します。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cd /usr/local/share/ghostscript/4.01</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ex Fontmap
+:$a
+/Showboat        (showboat.pfb) ; % From CICA /fonts/atm/showboat
+.
+:wq</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">Ghostscript を用いてフォントを試してみます。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>gs prfont.ps</code></strong>
+Aladdin Ghostscript 4.01 (1996-7-10)
+Copyright (C) 1996 Aladdin Enterprises, Menlo Park, CA.  All rights
+reserved.
+This software comes with NO WARRANTY: see the file PUBLIC for details.
+Loading Times-Roman font from /usr/local/share/ghostscript/fonts/tir_____.pfb...
+ /1899520 581354 1300084 13826 0 done.
+GS&gt;<strong class="userinput"><code>Showboat DoFont</code></strong>
+Loading Showboat font from /usr/local/share/ghostscript/fonts/showboat.pfb...
+ 1939688 565415 1300084 16901 0 done.
+&gt;&gt;showpage, press &lt;return&gt; to continue&lt;&lt;
+&gt;&gt;showpage, press &lt;return&gt; to continue&lt;&lt;
+&gt;&gt;showpage, press &lt;return&gt; to continue&lt;&lt;
+GS&gt;<strong class="userinput"><code>quit</code></strong></pre></div><p>参考文献: <span class="application">Ghostscript バージョン
+      4.01</span> で配布されている
+      <code class="filename">fonts.txt</code></p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="type1-fonts-groff"></a>7. タイプ 1 フォントを Groff で利用する</h2></div></div></div><p>ここまでで新しいフォントを <span class="application">X11</span> と
+      <span class="application">Ghostscript</span>
+      の両方で用いることができるようになりましたが、
+      この新しいフォントをどのようにすれば
+      <span class="application">groff</span> で使うことができるでしょうか?
+      まず第一に、<span class="trademark">PostScript</span>® のタイプ 1 フォントを扱っていますから、
+      これを適用できる <span class="application">groff</span> デバイスは
+      <span class="emphasis"><em>ps</em></span> デバイスです。次に、各々のフォントを
+      <span class="application">groff</span> で使用できるようにフォントファ
+      イルを作らなくてはなりません。
+      <span class="application">groff</span> でのフォント名は
+      <code class="filename">/usr/share/groff_font/devps</code>
+      の中のファイル名になります。上述の例では、フォントファイルは
+      <code class="filename">/usr/share/groff_font/devps/SHOWBOAT</code>
+      とすることができるでしょう。このファイルは <span class="application">groff</span>
+      によって提供されているツールを用いて生成しなくてはなりません。</p><p>最初に <code class="command">afmtodit</code> というツールを使います。
+      このコマンドは通常ではインストールされませんので、
+      ソースプログラム群から該当プログラムを取り出さなくてはなりません。
+      このファイルの最初の一行を変更しなくてはならないことが分かっています。
+      著者は次のようにしました。</p><div class="informalexample"><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cp /usr/src/gnu/usr.bin/groff/afmtodit/afmtodit.pl /tmp</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ex /tmp/afmtodit.pl
+:1c
+#!/usr/bin/perl -P-
+.
+:wq</code></strong></pre></div><p>このツールはメトリックファイル (<code class="filename">.afm</code> 拡張子)
+      から <span class="application">groff</span> フォントファイルを生成してくれます。
+      フォント使用方法例を続けることにしましょう。</p><div class="informalexample"><pre class="screen"><em class="lineannotation"><span class="lineannotation">.afm ファイルの多くは Mac 形式… すなわち行が ^M で区切られています。
+これを行を ^J で区切る <span class="trademark">UNIX</span>® スタイルに変換する必要があります。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cd /tmp</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>cat /usr/local/share/fonts/type1/showboat.afm |
+	tr '\015' '\012' &gt;showboat.afm</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">そして、groff フォントファイルを生成します。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>cd /usr/share/groff_font/devps</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>/tmp/afmtodit.pl -d DESC -e text.enc /tmp/showboat.afm generate/textmap SHOWBOAT</code></strong></pre></div><p>これでフォントを SHOWBOAT という名前で参照することができました。</p><p>システムでプリンタを扱うために
+      <span class="application">Ghostscript</span> を使用しているならば、
+      これで作業は完了しました。しかしながら、本物の <span class="trademark">PostScript</span>®
+      プリンタを使っている場合は、フォントを使用可能にする為に、
+      当該フォントをプリンタにダウンロードする必要があります
+      (showboat フォントがプリンタに偶然にも最初から組み込まれている場合、
+      もしくはプリンタからアクセスされるフォントディスクの中に入ってい
+      る場合はこの限りではありません)。
+      フォント利用の最終段階として、
+      ダウンロード可能な形式のフォントを生成します。
+      ツール <code class="command">pfbtops</code> は (訳注 : <code class="filename">.pfb</code> 形式から)
+      <code class="filename">.pfa</code> 形式のフォントを生成するために、そして、
+      <code class="filename">download</code> というファイルを編集し、
+      フォントの内部名を参照するように変更しなくてはなりません。
+      この内部名は以下で示すように groff
+      フォントファイルから容易に調べることができます。</p><div class="informalexample"><pre class="screen"><em class="lineannotation"><span class="lineannotation">.pfa フォントファイルを生成する。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>pfbtops /usr/local/share/fonts/type1/showboat.pfb &gt;showboat.pfa</code></strong></pre></div><p>もちろん、<code class="filename">.pfa</code> が既に利用可能であれば、
+      参照できるようにシンボリックリンクを張って下さい。</p><div class="informalexample"><pre class="screen"><em class="lineannotation"><span class="lineannotation">内部フォント名を得る。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>fgrep internalname SHOWBOAT</code></strong>
+internalname Showboat
+
+<em class="lineannotation"><span class="lineannotation">該当フォントをダウンロードしなくてはならないことを groff に通知する。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>ex download
+:$a
+Showboat      showboat.pfa
+.
+:wq</code></strong></pre></div><p>フォントを試用する。</p><div class="informalexample"><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cd /tmp</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>cat &gt;example.t &lt;&lt;EOF
+.sp 5
+.ps 16
+This is an example of the Showboat font:
+.br
+.ps 48
+.vs (\n(.s+2)p
+.sp
+.ft SHOWBOAT
+ABCDEFGHI
+.br
+JKLMNOPQR
+.br
+STUVWXYZ
+.sp
+.ps 16
+.vs (\n(.s+2)p
+.fp 5 SHOWBOAT
+.ft R
+To use it for the first letter of a paragraph, it will look like:
+.sp 50p
+\s(48\f5H\s0\fRere is the first sentence of a paragraph that uses the
+showboat font as its first letter.
+Additional vertical space must be used to allow room for the larger
+letter.
+EOF</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>groff -Tps example.t &gt;example.ps</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">ghostscript/ghostviewを使って表示する。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>ghostview example.ps</code></strong>
+
+<em class="lineannotation"><span class="lineannotation">印刷する (訳注 : プリンタ名は適宜変更して下さい)。</span></em>
+<code class="prompt">%</code> <strong class="userinput"><code>lpr -Ppostscript example.ps</code></strong></pre></div><p>参考文献:
+      <code class="filename">/usr/src/gnu/usr.bin/groff/afmtodit/afmtodit.man</code>、
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=groff_font&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">groff_font</span>(5)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=groff_char&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">groff_char</span>(7)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pfbtops&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">pfbtops</span>(1)</span></a></p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="convert-truetype"></a>8. TrueType フォントを groff 用に groff/PostScript
+      フォーマットに変換する</h2></div></div></div><p>これにはいくつかユーティリティが必要ですが、
+      ベースシステムの一部としてインストールされてはいないので若干の作業が必要となります。
+      インストールするものは:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="command">ttf2pf</code></span></dt><dd><p>TrueType から PostScript への変換ユーティリティです。
+	    これは TrueType フォントからアスキーフォントメトリック
+	    (<code class="filename">.afm</code>) ファイルへの変換を行います。</p><p>現時点では <code class="uri"><a class="uri" href="http://sunsite.icm.edu.pl/pub/GUST/contrib/BachoTeX98/ttf2pf/" target="_top">http://sunsite.icm.edu.pl/pub/GUST/contrib/BachoTeX98/ttf2pf/</a></code>
+	    から入手できます。
+	    注意: これらのファイルは PostScript によるプログラムなので、
+	    <span class="keycap"><strong>Shift</strong></span> キーを押しながらリンクをクリックして
+	    ディスクにダウンロードしてください。
+	    さもないとあなたのブラウザは <span class="application">ghostview</span>
+	    を立ちあげます。</p><p>重要なファイルは:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="filename">GS_TTF.PS</code></p></li><li class="listitem"><p><code class="filename">PF2AFM.PS</code></p></li><li class="listitem"><p><code class="filename">ttf2pf.ps</code></p></li></ul></div><p>大文字と小文字が奇妙に混在しているのは、
+	    DOS シェルのことも考慮しているためです。
+	    <code class="filename">ttf2pf.ps</code> はそれ以外のファイルを
+	    大文字として扱いますので、
+	    ファイル名の変更はそれに対応させてください
+	    (実際には <code class="filename">GS_TTF.PS</code> と
+	    <code class="filename">PFS2AFM.PS</code> は、一応
+	    <span class="application">Ghostscript</span> の配布物の一部ですが、
+	    個別のユーティリティとしても問題なく利用できます。
+	    FreeBSD には後者が入っていないようです)。
+	    <code class="filename">/usr/local/share/groff_font/devps</code>
+	    にインストールするとよいかもしれません。</p></dd><dt><span class="term"><code class="command">afmtodit</code></span></dt><dd><p>はアスキーフォントメトリックファイルから
+	    <span class="application">groff</span> とともに使うフォントファイルを作ります。
+	    これは通常、
+	    <code class="filename">/usr/src/contrib/groff/afmtodit</code>
+	    ディレクトリに存在していて、
+	    使えるようにするには作業が必要です。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">もしも <code class="filename">/usr/src</code>
+	      ツリーで作業をすることを躊躇うなら、
+	      このディレクトリの内容を作業用の場所にコピーすればいいです。</p></div><p>作業エリアで以下のようにしてこのユーティリティします。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -f Makefile.sub afmtodit</code></strong>
+	  </pre><p>もし、まだ存在していなければ
+	    <code class="filename">/usr/contrib/groff/devps/generate/textmap</code>
+	    を
+	    <code class="filename">/usr/share/groff_font/devps/generate</code>
+	    にコピーします。</p></dd></dl></div><p>これらのユーティリティが所定の場所に収まったら
+      いつでも開始できます。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p><code class="filename">.afm</code> ファイルを以下のようにして作ります。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gs -dNODISPLAY -q -- ttf2pf.ps TTF_name PS_font_name AFM_name</code></strong>
+	</pre><p>ここで、<em class="replaceable"><code>TTF_name</code></em> はあなたの
+	  TrueType フォントの名前で、<em class="replaceable"><code>PS_font_name</code></em>
+	  は <code class="filename">.pfa</code> ファイルのためのファイル名で、
+	  <em class="replaceable"><code>AFM_name</code></em> は <code class="filename">.afm</code>
+	  ファイルに望む名前です.
+	  <code class="filename">.pfa</code> や <code class="filename">.afm</code>
+	  用の出力ファイル名を明示しなければ、
+	  デフォルト名は TrueType フォントファイル名から作成されます。</p><p>この時、アスキー PostScript フォントメトリックファイルである
+	  <code class="filename">.pfa</code> ファイルも同時に作られます
+	  (<code class="filename">.pfb</code> はバイナリ形式です)。
+	  これは不要となるでしょうが、(私が考えるに)
+	  フォントサーバには役立つでしょう。</p><p>例として、30f9 バーコードフォントをデフォルトのファイル名で変換するには以下のようにします。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gs -dNODISPLAY -- ttf2pf.ps 3of9.ttf</code></strong>
+Aladdin Ghostscript 5.10 (1997-11-23)
+Copyright (C) 1997 Aladdin Enterprises, Menlo Park, CA.  All rights reserved.
+This software comes with NO WARRANTY: see the file PUBLIC for details.
+Converting 3of9.ttf to 3of9.pfa and 3of9.afm.
+	</pre><p>変換後のフォントを
+	  <code class="filename">A.pfa</code> と <code class="filename">B.afm</code>
+	  にするなら以下のようにします。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gs -dNODISPLAY -- ttf2pf.ps 3of9.ttf A B</code></strong>
+Aladdin Ghostscript 5.10 (1997-11-23)
+Copyright (C) 1997 Aladdin Enterprises, Menlo Park, CA.  All rights reserved.
+This software comes with NO WARRANTY: see the file PUBLIC for details.
+Converting 3of9.ttf to A.pfa and B.afm.
+	</pre></li><li class="listitem"><p><span class="application">groff</span> PostScript ファイルを作ります。</p><p>以下のコマンドの実行が用意なように
+	  <code class="filename">/usr/share/groff_font/devps</code> に
+	  ディレクトリを変更します。
+	  恐らく root 特権が必要になるでしょう
+	  (そこでの作業が気にいらないなら、このディレクトリの
+	  <code class="filename">DESC</code>、
+	  <code class="filename">text.enc</code>、
+	  <code class="filename">generate/textmap</code>
+	  ファイルが参照されるということに注意してください)。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>afmtodit -d DESC -e text.enc file.afm \
+	    generate/textmap PS_font_name</code></strong>
+	</pre><p>ここで、<code class="filename">file.afm</code>
+	  は <em class="replaceable"><code>AFM_name</code></em>
+	  で、上で <code class="command">ttf2pf.ps</code> で作ったものです。
+	  <em class="replaceable"><code>PS_font_name</code></em>
+	  はコマンドから使われるフォント名で、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=groff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">groff</span>(1)</span></a> がこのフォントを参照するために使うものです。
+	  たとえば、最初の <code class="command">tiff2pf.ps</code>
+	  コマンドを上述のように行っていたとすると、
+	  3of9 バーコードフォントは以下のコマンドで作成できます。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>afmtodit -d DESC -e text.enc 3of9.afm \
+                 generate/textmap 3of9</code></strong>
+	</pre><p>得られる <em class="replaceable"><code>PS_font_name</code></em>
+	  ファイル (この例では <code class="filename">3of9</code>)
+	  はディレクトリ <code class="filename">/usr/share/groff_font/devps</code>
+	  に、コピーするなり移動するなりして置かれることに気をつけてください。</p><p><code class="filename">ttf2pf.ps</code> がわりつけるフォント名は
+	  TrueType フォントファイル中に見つかったものになります。
+	  それとは異なる名前を使いたかったら、
+	  <code class="filename">.afm</code> ファイルを編集してから
+	  <code class="command">afmtodit</code> を実行する必要があります。
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=groff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">groff</span>(1)</span></a> から <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gs&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">gs</span>(1)</span></a> へパイプするつもりならば、
+	  その名前は同時にフォントマップファイルで使われているものである必要があります。</p></li></ol></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="truetype-for-other-programs"></a>9. TrueType フォントを他のプログラムで使うことができますか?</h2></div></div></div><p>TrueType フォント形式は Windows、Windows 95、Mac
+      で用いられます。この形式は極めて有名であり、
+      非常にたくさんのフォントが利用できます。</p><p>残念ながら、この形式を (訳注: FreeBSD で) この形式を利用でき
+      るアプリケーションは、筆者が知る限りほとんどなく、
+      <span class="application">Ghostscript</span> と
+      <span class="application">Povray</span> しか思いつきません。
+      ドキュメントによれば、<span class="application">Ghostscript</span> の
+      対応は不十分であり、タイプ 1 フォントより粗悪な結果になるようです。
+      <span class="application">Povray</span> バージョン 3 もまた TrueType
+      フォントを利用可能ですが、筆者は、ドキュメントを一連のレイトレー
+      スしたページとして作成する人が多いのではないかと疑っています :-)。</p><p>このなんとも悲惨な状況は変わりつつあります。
+      <a class="link" href="http://www.freetype.org/" target="_top">FreeType プロジェクト</a>
+      では FreeType の便利なツールを開発しています。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>XFree86 4.x に含まれている freetype モジュール。
+	詳細は <a class="link" href="../../../../doc/ja_JP.eucJP/books/handbook/x-fonts.html" target="_top">FreeBSD
+        ハンドブック</a>か <a class="link" href="http://www.xfree86.org/4.0.2/fonts.html" target="_top">XFree86 4.0.2
+        Fonts</a> ページを見てください。</p></li><li class="listitem"><p><span class="application">X11</span> 用の
+	  <span class="application">xfsft</span> フォントサーバは
+	  一般のフォントに加えて TrueType フォントを提供します。
+	  現在ベータ版であるにもかかわらずたいへん評判がいいものです。
+	  詳しくは
+	  <a class="link" href="http://www.dcs.ed.ac.uk/home/jec/programs/xfsft/" target="_top">
+	  Juliusz Chroboczek's page</a> をごらんください。
+	  FreeBSD への移植についての情報は
+	  <a class="link" href="http://math.missouri.edu/~stephen/software/" target="_top">
+	  Stephen Montgomery's software page</a> にあります。</p></li><li class="listitem"><p><span class="application">xfstt</span> は
+	  <span class="application">X11</span> 用のもうひとつのフォントサーバで、
+	  <code class="uri"><a class="uri" href=" ftp://sunsite.unc.edu/pub/Linux/X11/fonts/" target="_top"> ftp://sunsite.unc.edu/pub/Linux/X11/fonts/</a></code>
+	  から入手できます。</p></li><li class="listitem"><p><code class="command">ttf2bdf</code> というプログラムは、
+	X の環境下で TrueType フォントのセットから BDF
+	形式のファイルを作るものです。
+	Linux 用のバイナリが
+	<code class="uri"><a class="uri" href="ftp://crl.nmsu.edu/CLR/multiling/General/" target="_top">ftp://crl.nmsu.edu/CLR/multiling/General/</a></code> から
+	入手できます。</p></li><li class="listitem"><p>そしてその他 …</p></li></ul></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="obtaining-additional-fonts"></a>10. どこでフォントを入手できますか?</h2></div></div></div><p>インターネット上でたくさんのフォントを利用することができます。
+      これらは完全に無料であるか、シェアウェアです。加えて、
+      たくさんのフォントが収録されたあまり高価ではない CDROM
+      がたくさんあります。インターネットでのアクセスポイント
+      (1996年8月現在)を以下に示します。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="uri"><a class="uri" href="http://www.simtel.net/" target="_top">http://www.simtel.net/</a></code></p></li><li class="listitem"><p><code class="uri"><a class="uri" href="http://www.freshmeat.net/" target="_top">http://www.freshmeat.net/</a></code></p></li><li class="listitem"><p>Ports Collection の <code class="filename">x11-fonts/</code></p></li></ul></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="additional-questions"></a>11. その他の質問</h2></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="filename">.pfm</code> ファイルを利用するものはあるのか?</p></li><li class="listitem"><p><code class="filename">.afm</code> ファイルを <code class="filename">.pfa</code>
+	  もしくは <code class="filename">.pfb</code> から作成できるか?</p></li><li class="listitem"><p>非標準キャラクタ名がある PostScript フォントを
+	  <span class="application">groff</span> キャラクタにマッピングする
+	  ファイルをどのように作成するか?</p></li><li class="listitem"><p>xditview と devX??
+	デバイスで新たなファイル全てにアクセスするためのセットアップをすることができるか?</p></li><li class="listitem"><p><span class="application">Povray</span> と
+	  <span class="application">Ghostscript</span> で TrueType
+	  フォントを利用する例があるといいだろう。</p></li></ul></div></div></div></body></html>

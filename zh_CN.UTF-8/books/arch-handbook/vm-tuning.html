@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>7.6. 调整FreeBSD的虚拟内存系统</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="vm.html" title="第 7 章 虚拟内存系统" /><link rel="prev" href="vm-kvm.html" title="7.5. KVM存储映射" /><link rel="next" href="smp.html" title="第 8 章 SMPng 设计文档" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">7.6. 调整FreeBSD的虚拟内存系统</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vm-kvm.html">上一页</a> </td><th width="60%" align="center">第 7 章 虚拟内存系统</th><td width="20%" align="right"> <a accesskey="n" href="smp.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vm-tuning"></a>7.6. 调整FreeBSD的虚拟内存系统</h2></div></div></div><p>开发者的协同努力使得FreeBSD可以自行动态调整内核。一般来说，
+         除了内核配置选项<code class="option">maxusers</code>和<code class="option">NMBCLUSTERS</code>，
+         你不需要做任何杂乱的事情。这些内核编译配置选项(一般)被指定在
+  <code class="filename">/usr/src/sys/i386/conf/CONFIG_FILE</code>
+        之中。所有可用内核配置选项的描述可在
+        <code class="filename">/usr/src/sys/i386/conf/LINT</code>中找到。</p><p>在一个大系统的配置中，你可能需要增加<code class="option">maxusers</code>的值。
+          数值范围通常在10到128。注意，过度增加<code class="option">maxusers</code>
+          的值可能导致系统从实际可用的KVM中溢出，从而引起无法预知的操作。
+          最好将<code class="option">maxusers</code>设为一个合理的数值，并且添加其它选项，
+          如<code class="option">NMBCLUSTERS</code>，来增加特定的资源。</p><p>如果你的系统要被重负荷的使用网络，你需要增加
+          <code class="option">NMBCLUSTERS</code>的值。数值范围通常在1024到4096。</p><p><code class="literal">NBUF</code>也是传统的规划系统的参数。
+          这个参数决定系统可用来映射文件系统输入/输出缓存的KVM的数量。
+          注意：这个参数与统一的缓存没有任何关系。这个参数可在3.0-CURRENT
+          和以后的内核中被动态的调节，通常不应当被手动的调节。
+          我们推荐你<span class="emphasis"><em>不要</em></span>指定<code class="literal">NBUF</code>。
+          让系统自行确定它。太小的值会导致非常低效的文件系统操作；
+          太大的值会使用页队列中缺少页面，而大量的页处于在线状态。</p><p>缺省情况下，FreeBSD内核编译时是不被优化的。
+          你可以在内核配置文件中用<code class="literal">makeoptions</code>
+          指定排错(debugging)和优化标志。注意，你一般不应使用<code class="option">-g</code>，
+          除非你能够应付由此产生的大内核(典型的是7MB或更多)。</p><pre class="programlisting">makeoptions      DEBUG="-g"
+makeoptions      COPTFLAGS="-O -pipe"</pre><p>Sysctl提供了在运行时调整内核的方式。你通常不需要指定任何sysctl变量，
+          尤其是与VM相关的那些变量。</p><p>运行时VM和系统调整的影响相对直接一些。
+          首先，应当尽可能在UFS/FFS文件系统上使用Soft Updates。
+          在<code class="filename">/usr/src/sys/ufs/ffs/README.softupdates</code>
+          里有关于如何配置的指示。</p><a id="idp70954192" class="indexterm"></a><p>其次，应当配置足够多的交换空间。
+              你应当在每个物理磁盘上配置一个交换分区，最多4个，
+          甚至在你的<span class="quote">“<span class="quote">工作</span>”</span>磁盘上。你应当有至少2倍于主内存的交换空间；
+          假如你没有足够内存的话，交换分区还应更多。
+          你也应当按照你期望中的最大内存配置决定交换分区的大小，
+          这样以后就不再需要重新给磁盘分区了。
+          如果你处理系统崩溃后的内存倾倒(crash dump)，
+          第一个交换分区必须至少与主内存一样大，
+          <code class="filename">/var/crash</code>必须有足够的空间来承装倾倒。</p><p>NFS上的交换分区可以很好的被4.X或后来的系统使用，
+          但是你必须明白NFS服务器将要经受页装载操作很强的冲击。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vm-kvm.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="vm.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="smp.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">7.5. KVM存储映射 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 第 8 章 SMPng 设计文档</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

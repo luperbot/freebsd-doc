@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>FreeBSD kvikstart Guide</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Denne artikel viser metoden hvorved man kan få maskiner til at installere FreeBSD ved hjælp af Intel PXE metoden til at boote en maskine over et netværk. Dansk version af Laust S. Jespersen Laust@doc.freebsd.dk." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="da" class="article" lang="da"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp61411536"></a>FreeBSD kvikstart Guide</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Alfred</span> <span class="surname">Perlstein</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:alfred@FreeBSD.org">alfred@FreeBSD.org</a>&gt;</code></p></div></div></div></div></div><div>Revision: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</p><p>Intel, Celeron, Centrino, Core, EtherExpress, i386,
+  i486, Itanium, Pentium, and Xeon are trademarks or registered
+  trademarks of Intel Corporation or its subsidiaries in the United
+  States and other countries.</p><p>Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <span class="quote">&#8220;<span class="quote">&#8482;</span>&#8221;</span> or the
+  <span class="quote">&#8220;<span class="quote">®</span>&#8221;</span> symbol.</p></div></div><div>   af .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Resumé</div><p>Denne artikel viser metoden hvorved man kan få maskiner til
+	at installere FreeBSD ved hjælp af <span class="trademark">Intel</span>® PXE metoden
+	til at boote en maskine over et netværk.</p><p><span class="emphasis"><em>Dansk version af Laust S. Jespersen
+  <code class="email">&lt;<a xmlns="" class="email" href="mailto:Laust@doc.freebsd.dk">Laust@doc.freebsd.dk</a>&gt;</code>.</em></span></p></div></div></div><hr /></div><div class="toc"><div class="toc-title">Indholdsfortegnelse</div><dl class="toc"><dt><span class="sect1"><a href="#introduction">1. Introduktion</a></span></dt><dt><span class="sect1"><a href="#server-config">2. Server Konfiguration</a></span></dt><dt><span class="sect1"><a href="#bootstrap-config">3. Bootstrap opsætning</a></span></dt><dt><span class="sect1"><a href="#install-setup">4. Installations opsætning</a></span></dt><dt><span class="sect1"><a href="#custom-postinst-package">5. Tilpasset Post-Install Pakke</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="introduction"></a>1. Introduktion</h2></div></div></div><div xmlns="" class="warning"><h3 class="admontitle">Advarsel: </h3><p xmlns="http://www.w3.org/1999/xhtml">Denne procedure vil gøre <span class="quote">&#8220;<span class="quote">Serveren</span>&#8221;</span>
+	både usikker og farlig. Det er bedst bare at holde
+	<span class="quote">&#8220;<span class="quote">Serveren</span>&#8221;</span> på sin egen hub og ikke på
+	nogen måde tilgængelig for andre maskiner end
+	<span class="quote">&#8220;<span class="quote">klienterne</span>&#8221;</span>.</p></div><p>Terminologi:</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>Server:</td><td>Maskinen der tilbyder netboot og installations
+	      muligheder.</td></tr><tr><td>Klient:</td><td>Maskinen der skal have FreeBSD installeret på
+	      sig.</td></tr></tbody></table></div><p>Kræver: Klienter der understøtter <span class="trademark">Intel</span>® PXE
+      netboot muligheden, en Ethernet forbindelse.</p><p>Lad mig gerne vide hvis du falder over noget du har
+      problemer med, eller forslag til yderligere dokumentation.</p><p>Hvis du skal bruge nogen til at træne/implementere et
+      specifikt netinstallations system for dig, så send mig
+      venligst en e-mail så vi kan diskutere vilkår.</p><p>Jeg vil også gerne takke Paul Saab og John Baldwin for, at
+      lave det meste af programmeringsarbejdet på pxeboot,
+      interfacet til <span class="trademark">Intel</span>® PXE (netboot) systemet.</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="server-config"></a>2. Server Konfiguration</h2></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Installér DHCP: Installér <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/isc-dhcp3/pkg-descr">net/isc-dhcp3</a> du kan bruge denne
+	  config fil <a class="link" href="dhcpd.conf" target="_top">
+	  <code class="filename">dhcpd.conf</code></a>, put den ind i
+	  <code class="filename">/usr/local/etc/</code>.</p></li><li class="step"><p>Slå tftp til:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Lav mappen <code class="filename">/usr/tftpboot</code></p></li><li class="step"><p>Tilføj denne linie til din
+	      <code class="filename">/etc/inetd.conf</code>:</p><pre class="programlisting">tftp    dgram   udp     wait    nobody  /usr/libexec/tftpd    tftpd /usr/tftpboot</pre></li></ol></div></li><li class="step"><p>Slå NFS til:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Tilføj dette til
+	      <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">nfs_server_enable="YES"</pre></li><li class="step"><p>Tilføj dette til
+	      <code class="filename">/etc/exports</code>:</p><pre class="programlisting">/usr -alldirs -ro</pre></li></ol></div></li><li class="step"><p>Genstart for at slå de nye services til eller
+	  start dem manuelt.</p></li></ol></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="bootstrap-config"></a>3. Bootstrap opsætning</h2></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Download bootfiler: Download
+	  <a class="link" href="ftp://snapshots.jp.freebsd.org/pub/FreeBSD/snapshots/i386/4-LATEST/floppies/kern.flp" target="_top">
+	  kern.flp</a> og <a class="link" href="ftp://snapshots.jp.freebsd.org/pub/FreeBSD/snapshots/i386/4-LATEST/floppies/mfsroot.flp" target="_top">
+	  mfsroot.flp</a> floppy imagesne.</p></li><li class="step"><p>Opsætning af ftp/pxe-boot mappen:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Put pxeboot i boot mappen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm -rf /usr/obj/*</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/sys/boot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp /usr/src/sys/boot/i386/pxeldr/pxeboot /usr/tftpboot</code></strong></pre></li><li class="step"><p>Mount <code class="filename">kern.flp</code> filen ved
+	      hjælp af vndevice og kopier dens indhold til
+	      <code class="filename">/usr/tftpboot</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vnconfig vn0 kern.flp</code></strong>    # associer et vndevice med filen
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/vn0 /mnt</code></strong>      # mount det
+<code class="prompt">#</code> <strong class="userinput"><code>cp -R /mnt /usr/tftpboot</code></strong> # kopier indholdet til /usr/tftpboot
+<code class="prompt">#</code> <strong class="userinput"><code>umount /mnt</code></strong>              # unmount det
+<code class="prompt">#</code> <strong class="userinput"><code>vnconfig -u vn0</code></strong>          # disassocier vndevicet fra filen</pre></li></ol></div></li><li class="step"><p>Kompiler en tilpasset kernel for klienterne (for at
+	  undgå device konfigurations skærmen ved boot) og
+	  put den i <code class="filename">/usr/tftpboot</code>.</p></li><li class="step"><p>Lav en speciel <code class="filename">loader.rc</code> og
+	  installer det i
+	  <code class="filename">/usr/tftpboot/boot/loader.rc</code> så den
+	  ikke prompter for den anden disk, her er <a class="link" href="loader.rc" target="_top">min</a>.</p></li><li class="step"><p>Pak installeren og hjælpeprogrammerne fra mfsroot
+	  disken ud og dekomprimer dem, put dem ned
+	  i<code class="filename">/usr/tftpboot</code> også:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vnconfig vn0 mfsroot.flp</code></strong>         # associer et vndevice med filen
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/vn0 /mnt</code></strong>              # mount det
+<code class="prompt">#</code> <strong class="userinput"><code>cp /mnt/mfsroot.gz /usr/tftpboot</code></strong> # kopier indholdet til /usr/tftpboot
+<code class="prompt">#</code> <strong class="userinput"><code>umount /mnt</code></strong>                      # unmount det
+<code class="prompt">#</code> <strong class="userinput"><code>vnconfig -u vn0</code></strong>                  # disassocier vndevicet fra filen
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/tftpboot</code></strong>                 # skift mappe til pxeboot mappen
+<code class="prompt">#</code> <strong class="userinput"><code>gunzip mfsroot.gz</code></strong>                # dekomprimer mfsroot</pre></li><li class="step"><p>Lav dit sysinstall script
+	  <code class="filename">install.cfg</code>, du kan bruge <a class="link" href="install.cfg" target="_top">mit</a> som en skabelon, men du er
+	  nød til at editere det.</p></li><li class="step"><p>Kopier sysinstall scriptet ind i det udpakkede og
+	  dekomprimerede mfsroot image:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/tftpboot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>vnconfig vn0 mfsroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/vn0 /mnt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp install.cfg /mnt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /mnt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>vnconfig -u vn0</code></strong></pre></li></ol></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="install-setup"></a>4. Installations opsætning</h2></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Put installations filerne i en mappe der kan nås
+	via NFS på Serveren.  Lav en mappe der svarer til 'nfs'
+	direktivet i <code class="filename">install.cfg</code> filen og lav et
+	spejl af FreeBSD installations filerne der, du skal have det
+	til at se ud nogenlunde sådan her:</p><pre class="screen">ABOUT.TXT       TROUBLE.TXT     compat20        floppies        ports
+ERRATA.TXT      UPGRADE.TXT     compat21        games           proflibs
+HARDWARE.TXT    XF86336         compat22        info            src
+INSTALL.TXT     bin             compat3x        kern.flp
+LAYOUT.TXT      catpages        crypto          manpages
+README.TXT      cdrom.inf       dict            mfsroot.flp
+RELNOTES.TXT    compat1x        doc             packages</pre></li><li class="step"><p>Kopier de komprimerede pakker ind i packages/All mappen
+	  under <code class="filename">nfs</code>.</p></li><li class="step"><p>Vær sikker på, at du har en
+	  <code class="filename">INDEX</code> fil gjort klar i packages mappen.
+	  Du kan lave dine egne <code class="filename">INDEX</code> notater
+	  sådan her:</p><pre class="programlisting">alfred-1.0||/|Alfred install bootstrap||alfred@FreeBSD.org||||</pre><p>Så kan du installere tilpassede pakker, specielt
+	  din egen tilpassede post-install pakke.</p></li></ol></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="custom-postinst-package"></a>5. Tilpasset Post-Install Pakke</h2></div></div></div><p>Du kan bruge scriptet <a class="link" href="pkgmaker.sh" target="_top"><code class="filename">pkgmaker.sh </code></a> til
+      at lave en tilpasset pakke til post install. Ideen er at have
+      den til at installere og konfigurere de specielle ting du vil have
+      gjort.  <code class="filename">pkgmaker</code> Køres i mappen
+      ovenover den pakke du ønsker at lave med det ene argument
+      fra pakken (f. eks mypkg) som så vil lave en mypkg.tgz som
+      du så kan inkludere i din sysinstall pakke.</p><p>Inde i din mappe med tilpassede pakker vil du have en fil kaldet
+      <code class="filename">PLIST</code> som indeholder alle de filer du
+      ønsker at installere og få inkorporeret i din
+      pakke.</p><p>Du vil også ønske dig at have nogle filer
+      kaldet <a class="link" href="pre" target="_top"><code class="filename">pre</code></a> og
+      <a class="link" href="post" target="_top"><code class="filename">post</code></a> i den mappe,
+      disse er shell scripts som du vil eksekverer før og efter
+      din pakke er installeret.</p><p>Siden denne pakke er i din <code class="filename">install.cfg</code>
+      fil burde den blive kørt og lave den sidste konfiguration
+      for dig.</p></div></div></body></html>

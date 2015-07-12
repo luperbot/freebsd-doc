@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Использование технологии серых списков во FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Эта статья создана исключительно для описания технологии задержки передачи сообщений на почтовом сервере FreeBSD. Сервер с технологией задержки передачи (relaydelay) или попаданием в серый список (greylisting) снижает уровень спама просто за счёт выдачи диагностического сообщения TEMPFAIL на каждое входящее почтовое сообщение. Смысл этой технологии заключается в том, что большинство спамеров для выполнения своей работы используют собственные персональные компьютеры и специализированное программное обеспечение. Настоящий почтовый сервер должен помещать сообщения в очередь и пытаться доставить его позже. Таким образом, скорее всего, спамер перейдёт к следующему хосту вместо того, чтобы попытаться снова послать электронное послание. Это прекрасная идея; по крайней мере, до тех пор, пока спамеры не начнут использовать программное обеспечение, которое будет обеспечивать повтор передачи. Но как именно это работает? Итак, в процессе приёма сообщения электронной почты ID сообщения сохраняется в базе данных, а в качестве результата возвращается TEMPFAIL вместе с электронной почтой. Если сообщение электронной почты посылается повторно, то ID сообщения будет сверяться с ID сообщений, сохранёнными в базе данных. Если в базе данных оно существует, то посланию электронной почты разрешается доставка по назначению. В противном случае ID сохраняется, а в качестве результата возвратится TEMPFAIL. Этот цикл будет повторяться для каждого сообщения, поступающего на сервер. По моему личному опыту, это действительно отсекает 90% спама." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="ru" class="article" lang="ru"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68608336"></a>Использование технологии серых списков во FreeBSD</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="author"><h3 class="author"><span class="firstname">Том</span> <span class="surname">Родес</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:trhodes@FreeBSD.org">trhodes@FreeBSD.org</a>&gt;</code></p></div></div></div></div><div>Издание: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Авторские права © 2004 The FreeBSD Documentation Project</p></div><div>    .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Аннотация</div><p>Эта статья создана исключительно для описания технологии задержки
+	передачи сообщений на почтовом сервере FreeBSD.  Сервер с технологией
+	задержки передачи (relaydelay) или попаданием в серый список
+	(greylisting) снижает уровень спама просто за счёт выдачи
+	диагностического сообщения <span class="errorname">TEMPFAIL</span> на каждое
+	входящее почтовое сообщение.  Смысл этой технологии заключается в том,
+	что большинство спамеров для выполнения своей работы используют
+	собственные персональные компьютеры и специализированное программное
+	обеспечение.  Настоящий почтовый сервер должен помещать сообщения в
+	очередь и пытаться доставить его позже.  Таким образом, скорее всего,
+	спамер перейдёт к следующему хосту вместо того, чтобы попытаться снова
+	послать электронное послание.  Это прекрасная идея; по крайней мере,
+	до тех пор, пока спамеры не начнут использовать программное
+	обеспечение, которое будет обеспечивать повтор передачи.  Но как именно
+	это работает?  Итак, в процессе приёма сообщения электронной почты
+	<acronym class="acronym">ID</acronym> сообщения сохраняется в базе данных, а в качестве
+	результата возвращается <span class="errorname">TEMPFAIL</span> вместе с
+	электронной почтой.  Если сообщение электронной почты посылается
+	повторно, то <acronym class="acronym">ID</acronym> сообщения будет сверяться с
+	<acronym class="acronym">ID</acronym> сообщений, сохранёнными в базе данных.  Если в
+	базе данных оно существует, то посланию электронной почты разрешается
+	доставка по назначению.  В противном случае <acronym class="acronym">ID</acronym>
+	сохраняется, а в качестве результата возвратится
+	<span class="errorname">TEMPFAIL</span>.  Этот цикл будет повторяться для
+	каждого сообщения, поступающего на сервер.  По моему личному опыту,
+	это действительно отсекает 90% спама.</p></div></div></div><hr /></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="sect1"><a href="#idp70030160">1. Базовая настройка</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp70030160"></a>1. Базовая настройка</h2></div></div></div><p>Нам потребуется <code class="command">perl</code> с поддержкой многопоточного
+      выполнения.  Установите <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/lang/perl5.8/pkg-descr">lang/perl5.8</a>
+      с установленной переменной <code class="varname">USE_THREADS=yes</code>.  Сначала
+      может потребоваться удалить текущую версию <code class="command">perl</code>; на
+      необходимость сделать это укажут ошибки в процессе установки.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">При этом потребуется, чтобы все порты, которым нужен
+	<code class="command">perl</code>, были перестроены и переустановлены;
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/ports-mgmt/portupgrade/pkg-descr">ports-mgmt/portupgrade</a> хорошо для
+	этого подходит.  По крайней мере, он укажет, какие порты были удалены и
+	какие необходимо переустановить.</p></div><p>Теперь что касается сервера базы данных;
+      <span class="application">MySQL</span> прекрасно подходит для такого типа
+      работы.  Установите <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/databases/mysql40-server/pkg-descr">databases/mysql40-server</a> вместе с <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/databases/p5-DBD-mysql40/pkg-descr">databases/p5-DBD-mysql40</a>.  Предыдущий порт
+      должен подразумевать установку <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/databases/p5-DBI-137/pkg-descr">databases/p5-DBI-137</a>, так что один шаг будет
+      пропущен.</p><p>Установите переносимый подключаемый серверный модуль на базе
+      <code class="command">perl</code>, порт <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/p5-Net-Daemon/pkg-descr">net/p5-Net-Daemon</a>.  Большинство установок этих
+      портов должны проходить без проблем.  Следующий шаг будет более
+      трудоёмким.</p><p>Теперь установите порт <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/p5-Sendmail-Milter/pkg-descr">mail/p5-Sendmail-Milter</a>.  На момент написания
+      этого документа в файле <code class="filename">Makefile</code> имелась строка,
+      начинающаяся с <code class="varname">BROKEN</code>, просто уберите или
+      закомментируйте её.  Она помечена так лишь потому, что в FreeBSD по
+      умолчанию не включался и не устанавливался пакет <code class="command">perl</code>
+      с поддержкой многопоточного выполнения.  После удаления этой строки он
+      должен строиться и устанавливаться без ошибок.</p><p>Создайте каталог для размещения временных конфигурационных
+      файлов:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /tmp/relaydelay</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /tmp/relaydelay</code></strong></pre><p>Теперь, когда у нас имеется временный каталог для работы, команде
+      <code class="command">fetch</code> нужно передать следующие
+      <acronym class="acronym">URL</acronym>-адреса:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fetch http://projects.puremagic.com/greylisting/releases/relaydelay-0.04.tgz</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>fetch http://lists.puremagic.com/pipermail/greylist-users/attachments/20030904/b8dafed9/relaydelay-0.04.bin</code></strong></pre><p>Теперь необходимо распаковать исходный код:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gunzip -c relaydelay-0.04.tgz | tar xvf -</code></strong></pre><p>На этот момент во временном каталоге должно оказаться несколько
+      файлов.  Теперь необходимая информация может передаваться серверу базы
+      данных импортированием её из файла <code class="filename">mysql.sql</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mysql &lt; relaydelay-0.04/mysql.sql</code></strong></pre><p>Установите патч <code class="filename">relaydelay.bin</code> для остальных
+      файлов, запустив такую команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>patch -d /tmp/relaydelay/relaydelay-0.04 &lt; relaydelay.bin</code></strong></pre><p>Отредактируйте файлы <code class="filename">relaydelay.conf</code> и
+      <code class="filename">db_maintenance.pl</code>, добавив в них корректное имя
+      пользователя и пароль для СУБД <span class="application">MySQL</span>.  Если
+      СУБД была построена и установлена так, как описано выше, то в ней
+      отсутствуют пользователи и пароли.  Эта ситуация должна быть исправлена
+      до перевода системы в промышленную эксплуатацию, что описано в
+      документации к СУБД и выходит за рамки данной статьи.</p><p>Смените рабочий каталог на <code class="filename">relaydelay-0.04</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd relaydelay-0.04</code></strong></pre><p>Скопируйте или переместите конфигурационные файлы в соответствующие
+      каталоги:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mv db_maintenance.pl relaydelay.pl /usr/local/sbin</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv relaydelay.conf /etc/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv relaydelay.sh /usr/local/etc/rc.d/</code></strong></pre><p>Протестируйте получившуюся конфигурацию, выполнив такую
+      команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /usr/local/etc/rc.d/relaydelay.sh start</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Этот файл не будет существовать, если предыдущие команды <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mv&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">mv</span>(1)</span></a>
+	не были выполнены.</p></div><p>Если всё отработало корректно, то в каталоге <code class="filename">/var/log</code> должен появиться новый файл,
+      <code class="filename">relaydelay.log</code>.  В нём должен находиться текст,
+      подобный следующему:</p><pre class="programlisting">Loaded Config File: /etc/mail/relaydelay.conf
+Using connection 'local:/var/run/relaydelay.sock' for filter relaydelay
+DBI Connecting to DBI:mysql:database=relaydelay:host=localhost:port=3306
+Spawned relaydelay daemon process 38277.
+Starting Sendmail::Milter 0.18 engine.</pre><p>Если файл не появился, то что-то сработало неправильно, пересмотрите
+      экранную диагностику или просмотрите журнальный файл
+      <code class="filename">messages</code> на предмет появления новой
+      информации.</p><p>Объедините всё вместе, добавив следующую строку в файл
+      <code class="filename">/etc/mail/sendmail.mc</code> или специфичный для вашей
+      системы <code class="filename">mc</code>-файл:</p><pre class="programlisting">INPUT_MAIL_FILTER(`relaydelay', `S=local:/var/run/relaydelay.sock, T=S:1m;R:2m;E:3m')dnl</pre><p>Перестройте и переустановите файлы в каталоге
+      <code class="filename">/etc/mail</code> и перезапустите
+      <code class="command">sendmail</code>.  Короткая команда <code class="command">make</code>
+      <code class="buildtarget">restart</code> должна сделать всё необходимое.</p><p>Сгрузите скрипт на языке <code class="command">perl</code>, размещённый по
+      адресу <a class="link" href="http://lists.puremagic.com/pipermail/greylist-users/2003-November/000327.html" target="_top">http://lists.puremagic.com/pipermail/greylist-users/2003-November/000327.html</a>
+      и сохраните его в каталог <code class="filename">relaydelay-0.04</code>.  В следующем примере этот
+      скрипт обозначается как <code class="filename">addlist.pl</code>.</p><p>Отредактируйте файл <code class="filename">whitelist_ip.txt</code>,
+      модифицировав его так, чтобы в него были включены
+      <acronym class="acronym">IP</acronym>-адреса серверов, которые должны иметь возможность
+      игнорировать фильтры <span class="application">relaydelay</span>.  То есть это
+      домены, при получении электронной почты от которых диагностическое
+      сообщение <span class="errorname">TEMPFAIL</span> выдаваться не будет.</p><p>Как пример можно привести:</p><pre class="programlisting">192.168.   # My internal network.
+66.218.66       # Yahoo groups has unique senders.</pre><p>Файл <code class="filename">blacklist_ip.txt</code> должен иметь похожее
+      назначение, но с обратными правилами.  Укажите в этом файле
+      <acronym class="acronym">IP</acronym>-адреса, которые должны отвергаться без выдачи
+      диагностического сообщения <span class="errorname">TEMPFAIL</span>.  Этот
+      перечень доменов никогда не получит даже возможность сообщить о том, что
+      они являются реально существующими почтовыми серверами.</p><p>Эти файлы теперь должны быть импортированы в базу данных посредством
+      скрипта <code class="filename">addlist.pl</code>, который был получен несколькими
+      строками выше:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>perl addlist.pl -whitelist 9999-12-31 23:59:59 &lt; whitelist_ip.txt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>perl addlist.pl -blacklist 9999-12-31 23:59:59 &lt; blacklist_ip.txt</code></strong></pre><p>Для включения технологии <span class="application">relaydelay</span> при
+      каждой загрузке системы, добавьте строчку
+      <code class="option">relaydelay_enable="YES"</code> в файл
+      <code class="filename">/etc/rc.conf</code>.</p><p>Журнальный файл <code class="filename">/var/log/relaydelay.log</code> должен
+      постепенно пополняться удачными прохождениями.  В зависимости от загрузки
+      вашего почтового сервера, вскоре должны появиться строчки, подобные
+      следующим.</p><pre class="programlisting">=== 2004-05-24 21:03:22 ===
+Stored Sender: &lt;someasshole@flawed-example.com&gt;
+Passed Recipient: &lt;local_user@pittgoth.com&gt;
+  Relay: example.net [XXX.XX.XXX.XX] - If_Addr: MY_IP_ADDRESS
+  RelayIP: XX.XX.XX.XX - RelayName: example.net - RelayIdent:  - PossiblyForged: 0
+  From: someasshole@flawed-example.com - To: local_user
+  InMailer: esmtp - OutMailer: local - QueueID: i4P13Lo6000701111
+  Email is known but block has not expired.  Issuing a tempfail.  rowid: 51
+  IN ABORT CALLBACK - PrivData: 0&lt;someasshole@flawed-example.com&gt;</pre><p>В файл <code class="filename">/etc/newsyslog.conf</code> теперь можно добавить
+      следующую строку, которая обеспечивает ротацию журналов
+      <code class="filename">relaydelay.log</code> при достижении размера в 100
+      <acronym class="acronym">Кбайт</acronym>:</p><pre class="screen">/var/log/relaydelay.log                 644  3     100  *     Z</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">В какой-то момент появлялась ошибка о неполном определении
+	переменных <code class="command">perl</code> в файле
+	<code class="filename">/etc/mail/relaydelay.conf</code>.  Если те две переменные
+	раскомментированы, то конфигурационный файл может быть обработан
+	нормально.  Просто не забудьте убрать их из комментариев до того, как
+	начать работу с технологией <code class="command">relaydelay</code>.</p></div></div></div></body></html>

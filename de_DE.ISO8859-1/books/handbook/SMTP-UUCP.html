@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>30.8. SMTP über UUCP</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="mail.html" title="Kapitel 30. Elektronische Post (E-Mail)" /><link rel="prev" href="mail-advanced.html" title="30.7. Weiterführende Themen" /><link rel="next" href="outgoing-only.html" title="30.9. Ausgehende E-Mail über einen Relay versenden" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">30.8. SMTP über UUCP</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mail-advanced.html">Zurück</a> </td><th width="60%" align="center">Kapitel 30. Elektronische Post (E-Mail)</th><td width="20%" align="right"> <a accesskey="n" href="outgoing-only.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-UUCP"></a>30.8. SMTP über UUCP</h2></div></div></div><p>Die <span class="application">sendmail</span>-Konfigurationsdatei,
+      die mit FreeBSD ausgeliefert wird, ist für Systeme geeignet,
+      die direkt ans Internet angeschlossen sind.  Systeme, die
+      ihre E-Mails per UUCP austauschen wollen, müssen eine andere
+      Konfigurationsdatei installieren.</p><p>Die manuelle Bearbeitung von
+      <code class="filename">/etc/mail/sendmail.cf</code> ist nur etwas
+      für Puristen.  Sendmail Version 8 bietet die neue
+      Möglichkeit der Generierung von Konfigurationsdateien
+      über eine Vorverarbeitung mit <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a>, wobei die
+      tatsächliche, händische Konfiguration auf einer
+      höheren Abstraktionsstufe stattfindet.  Sie sollten
+      die Konfigurationsdateien unter
+      <code class="filename">/usr/src/usr.sbin/sendmail/cf</code>
+      benutzen.
+      Die Datei <code class="filename">README</code> im Verzeichnis
+      <code class="filename">cf</code> kann zur grundlegenden
+      Einführung in die <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a>-Konfiguration dienen.</p><p>Zur Zustellung über UUCP sind Sie am besten damit
+      beraten, die <code class="filename">mailertable</code>-Datenbank
+      zu benutzen.  Mit dieser Datenbank ermittelt
+      <span class="application">sendmail</span> mit welchem
+      Protokoll und wohin eine E-Mail zugestellt werden soll.</p><p>Zunächst müssen Sie Ihre
+      <code class="filename">.mc</code>-Datei erstellen.  Das Verzeichnis
+      <code class="filename">/usr/share/sendmail/cf/cf</code> ist
+      die Basis für diese Dateien.  Sehen Sie sich um, es
+      gibt bereits einige Beispiele.  Wenn Sie Ihre Datei
+      <code class="filename">foo.mc</code> genannt haben, müssen Sie
+      die folgenden Befehle ausführen, um sie in eine
+      gültige <code class="filename">sendmail.cf</code> umzuwandeln:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make foo.cf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp foo.cf /etc/mail/sendmail.cf</code></strong></pre><p>Eine typische <code class="filename">.mc</code>-Datei
+      könnte so aussehen:</p><pre class="programlisting">VERSIONID(`<em class="replaceable"><code>Your version number</code></em>')
+OSTYPE(bsd4.4)
+
+FEATURE(accept_unresolvable_domains)
+FEATURE(nocanonify)
+FEATURE(mailertable, `hash -o /etc/mail/mailertable')
+
+define(`UUCP_RELAY', <em class="replaceable"><code>your.uucp.relay</code></em>)
+define(`UUCP_MAX_SIZE', 200000)
+define(`confDONT_PROBE_INTERFACES')
+
+MAILER(local)
+MAILER(smtp)
+MAILER(uucp)
+
+Cw    <em class="replaceable"><code>your.alias.host.name</code></em>
+Cw    <em class="replaceable"><code>youruucpnodename.UUCP</code></em></pre><p>Die Einstellungen <code class="literal">accept_unresolvable_domains</code>,
+      <code class="literal">nocanonify</code> und
+      <code class="literal">confDONT_PROBE_INTERFACES</code> werden die
+      Benutzung von DNS bei der Zustellung von Mails verhindern.
+      Die Klausel <code class="literal">UUCP_RELAY</code> wird aus
+      seltsamen Gründen benötigt &#8211; fragen Sie nicht,
+      warum.  Setzen Sie dort einfach den Namen eines Hosts ein,
+      der in der Lage ist, Adressen mit der Pseudodomäne
+      .UUCP zu behandeln; wahrscheinlich werden Sie dort den
+      Relayhost Ihres ISP eintragen.</p><p>Wenn Sie soweit sind, müssen Sie die Datei
+      <code class="filename">/etc/mail/mailertable</code> erzeugen.  Hierzu
+      wieder ein typisches Beispiel:</p><pre class="programlisting">#
+# makemap hash /etc/mail/mailertable.db &lt; /etc/mail/mailertable
+#
+.  uucp-dom:<em class="replaceable"><code>your.uucp.relay</code></em></pre><p>Ein komplexeres Beispiel könnte wie folgt
+      aussehen:</p><pre class="programlisting">#
+# makemap hash /etc/mail/mailertable.db &lt; /etc/mail/mailertable
+#
+horus.interface-business.de   uucp-dom:horus
+.interface-business.de        uucp-dom:if-bus
+interface-business.de         uucp-dom:if-bus
+.heep.sax.de                  smtp8:%1
+horus.UUCP                    uucp-dom:horus
+if-bus.UUCP                   uucp-dom:if-bus
+.                             uucp-dom:</pre><p>Die ersten drei Zeilen behandeln
+      spezielle Fälle, in denen an Domänen adressierte
+      E-Mails nicht über die Standard-Route versendet werden
+      sollen, sondern zu einem UUCP-Nachbarn, um den Zustellweg
+      <span class="quote">&#8222;<span class="quote">abzukürzen</span>&#8220;</span>.  Die nächsten Zeilen
+      behandeln E-Mails an Rechner in der lokalen Domain.
+      Diese Mails können direkt
+      per SMTP zugestellt werden.  Schließlich werden die
+      UUCP-Nachbarn in der Notation mit der Pseudodomäne
+      .UUCP aufgeführt, um die Standardregeln mit
+      <code class="literal">uucp-neighbour!recipient</code>
+      zu überschreiben.  Die letzte Zeile besteht stets aus
+      einem einzelnen Punkt, der als Ihr Universalgateway in die
+      Welt dient.  Alle Knoten hinter dem Schlüsselwort
+      <code class="literal">uucp-dom:</code> müssen gültige
+      UUCP-Nachbarn sein, was Sie mit dem Befehl
+      <code class="literal">uuname</code> überprüfen
+      können.</p><p>Als Erinnerung daran, dass diese Datei in eine
+      DBM-Datenbankdatei konvertiert werden muss, bevor sie
+      benutzt werden kann, sollte der Befehl hierzu als
+      Kommentar am Anfang der <code class="filename">mailertable</code>
+      plaziert werden.  Sie müssen den Befehl jedes Mal
+      ausführen, wenn Sie die <code class="filename">mailertable</code>
+      geändert haben.</p><p>Abschließender Hinweis:  Wenn Sie unsicher sind,
+      ob bestimmte Zustellwege funktionieren, erinnern Sie sich
+      an die Option <code class="option">-bt</code> von
+      <span class="application">sendmail</span>.  Sie startet
+      <span class="application">sendmail</span> im
+      <span class="emphasis"><em>Adress-Testmodus</em></span>; geben Sie
+      einfach <code class="literal">3,0</code>, gefolgt von der Adresse,
+      für die Sie den Zustellweg testen möchten, ein.
+      Die letzte Zeile nennt Ihnen den benutzten Mailagenten,
+      den Zielhost, mit dem dieser Agent aufgerufen wird und die
+      (möglicherweise  übersetzte) Adresse.  Verlassen Sie diesen
+      Modus, indem Sie
+      <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>D</strong></span> eingeben.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>sendmail -bt</code></strong>
+ADDRESS TEST MODE (ruleset 3 NOT automatically invoked)
+Enter &lt;ruleset&gt; &lt;address&gt;
+<code class="prompt">&gt;</code> <strong class="userinput"><code>3,0 foo@example.com</code></strong>
+canonify           input: foo @ example . com
+...
+parse            returns: $# uucp-dom $@ <em class="replaceable"><code>your.uucp.relay</code></em> $: foo &lt; @ example . com . &gt;
+<code class="prompt">&gt;</code> <strong class="userinput"><code>^D</code></strong></pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mail-advanced.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="outgoing-only.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">30.7. Weiterführende Themen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 30.9. Ausgehende E-Mail über einen Relay versenden</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

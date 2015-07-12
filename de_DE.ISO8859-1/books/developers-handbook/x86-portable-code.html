@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.5. Portablen Code erzeugen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="x86.html" title="Kapitel 11. x86-Assembler-Programmierung" /><link rel="prev" href="x86-return-values.html" title="11.4. Rückgabewerte" /><link rel="next" href="x86-first-program.html" title="11.6. Unser erstes Programm" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.5. Portablen Code erzeugen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="x86-return-values.html">Zurück</a> </td><th width="60%" align="center">Kapitel 11. x86-Assembler-Programmierung</th><td width="20%" align="right"> <a accesskey="n" href="x86-first-program.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="x86-portable-code"></a>11.5. Portablen Code erzeugen</h2></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Hagen</span> <span class="surname">Kühl</span></span>. </span></div></div></div><p>Portabilität ist im Allgemeinen keine Stärke der
+      Assembler-Programmierung. Dennoch ist es, besonders mit
+      <span class="application">nasm</span>, möglich
+      Assembler-Programme für verschiedene Plattformen zu
+      schreiben. Ich selbst habe bereits Assembler-Bibliotheken
+      geschrieben die auf so unterschiedlichen Systemen wie <span class="trademark">Windows</span>®
+      und FreeBSD übersetzt werden können.</p><p>Das ist um so besser möglich, wenn Ihr Code auf zwei
+      Plattformen laufen soll , die, obwohl sie verschieden sind, auf
+      ähnlichen Architekturen basieren.</p><p>Beispielsweise ist FreeBSD ein <span class="trademark">UNIX</span>®, während Linux
+      <span class="trademark">UNIX</span>®-artig ist. Ich habe bisher nur drei Unterschiede zwischen
+      beiden (aus Sicht eines Assembler-Programmierers) erwähnt:
+      Die Aufruf-Konvention, die Funktionsnummern und die Art der
+      Übergabe von Rückgabewerten.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-deal-with-function-numbers"></a>11.5.1. Mit Funktionsnummern umgehen</h3></div></div></div><p>In vielen Fällen sind die Funktionsnummern die
+	selben. Allerdings kann man auch wenn sie es nicht sind
+	leicht mit diesem Problem umgehen: Anstatt die Nummern in
+	Ihrem Code zu verwenden, benutzen Sie Konstanten, die Sie
+	abhängig von der Zielarchitektur unterschiedlich
+	definieren:</p><pre class="programlisting">%ifdef	LINUX
+%define	SYS_execve	11
+%else
+%define	SYS_execve	59
+%endif</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-deal-with-geneva"></a>11.5.2. Umgang mit Konventionen</h3></div></div></div><p>Sowohl die Aufrufkonvention, als auch die
+	Rückgabewerte (das <code class="varname">errno</code> Problem) kann
+	man mit Hilfe von Makros lösen:</p><pre class="programlisting">%ifdef	LINUX
+
+%macro	system	0
+	call	kernel
+%endmacro
+
+align 4
+kernel:
+	push	ebx
+	push	ecx
+	push	edx
+	push	esi
+	push	edi
+	push	ebp
+
+	mov	ebx, [esp+32]
+	mov	ecx, [esp+36]
+	mov	edx, [esp+40]
+	mov	esi, [esp+44]
+	mov	ebp, [esp+48]
+	int	80h
+
+	pop	ebp
+	pop	edi
+	pop	esi
+	pop	edx
+	pop	ecx
+	pop	ebx
+
+	or	eax, eax
+	js	.errno
+	clc
+	ret
+
+.errno:
+	neg	eax
+	stc
+	ret
+
+%else
+
+%macro	system	0
+	int	80h
+%endmacro
+
+%endif</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-deal-with-other-portability"></a>11.5.3. Umgang mit anderen
+	Portabilitätsangelegenheiten</h3></div></div></div><p>Die oben genannte Lösung funktioniert in den meisten
+	Fällen, wenn man Code schreibt, der zwischen FreeBSD und
+	Linux portierbar sein soll. Allerdings sind die Unterschiede
+	bei einigen Kernel-Diensten tiefgreifender.</p><p>In diesem Fällen müssen Sie zwei verschiedene
+	Handler für diese Systemaufrufe schreiben und bedingte
+	Assemblierung benutzen, um diese zu übersetzen.
+	Glücklicherweise wird der größte Teil Ihres
+	Codes nicht den Kernel aufrufen und Sie werden deshalb nur
+	wenige solcher bedingten Abschnitte benötigen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-portable-library"></a>11.5.4. Eine Bibliothek benutzen</h3></div></div></div><p>Sie können Portabilitätsprobleme im Hauptteil
+	ihres Codes komplett vermeiden, indem Sie eine Bibliothek
+	für Systemaufrufe schreiben. Erstellen Sie eine
+	Bibliothek für FreeBSD, eine für Linux und weitere
+	für andere Betriebssysteme.</p><p>Schreiben Sie in ihrer Bibliothek eine gesonderte Funktion
+	(oder Prozedur, falls Sie die traditionelle
+	Assembler-Terminologie bevorzugen) für jeden
+	Systemaufruf. Verwenden Sie dabei die C-Aufrufkonvention um
+	Parameter zu übergeben, aber verwenden Sie weiterhin
+	<code class="varname">EAX</code>, für die
+	Aufrufnummer. In diesem Fall kann ihre FreeBSD-Bibliothek sehr
+	einfach sein, da viele scheinbar unterschiedliche Funktionen
+	als Label für denselben Code implementiert sein
+	können:</p><pre class="programlisting">sys.open:
+sys.close:
+[etc...]
+	int	80h
+	ret</pre><p>Ihre Linux-Bibliothek wird mehr verschiedene Funktionen
+	benötigen, aber auch hier können Sie Systemaufrufe,
+	welche die Anzahl an Parametern akzeptieren
+	zusammenfassen:</p><pre class="programlisting">sys.exit:
+sys.close:
+[etc... one-parameter functions]
+	push	ebx
+	mov	ebx, [esp+12]
+	int	80h
+	pop	ebx
+	jmp	sys.return
+
+...
+
+sys.return:
+	or	eax, eax
+	js	sys.err
+	clc
+	ret
+
+sys.err:
+	neg	eax
+	stc
+	ret</pre><p>Der Bibliotheks-Ansatz mag auf den ersten Blick unbequem
+	aussehen, weil Sie eine weitere Datei erzeugen müssen von
+	der Ihr Code abhängt. Aber er hat viele Vorteile: Zum
+	einen müssen Sie die Bibliothek nur einmal schreiben und
+	können sie dann in allen Ihren Programmen verwenden. Sie
+	können sie sogar von anderen Assembler-Programmierern
+	verwenden lassen, oder eine die von jemand anderem geschrieben
+	wurde verwenden. Aber der vielleicht größte Vorteil
+	ist, dass Ihr Code sogar von anderen Programmierer auf andere
+	Systeme portiert werden kann, einfach indem man eine neue
+	Bibliothek schreibt, völlig ohne Änderungen an Ihrem
+	Code.</p><p>Falls Ihnen der Gedanke eine Bibliothek zu nutzen nicht
+	gefällt, können Sie zumindest all ihre Systemaufrufe
+	in einer gesonderten Assembler-Datei ablegen und diese mit
+	Ihrem Hauptprogramm zusammen binden. Auch hier müssen
+	alle, die ihr Programm portieren, nur eine neue Objekt-Datei
+	erzeugen und an Ihr Hauptprogramm binden.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-portable-include"></a>11.5.5. Eine Include-Datei verwenden</h3></div></div></div><p>Wenn Sie ihre Software als (oder mit dem) Quelltext
+	ausliefern, können Sie Makros definieren und in einer
+	getrennten Datei ablegen, die Sie ihrem Code beilegen.</p><p>Porter Ihrer Software schreiben dann einfach eine neue
+	Include-Datei. Es ist keine Bibliothek oder eine externe
+	Objekt-Datei nötig und Ihr Code ist portabel, ohne dass
+	man ihn editieren muss.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Das ist der Ansatz den wir in diesem Kapitel verwenden
+	  werden. Wir werden unsere Include-Datei
+	  <code class="filename">system.inc</code> nennen und jedesmal, wenn
+	  wir einen neuen Systemaufruf verwenden, den entsprechenden
+	  Code dort einfügen.</p></div><p>Wir können unsere <code class="filename">system.inc</code>
+	beginnen indem wir die Standard-Dateideskriptoren
+	deklarieren:</p><pre class="programlisting">%define	stdin	0
+%define	stdout	1
+%define	stderr	2</pre><p>Als Nächstes erzeugen wir einen symbolischen Namen
+	für jeden Systemaufruf:</p><pre class="programlisting">%define	SYS_nosys	0
+%define	SYS_exit	1
+%define	SYS_fork	2
+%define	SYS_read	3
+%define	SYS_write	4
+; [etc...]</pre><p>Wir fügen eine kleine, nicht globale Prozedur mit
+	langem Namen ein, damit wir den Namen nicht aus Versehen in
+	unserem Code wiederverwenden:</p><pre class="programlisting">section	.text
+align 4
+access.the.bsd.kernel:
+	int	80h
+	ret</pre><p>Wir erzeugen ein Makro, das ein Argument erwartet, die
+	Systemaufruf-Nummer:</p><pre class="programlisting">%macro	system	1
+	mov	eax, %1
+	call	access.the.bsd.kernel
+%endmacro</pre><p>Letztlich erzeugen wir Makros für jeden Systemaufruf.
+	Diese Argumente erwarten keine Argumente.</p><pre class="programlisting">%macro	sys.exit	0
+	system	SYS_exit
+%endmacro
+
+%macro	sys.fork	0
+	system	SYS_fork
+%endmacro
+
+%macro	sys.read	0
+	system	SYS_read
+%endmacro
+
+%macro	sys.write	0
+	system	SYS_write
+%endmacro
+
+; [etc...]</pre><p>Fahren Sie fort, geben das in Ihren Editor ein und
+	speichern es als <code class="filename">system.inc</code>. Wenn wir
+	Systemaufrufe besprechen, werden wir noch Ergänzungen in
+	dieser Datei vornehmen.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="x86-return-values.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="x86.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="x86-first-program.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">11.4. Rückgabewerte </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 11.6. Unser erstes Programm</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

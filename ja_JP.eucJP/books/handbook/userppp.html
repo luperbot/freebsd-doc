@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>20.2. ユーザ ppp の利用</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="ppp-and-slip.html" title="第20章 PPP と SLIP" /><link rel="prev" href="ppp-and-slip.html" title="第20章 PPP と SLIP" /><link rel="next" href="ppp.html" title="20.3. カーネル PPP の利用" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.2. ユーザ ppp の利用</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ppp-and-slip.html">戻る</a>〓</td><th width="60%" align="center">第20章 PPP と SLIP</th><td width="20%" align="right">〓<a accesskey="n" href="ppp.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="userppp"></a>20.2. ユーザ ppp の利用</h2></div></div></div><p><span class="emphasis"><em>原作: Brian Somers, 協力:
+        Nik Clayton, Dirk-Willem van Gulik <code class="email">&lt;<a xmlns="" class="email" href="mailto:Dirk.vanGulik@jrc.it">Dirk.vanGulik@jrc.it</a>&gt;</code>,
+        Peter Childs <code class="email">&lt;<a xmlns="" class="email" href="mailto:pjchilds@imforei.apana.org.au">pjchilds@imforei.apana.org.au</a>&gt;</code>.</em></span>
+    </p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94063056"></a>20.2.1. ユーザ PPP</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94063696"></a>20.2.1.1. 前提条件</h4></div></div></div><p>以下の情報を手に入れておく必要があるでしょう:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>PPP で接続するインターネットサービスプロバイダ (ISP)
+              のアカウント.  さらに, 接続済みのモデム
+              (またはその他のデバイス) があり,
+              プロバイダとの接続が可能なように正しく設定されている.</p></li><li class="listitem"><p>プロバイダの電話番号.</p></li><li class="listitem"><p>ログイン名とパスワード. これは通常の unix
+              形式のログイン名と パスワードの組という場合もありますし,
+              PPP PAP または CHAP の
+              ログイン名とパスワードの組という場合もあります.</p></li><li class="listitem"><p>一つ以上のネームサーバの IP アドレス. 通常,
+              プロバイダから IP アドレスを二つ指示されている はずです.
+              一つすら提供されていないならば, <code class="filename">ppp.conf</code>
+              ファイル中で <code class="command">enable dns</code> コマンドを使って
+              <span class="application">ppp</span> にネームサーバを設定するよう
+              指示できます.</p></li></ul></div><p>プロバイダからは以下の情報が提供されているはずですが,
+          どうしても必要というわけではありません: </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>プロバイダのゲートウェイの IP アドレス.
+              ゲートウェイとは, あなたがそこに接続をおこなって,
+              <span class="emphasis"><em>デフォルトルート</em></span>
+              として設定することになるマシンです.
+              プロバイダがこのアドレスを明示していなくても, 最初は
+              適当に設定しておいて, 接続時にプロバイダの PPP サーバから
+              正しいアドレスを教えてもらうことができます.</p><p>このアドレスは, <span class="application">ppp</span> から
+              <code class="literal">HISADDR</code>として参照されます.</p></li><li class="listitem"><p>プロバイダのネットマスク設定.
+              プロバイダが明示していないとしても,  ネットマスクとして
+              <code class="systemitem">255.255.255.0</code>
+              を使用しておけば問題ありません.</p></li><li class="listitem"><p>もしプロバイダから固定の IP
+              アドレスとホスト名の割り当てを 受けていれば,
+              その情報を指定しておくこともできます.
+              割り当てを受けていなければ, 接続先から適切な IP
+              アドレスを指定してもらいます. </p></li></ul></div><p>もし, 必要な情報が不足していれば, プロバイダに連絡を取って
+          確認しておいてください.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94095696"></a>20.2.1.2. ppp 対応カーネルの構築</h4></div></div></div><p>説明でも述べているように, <code class="command">ppp</code>
+          はカーネルの <code class="filename">tun</code> デバイスを使います.
+          使っているカーネルがどれであっても,
+          <code class="filename">tun</code> デバイスを設定しなければなりません.
+          FreeBSDに付属しているデフォルトの
+          <code class="filename">GENERIC</code> カーネルに合うように
+          <code class="filename">tun</code> デバイスは前もって設定されています.
+          しかしながら, 自分で修正したカーネルをインストールするのであれば,
+          pppが正しく動くよう, カーネルが設定されているか確認しなくてはいけません.</p><p>これを確認するには, カーネルコンパイルディレクトリ
+          (<code class="filename">/sys/i386/conf</code> または
+          <code class="filename">/sys/pc98/conf</code>) に移動して,
+          カーネルコンフィグレーションファイルを調べます.
+          以下の行がどこかに含まれている必要があります.</p><pre class="programlisting">pseudo-device tun 1</pre><p>この行がカーネルコンフィグレーションファイルに
+          含まれていない場合, この行を追加して
+          カーネルの再コンパイルとインストールをおこなう必要があります.
+          元々の <code class="filename">GENERIC</code> カーネルは
+          標準でこれを含んでいますので,
+          カスタムカーネルをインストールしているのではなかったり,
+          <code class="filename">/sys</code> ディレクトリが存在しないのであれば,
+          何も変更する必要はありません.
+          カーネルコンフィグレーションの詳細については,
+          <a class="link" href="kernelconfig.html" title="第9章 FreeBSD カーネルのコンフィグレーション">FreeBSD
+            カーネルのコンフィグレーション</a>
+          を参照してください.</p><p>以下のコマンドを実行することで,
+          現在のカーネルにトンネルデバイスが
+          いくつ組み込まれているかを調べることができます:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig -a</code></strong>
+tun0: flags=8051&lt;UP,POINTOPOINT,RUNNING,MULTICAST&gt; mtu 1500
+	inet 200.10.100.1 --&gt; 203.10.100.24 netmask 0xffffffff
+tun1: flags=8050&lt;POINTOPOINT,RUNNING,MULTICAST&gt; mtu 576
+tun2: flags=8051&lt;UP,POINTOPOINT,RUNNING,MULTICAST&gt; mtu 1500
+	inet 203.10.100.1 --&gt; 203.10.100.20 netmask 0xffffffff
+tun3: flags=8010&lt;POINTOPOINT,MULTICAST&gt; mtu 1500</pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">FreeBSD 4.0やより最近のリリースでは, すでに使われている
+            <code class="filename">tun</code> デバイスしか見つけることが
+            できないでしょう. これは, <span class="emphasis"><em>全く</em></span>
+            <code class="filename">tun</code> デバイスを見つけることが
+            できないかもしれないということです. しかし, もしこうなって
+            しまっても, 心配することはありません. そのデバイスは
+            <code class="command">ppp</code> が使おうとする時に動的に作られるはず
+            だからです. </p></div><p>この例ではトンネルデバイスが四つ存在し, そのうち二つに
+          設定がおこなわれ, 使用中であることがわかります.  上の例で
+          <code class="literal">RUNNING</code> フラグがオンになっている
+          ものがありますが, これは
+          そのインタフェースが何かに使用されていることを示している
+          だけであるということに注意してください. つまり,
+          <code class="literal">RUNNING</code> になっていない
+          インタフェースがあったとしても, それはエラーではありません.
+        </p><p>トンネルデバイスがカーネルに組み込まれておらず,
+          何らかの理由で
+          カーネルの再構築ができない場合でも,
+          方法がないわけではありません.
+          動的にデバイスをロードすることができるはずです.
+          詳細については
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=modload&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">modload</span>(8)</span></a> や <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lkm&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">lkm</span>(4)</span></a> など,
+          適切なマニュアルを参照してください.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94109008"></a>20.2.1.3. tun デバイスの確認</h4></div></div></div><p>ほとんどのユーザは <code class="filename">tun</code> デバイス
+          (<code class="filename">/dev/tun0</code>) が一つあれば充分でしょう.
+          より多くのデバイスを使う場合 (すなわち,
+          カーネルコンフィグレーション ファイルで <code class="literal">pseudo-device
+            tun</code> の行に <code class="literal">1</code>
+          以外の数値を指定している場合),  以下で
+          <code class="filename">tun0</code> と書かれている部分をすべて,
+          あなたが使うデバイスの番号に
+          あわせて読みかえてください.</p><p><code class="filename">tun0</code>
+          デバイスが正しく作成されていることを確認する最も簡単な方法は,
+          それを作り直すことです. そのためには,
+          以下のコマンドを実行します:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /dev</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>./MAKEDEV tun0</code></strong></pre><p>カーネルに 16 個のトンネルデバイスを組み込んだのであれば,
+          <code class="filename">tun0</code> だけでなく他の tun
+          デバイスも作成しておく必要があるでしょう:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /dev</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>./MAKEDEV tun15</code></strong></pre><p>また, カーネルが正しく設定されているかどうかを調べるために
+          以下のコマンドを実行して,
+          このような出力が得られることを確認します:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig tun0</code></strong>
+tun0: flags=8050&lt;POINTOPOINT,RUNNING,MULTICAST&gt; mtu 1500</pre><p>まだ <code class="literal">RUNNING</code>
+          フラグがセットされていない場合もあります.
+          その時は以下のような出力が得られるでしょう: </p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig tun0</code></strong>
+tun0: flags=8010&lt;POINTOPOINT,MULTICAST&gt; mtu 1500</pre><p>前述したように, FreeBSD 4.0 以降のリリースでは
+          <code class="filename">tun</code> デバイスは要求に応じて
+          作られるので, もしそのデバイスがまだ使われていなければ,
+          見つけられないかもしれないということを思い出してください.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94145616"></a>20.2.1.4. 名前の解決に関する設定</h4></div></div></div><p>リゾルバ (resolver) はシステムの一部分で, IP
+          アドレスとホスト名との 変換をおこないます. IP
+          アドレスとホスト名を対応させるためのマップを,
+          二つの場所のうちの一つから探すように設定できます.  一つめは
+          <code class="filename">/etc/hosts</code> (<code class="command">man 5
+            hosts</code>) と呼ばれるファイルです.   二つめはインターネット
+          ドメインネームサービス (DNS) と呼ばれる
+          分散データベースですが, これに関する議論は
+          このドキュメントで扱う範囲を 越えていますので,
+          これについての説明はおこないません.</p><p>リゾルバは名前のマッピングを
+          おこなうシステムコールの集合体です. ただし
+          どこからマッピング情報を見つけるのかは,
+          最初に指示しておく必要があります.  これは まず
+          <code class="filename">/etc/host.conf</code>
+          ファイルを編集することでおこないます.  混乱の元になりますので,
+          このファイルを <code class="filename">/etc/hosts.conf </code>と
+          呼んだりしては<span class="emphasis"><em>いけません</em></span> (余分な
+          <code class="literal">s</code> がついていますね).</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94153808"></a>20.2.1.4.1. <code class="filename">/etc/host.conf</code> ファイルの編集</h5></div></div></div><p>このファイルには 以下の 2 行が (この順番で)
+            書かれているはずです:</p><pre class="programlisting">hosts
+bind</pre><p>これは, 最初に <code class="filename">/etc/hosts</code>
+            ファイルを調べ, そこで目的の名前が 見つけられなかった場合に
+            DNS を引きにいくようリゾルバに指示します.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94156368"></a>20.2.1.4.2. /etc/hosts(5) ファイルの編集</h5></div></div></div><p>このファイルはローカルネットワーク上に存在するマシンの
+            IP アドレスと ホスト名を含んでいるはずです. 最低でも ppp
+            を動作させるマシンのエントリが 含まれている必要があります.
+            そのマシンのホスト名が <code class="systemitem">foo.bar.com</code>
+            で,  IP アドレスが
+            <code class="systemitem">10.0.0.1</code> であると仮定すると,
+            <code class="filename">/etc/hosts</code> は
+            以下の行を含んでいなければいけません:</p><pre class="programlisting">127.0.0.1	localhost.bar.com	localhost
+127.0.0.1	localhost.bar.com.
+10.0.0.1	foo.bar.com		foo
+10.0.0.1	foo.bar.com.</pre><p>一つめの行は <code class="systemitem">localhost</code>
+            を現在のマシンの別名として定義しています.  マシン固有の IP
+            アドレスが何であっても, この行の IP アドレスは 常に
+            <code class="systemitem">127.0.0.1</code> でなければいけません.
+            二つめの行はホスト名 <code class="systemitem">foo.bar.com</code>
+            (と, その省略形
+            <code class="systemitem">foo</code>) を IP アドレス
+            <code class="systemitem">10.0.0.1</code> にマップします.</p><p>もしプロバイダから固定の IP
+            アドレスとホスト名を割り当てられて いるのであれば, それを
+            <code class="systemitem">10.0.0.1</code>
+            エントリのかわりに使ってください.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94163536"></a>20.2.1.4.3. <code class="filename">/etc/resolv.conf</code> ファイルの編集</h5></div></div></div><p><code class="filename">/etc/resolv.conf</code>
+            はリゾルバの振舞いを指定します.  もし自前の DNS
+            サーバを走らせているのなら, このファイルは空のままに
+            しておくこともできます. 通常は,
+            以下のように書いておく必要があるでしょう:</p><pre class="programlisting">domain <em class="replaceable"><code>bar.com</code></em>
+nameserver <em class="replaceable"><code>x.x.x.x</code></em>
+nameserver <em class="replaceable"><code>y.y.y.y</code></em></pre><p><code class="systemitem"><em class="replaceable"><code>x.x.x.x</code></em></code>
+            と <code class="systemitem"><em class="replaceable"><code>y.y.y.y</code></em></code>
+            はプロバイダから指示されたアドレスで,
+            接続するプロバイダが提供しているネームサーバを
+            すべて書いてください.  <code class="literal">domain</code>
+            に指定するのは このマシンのデフォルトのドメイン名で,
+            おそらく 書かなくても問題は無いでしょう.
+            このファイルの各エントリの詳細については,
+            <code class="filename">resolv.conf</code>
+            のマニュアルページを参照してください.</p><p>バージョン 2 以降の ppp を使用している場合には,
+            <code class="command">enable dns</code>
+            コマンドを使用してネームサーバのアドレスを
+            プロバイダに問い合わせるように指示することができます.
+            上の指定とは異なるアドレスをプロバイダが指定してきた場合
+            (または <code class="filename">/etc/resolv.conf</code>
+            でネームサーバが指定されていない場合),  ppp
+            はプロバイダが指定したアドレスで
+            <code class="filename">resolv.conf</code> を書きかえます. </p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94170704"></a>20.2.1.5. <code class="command">ppp</code> の設定</h4></div></div></div><p>ユーザ ppp と <code class="command">pppd</code> (カーネルレベルの
+          PPP 実装) は どちらも <code class="filename">/usr/share/examples/ppp</code>
+          ディレクトリに置かれた設定ファイルを使います.
+          ここには設定ファイルのサンプルが用意されていて, ユーザ ppp
+          の設定を おこなう際に大変参考になりますので,
+          削除したりしないでください.</p><p><code class="command">ppp</code> の設定をするためには,
+          必要に応じていくつかのファイルを編集する必要が あります.
+          書き込む内容は, プロバイダが静的に IP アドレスを割り当てる
+          (つまり, 固定の IP アドレスを一つ与えられて, 常にそれを使う)
+          か,  または動的に IP アドレスを割り当てる (つまり, PPP
+          セッションごとに  IP アドレスが変化する可能性がある)
+          かということに ある程度依存します.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-staticIP"></a>20.2.1.5.1. 静的 IP アドレスによる PPP 接続</h5></div></div></div><p>まず <code class="filename">/etc/ppp/ppp.conf</code>
+            という設定ファイルを作成する必要があります.
+            これは以下の例とほとんど同じようなものになるでしょう.</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="literal">:</code> で終る行は  1 カラム目から始め,
+              その他の行はスペースまたはタブで以下の例のように
+              段をつける (インデントする) 必要があります.</p></div><pre class="programlisting">1     default:
+2       set device /dev/cuaa0
+3       set speed 115200
+4       set dial "ABORT BUSY ABORT NO\\sCARRIER TIMEOUT 5 \"\" ATE1Q0 OK-AT-OK \\dATDT\\TTIMEOUT 40 CONNECT"
+5     provider:
+6       set phone "(123) 456 7890"
+7       set login "TIMEOUT 10 \"\" \"\" gin:--gin: foo word: bar col: ppp"
+8       set timeout 300
+9       set ifaddr <em class="replaceable"><code>x.x.x.x</code></em> <em class="replaceable"><code>y.y.y.y</code></em> 255.255.255.0 0.0.0.0
+10      add default HISADDR
+11      enable dns</pre><p>ファイルでは行番号を取り除いておいてください.
+            これは解説の際に参照する行を示すためにつけたものです.</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Line 1:</span></dt><dd><p>デフォルトエントリを指定します.
+                  このエントリ中のコマンドは ppp
+                  が起動された際に自動的に実行されます.</p></dd><dt><span class="term">Line 2:</span></dt><dd><p>モデムが接続されているデバイスを指定します.
+                  <code class="filename">COM1:</code> は
+                  <code class="filename">/dev/cuaa0</code> に,
+                  <code class="filename">COM2:</code> は
+                  <code class="filename">/dev/cuaa1</code> になります.</p></dd><dt><span class="term">Line 3:</span></dt><dd><p>通信速度 (DTE 速度) を指定します. もし 115200
+                  が使えない (最近のモデムなら大抵使えるはずですが)
+                  場合には,  かわりに 38400
+                  を指定してみてください.</p></dd><dt><span class="term">Line 4:</span></dt><dd><p>ダイアルスクリプトを指定します.  ユーザ PPP は
+		  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chat</span>(8)</span></a> 言語に似た, 受信待ち文字列と
+                  送信文字列の対からなるスクリプトを使用します.
+                  この言語の機能に関しては,
+                  マニュアルページを参照してください.</p></dd><dt><span class="term">Line 5:</span></dt><dd><p>接続するプロバイダの名前 <span class="quote">「<span class="quote">provider</span>」</span> を
+                  エントリ名として指定します.</p></dd><dt><span class="term">Line 6:</span></dt><dd><p>このプロバイダの電話番号を指定します.
+                  複数の電話番号を  <code class="literal">:</code> や
+                  <code class="literal">|</code> で区切って指定することができます.
+                  これら区切り文字の違いについては, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ppp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ppp</span>(8)</span></a>
+                  に 詳しく書かれています.
+                  要約すると, 毎回違う番号に かけたいのであれば
+                  <code class="literal">:</code> を使います.  常に
+                  まず先頭の番号にかけてみて, つながらない時にだけ  2
+                  番目以降の番号に かけたいのであれば
+                  <code class="literal">|</code> を使います.
+                  例に示されているように, 常に電話番号全体を引用符で
+                  くくって (クォートして) おきます.</p></dd><dt><span class="term">Line 7:</span></dt><dd><p>ダイアルスクリプトと同様に, ログインスクリプトも
+                  chat 言語風の記述をおこないます.  この例は,
+                  以下のようなログインセッションを使用する
+                  プロバイダのためのものです:</p><pre class="screen">J. Random Provider
+login: <em class="replaceable"><code>foo</code></em>
+password: <em class="replaceable"><code>bar</code></em>
+protocol: ppp</pre><p>このスクリプトは必要に応じて
+                  書きかえなければならないでしょう.
+                  初めてスクリプトを書く時には, 予想した通りに
+                  処理が進んだかどうかを確認するため, <span class="quote">「<span class="quote">chat</span>」</span>
+                  ログを とるようにしておいた方が良いでしょう. </p><p>PAP や CHAP を使用する場合には,
+                  ここでログインすることは  ありませんから,
+                  ログイン文字列は空白のままにしておくべきです.
+                  詳細については <a class="link" href="userppp.html#userppp-PAPnCHAP" title="20.2.1.5.5. PAP および CHAP による認証">PAP
+                    および CHAP
+                    による認証</a>を参照してください.</p></dd><dt><span class="term">Line 8:</span></dt><dd><p>デフォルトの接続タイムアウト時間を (秒数で)
+                  指定します.  この例では, 300 秒間
+                  通信がおこなわれなければ
+                  自動的に接続を切るように指定しています.
+                  タイムアウトさせたくない場合には, この値を 0
+                  に設定します.</p></dd><dt><span class="term">Line 9:</span></dt><dd><p>インタフェースのアドレスを指定します. 文字列
+                  <em class="replaceable"><code>x.x.x.x</code></em> は
+                  プロバイダに割り当てられた IP
+                  アドレスで置きかえてください.  文字列
+                  <em class="replaceable"><code>y.y.y.y</code></em>
+                  はプロバイダから指示されたゲートウェイ
+                  (接続先となるマシン) の IP
+                  アドレスで置きかえてください.
+                  プロバイダがゲートウェイのアドレスを
+                  指示していない場合は,  <code class="systemitem">10.0.0.2/0</code>
+                  を使用しておいてください. もし <span class="quote">「<span class="quote">仮の</span>」</span>
+                  アドレスを使用する必要がある場合には,
+                  <a class="link" href="userppp.html#userppp-dynamicIP" title="20.2.1.5.2. 動的 IP アドレスによる PPP 接続">動的 IP アドレスによる
+                    PPP 接続</a>に関する指示に従って,
+                  <code class="filename">/etc/ppp/ppp.linkup</code>
+                  にエントリを作成していることを 確認してください.
+                  この行が省略されている場合, ppp を
+                  <code class="option">-auto</code>
+                  モードで動作させることはできません. </p></dd><dt><span class="term">Line 10:</span></dt><dd><p>プロバイダのゲートウェイへの経路を
+                  デフォルトルートとして 追加します. 特殊文字列
+                  <code class="literal">HISADDR</code> は, 9 行目で指定された
+                  ゲートウェイのアドレスで置きかえられます.
+                  <code class="literal">HISADDR</code> は 9
+                  行目までは初期化されていませんので,
+                  その行よりも後でしか使えないことに
+                  注意してください.</p></dd><dt><span class="term">Line 11:</span></dt><dd><p>ネームサーバのアドレスが正しいか
+                  どうかを確認するため,
+                  プロバイダに問い合わせをおこなうよう ppp に指示します.
+                  プロバイダがこの機能をサポートしていれば, ppp は
+                  <code class="filename">/etc/resolv.conf</code>
+                  のネームサーバエントリを
+                  正しいアドレスに更新することができます. </p></dd></dl></div><p>静的な IP アドレスを持っていて,
+            接続が完了する前にルーティングテーブルの
+            エントリが正しく設定されているのであれば,
+            <code class="filename">ppp.linkup</code> に
+            エントリを追加する必要はありません.  しかし,
+            この場合でもエントリを追加して, 接続が完了した時点で
+            プログラムを呼び出したいことがあるかもしれません.
+            これについては後ほど sendmail を例として説明します.</p><p>これらの設定ファイルのサンプルが
+            <code class="filename">/usr/share/examples/ppp</code> ディレクトリに
+            置かれています.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-dynamicIP"></a>20.2.1.5.2. 動的 IP アドレスによる PPP 接続</h5></div></div></div><p>プロバイダが静的な IP
+            アドレスの割り当てをおこなっていない場合,
+            <code class="command">ppp</code> が相手側のホスト (ゲートウェイ)
+            と交渉して, こちら側と相手側のアドレスを
+            決めるように設定することができます.  これは,
+            起動時には<span class="quote">「<span class="quote">仮の</span>」</span>アドレスを使っておいて,
+            接続後に IP コンフィグレーション プロトコル (IPCP)
+            を使用して <code class="command">ppp</code> が IP
+            アドレスを正しく設定できるようにすることで実現されます.
+            <a class="link" href="userppp.html#userppp-staticIP" title="20.2.1.5.1. 静的 IP アドレスによる PPP 接続">静的 IP アドレスによる PPP
+              接続</a>に 以下の変更を加える以外は,
+            <code class="filename">ppp.conf</code> の設定は同じです:</p><pre class="programlisting">9       set ifaddr 10.0.0.1/0 10.0.0.2/0 255.255.255.0</pre><p>繰り返しますが, 行番号は取り除いておいてください.
+            これは解説の際に参照する行を示すためにつけたものです.  なお,
+            少なくともスペース 1 個分の段づけ (インデント)
+            が必要です.</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Line 9:</span></dt><dd><p><code class="literal">/</code> 文字の後ろの数字は,
+                  アドレス交渉の際に固定しておきたい ビットの数です.
+                  場合によっては, もっと適切な IP アドレスを
+                  指定しておきたいこともあるかもしれませんが,
+                  ほとんどの場合には 上の例の通りで問題ありません.
+                </p><p>最後の引数 (<code class="literal">0.0.0.0</code>) は,
+                  アドレスの交渉の際に <code class="systemitem">10.0.0.1</code>
+                  ではなく <code class="systemitem">0.0.0.0</code> を使用するよう ppp
+                  に指示するためのものです.  <code class="command">set
+                    ifaddr</code> コマンドの最初の引数として
+                  <code class="literal">0.0.0.0</code> を指定してはいけません.
+                  さもないと, <code class="option">-auto</code>
+                  モードで動作させる際に
+                  初期経路を設定することができなくなります. </p></dd></dl></div><p>バージョン 1.X の ppp を使用する場合,
+            <code class="filename">/etc/ppp/ppp.linkup</code>
+            にもエントリを作成しておく必要があります.
+            <code class="filename">ppp.linkup</code>
+            は接続が確立された後に使用されます. この時点では,
+            <code class="command">ppp</code> は<span class="emphasis"><em>実際に</em></span>どの IP
+            アドレスを使うべきなのか わかっているはずです.
+            以下のエントリは存在する仮の経路を削除し,
+            正しい経路を作成します:</p><pre class="programlisting">1     provider:
+2       delete ALL
+3       add default HISADDR</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term">Line 1:</span></dt><dd><p>接続を確立する際に, <code class="command">ppp</code>
+                  は以下のルールに従って
+                  <code class="filename">ppp.linkup</code>
+                  のエントリを検索します:  まず
+                  <code class="filename">ppp.conf</code>
+                  で使用されたのと同じラベルを探します.
+                  もし見つからなければ, ゲートウェイの IP
+                  アドレスのエントリを 探します. このエントリは 4
+                  オクテットの IP アドレス形式の ラベルです. それでも
+                  まだエントリが見つからなければ,
+                  <code class="literal">MYADDR</code> エントリを探します.</p></dd><dt><span class="term">Line 2:</span></dt><dd><p>この行は, 使用する tun
+                  インタフェースに関する既存の経路を
+                  (ダイレクトルートのエントリを除き) すべて削除するよう
+                  <code class="command">ppp</code> に指示します.</p></dd><dt><span class="term">Line 3:</span></dt><dd><p>この行は <code class="literal">HISADDR</code>
+                  への経路をデフォルトルートとして 追加するように ppp
+                  に指示します. <code class="literal">HISADDR</code> は IPCP で
+                  決定されたゲートウェイの IP
+                  アドレスで置きかえられます.</p></dd></dl></div><p>詳細なサンプルについては,
+            <code class="filename">/usr/share/examples/ppp/ppp.conf.sample</code>
+            ファイル中のpmdemand エントリと
+            <code class="filename">/usr/share/examples/ppp/ppp.linkup.sample</code>
+            を参照してください.</p><p>バージョン 2 の ppp から <span class="quote">「<span class="quote">sticky routes</span>」</span>
+            が導入されました.  <code class="literal">MYADDR</code> や
+            <code class="literal">HISADDR</code> を含む <code class="literal">add</code>
+            コマンドと  <code class="literal">delete</code> コマンドを記憶して,
+            <code class="literal">MYADDR</code> や <code class="literal">HISADDR</code> の
+            アドレスが変化した際には経路の再設定をおこないます.
+            したがって, これらのコマンドを
+            <code class="filename">ppp.linkup</code> に
+            繰り返し記述する必要は無くなりました. </p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94248528"></a>20.2.1.5.3. かかってきた電話を <code class="command">ppp</code>
+            で受けるには</h5></div></div></div><p>かかってきた電話を <code class="command">ppp</code>
+            が受けるように設定する際に,  そのマシンが LAN
+            に接続されているのであれば,  パケットを LAN
+            に転送するかどうかを決定する必要があります.
+            転送をおこなう場合には, その LAN のサブネットから IP
+            アドレスを ppp クライアントに割り当て,
+            以下のコマンドを指定するのが良いでしょう. </p><pre class="programlisting">gateway_enable=YES</pre><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94259024"></a>20.2.1.5.3.1. どの getty を使いますか?</h6></div></div></div><p>getty
+              でダイアルアップサービスをおこなう場合の優れた解説が
+              <a class="link" href="dialup.html" title="19.4. ダイアルインサービス">FreeBSD
+                でダイアルアップサービスをおこなうための設定
+              </a>にあります.</p><p><code class="command">getty</code> に代わるものとしては,
+              <a class="link" href="http://www.leo.org/~doering/mgetty/index.html" target="_top">
+                mgetty</a> があります. これは
+              <code class="command">getty</code> をより柔軟にしたもので,
+              ダイアルアップ回線での使用を意図して
+              設計されています.</p><p><code class="command">mgetty</code> を使う場合の利点は,
+              <code class="command">mgetty</code>
+              が積極的にモデムと<span class="emphasis"><em>通信する</em></span>
+              ということです. つまり, もし
+              <code class="filename">/etc/ttys</code> でポートを閉じている場合,
+              モデムは電話をとらなくなります.</p><p>最近のバージョンの <code class="command">mgetty</code> (0.99beta
+              以降) では, PPP ストリームの
+              自動検出もサポートされています. これにより,
+              クライアント側で スクリプトを準備しなくてもサーバに
+              アクセスすることができます.</p><p><code class="command">mgetty</code> に関する,
+              より詳細な情報については
+              <a class="link" href="userppp.html#userppp-mgetty" title="20.2.1.5.4.1. mgetty と AutoPPP">Mgetty と AutoPPP</a>
+              を参照してください.</p></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94266064"></a>20.2.1.5.3.2. ppp の実行許可</h6></div></div></div><p><code class="command">ppp</code> は通常, ID 0 のユーザ (root)
+              として動作しなければいけませんが,  以下で説明するように,
+              <code class="command">ppp</code>
+              を通常のユーザとしてサーバモードで実行させたい 場合には,
+              そのユーザを <code class="filename">/etc/group</code> の
+              <code class="systemitem">network</code> グループに 追加して, ppp
+              を実行する許可を与えておかなければいけません.</p><p>また, そのユーザが設定ファイル内の目的のエントリに
+              アクセスできるように,  以下のように
+              <code class="command">allow</code>
+              コマンドで許可を与えておく必要があります: </p><pre class="programlisting">allow users fred mary</pre><p>このコマンドがデフォルトエントリに
+              書かれている場合には, 指定されたユーザは
+              すべてのエントリをアクセスできるようになります.</p></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94270288"></a>20.2.1.5.3.3. 動的 IP ユーザのための ppp シェルの設定</h6></div></div></div><p><code class="filename">/etc/ppp/ppp-shell</code> という名前で,
+              以下のような内容のファイルを 作成します:</p><pre class="programlisting">#!/bin/sh
+IDENT=`echo $0 | sed -e 's/^.*-\(.*\)$/\1/'`
+CALLEDAS="$IDENT"
+TTY=`tty`
+
+if [ x$IDENT = xdialup ]; then
+	IDENT=`basename $TTY`
+fi
+
+echo "PPP for $CALLEDAS on $TTY"
+echo "Starting PPP for $IDENT"
+
+exec /usr/sbin/ppp -direct $IDENT</pre><p>このスクリプトには実行可能属性をつけておきます.  次に,
+              以下のコマンドを実行し, <code class="filename">ppp-dialup</code>
+              という名前で このスクリプトへのリンクを作成します:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s ppp-shell /etc/ppp/ppp-dialup</code></strong></pre><p>すべてのダイアルアップ ppp
+              ユーザのログイン<span class="emphasis"><em>シェル</em></span>として
+              このスクリプトを使用します. 以下は
+              <code class="systemitem">pchilds</code> というユーザ名の
+              ダイアルアップユーザを <code class="filename">/etc/password</code>
+              へ登録した場合の例です.
+              (パスワードファイルを直接エディタで編集したりせず,
+              <code class="command">vipw</code> を使ってください)</p><pre class="programlisting">pchilds:*:1011:300:Peter Childs PPP:/home/ppp:/etc/ppp/ppp-dialup</pre><p>任意のユーザが読むことのできる,
+              <code class="filename">/home/ppp</code> ディレクトリを 作成します.
+              <code class="filename">/etc/motd</code>
+              が表示されないようにするため,
+              このディレクトリには以下のように大きさが 0
+              バイトのファイルを 作成しておきます.</p><pre class="screen">-r--r--r--   1 root     wheel           0 May 27 02:23 .hushlogin
+-r--r--r--   1 root     wheel           0 May 27 02:22 .rhosts</pre></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94277840"></a>20.2.1.5.3.4. 静的 IP ユーザのための PPP シェルの設定</h6></div></div></div><p>上記と同じように <code class="filename">ppp-shell</code>
+              ファイルを作成し,  静的な IP
+              アドレスを割り当てるアカウントそれぞれについて
+              <code class="filename">ppp-shell</code>
+              へのシンボリックリンクを作成します.</p><p>例えば, クラス C ネットワークの経路制御を必要とする,
+              三人のダイアルアップユーザ <code class="systemitem">fred</code>,
+              <code class="systemitem">sam</code>, <code class="systemitem">mary</code>
+              がいるとすると,
+              以下のコマンドを実行することになります:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/ppp/ppp-shell /etc/ppp/ppp-fred</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/ppp/ppp-shell /etc/ppp/ppp-sam</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/ppp/ppp-shell /etc/ppp/ppp-mary</code></strong></pre><p>これらのユーザのダイアルアップアカウントでは,
+              上で作成した それぞれのシンボリックリンクを
+              ログインシェルとして設定しておきます.  (つまり, ユーザ
+              <code class="systemitem">mary</code> のログインシェルは
+              <code class="filename">/etc/ppp/ppp-mary</code> に
+              なります).</p></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94285520"></a>20.2.1.5.3.5. 動的 IP ユーザのための ppp.conf の設定</h6></div></div></div><p><code class="filename">/etc/ppp/ppp.conf</code> ファイルは,
+              大体以下のような内容になるでしょう:</p><pre class="programlisting">default:
+  set debug phase lcp chat
+  set timeout 0
+
+ttyd0:
+  set ifaddr 203.14.100.1 203.14.100.20 255.255.255.255
+  enable proxy
+
+ttyd1:
+  set ifaddr 203.14.100.1 203.14.100.21 255.255.255.255
+  enable proxy</pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">上の例のように段をつける (インデントする)
+                必要があることに注意してください.</p></div><p><code class="literal">default:</code>
+              エントリはセッションごとにロードされます.
+              <code class="filename">/etc/ttys</code>
+              で有効にしてある各ダイアルアップ回線ごとに一つ,  上記の
+              <code class="literal">ttyd0:</code> のようなエントリを作成します.
+              各行の相手側アドレスとして, それぞれ別の IP アドレスを
+              動的 IP ユーザのための IP
+              アドレスのプールから割り当てておく必要があります.</p></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94289872"></a>20.2.1.5.3.6. 静的 IP ユーザのための <code class="filename">ppp.conf</code>
+              の設定</h6></div></div></div><p>上のサンプルの
+              <code class="filename">/usr/share/examples/ppp/ppp.conf</code>
+              の内容に加えて,  静的に IP
+              を割り当てられたダイアルアップユーザ
+              それぞれのためのエントリを追加する必要があります.
+              ここでも <code class="systemitem">fred</code>,
+              <code class="systemitem">sam</code>, <code class="systemitem">mary</code>
+              の例を使うことにしましょう.</p><pre class="programlisting">fred:
+  set ifaddr 203.14.100.1 203.14.101.1 255.255.255.255
+
+sam:
+  set ifaddr 203.14.100.1 203.14.102.1 255.255.255.255
+
+mary:
+  set ifaddr 203.14.100.1 203.14.103.1 255.255.255.255</pre><p>必要であれば, それぞれの静的 IP
+              ユーザに対する経路制御情報も
+              <code class="filename">/etc/ppp/ppp.linkup</code>
+              ファイルに書いておくべきでしょう.
+              以下の例ではクライアントの PPP リンクを経由する,  クラス C
+              の <code class="systemitem">203.14.101.0</code>
+              ネットワークへの経路を追加しています.</p><pre class="programlisting">fred:
+  add 203.14.101.0 netmask 255.255.255.0 HISADDR
+
+sam:
+  add 203.14.102.0 netmask 255.255.255.0 HISADDR
+
+mary:
+  add 203.14.103.0 netmask 255.255.255.0 HISADDR</pre></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94299856"></a>20.2.1.5.4. <code class="command">mgetty</code>, AutoPPP,
+	    マイクロソフト拡張の詳細</h5></div></div></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-mgetty"></a>20.2.1.5.4.1. <code class="command">mgetty</code> と AutoPPP</h6></div></div></div><p><code class="literal">AUTO_PPP</code>
+	      オプションつきでコンパイルした <code class="command">mgetty</code>
+	      を使えば, <code class="command">mgetty</code> が PPP 接続の LCP
+	      フェーズを検出して, 自動的に PPP シェルを起動するように
+	      設定することができます.  しかし この場合, デフォルトの
+	      login/password シーケンスは発生しないので,
+	      ユーザの認証は PAP または CHAP
+	      を使っておこなう必要があります.</p><p>このセクションでは, ユーザ (あなた) が問題なく
+	      <code class="literal">AUTO_PPP</code> オプションつきの
+	      <code class="command">mgetty</code> (v0.99beta またはそれ以降)
+	      の設定,  コンパイル,
+	      インストールができているものと仮定しています.</p><p><code class="filename">
+		/usr/local/etc/mgetty+sendfax/login.config</code>
+	      ファイルが
+	      以下の行を含んでいることを確認してください:</p><pre class="programlisting">/AutoPPP/ -     -       /etc/ppp/ppp-pap-dialup</pre><p>これにより, PPP 接続を検出したら
+	      <code class="command">mgetty</code> が
+	      <code class="filename">ppp-pap-dialup</code>
+	      スクリプトを実行するようになります.</p><p><code class="filename">/etc/ppp/ppp-pap-dialup</code>
+	      という名前で, 以下のような内容のファイルを 作成します
+	      (このファイルには実行可能属性を
+	      つけておく必要があります):</p><pre class="programlisting">#!/bin/sh
+exec /usr/sbin/ppp -direct pap</pre><p>さらに, かかってきた電話すべてを自分で扱うエントリを
+	      <code class="filename">/etc/ppp/ppp.conf</code>
+	      に作成します.</p><pre class="programlisting">pap:
+  enable pap
+  set ifaddr 203.14.100.1 203.14.100.20-203.14.100.40
+  enable proxy</pre><p>この方法でログインする それぞれのユーザは, PAP
+	      によるユーザ認証を おこなうために
+	      <code class="filename">/etc/ppp/ppp.secret</code>
+	      ファイルにユーザ名とパスワードを 書いておくか, または
+	      <code class="filename">/etc/password</code>
+	      ファイルを使うように,</p><pre class="programlisting">enable passwdauth</pre><p>ユーザに静的な IP アドレスを割り当てる場合には,
+	      そのアドレスを  <code class="filename">/etc/ppp/ppp.secret</code>
+	      の第三引数として指定することができます.
+	      サンプルについては,
+	      <code class="filename">/usr/share/examples/ppp/ppp.secret.sample</code>
+	      を参照してください.</p></div><div class="sect5"><div xmlns="" class="titlepage"><div><div><h6 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94328528"></a>20.2.1.5.4.2. マイクロソフト拡張</h6></div></div></div><p>クライアントからの要求に応じて, ppp が DNS や
+	      NetBIOS ネームサーバの アドレスを通知するように
+	      設定をおこなうこともできます.</p><p>バージョン 1.X の ppp で
+	      これらの拡張機能を有効にするには, 以下の行を
+	      <code class="filename">/etc/ppp/ppp.conf</code>
+	      の適切なセクションに追加する必要があるでしょう. </p><pre class="programlisting">enable msext
+set ns 203.14.100.1 203.14.100.2
+set nbns 203.14.100.5</pre><p>バージョン 2 以降の ppp では,
+	      以下のようになります:</p><pre class="programlisting">accept dns
+set dns 203.14.100.1 203.14.100.2
+set nbns 203.14.100.5</pre><p>これにより, クライアントはプライマリと
+	      セカンダリのネームサーバアドレス および NetBIOS
+	      ネームサーバホストを知ることができます.</p><p>バージョン 2 以降の ppp では, <code class="literal">set
+		dns</code> の行を省略した場合には
+	      <code class="filename">/etc/resolv.conf</code>
+	      に書かれているネームサーバのアドレスを使用します.
+	    </p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-PAPnCHAP"></a>20.2.1.5.5. PAP および CHAP による認証</h5></div></div></div><p>いくつかのプロバイダでは, PAP または CHAP
+            のいずれかの認証メカニズムを
+            使用して接続時の認証をおこなうように
+            システムを設定しています.  この場合, プロバイダは接続の際に
+            <code class="prompt">login:</code> プロンプトを送信せず,  最初から PPP
+            で通信を始めようとするでしょう.</p><p>PAP ではパスワードがそのまま送られてしまうため, CHAP
+            に比べると安全性が 低くなりますが,
+            このパスワードはシリアル回線のみを通して送られます.
+            そのため,
+            クラッカーが <span class="quote">「<span class="quote">盗み聞き</span>」</span> する余地は多くないので,
+            通常ここの セキュリティは問題にはなりません.</p><p><a class="link" href="userppp.html#userppp-staticIP" title="20.2.1.5.1. 静的 IP アドレスによる PPP 接続">静的 IP アドレスによる
+              PPP 接続</a>または
+            <a class="link" href="userppp.html#userppp-dynamicIP" title="20.2.1.5.2. 動的 IP アドレスによる PPP 接続">動的 IP アドレスによる PPP
+              接続</a>の セクションに戻って,
+            以下の変更をおこないます:</p><pre class="programlisting">7       set login
+…
+12      set authname <em class="replaceable"><code>MyUserName</code></em>
+13      set authkey <em class="replaceable"><code>MyPassword</code></em></pre><p>これまでと同様に, 行番号は取り除いておいてください.
+            これは解説の際に参照する行を示すためにつけたものです.  なお,
+            少なくともスペース 1 個分の段づけ (インデント)
+            が必要です.</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Line 7:</span></dt><dd><p>PAP または CHAP を使用する場合, 通常
+                  プロバイダはサーバへの ログインを必要としません.
+                  そのため, <span class="quote">「<span class="quote">set login</span>」</span> 文字列を
+                  無効にしておかなければいけません.</p></dd><dt><span class="term">Line 12:</span></dt><dd><p>この行は PAP/CHAP ユーザ名を指定します.
+                  <em class="replaceable"><code>MyUserName</code></em> に
+                  正しい値を入れておく必要があります.</p></dd><dt><span class="term">Line 13:</span></dt><dd><p>この行は PAP/CHAP パスワードを指定します.
+                  <em class="replaceable"><code>MyPassword</code></em> に
+                  正しい値を入れておく必要があります.
+                  PAP と CHAP はデフォルトで両方とも
+                  受け付けられるようになって
+                  いますが, PAP や CHAP を使用するという
+                  意思を明示するために,
+
+                  </p><pre class="programlisting">15      accept PAP</pre><p>
+
+                  または
+
+                  </p><pre class="programlisting">15      accept CHAP</pre><p>
+
+                  という行を追加しておくのも良いでしょう.</p></dd></dl></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94349776"></a>20.2.1.5.6. 動作中の ppp の設定変更</h5></div></div></div><p>適切な診断ポートが設定されている場合には,
+            バックグラウンドで動作中の  <code class="command">ppp</code>
+            プログラムと通信することができます.
+            この設定をおこなうためには,
+            以下の行を設定ファイルに追加しておきます: </p><pre class="programlisting">set server /var/run/ppp-tun%d DiagnosticPassword 0177</pre><p>これにより, ppp は指定された unix ドメインの
+            ソケットをモニタして,
+            クライアントから正しいパスワードを受け取った後に
+            アクセスを許可します.  このソケット名に含まれる
+            <code class="literal">%d</code> は, この ppp が使用している
+            <code class="filename">tun</code>
+            デバイスの デバイス番号で置きかえられます.</p><p>一旦ソケットの設定が終了したら, スクリプト中で
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pppctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pppctl</span>(8)</span></a> を 使用して, 動作中の ppp
+            を操作することができるでしょう.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-final"></a>20.2.1.6. システムの最終設定</h4></div></div></div><p>これで <code class="command">ppp</code> の設定は終りました.  しかし
+          <code class="command">ppp</code> を動かす前に,
+          まだ少し必要なことがあります.  それらの設定は, すべて
+          <code class="filename">/etc/rc.conf</code> ファイルを
+          編集することでおこないます.  (このファイルは以前には
+          <code class="filename">/etc/sysconfig</code> と呼ばれていました)</p><p>このファイルを上から順に設定していきます.  まずは
+          <code class="literal">hostname=</code>
+          の行が設定されていることを確認します.
+          例えば以下のように:</p><pre class="programlisting">hostname="foo.bar.com"</pre><p>もしプロバイダが静的な IP
+          アドレスとホスト名を割り当てているのなら,
+          ホスト名としてそれを使うのが おそらくベストでしょう.</p><p>次に <code class="literal">network_interfaces</code> 変数を調べます.
+          必要に応じて (on demand)
+          プロバイダにダイアルするようにシステムを設定したい場合には,
+          <code class="filename">tun0</code>
+          デバイスがこのリストに追加されていることを確認しておきます.
+          それ以外の場合には, tun0
+          デバイスをリストから削除しておきます.</p><pre class="programlisting">network_interfaces="lo0 tun0" ifconfig_tun0=</pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="literal">ifconfig_tun0</code> 変数が空で,
+            <code class="filename">/etc/start_if.tun0</code> という名前の
+            ファイルが作成されていなければなりません.
+            このファイルの内容は以下のようになります.</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">ppp -auto mysystem</pre><p xmlns="http://www.w3.org/1999/xhtml">このスクリプトはネットワークの設定時に実行され,  ppp
+            デーモンを自動モードで立ち上げます.  このマシンがもし LAN
+            のゲートウェイであれば,  <code class="option">-alias</code>
+            スイッチも使用したいと思うかもしれません.  詳細に関しては,
+            マニュアルページを参照してください.</p></div><p>以下のようにルータプログラムを <code class="literal">NO</code>
+          に設定します.</p><pre class="programlisting">router_enable="NO"</pre><p><code class="command">routed</code> は, <code class="command">ppp</code>
+          が作成したデフォルトのルーティングテーブル
+          エントリを削除してしまう場合がありますので,
+          (初期設定では起動されるようになっている)
+          <code class="command">routed</code> デーモンが
+          起動されないようにしておくことが重要です.</p><p><code class="literal">sendmail_flags</code> 行が <code class="option">-q</code>
+          オプションを含まないように 設定しておいた方がよいでしょう.
+          さもないと, <code class="command">sendmail</code> が
+          アドレスを調べようとして発信をおこなってしまう場合があります.
+          以下のような設定で良いでしょう:</p><pre class="programlisting">sendmail_flags="-bd"</pre><p>この結果, PPP リンクを立ち上げた時には
+          いつでも以下のコマンドを実行して, キューにたまっているメールを
+          <code class="command">sendmail</code>
+          に送信させる作業が必要になるでしょう.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/sbin/sendmail -q</code></strong></pre><p><code class="filename">ppp.linkup</code> 中で
+          <code class="command">!bg</code> コマンドを使用することで,
+          これを自動的に おこなうこともできます:</p><pre class="programlisting">1     provider:
+2       delete ALL
+3       add 0 0 HISADDR
+4       !bg sendmail -bd -q30m</pre><p>こうするのが嫌であれば, SMTP
+          トラフィックをブロックするように <span class="quote">「<span class="quote">dfilter</span>」</span>
+          を設定しておくこともできます.
+          詳細についてはサンプルファイルを参照してください.</p><p>後はマシンをリブートするだけです.</p><p>リブートが終ったら,</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ppp</code></strong></pre><p>コマンドを実行し, 続いて PPP セッションを開始させるために
+          <code class="command">dial provider</code> と入力することもできますし,
+          (<code class="filename">start_if.tun0</code>
+          スクリプトを作成していない場合に),
+          外部へのトラフィックが発生した時に, <code class="command">ppp</code>
+          が自動的に セッションを確立してくれるようにしたいのであれば,
+          以下のコマンドを実行することもできます.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ppp -auto provider</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94383824"></a>20.2.1.7. まとめ</h4></div></div></div><p>要約すると, 初めて ppp を設定する際には,
+          以下のステップが不可欠です:</p><p>クライアント側:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>カーネルに <code class="filename">tun</code>
+              デバイスが組み込まれていることを確認.</p></li><li class="step"><p><code class="filename">/dev</code> ディレクトリに
+              <code class="filename">tunX</code>
+              デバイスファイルが 存在することを確認.</p></li><li class="step"><p><code class="filename">/etc/ppp/ppp.conf</code>
+              にエントリを作成.  ほとんどのプロバイダでは,
+              <code class="filename">pmdemand</code> の例で充分でしょう.</p></li><li class="step"><p>動的 IP アドレスを使用するなら,
+              <code class="filename">/etc/ppp/ppp.linkup</code> に
+              エントリを作成.</p></li><li class="step"><p><code class="filename">/etc/rc.conf</code> (または
+              <code class="filename">sysconfig</code>) ファイルを更新.</p></li><li class="step"><p>必要に応じてダイヤル (demand dialing)
+              したいのであれば,  <code class="filename">start_if.tun0</code>
+              スクリプトを作成.</p></li></ol></div><p>サーバ側:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>カーネルに <code class="filename">tun</code>
+              デバイスが組み込まれていることを確認.</p></li><li class="step"><p><code class="filename">/dev</code> ディレクトリに
+              <code class="filename">tunX</code>
+              デバイスファイルが 存在することを確認.</p></li><li class="step"><p>(<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vipw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vipw</span>(8)</span></a> コマンドを使って)
+              <code class="filename">/etc/passwd</code> にエントリを作成.</p></li><li class="step"><p>このユーザのホームディレクトリに <code class="command">ppp -direct
+                direct-server</code>
+              か何かを実行するプロファイルを作成.</p></li><li class="step"><p><code class="filename">/etc/ppp/ppp.conf</code>
+              にエントリを作成.  <code class="filename">direct-server</code>
+              の例で充分でしょう.</p></li><li class="step"><p><code class="filename">/etc/ppp/ppp.linkup</code>
+              にエントリを作成.</p></li><li class="step"><p><code class="filename">/etc/rc.conf</code>ファイルを更新.</p></li></ol></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ppp-and-slip.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="ppp-and-slip.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="ppp.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">第20章 PPP と SLIP〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓20.3. カーネル PPP の利用</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

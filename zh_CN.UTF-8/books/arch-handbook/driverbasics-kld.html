@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>9.2. 动态内核链接工具──KLD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="driverbasics.html" title="第 9 章 编写 FreeBSD 设备驱动程序" /><link rel="prev" href="driverbasics.html" title="第 9 章 编写 FreeBSD 设备驱动程序" /><link rel="next" href="driverbasics-access.html" title="9.3. 访问设备驱动程序" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">9.2. 动态内核链接工具──KLD</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="driverbasics.html">上一页</a> </td><th width="60%" align="center">第 9 章 编写 FreeBSD 设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="driverbasics-access.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="driverbasics-kld"></a>9.2. 动态内核链接工具──KLD</h2></div></div></div><a id="idp71407952" class="indexterm"></a><a id="idp71408720" class="indexterm"></a><p>kld接口允许系统管理员从运行的系统中动态地添加和删除功能。
+      这允许设备驱动程序的编写者将他们的新改动加载到运行的内核中，
+      而不用为了测试新改动而频繁地重启。</p><p>kld接口通过下面的特权命令使用：
+
+    <a id="idp71409872" class="indexterm"></a>
+    <a id="idp71410640" class="indexterm"></a>
+    <a id="idp71411408" class="indexterm"></a>
+    </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><code class="command">kldload</code> - 加载新内核模块
+        </li><li class="listitem"><code class="command">kldunload</code> - 卸载内核模块
+        </li><li class="listitem"><code class="command">kldstat</code> - 列举当前加载的模块
+        </li></ul></div><p>
+    </p><p>内核模块的程序框架</p><pre class="programlisting">/*
+ * KLD程序框架
+ * 受Andrew Reiter在Daemonnews上的文章所启发
+ */
+
+#include &lt;sys/types.h&gt;
+#include &lt;sys/module.h&gt;
+#include &lt;sys/systm.h&gt;  /* uprintf */
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/param.h&gt;  /* kernel.h中用到的定义 */
+#include &lt;sys/kernel.h&gt; /* 模块初始化中使用的类型 */
+
+/*
+ * 加载处理函数，负责处理KLD的加载和卸载。
+ */
+
+static int
+skel_loader(struct module *m, int what, void *arg)
+{
+  int err = 0;
+
+  switch (what) {
+  case MOD_LOAD:                /* kldload */
+    uprintf("Skeleton KLD loaded.\n");
+    break;
+  case MOD_UNLOAD:
+    uprintf("Skeleton KLD unloaded.\n");
+    break;
+  default:
+    err = EOPNOTSUPP;
+    break;
+  }
+  return(err);
+}
+
+/* 向内核其余部分声明此模块 */
+
+static moduledata_t skel_mod = {
+  "skel",
+  skel_loader,
+  NULL
+};
+
+DECLARE_MODULE(skeleton, skel_mod, SI_SUB_KLD, SI_ORDER_ANY);</pre><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71415888"></a>9.2.1. Makefile</h3></div></div></div><p>FreeBSD提供了一个makefile包含文件，利用它你可以快速地编译
+        你附加到内核的东西。</p><pre class="programlisting">SRCS=skeleton.c
+KMOD=skeleton
+
+.include &lt;bsd.kmod.mk&gt;</pre><p>简单地用这个makefile运行<code class="command">make</code>就能够创建文件
+        <code class="filename">skeleton.ko</code>，键入如下命令可以把它加载到内核：
+</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload -v ./skeleton.ko</code></strong></pre><p>
+      </p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="driverbasics.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="driverbasics.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="driverbasics-access.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 9 章 编写 FreeBSD 设备驱动程序 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 9.3. 访问设备驱动程序</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

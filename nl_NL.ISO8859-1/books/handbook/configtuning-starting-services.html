@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>12.5. Diensten starten</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="config-tuning.html" title="Hoofdstuk 12. Instellingen en optimalisatie" /><link rel="prev" href="configtuning-appconfig.html" title="12.4. Toepassingen instellen" /><link rel="next" href="configtuning-cron.html" title="12.6. cron instellen" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.5. Diensten starten</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="configtuning-appconfig.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 12. Instellingen en optimalisatie</th><td width="20%" align="right"> <a accesskey="n" href="configtuning-cron.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="configtuning-starting-services"></a>12.5. Diensten starten</h2></div><div><span class="authorgroup">Bijgedragen door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp75062352" class="indexterm"></a><p>Veel gebruikers kiezen ervoor om software van derden te
+      installeren op FreeBSD vanuit de Portscollectie.  In veel gevallen
+      is het noodzakelijk om de software dusdanig in te stellen dat
+      het opstart tijdens het opstarten van de computer.  Diensten
+      zoals <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/postfix/pkg-descr">mail/postfix</a> of
+      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/www/apache22/pkg-descr">www/apache22</a> zijn slechts
+      twee voorbeelden van softwarepakketten die gestart kunnen worden
+      tijdens de systeemstart.  In deze paragraaf wordt toegelicht hoe
+      software van derde partijen kan worden gestart.</p><p>In FreeBSD worden de meeste diensten, zoals <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a>, door
+      de opstartscripts van het systeem gestart.  Deze scripts kunnen
+      verschillen tussen FreeBSD en leverancierversies, echter het meest
+      belangrijke aspect om in gedachten te houden is dat hun
+      opstartinstellingen verwerkt kunnen worden door simpele
+      opstartscripts.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp75069392"></a>12.5.1. Uitgebreide applicatieinstellingen</h3></div></div></div><p>Nu FreeBSD <code class="filename">rc.d</code> heeft, zijn de
+	instellingen van applicaties die mee moeten opstarten
+	versimpeld en rijker aan mogelijkheden.  Door gebruik te maken
+	van de sleutelwoorden die in de paragraaf <a class="link" href="configtuning-rcd.html" title="12.7. Gebruik van rc met FreeBSD"><code class="filename">rc.d</code></a>
+	behandeld worden, kunnen applicaties nu starten na andere
+	diensten.  <acronym class="acronym">DNS</acronym> kan bijvoorbeeld extra
+	opties meekrijgen van <code class="filename">/etc/rc.conf</code> in
+	plaats van hard ingestelde opties in het opstartscript.  Een
+	basisscript ziet er ongeveer als volgt uit:</p><pre class="programlisting">#!/bin/sh
+#
+# PROVIDE: utility
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=utility
+rcvar=utility_enable
+
+command="/usr/local/sbin/utility"
+
+load_rc_config $name
+
+#
+# VERANDER DE STANDAARDWAARDEN HIER NIET
+# STEL ZE IN HET BESTAND /etc/rc.conf IN
+#
+utility_enable=${utility_enable-"NO"}
+pidfile=${utility_pidfile-"/var/run/utility.pid"}
+
+run_rc_command "$1"</pre><p>Dit script zorgt ervoor dat
+	<span class="application">utility</span> wordt gestart na de pseudodienst
+	<code class="literal">DAEMON</code>.  Het biedt ook de mogelijkheid voor
+	het instellingen en volgen van het <acronym class="acronym">PID</acronym> of
+	het proces-<acronym class="acronym">ID</acronym> bestand.</p><p>Voor deze applicatie kan dan de volgende regel in
+	<code class="filename">/etc/rc.conf</code> geplaatst worden:</p><pre class="programlisting">utility_enable="YES"</pre><p>Deze methode maakt het volgende mogelijk: makkelijker
+	commandoregelopties manipuleren, importeren van
+	standaardfuncties uit <code class="filename">/etc/rc.subr</code>,
+	compatibiliteit met het gereedschap <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> en het levert
+	makkelijkere configuratie via <code class="filename">rc.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp75077968"></a>12.5.2. Diensten met diensten starten</h3></div></div></div><p>Andere diensten, zoals <acronym class="acronym">POP</acronym>3-server
+	daemons, <acronym class="acronym">IMAP</acronym>, enzovoort, kunnen gestart
+	worden door gebruik te maken van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a>.  Daaraan is
+	voorafgegaan dat die dienst uit de Portscollectie is
+	geïstalleerd en dat er een regel met instellingen is
+	toegevoegd aan <code class="filename">/etc/inetd.conf</code> of
+	één van de bestaande niet-actieve regels is
+	geactiveerd.  Werken met <span class="application">inetd</span> en
+	zijn instellingen wordt uitgebreid toegelicht in de paragraaf
+	over <a class="link" href="network-inetd.html" title="29.2. De inetd &#8220;Super-Server&#8221;">inetd</a>.</p><p>In sommige gevallen is het handiger om <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a> te
+	gebruiken om diensten te starten.  Deze aanpak heeft een aantal
+	voordelen omdat <code class="command">cron</code> start als de eigenaar
+	van <code class="filename">crontab</code>.  Dit stelt reguliere
+	gebruikers in staat om sommige applicaties te starten en te
+	onderhouden.</p><p><code class="command">cron</code> levert een unieke optie: in plaats
+	van een tijdsspecificatie kan <code class="literal">@reboot</code>
+	gebruikt worden.  Dit zorgt ervoor dat de taak gestart wordt als
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a> gestart wordt, meestal tijdens een
+	systeemstart.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="configtuning-appconfig.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="config-tuning.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="configtuning-cron.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">12.4. Toepassingen instellen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 12.6. <code class="command">cron</code> instellen</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

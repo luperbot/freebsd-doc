@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>17.2. Les ressources du bus</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="pci.html" title="Chapitre 17. Les périphériques PCI" /><link rel="prev" href="pci.html" title="Chapitre 17. Les périphériques PCI" /><link rel="next" href="scsi.html" title="Chapitre 18. Contrôleurs SCSI Common Access Method (CAM) **" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">17.2. Les ressources du bus</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pci.html">Précédent</a> </td><th width="60%" align="center">Chapitre 17. Les périphériques PCI</th><td width="20%" align="right"> <a accesskey="n" href="scsi.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp68101456"></a>17.2. Les ressources du bus</h2></div></div></div><p>FreeBSD fournit un mécanisme orienté objet pour demander
+      des ressources du bus parent.  Pratiquement tous les périphériques
+      seront un fils membre d'un type de bus (PCI, ISA, USB, SCSI, etc)
+      et ces périphériques nécessite des ressources issues de leur bus parent
+      (comme des segments de mémoire, des interruptions or des canaux DMA).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68102480"></a>17.2.1. Registres d'adresse de base</h3></div></div></div><p>Pour faire de particulièrement utile avec un périphérique PCI,
+      vous aurez besoin d'obtenir les <span class="emphasis"><em>registres d'adresse de base</em></span>
+       (Base Address Registers ou BARs) de l'espace de configuration PCI.
+      Les détails spécifiques au PCI sur l'obtention du registre d'adresse de base
+      sont masqués dans la fonction <code class="function">bus_alloc_resource()</code>.</p><p>Par exemple, un pilote typique aura sa fonction <code class="function">attach()</code>
+      similaire à ceci : </p><pre class="programlisting">    sc-&gt;bar0id = 0x10;
+    sc-&gt;bar0res = bus_alloc_resource(dev, SYS_RES_MEMORY, &amp;(sc-&gt;bar0id),
+				  0, ~0, 1, RF_ACTIVE);
+    if (sc-&gt;bar0res == NULL) {
+        uprintf("Allocation memoire du registre PCI de base 0 echouee!\n");
+        error = ENXIO;
+        goto fail1;
+    }
+
+    sc-&gt;bar1id = 0x14;
+    sc-&gt;bar1res = bus_alloc_resource(dev, SYS_RES_MEMORY, &amp;(sc-&gt;bar1id),
+				  0, ~0, 1, RF_ACTIVE);
+    if (sc-&gt;bar1res == NULL) {
+        uprintf("Allocation memoire du registre PCI de base 1 echouee!\n");
+        error =  ENXIO;
+        goto fail2;
+    }
+    sc-&gt;bar0_bt = rman_get_bustag(sc-&gt;bar0res);
+    sc-&gt;bar0_bh = rman_get_bushandle(sc-&gt;bar0res);
+    sc-&gt;bar1_bt = rman_get_bustag(sc-&gt;bar1res);
+    sc-&gt;bar1_bh = rman_get_bushandle(sc-&gt;bar1res);
+
+</pre><p>Des références pour chaque registre d'adresse de base sont gardées
+      dans la structure <code class="varname">softc</code> afin qu'elle puisse
+      être utilisée pour écrire dans le périphérique plus tard.</p><p>Ces références peuvent alors être utilisées pour lire ou écrire
+      	dans les registres du périphérique avec les fonctions <code class="function">bus_space_*</code>.
+      	Par exemple, un pilote peut contenir une fonction raccourci
+        pour lire dans un registre spécifique à une carte comme cela :
+        </p><pre class="programlisting">uint16_t
+board_read(struct ni_softc *sc, uint16_t address) {
+    return bus_space_read_2(sc-&gt;bar1_bt, sc-&gt;bar1_bh, address);
+}
+</pre><p>De façon similaire, une autre peut écrire dans les registres avec : </p><pre class="programlisting">void
+board_write(struct ni_softc *sc, uint16_t address, uint16_t value) {
+    bus_space_write_2(sc-&gt;bar1_bt, sc-&gt;bar1_bh, address, value);
+}
+</pre><p>Ces fonctions existent en versions 8bit, 16bit et 32bit
+        et vous devriez utiliser
+        <code class="function">bus_space_{read|write}_{1|2|4}</code>
+        en conséquence.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68113360"></a>17.2.2. Les interruptions</h3></div></div></div><p>Les interruptions sont alloués à partir du code orienté objet du
+         bus de façon similaire aux ressources mémoire. D'abord une ressource
+         IRQ doit être allouée à partir du bus parent, et alors le
+        gestionnaire d'interruption doit être règlé pour traiter cet IRQ.</p><p>A nouveau, un exemple de fonction
+        <code class="function">attach()</code> en dit plusqu'un long discours.</p><pre class="programlisting">/* Recupere la ressource IRQ */
+
+    sc-&gt;irqid = 0x0;
+    sc-&gt;irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &amp;(sc-&gt;irqid),
+				  0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+    if (sc-&gt;irqres == NULL) {
+	uprintf("Allocation IRQ echouee!\n");
+	error = ENXIO;
+	goto fail3;
+    }
+
+    /* Maitnenant nous choisissons notre gestionnaire d'interruption */
+
+    error = bus_setup_intr(dev, sc-&gt;irqres, INTR_TYPE_MISC,
+			   my_handler, sc, &amp;(sc-&gt;handler));
+    if (error) {
+	printf("Ne peut regler l'IRQ\n");
+	goto fail4;
+    }
+
+    sc-&gt;irq_bt = rman_get_bustag(sc-&gt;irqres);
+    sc-&gt;irq_bh = rman_get_bushandle(sc-&gt;irqres);
+</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68115664"></a>17.2.3. DMA</h3></div></div></div><p>Sur les PC, les périphériques qui veulent utiliser la gestion de
+      bus DMA doivent travailler avec des adresses physiques. C'est un problème
+      puisque FreeBSD utilise une mémoire virtuelle et travaille presque
+      exclusivement avec des adresses virtuelles. Heureusement, il y a une
+      fonction <code class="function">vtophys()</code> pour nous aider.</p><pre class="programlisting">#include &lt;vm/vm.h&gt;
+#include &lt;vm/pmap.h&gt;
+
+#define vtophys(virtual_address) (...)
+</pre><p>La solution est toutefois un peu différente sur Alpha, et
+        ce que nous voulons réellement est une fonction appelée
+        <code class="function">vtobus()</code>.</p><pre class="programlisting">#if defined(__alpha__)
+#define vtobus(va)      alpha_XXX_dmamap((vm_offset_t)va)
+#else
+#define vtobus(va)      vtophys(va)
+#endif
+</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68118736"></a>17.2.4. Désallouer les resources</h3></div></div></div><p>Il est très important de désallouer toutes les ressources
+        qui furent allouées pendant <code class="function">attach()</code>.
+        Unsoin tout particulier doit être pris pour désallouer
+        les bonnes choses même lors d'un échec afin que le système reste
+        utilisable lorsque votre driver meurt.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pci.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="pci.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="scsi.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">Chapitre 17. Les périphériques PCI </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Chapitre 18. Contrôleurs SCSI Common Access Method (CAM) **</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

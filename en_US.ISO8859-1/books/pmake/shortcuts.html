@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Chapter 3. Short-cuts and Other Nice Things</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="prev" href="summary.html" title="2.8. Summary" /><link rel="next" href="including.html" title="3.2. Including Other Makefiles" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Chapter 3. Short-cuts and Other Nice Things</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="summary.html">Prev</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="including.html">Next</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="shortcuts"></a>Chapter 3. Short-cuts and Other Nice Things</h1></div></div></div><div class="toc"><div class="toc-title">Table of Contents</div><dl class="toc"><dt><span class="section"><a href="shortcuts.html#rules">3.1. Transformation Rules</a></span></dt><dt><span class="section"><a href="including.html">3.2. Including Other Makefiles</a></span></dt><dt><span class="section"><a href="savingcmds.html">3.3. Saving Commands</a></span></dt><dt><span class="section"><a href="targetattr.html">3.4. Target Attributes</a></span></dt><dt><span class="section"><a href="specialtargets.html">3.5. Special Targets</a></span></dt><dt><span class="section"><a href="modyvarex.html">3.6. Modifying Variable Expansion</a></span></dt><dt><span class="section"><a href="moreexercises.html">3.7. More Exercises</a></span></dt></dl></div><p>Based on what I have told you so far, you may have gotten the
+    impression that <span class="application">PMake</span> is just a way of
+    storing away commands and making sure you do not forget to compile
+    something.  Good.  That is just what it is.  However, the ways I
+    have described have been inelegant, at best, and painful, at
+    worst.  This chapter contains things that make the writing of
+    makefiles easier and the makefiles themselves shorter and easier
+    to modify (and, occasionally, simpler).  In this chapter, I assume
+    you are somewhat more familiar with Sprite (or <span class="trademark">UNIX</span>®, if that is
+    what you are using) than I did in <a class="xref" href="basics.html" title="Chapter 2. The Basics of PMake">Chapter 2, <em>The Basics of PMake</em></a>, just so
+    you are on your toes.  So without further ado&#8230;</p><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rules"></a>3.1. Transformation Rules</h2></div></div></div><p>As you know, a file's name consists of two parts: a base
+      name, which gives some hint as to the contents of the file, and
+      a suffix, which usually indicates the format of the file.  Over
+      the years, as <span class="trademark">UNIX</span>® has developed, naming conventions, with
+      regard to suffixes, have also developed that have become almost
+      as incontrovertible as Law.  E.g. a file ending in
+      <code class="filename">.c</code> is assumed to contain C source code; one
+      with a <code class="filename">.o</code> suffix is assumed to be a
+      compiled, relocatable object file that may be linked into any
+      program; a file with a <code class="filename">.ms</code> suffix is
+      usually a text file to be processed by
+      <span class="application">Troff</span> with the <code class="literal">-ms</code>
+      macro package, and so on.  One of the best aspects of both
+      <span class="application">Make</span> and
+      <span class="application">PMake</span> comes from their understanding
+      of how the suffix of a file pertains to its contents and their
+      ability to do things with a file based solely on its suffix.
+      This ability comes from something known as a transformation
+      rule.  A transformation rule specifies how to change a file with
+      one suffix into a file with another suffix.</p><p>A transformation rule looks much like a dependency line,
+      except the target is made of two known suffixes stuck
+      together.  Suffixes are made known to
+      <span class="application">PMake</span> by placing them
+      as sources on a dependency line whose target is the special
+      target <code class="varname">.SUFFIXES</code>.  E.g.:</p><pre class="programlisting">.SUFFIXES   : .o .c
+.c.o        :
+	$(CC) $(CFLAGS) -c $(.IMPSRC)</pre><p>The creation script attached to the target is used to
+      trans form a file with the first suffix (in this case,
+      <code class="filename">.c</code>) into a
+      file with the second suffix (here, <code class="filename">.o</code>).
+      In addition, the target inherits whatever attributes have
+      been applied to the transformation rule.
+      The simple rule given above says that to transform a C source
+      file into an object file, you compile it using
+      <span class="application">cc</span> with the <code class="option">-c</code>
+      flag.  This rule is taken straight from the system makefile.
+      Many transformation rules (and suffixes) are defined there,
+      and I refer you to it for more examples
+      (type <code class="command">pmake -h</code> to find out where it
+      is).</p><p>There are several things to note about the
+      transformation rule given above:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>The <code class="varname">.IMPSRC</code> variable.
+	  This variable is set to the
+	  <span class="quote">&#8220;<span class="quote">implied source</span>&#8221;</span> (the file from which
+	  the target is  being created; the one with the first
+	  suffix), which, in this case, is the
+	  <code class="filename">.c</code> file.</p></li><li class="listitem"><p>The <code class="envar">CFLAGS</code> variable.  Almost all of
+	  the transformation rules in the system makefile are set
+	  up using variables that you can alter in your makefile
+	  to tailor the rule to your needs.  In this case, if you
+	  want all your C files to be compiled with the
+	  <code class="option">-g</code> flag, to provide information for
+	  dbx, you would set the <code class="envar">CFLAGS</code> variable to
+	  contain <code class="option">-g</code> (<code class="literal">CFLAGS  =
+	  -g</code>) and <span class="application">PMake</span>
+	  would take care of the rest.</p></li></ol></div><p>To give you a quick example, the makefile in
+      <a class="xref" href="variables.html#envvars" title="2.3.4. Environment Variables">Section 2.3.4, &#8220;Environment Variables&#8221;</a> could be changed to this:</p><pre class="programlisting">OBJS            = a.o b.o c.o
+program         : $(OBJS)
+	 $(CC) -o $(.TARGET) $(.ALLSRC)
+$(OBJS)         : defs.h</pre><p>The transformation rule I gave above takes the place of the
+      6 lines
+      <a href="#ftn.idp64891600" class="footnote" id="idp64891600"><sup class="footnote">[1]</sup></a>:</p><pre class="programlisting">a.o             : a.c
+	cc -c a.c
+b.o             : b.c
+	cc -c b.c
+c.o             : c.c
+	cc -c c.c</pre><p>Now you may be wondering about the dependency between the
+      <code class="filename">.o</code>
+      and <code class="filename">.c</code> files &#8211; it is not mentioned
+      anywhere in the new makefile.  This is because it is not needed:
+      one of the effects of applying a transformation rule is the
+      target comes to depend on the implied source.  That's why it is
+      called the implied source.</p><p>For a more detailed example.  Say you have a makefile like
+      this:</p><pre class="programlisting">a.out           : a.o b.o
+	$(CC) $(.ALLSRC)</pre><p>and a directory set up like this:</p><pre class="screen">total 4
+-rw-rw-r--  1 deboor        34 Sep  7 00:43 Makefile
+-rw-rw-r--  1 deboor       119 Oct  3 19:39 a.c
+-rw-rw-r--  1 deboor       201 Sep  7 00:43 a.o
+-rw-rw-r--  1 deboor        69 Sep  7 00:43 b.c</pre><p>While just typing <code class="command">pmake</code> will do
+      the right thing, it is much more informative to type
+      <code class="command">pmake -d s</code>.  This will
+      show you what <span class="application">PMake</span> is up
+      to as it processes the files.  In this case,
+      <span class="application">PMake</span> prints the following:</p><pre class="screen">Suff_FindDeps (a.out)
+     using existing source a.o
+     applying .o -&gt; .out to "a.o"
+Suff_FindDeps (a.o)
+     trying a.c...got it
+     applying .c -&gt; .o to "a.c"
+Suff_FindDeps (b.o)
+     trying b.c...got it
+     applying .c -&gt; .o to "b.c"
+Suff_FindDeps (a.c)
+     trying a.y...not there
+     trying a.l...not there
+     trying a.c,v...not there
+     trying a.y,v...not there
+     trying a.l,v...not there
+Suff_FindDeps (b.c)
+     trying b.y...not there
+     trying b.l...not there
+     trying b.c,v...not there
+     trying b.y,v...not there
+     trying b.l,v...not there
+--- a.o ---
+cc  -c a.c
+--- b.o ---
+cc  -c b.c
+--- a.out ---
+cc a.o b.o</pre><p><code class="computeroutput">Suff_FindDeps</code> is the
+      name of a function in <span class="application">PMake</span> that
+      is called to check for implied sources for a target using
+      transformation rules.  The transformations it tries are,
+      naturally enough, limited to the ones that have been defined
+      (a transformation may be defined multiple times, by the way,
+      but only the most recent one will be used).  You will notice,
+      however, that there is a definite order to the suffixes that
+      are tried.  This order is set by the relative positions of
+      the suffixes on the <code class="varname">.SUFFIXES</code> line
+      &#8211; the earlier a suffix appears, the earlier it is
+      checked as the source of a transformation.  Once a suffix
+      has been defined, the only way to change its position in the
+      pecking order is to remove all the suffixes (by having a
+      <code class="varname">.SUFFIXES</code> dependency line with no sources)
+      and redefine them in the order you want.
+      (Previously-defined transformation rules will be
+      automatically redefined as the suffixes they involve are
+      re-entered.)  Another way to affect the search order is to make
+      the dependency explicit.  In the above example,
+      <code class="filename">a.out</code> depends on <code class="filename">a.o</code>
+      and <code class="filename">b.o</code>.  Since a transformation exists
+      from <code class="filename">.o</code> to <code class="filename">.out</code>,
+      <span class="application">PMake</span> uses that, as indicated by
+      the <code class="computeroutput">using existing source a.o</code>
+      message.</p><p>The search for a transformation starts from the suffix of
+      the target and continues through all the defined
+      transformations, in the order dictated by the suffix ranking,
+      until an existing file with the same base (the target name
+      minus the suffix and any leading directories) is found.  At that
+      point, one or more transformation rules will have been found
+      to change the one existing file into the target.</p><p>For example, ignoring what's in the system makefile for
+      now, say you have a makefile like this:</p><pre class="screen">.SUFFIXES       : .out .o .c .y .l
+.l.c            :
+	lex $(.IMPSRC)
+	mv lex.yy.c $(.TARGET)
+.y.c            :
+	yacc $(.IMPSRC)
+	mv y.tab.c $(.TARGET)
+.c.o            :
+	cc -c $(.IMPSRC)
+.o.out          :
+	cc -o $(.TARGET) $(.IMPSRC)</pre><p>and the single file <code class="filename">jive.l</code>.
+      If you were to type <code class="command">pmake -rd ms jive.out</code>,
+      you would get the following output for
+      <code class="filename">jive.out</code>:</p><pre class="screen">Suff_FindDeps (jive.out)
+     trying jive.o...not there
+     trying jive.c...not there
+     trying jive.y...not there
+     trying jive.l...got it
+     applying .l -&gt; .c to "jive.l"
+     applying .c -&gt; .o to "jive.c"
+     applying .o -&gt; .out to "jive.o"</pre><p>and this is why: <span class="application">PMake</span> starts with the
+      target <code class="filename">jive.out</code>, figures out its suffix
+      (<code class="filename">.out</code>) and looks for things it  can
+      transform to a <code class="filename">.out</code> file.  In this case, it
+      only finds <code class="filename">.o</code>, so it looks for the file
+      <code class="filename">jive.o</code>.  It fails to find it, so it
+      looks for transformations into a <code class="filename">.o</code>
+      file.  Again it has only one choice: <code class="filename">.c</code>.
+      So it looks for <code class="filename">jive.c</code> and, as you
+      know, fails to find it.  At this point it has two choices: it can
+      create the <code class="filename">.c</code> file from either a
+      <code class="filename">.y</code> file or a <code class="filename">.l</code> file.
+      Since <code class="filename">.y</code> came first on the
+      <code class="varname">.SUFFIXES</code> line, it checks for
+      <code class="filename">jive.y</code> first, but can not find it, so it looks
+      for <code class="filename">jive.l</code> and, lo and behold, there it is.
+      At this point, it has defined a transformation path as follows:</p><div class="literallayout"><p><code class="filename">.l</code>  -&gt;  <code class="filename">.c</code>  -&gt;  <code class="filename">.o</code>  -&gt; <code class="filename">.out</code></p></div><p>and applies the transformation rules accordingly.  For completeness,
+      and to give you a better idea of what <span class="application">PMake</span>
+      actually did with this three-step transformation, this is what
+      <span class="application">PMake</span> printed for the rest of the
+      process:</p><pre class="screen">Suff_FindDeps (jive.o)
+     using existing source jive.c
+     applying .c -&gt; .o to "jive.c"
+Suff_FindDeps (jive.c)
+     using existing source jive.l
+     applying .l -&gt; .c to "jive.l"
+Suff_FindDeps (jive.l)
+Examining jive.l...modified 17:16:01 Oct 4, 1987...up-to-date
+Examining jive.c...non-existent...out-of-date
+--- jive.c ---
+lex jive.l
+... meaningless lex output deleted ...
+mv lex.yy.c jive.c
+Examining jive.o...non-existent...out-of-date
+--- jive.o ---
+cc -c jive.c
+Examining jive.out...non-existent...out-of-date
+--- jive.out ---
+cc -o jive.out jive.o</pre><p>One final question remains: what does
+      <span class="application">PMake</span> do with targets that have no
+      known suffix?  <span class="application">PMake</span> simply pretends
+      it actually has a known suffix and searches for
+      transformations accordingly.  The suffix it chooses is the
+      source for the <code class="buildtarget">.NULL</code> target mentioned
+      later.  In the system makefile, <code class="filename">.out</code> is
+      chosen as the <span class="quote">&#8220;<span class="quote">null suffix</span>&#8221;</span> because most people
+      use <span class="application">PMake</span> to create programs.  You
+      are, however, free and welcome to change it to a suffix
+      of your own choosing.  The null suffix is ignored, however,
+      when <span class="application">PMake</span> is in compatibility
+      mode (see <a class="xref" href="gods.html" title="Chapter 4. PMake for Gods">Chapter 4, <em>PMake for Gods</em></a>).</p></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp64891600" class="footnote"><p><a href="#idp64891600" class="para"><sup class="para">[1] </sup></a>This is also somewhat cleaner, I think, than
+	  the dynamic source solution presented in
+	  <a class="xref" href="writeanddebug.html" title="2.6. Writing and Debugging a Makefile">Section 2.6, &#8220;Writing and Debugging a Makefile&#8221;</a>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="summary.html">Prev</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="including.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">2.8. Summary </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 3.2. Including Other Makefiles</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

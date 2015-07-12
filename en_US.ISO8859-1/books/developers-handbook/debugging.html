@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>2.6. Debugging</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="tools.html" title="Chapter 2. Programming Tools" /><link rel="prev" href="tools-make.html" title="2.5. Make" /><link rel="next" href="emacs.html" title="2.7. Using Emacs as a Development Environment" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.6. Debugging</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="tools-make.html">Prev</a> </td><th width="60%" align="center">Chapter 2. Programming Tools</th><td width="20%" align="right"> <a accesskey="n" href="emacs.html">Next</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="debugging"></a>2.6. Debugging</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64797264"></a>2.6.1. The Debugger</h3></div></div></div><p>The debugger that comes with FreeBSD is called
+	<code class="command">gdb</code> (<span class="application">GNU
+	  debugger</span>).  You start it up by typing</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gdb <em class="replaceable"><code>progname</code></em></code></strong></pre><p>although many people prefer to run it inside
+	<span class="application">Emacs</span>.  You can do this by:</p><pre class="screen"><strong class="userinput"><code>M-x gdb RET <em class="replaceable"><code>progname</code></em> RET</code></strong></pre><p>Using a debugger allows you to run the program under more
+	controlled circumstances.  Typically, you can step through the
+	program a line at a time, inspect the value of variables,
+	change them, tell the debugger to run up to a certain point
+	and then stop, and so on.  You can even attach to a program
+	that is already running, or load a core file to investigate why
+	the program crashed.  It is even possible to debug the kernel,
+	though that is a little trickier than the user applications
+	we will be discussing in this section.</p><p><code class="command">gdb</code> has quite good on-line help, as
+	well as a set of info pages, so this section will concentrate
+	on a few of the basic commands.</p><p>Finally, if you find its text-based command-prompt style
+	off-putting, there is a graphical front-end for it
+	(<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/devel/xxgdb/pkg-descr">devel/xxgdb</a>) in the Ports
+	Collection.</p><p>This section is intended to be an introduction to using
+	<code class="command">gdb</code> and does not cover specialized topics
+	such as debugging the kernel.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64827600"></a>2.6.2. Running a program in the debugger</h3></div></div></div><p>You will need to have compiled the program with the
+	<code class="option">-g</code> option to get the most out of using
+	<code class="command">gdb</code>.  It will work without, but you will only
+	see the name of the function you are in, instead of the source
+	code.  If you see a line like:</p><pre class="screen">&#8230; (no debugging symbols found) &#8230;</pre><p>when <code class="command">gdb</code> starts up, you will know that
+	the program was not compiled with the <code class="option">-g</code>
+	option.</p><p>At the <code class="command">gdb</code> prompt, type
+	<strong class="userinput"><code>break main</code></strong>.  This will tell the
+	debugger that you are not interested in watching the
+	preliminary set-up code in the program being run, and that it
+	should stop execution at the beginning of your code.  Now type
+	<strong class="userinput"><code>run</code></strong> to start the program&#8212;it will
+	start at the beginning of the set-up code and then get stopped
+	by the debugger when it calls <code class="function">main()</code>.
+	(If you have ever wondered where <code class="function">main()</code>
+	gets called from, now you know!).</p><p>You can now step through the program, a line at a time, by
+	pressing <code class="command">n</code>.  If you get to a function call,
+	you can step into it by pressing <code class="command">s</code>.  Once
+	you are in a function call, you can return from stepping into a
+	function call by pressing <code class="command">f</code>.  You can also
+	use <code class="command">up</code> and <code class="command">down</code> to take
+	a quick look at the caller.</p><p>Here is a simple example of how to spot a mistake in a
+	program with <code class="command">gdb</code>.  This is our program
+	(with a deliberate mistake):</p><pre class="programlisting">#include &lt;stdio.h&gt;
+
+int bazz(int anint);
+
+main() {
+	int i;
+
+	printf("This is my program\n");
+	bazz(i);
+	return 0;
+}
+
+int bazz(int anint) {
+	printf("You gave me %d\n", anint);
+	return anint;
+}</pre><p>This program sets <span class="symbol">i</span> to be
+	<code class="literal">5</code> and passes it to a function
+	<code class="function">bazz()</code> which prints out the number we
+	gave it.</p><p>When we compile and run the program we get</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cc -g -o temp temp.c</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>./temp</code></strong>
+This is my program
+anint = 4231</pre><p>That was not what we expected! Time to see what is going
+	on!</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gdb temp</code></strong>
+GDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "show copying" to see the conditions.
+There is absolutely no warranty for GDB; type "show warranty" for details.
+GDB 4.13 (i386-unknown-freebsd), Copyright 1994 Free Software Foundation, Inc.
+(gdb) <strong class="userinput"><code>break main</code></strong>				<em class="lineannotation"><span class="lineannotation">Skip the set-up code</span></em>
+Breakpoint 1 at 0x160f: file temp.c, line 9.	<em class="lineannotation"><span class="lineannotation">gdb puts breakpoint at main()</span></em>
+(gdb) <strong class="userinput"><code>run</code></strong>					<em class="lineannotation"><span class="lineannotation">Run as far as main()</span></em>
+Starting program: /home/james/tmp/temp		<em class="lineannotation"><span class="lineannotation">Program starts running</span></em>
+
+Breakpoint 1, main () at temp.c:9		<em class="lineannotation"><span class="lineannotation">gdb stops at main()</span></em>
+(gdb) <strong class="userinput"><code>n</code></strong>						<em class="lineannotation"><span class="lineannotation">Go to next line</span></em>
+This is my program				<em class="lineannotation"><span class="lineannotation">Program prints out</span></em>
+(gdb) <strong class="userinput"><code>s</code></strong>						<em class="lineannotation"><span class="lineannotation">step into bazz()</span></em>
+bazz (anint=4231) at temp.c:17			<em class="lineannotation"><span class="lineannotation">gdb displays stack frame</span></em>
+(gdb)</pre><p>Hang on a minute! How did <span class="symbol">anint</span> get to be
+	<code class="literal">4231</code>? Did we not we set it to be
+	<code class="literal">5</code> in <code class="function">main()</code>? Let's
+	move up to <code class="function">main()</code> and have a look.</p><pre class="screen">(gdb) <strong class="userinput"><code>up</code></strong>					<em class="lineannotation"><span class="lineannotation">Move up call stack</span></em>
+#1  0x1625 in main () at temp.c:11		<em class="lineannotation"><span class="lineannotation">gdb displays stack frame</span></em>
+(gdb) <strong class="userinput"><code>p i</code></strong>					<em class="lineannotation"><span class="lineannotation">Show us the value of i</span></em>
+$1 = 4231					<em class="lineannotation"><span class="lineannotation">gdb displays 4231</span></em></pre><p>Oh dear! Looking at the code, we forgot to initialize
+	<span class="symbol">i</span>.  We meant to put</p><pre class="programlisting"><em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+main() {
+	int i;
+
+	i = 5;
+	printf("This is my program\n");
+<em class="lineannotation"><span class="lineannotation">&#8230;</span></em></pre><p>but we left the <code class="literal">i=5;</code> line out.  As we
+	did not initialize <span class="symbol">i</span>, it had whatever number
+	happened to be in that area of memory when the program ran,
+	which in this case happened to be
+	<code class="literal">4231</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="command">gdb</code> displays the stack frame every
+	  time we go into or out of a function, even if we are using
+	  <code class="command">up</code> and <code class="command">down</code> to move
+	  around the call stack.  This shows the name of the function
+	  and the values of its arguments, which helps us keep track
+	  of where we are and what is going on.  (The stack is a
+	  storage area where the program stores information about the
+	  arguments passed to functions and where to go when it
+	  returns from a function call).</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64939216"></a>2.6.3. Examining a core file</h3></div></div></div><p>A core file is basically a file which contains the
+	complete state of the process when it crashed.  In <span class="quote">&#8220;<span class="quote">the
+	  good old days</span>&#8221;</span>, programmers had to print out hex
+	listings of core files and sweat over machine code manuals,
+	but now life is a bit easier.  Incidentally, under FreeBSD and
+	other 4.4BSD systems, a core file is called
+	<code class="filename"><em class="replaceable"><code>progname</code></em>.core</code> instead of just
+	<code class="filename">core</code>, to make it clearer which program a
+	core file belongs to.</p><p>To examine a core file, start up <code class="command">gdb</code> in
+	the usual way.  Instead of typing <code class="command">break</code> or
+	<code class="command">run</code>, type</p><pre class="screen">(gdb) <strong class="userinput"><code>core <em class="replaceable"><code>progname</code></em>.core</code></strong></pre><p>If you are not in the same directory as the core file,
+	you will have to do <strong class="userinput"><code>dir
+	  /path/to/core/file</code></strong> first.</p><p>You should see something like this:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gdb a.out</code></strong>
+GDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "show copying" to see the conditions.
+There is absolutely no warranty for GDB; type "show warranty" for details.
+GDB 4.13 (i386-unknown-freebsd), Copyright 1994 Free Software Foundation, Inc.
+(gdb) <strong class="userinput"><code>core a.out.core</code></strong>
+Core was generated by `a.out'.
+Program terminated with signal 11, Segmentation fault.
+Cannot access memory at address 0x7020796d.
+#0  0x164a in bazz (anint=0x5) at temp.c:17
+(gdb)</pre><p>In this case, the program was called
+	<code class="filename">a.out</code>, so the core file is called
+	<code class="filename">a.out.core</code>.  We can see that the program
+	crashed due to trying to access an area in memory that was not
+	available to it in a function called
+	<code class="function">bazz</code>.</p><p>Sometimes it is useful to be able to see how a function was
+	called, as the problem could have occurred a long way up the
+	call stack in a complex program.  The <code class="command">bt</code>
+	command causes <code class="command">gdb</code> to print out a
+	back-trace of the call stack:</p><pre class="screen">(gdb) <strong class="userinput"><code>bt</code></strong>
+#0  0x164a in bazz (anint=0x5) at temp.c:17
+#1  0xefbfd888 in end ()
+#2  0x162c in main () at temp.c:11
+(gdb)</pre><p>The <code class="function">end()</code> function is called when a
+	program crashes; in this case, the <code class="function">bazz()</code>
+	function was called from <code class="function">main()</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64978384"></a>2.6.4. Attaching to a running program</h3></div></div></div><p>One of the neatest features about <code class="command">gdb</code>
+	is that it can attach to a program that is already running.  Of
+	course, that assumes you have sufficient permissions to do so.
+	A common problem is when you are stepping through a program
+	that forks, and you want to trace the child, but the debugger
+	will only let you trace the parent.</p><p>What you do is start up another <code class="command">gdb</code>,
+	use <code class="command">ps</code> to find the process ID for the
+	child, and do</p><pre class="screen">(gdb) <strong class="userinput"><code>attach <em class="replaceable"><code>pid</code></em></code></strong></pre><p>in <code class="command">gdb</code>, and then debug as usual.</p><p><span class="quote">&#8220;<span class="quote">That is all very well,</span>&#8221;</span> you are probably
+	thinking, <span class="quote">&#8220;<span class="quote">but by the time I have done that, the child
+	  process will be over the hill and far away</span>&#8221;</span>.  Fear
+	not, gentle reader, here is how to do it (courtesy of the
+	<code class="command">gdb</code> info pages):</p><pre class="screen"><em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+if ((pid = fork()) &lt; 0)		/* _Always_ check this */
+	error();
+else if (pid == 0) {		/* child */
+	int PauseMode = 1;
+
+	while (PauseMode)
+		sleep(10);	/* Wait until someone attaches to us */
+	<em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+} else {			/* parent */
+	<em class="lineannotation"><span class="lineannotation">&#8230;</span></em></pre><p>Now all you have to do is attach to the child, set
+	<span class="symbol">PauseMode</span> to <code class="literal">0</code>, and wait
+	for the <code class="function">sleep()</code> call to return!</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="tools-make.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="tools.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="emacs.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">2.5. Make </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 2.7. Using Emacs as a Development Environment</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

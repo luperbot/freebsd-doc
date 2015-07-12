@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>26.9. Uso della Posta con una Connessione Dialup</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="mail.html" title="Capitolo 26. Posta Elettronica" /><link rel="prev" href="outgoing-only.html" title="26.8. Configurazione del Sistema di Posta solo per l'Invio" /><link rel="next" href="SMTP-Auth.html" title="26.10. Autenticazione SMTP" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">26.9. Uso della Posta con una Connessione Dialup</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="outgoing-only.html">Indietro</a> </td><th width="60%" align="center">Capitolo 26. Posta Elettronica</th><td width="20%" align="right"> <a accesskey="n" href="SMTP-Auth.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-dialup"></a>26.9. Uso della Posta con una Connessione Dialup</h2></div></div></div><p>Se hai un indirizzo IP statico, non hai bisogno di adattare nulla alla
+      configurazione di default.  Imposta come nome host il nome Internet che
+      ti è stato assegnato e <span class="application">sendmail</span>
+      farà il resto.</p><p>Se hai un indirizzo IP assegnato in modo dinamico e usi una
+      connessione PPP dialup per Internet, allora probabilmente avrai una
+      casella di posta sul server di posta del tuo ISP.  Assumiamo che il
+      dominio del tuo ISP sia <code class="systemitem">example.net</code>,
+      che il tuo nome utente sia <code class="systemitem">user</code>, che hai chiamato
+      la tua macchina <code class="systemitem">bsd.home</code>, e che il tuo ISP
+      ti ha detto che puoi usare <code class="systemitem">relay.example.net</code> come relay per la posta.</p><p>Per ricevere la posta dalla tua casella, devi installare un agente
+      di ricupero.  L'utility <span class="application">fetchmail</span> è
+      una buona scelta poichè supporta diversi tipi di protocolli.
+      Questo programma è disponibile come package o dalla collezione dei
+      port (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/fetchmail/pkg-descr">mail/fetchmail</a>).
+      Di solito, il tuo <acronym class="acronym">ISP</acronym> fornirà
+      <acronym class="acronym">POP</acronym>.  Se stai usando <acronym class="acronym">PPP</acronym> a livello
+      utente, puoi prelevare automaticamente la tua posta quando viene stabilita
+      una connessione a Internet mettendo la seguente riga in
+      <code class="filename">/etc/ppp/ppp.linkup</code>:</p><pre class="programlisting">MYADDR:
+!bg su user -c fetchmail</pre><p>Se stai usando <span class="application">sendmail</span> (come mostrato
+      sotto) per consegnare posta ad account non locali, probabilmente vorrai
+      che <span class="application">sendmail</span> processi la tua coda di posta
+      non appena viene stabilita una connessione ad Internet.  Per far questo,
+      metti il seguente comando dopo il comando <code class="command">fetchmail</code> in
+      <code class="filename">/etc/ppp/ppp.linkup</code>.</p><pre class="programlisting">!bg su user -c "sendmail -q"</pre><p>Assumiamo che tu abbia un account per <code class="systemitem">user</code> su
+      <code class="systemitem">bsd.home</code>.  Nella directory home di
+      <code class="systemitem">user</code> su <code class="systemitem">bsd.home</code>, crea
+      il file <code class="filename">.fetchmailrc</code> così composto:</p><pre class="programlisting">poll example.net protocol pop3 fetchall pass MySecret</pre><p>Questo file non dovrebbe essere leggibile da nessuno ad eccezione di
+      <code class="systemitem">user</code> poichè contiene la password
+      <code class="literal">MySecret</code>.</p><p>Per spedire la posta con il corretto header <code class="literal">from:</code>,
+      devi indicare a <span class="application">sendmail</span> di usare
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:user@example.net">user@example.net</a>&gt;</code> piuttosto che
+      <code class="email">&lt;user@bsd.home&gt;</code>.  Inoltre vorrai indicare a
+      <span class="application">sendmail</span> di spedire tutta la posta tramite
+      <code class="systemitem">relay.example.net</code>, permettendo una veloce
+      trasmissione della posta.</p><p>Il seguente file <code class="filename">.mc</code> dovrebbe essere
+      sufficiente:</p><pre class="programlisting">VERSIONID(`bsd.home.mc version 1.0')
+OSTYPE(bsd4.4)dnl
+FEATURE(nouucp)dnl
+MAILER(local)dnl
+MAILER(smtp)dnl
+Cwlocalhost
+Cwbsd.home
+MASQUERADE_AS(`example.net')dnl
+FEATURE(allmasquerade)dnl
+FEATURE(masquerade_envelope)dnl
+FEATURE(nocanonify)dnl
+FEATURE(nodns)dnl
+define(`SMART_HOST', `relay.example.net')
+Dmbsd.home
+define(`confDOMAIN_NAME',`bsd.home')dnl
+define(`confDELIVERY_MODE',`deferred')dnl</pre><p>Fai riferimento alla precedente sezione per i dettagli su come
+      trasformare questo file <code class="filename">.mc</code> nel file
+      <code class="filename">sendmail.cf</code>.  Inoltre, non dimenticarti di riavviare
+      <span class="application">sendmail</span> dopo aver aggiornato il file
+      <code class="filename">sendmail.cf</code>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="outgoing-only.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="SMTP-Auth.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">26.8. Configurazione del Sistema di Posta solo per l'Invio </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 26.10. Autenticazione SMTP</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

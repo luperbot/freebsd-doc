@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>19.16. Highly Available Storage (HAST)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Εγχειρίδιο του FreeBSD" /><link rel="up" href="disks.html" title="Κεφάλαιο 19. Αποθηκευτικά Μέσα" /><link rel="prev" href="swap-encrypting.html" title="19.15. Encrypting Swap Space" /><link rel="next" href="GEOM.html" title="Κεφάλαιο 20. GEOM: Διαχείριση Συστοιχιών Δίσκων" /><link rel="copyright" href="legalnotice.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.16. Highly Available Storage (HAST)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="swap-encrypting.html">Προηγ</a> </td><th width="60%" align="center">Κεφάλαιο 19. Αποθηκευτικά Μέσα</th><td width="20%" align="right"> <a accesskey="n" href="GEOM.html">Επόμενο</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-hast"></a>19.16. Highly Available Storage (HAST)</h2></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div><div><span class="authorgroup">With inputs from <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Freddie</span> <span class="surname">Cash</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Pawel Jakub</span> <span class="surname">Dawidek</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Michael W.</span> <span class="surname">Lucas</span></span> και <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Viktor</span> <span class="surname">Petersson</span></span>. </span></div></div></div><a id="idp91176272" class="indexterm"></a><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91177424"></a>19.16.1. Synopsis</h3></div></div></div><p>High availability is one of the main requirements in
+	serious business applications and highly-available storage is
+	a key component in such environments.  Highly Available
+	STorage, or <acronym class="acronym">HAST<em><span class="remark">Highly
+	    Available STorage</span></em></acronym>, was developed by
+	Pawel Jakub Dawidek <code class="email">&lt;<a xmlns="" class="email" href="mailto:pjd@FreeBSD.org">pjd@FreeBSD.org</a>&gt;</code> as a framework which allows transparent storage
+	of the same data across several physically separated machines
+	connected by a TCP/IP network.  <acronym class="acronym">HAST</acronym> can be
+	understood as a network-based RAID1 (mirror), and is similar
+	to the DRBD(R) storage system known from the GNU/<span class="trademark">Linux</span>(R)
+	platform.  In combination with other high-availability
+	features of FreeBSD like <acronym class="acronym">CARP</acronym>,
+	<acronym class="acronym">HAST</acronym> makes it possible to build a
+	highly-available storage cluster that is resistant to hardware
+	failures.</p><p>After reading this section, you will know:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>What <acronym class="acronym">HAST</acronym> is, how it works and
+	    which features it provides.</p></li><li class="listitem"><p>How to set up and use <acronym class="acronym">HAST</acronym> on
+	    FreeBSD.</p></li><li class="listitem"><p>How to integrate <acronym class="acronym">CARP</acronym> and
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> to build a robust storage system.</p></li></ul></div><p>Before reading this section, you should:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Understand <span class="trademark">UNIX</span>(R) and
+	    <a class="link" href="basics.html" title="Κεφάλαιο 4. Βασικές Έννοιες στο UNIX(R)">FreeBSD basics</a>.</p></li><li class="listitem"><p>Know how to
+	    <a class="link" href="config-tuning.html" title="Κεφάλαιο 12. Ρύθμιση και Βελτιστοποίηση">configure</a> network
+	    interfaces and other core FreeBSD subsystems.</p></li><li class="listitem"><p>Have a good understanding of
+	    <a class="link" href="network-communication.html" title="Μέρος IV. Δικτυακές Επικοινωνίες">FreeBSD
+	      networking</a>.</p></li></ul></div><p>The <acronym class="acronym">HAST</acronym> project was sponsored by The
+	FreeBSD Foundation with support from
+	<a class="link" href="http://www.omc.net/" target="_top">OMCnet Internet Service
+	  GmbH</a> and <a class="link" href="http://www.transip.nl/" target="_top">TransIP
+	  BV</a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91193680"></a>19.16.2. HAST Features</h3></div></div></div><p>The main features of the <acronym class="acronym">HAST</acronym> system
+	are:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Can be used to mask I/O errors on local hard
+	    drives.</p></li><li class="listitem"><p>File system agnostic as it works with any file
+	    system supported by FreeBSD.</p></li><li class="listitem"><p>Efficient and quick resynchronization, synchronizing
+	    only blocks that were modified during the downtime of a
+	    node.</p></li><li class="listitem"><p>Can be used in an already deployed environment to add
+	    additional redundancy.</p></li><li class="listitem"><p>Together with <acronym class="acronym">CARP</acronym>,
+	    <span class="application">Heartbeat</span>, or other tools, it
+	    can be used to build a robust and durable storage
+	    system.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91217104"></a>19.16.3. HAST Operation</h3></div></div></div><p>As <acronym class="acronym">HAST</acronym> provides a synchronous
+	block-level replication of any storage media to several
+	machines, it requires at least two physical machines:
+	the <code class="literal">primary</code>, also known as the
+	<code class="literal">master</code> node, and the
+	<code class="literal">secondary</code> or <code class="literal">slave</code>
+	node.  These two machines together are referred to as a
+	cluster.</p><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">HAST is currently limited to two cluster nodes in
+	  total.</p></div><p>Since <acronym class="acronym">HAST</acronym> works in a
+	primary-secondary configuration, it allows only one of the
+	cluster nodes to be active at any given time.  The
+	<code class="literal">primary</code> node, also called
+	<code class="literal">active</code>, is the one which will handle all
+	the I/O requests to <acronym class="acronym">HAST</acronym>-managed
+	devices.  The <code class="literal">secondary</code> node is
+	automatically synchronized from the <code class="literal">primary</code>
+	node.</p><p>The physical components of the <acronym class="acronym">HAST</acronym>
+	system are:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>local disk on primary node, and</p></li><li class="listitem"><p>disk on remote, secondary node.</p></li></ul></div><p><acronym class="acronym">HAST</acronym> operates synchronously on a block
+	level, making it transparent to file systems and applications.
+	<acronym class="acronym">HAST</acronym> provides regular GEOM providers in
+	<code class="filename">/dev/hast/</code> for use by
+	other tools or applications, thus there is no difference
+	between using <acronym class="acronym">HAST</acronym>-provided devices and
+	raw disks or partitions.</p><p>Each write, delete, or flush operation is sent to the
+	local disk and to the remote disk over TCP/IP.  Each read
+	operation is served from the local disk, unless the local disk
+	is not up-to-date or an I/O error occurs.  In such case, the
+	read operation is sent to the secondary node.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91232720"></a>19.16.3.1. Synchronization and Replication Modes</h4></div></div></div><p><acronym class="acronym">HAST</acronym> tries to provide fast failure
+	  recovery.  For this reason, it is very important to reduce
+	  synchronization time after a node's outage.  To provide fast
+	  synchronization, <acronym class="acronym">HAST</acronym> manages an on-disk
+	  bitmap of dirty extents and only synchronizes those during a
+	  regular synchronization, with an exception of the initial
+	  sync.</p><p>There are many ways to handle synchronization.
+	  <acronym class="acronym">HAST</acronym> implements several replication modes
+	  to handle different synchronization methods:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>memsync</em></span>: report write operation
+	      as completed when the local write operation is finished
+	      and when the remote node acknowledges data arrival, but
+	      before actually storing the data.  The data on the
+	      remote node will be stored directly after sending the
+	      acknowledgement.  This mode is intended to reduce
+	      latency, but still provides very good
+	      reliability.</p></li><li class="listitem"><p><span class="emphasis"><em>fullsync</em></span>: report write
+	      operation as completed when local write completes and
+	      when remote write completes.  This is the safest and the
+	      slowest replication mode.  This mode is the
+	      default.</p></li><li class="listitem"><p><span class="emphasis"><em>async</em></span>: report write operation
+	      as completed when local write completes.  This is the
+	      fastest and the most dangerous replication mode.  It
+	      should be used when replicating to a distant node where
+	      latency is too high for other modes.</p></li></ul></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91238992"></a>19.16.4. HAST Configuration</h3></div></div></div><p><acronym class="acronym">HAST</acronym> requires
+	<code class="literal">GEOM_GATE</code> support which is not present in
+	the default <code class="literal">GENERIC</code> kernel.  However, the
+	<code class="varname">geom_gate.ko</code> loadable module is available
+	in the default FreeBSD installation.  Alternatively, to build
+	<code class="literal">GEOM_GATE</code> support into the kernel
+	statically, add this line to the custom kernel configuration
+	file:</p><pre class="programlisting">options	GEOM_GATE</pre><p>The <acronym class="acronym">HAST</acronym> framework consists of several
+	parts from the operating system's point of view:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> daemon responsible for data
+	    synchronization,</p></li><li class="listitem"><p>the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastctl</span>(8)</span></a> userland management
+	    utility,</p></li><li class="listitem"><p>and the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hast.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hast.conf</span>(5)</span></a> configuration file.</p></li></ul></div><p>The following example describes how to configure two nodes
+	in <code class="literal">master</code>-<code class="literal">slave</code> /
+	<code class="literal">primary</code>-<code class="literal">secondary</code>
+	operation using <acronym class="acronym">HAST</acronym> to replicate the data
+	between the two.  The nodes will be called
+	<code class="literal">hasta</code> with an IP address of
+	<em class="replaceable"><code>172.16.0.1</code></em> and
+	<code class="literal">hastb</code> with an IP of address
+	<em class="replaceable"><code>172.16.0.2</code></em>.  Both nodes will have a
+	dedicated hard drive <code class="filename">/dev/ad6</code> of the same
+	size for <acronym class="acronym">HAST</acronym> operation.  The
+	<acronym class="acronym">HAST</acronym> pool, sometimes also referred to as a
+	resource or the GEOM provider in
+	<code class="filename">/dev/hast/</code>, will be called
+	<code class="filename">test</code>.</p><p>Configuration of <acronym class="acronym">HAST</acronym> is done using
+	<code class="filename">/etc/hast.conf</code>.  This file should be the
+	same on both nodes.  The simplest configuration possible
+	is:</p><pre class="programlisting">resource test {
+	on hasta {
+		local /dev/ad6
+		remote 172.16.0.2
+	}
+	on hastb {
+		local /dev/ad6
+		remote 172.16.0.1
+	}
+}</pre><p>For more advanced configuration, refer to
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hast.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hast.conf</span>(5)</span></a>.</p><div xmlns="" class="tip"><h3 class="admontitle">Υπόδειξη: </h3><p xmlns="http://www.w3.org/1999/xhtml">It is also possible to use host names in the
+	  <code class="literal">remote</code> statements.  In such a case, make
+	  sure that these hosts are resolvable and are defined in
+	  <code class="filename">/etc/hosts</code> or in the local
+	  <acronym class="acronym">DNS</acronym>.</p></div><p>Now that the configuration exists on both nodes,
+	the <acronym class="acronym">HAST</acronym> pool can be created.  Run these
+	commands on both nodes to place the initial metadata onto the
+	local disk and to start <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl create test</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>service hastd onestart</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">It is <span class="emphasis"><em>not</em></span> possible to use GEOM
+	  providers with an existing file system or to convert an
+	  existing storage to a <acronym class="acronym">HAST</acronym>-managed pool.
+	  This procedure needs to store some metadata on the provider
+	  and there will not be enough required space
+	  available on an existing provider.</p></div><p>A HAST node's <code class="literal">primary</code> or
+	<code class="literal">secondary</code> role is selected by an
+	administrator, or software like
+	<span class="application">Heartbeat</span>, using <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastctl</span>(8)</span></a>.
+	On the primary node,
+	<code class="literal">hasta</code>, issue
+	this command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl role primary test</code></strong></pre><p>Similarly, run this command on the secondary node,
+	<code class="literal">hastb</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl role secondary test</code></strong></pre><div xmlns="" class="caution"><h3 class="admontitle">Προσοχή: </h3><p xmlns="http://www.w3.org/1999/xhtml">When the nodes are unable to communicate with each
+	  other, and both are configured as primary nodes, the
+	  condition is called <code class="literal">split-brain</code>.  To
+	  troubleshoot this situation, follow the steps described in
+	  <a class="xref" href="disks-hast.html#disks-hast-sb" title="19.16.5.2. Recovering from the Split-brain Condition">Τμήμα 19.16.5.2, «Recovering from the Split-brain Condition»</a>.</p></div><p>Verify the result by running <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastctl</span>(8)</span></a> on each
+	node:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl status test</code></strong></pre><p>The important text is the <code class="literal">status</code> line,
+	which should say <code class="literal">complete</code>
+	on each of the nodes.  If it says <code class="literal">degraded</code>,
+	something went wrong.  At this point, the synchronization
+	between the nodes has already started.  The synchronization
+	completes when <code class="command">hastctl status</code>
+	reports 0 bytes of <code class="literal">dirty</code> extents.</p><p>The next step is to create a filesystem on the
+	<code class="filename">/dev/hast/test</code>
+	GEOM provider and mount it.  This must be done on the
+	<code class="literal">primary</code> node, as
+	<code class="filename">/dev/hast/test</code>
+	appears only on the <code class="literal">primary</code> node.  Creating
+	the filesystem can take a few minutes, depending on the size
+	of the hard drive:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/hast/test</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir /hast/test</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/hast/test /hast/test</code></strong></pre><p>Once the <acronym class="acronym">HAST</acronym> framework is configured
+	properly, the final step is to make sure that
+	<acronym class="acronym">HAST</acronym> is started automatically during
+	system boot.  Add this line to
+	<code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">hastd_enable="YES"</pre><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91297744"></a>19.16.4.1. Failover Configuration</h4></div></div></div><p>The goal of this example is to build a robust storage
+	  system which is resistant to the failure of any given node.
+	  The scenario is that a <code class="literal">primary</code> node of
+	  the cluster fails.  If this happens, the
+	  <code class="literal">secondary</code> node is there to take over
+	  seamlessly, check and mount the file system, and continue to
+	  work without missing a single bit of data.</p><p>To accomplish this task, another FreeBSD feature,
+	  <acronym class="acronym">CARP</acronym>, provides for automatic failover on
+	  the IP layer.  <acronym class="acronym">CARP</acronym> (Common
+	  Address Redundancy Protocol) allows multiple hosts on the
+	  same network segment to share an IP address.  Set up
+	  <acronym class="acronym">CARP</acronym> on both nodes of the cluster
+	  according to the documentation available in
+	  <a class="xref" href="carp.html" title="31.12. Common Access Redundancy Protocol (CARP)">Τμήμα 31.12, «Common Access Redundancy Protocol (CARP)»</a>.  After setup, each node will
+	  have its own <code class="filename">carp0</code> interface with a
+	  shared IP address of
+	  <em class="replaceable"><code>172.16.0.254</code></em>.  The primary
+	  <acronym class="acronym">HAST</acronym> node of the cluster must be the
+	  master <acronym class="acronym">CARP</acronym> node.</p><p>The <acronym class="acronym">HAST</acronym> pool created in the previous
+	  section is now ready to be exported to the other hosts on
+	  the network.  This can be accomplished by exporting it
+	  through <acronym class="acronym">NFS</acronym> or
+	  <span class="application">Samba</span>, using the shared IP
+	  address <em class="replaceable"><code>172.16.0.254</code></em>.  The only
+	  problem which remains unresolved is an automatic failover
+	  should the primary node fail.</p><p>In the event of <acronym class="acronym">CARP</acronym> interfaces going
+	  up or down, the FreeBSD operating system generates a
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> event, making it possible to watch for state
+	  changes on the <acronym class="acronym">CARP</acronym> interfaces.  A state
+	  change on the <acronym class="acronym">CARP</acronym> interface is an
+	  indication that one of the nodes failed or came back online.
+	  These state change events make it possible to run a script
+	  which will automatically handle the HAST failover.</p><p>To be able to catch state changes on the
+	  <acronym class="acronym">CARP</acronym> interfaces, add this
+	  configuration to
+	  <code class="filename">/etc/devd.conf</code> on each node:</p><pre class="programlisting">notify 30 {
+	match "system" "IFNET";
+	match "subsystem" "carp0";
+	match "type" "LINK_UP";
+	action "/usr/local/sbin/carp-hast-switch master";
+};
+
+notify 30 {
+	match "system" "IFNET";
+	match "subsystem" "carp0";
+	match "type" "LINK_DOWN";
+	action "/usr/local/sbin/carp-hast-switch slave";
+};</pre><p>Restart <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> on both nodes to put the new
+	  configuration into effect:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service devd restart</code></strong></pre><p>When the <code class="filename">carp0</code> interface state
+	  changes by going up or down , the system generates a
+	  notification, allowing the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> subsystem to run an
+	  arbitrary script, in this case
+	  <code class="filename">/usr/local/sbin/carp-hast-switch</code>.  This
+	  script handles the automatic failover.  For further
+	  clarification about the above <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> configuration,
+	  refer to <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devd.conf</span>(5)</span></a>.</p><p>An example of such a script could be:</p><pre class="programlisting">#!/bin/sh
+
+# Original script by Freddie Cash &lt;fjwcash@gmail.com&gt;
+# Modified by Michael W. Lucas &lt;mwlucas@BlackHelicopters.org&gt;
+# and Viktor Petersson &lt;vpetersson@wireload.net&gt;
+
+# The names of the HAST resources, as listed in /etc/hast.conf
+resources="test"
+
+# delay in mounting HAST resource after becoming master
+# make your best guess
+delay=3
+
+# logging
+log="local0.debug"
+name="carp-hast"
+
+# end of user configurable stuff
+
+case "$1" in
+	master)
+		logger -p $log -t $name "Switching to primary provider for ${resources}."
+		sleep ${delay}
+
+		# Wait for any "hastd secondary" processes to stop
+		for disk in ${resources}; do
+			while $( pgrep -lf "hastd: ${disk} \(secondary\)" &gt; /dev/null 2&gt;&amp;1 ); do
+				sleep 1
+			done
+
+			# Switch role for each disk
+			hastctl role primary ${disk}
+			if [ $? -ne 0 ]; then
+				logger -p $log -t $name "Unable to change role to primary for resource ${disk}."
+				exit 1
+			fi
+		done
+
+		# Wait for the /dev/hast/* devices to appear
+		for disk in ${resources}; do
+			for I in $( jot 60 ); do
+				[ -c "/dev/hast/${disk}" ] &amp;&amp; break
+				sleep 0.5
+			done
+
+			if [ ! -c "/dev/hast/${disk}" ]; then
+				logger -p $log -t $name "GEOM provider /dev/hast/${disk} did not appear."
+				exit 1
+			fi
+		done
+
+		logger -p $log -t $name "Role for HAST resources ${resources} switched to primary."
+
+
+		logger -p $log -t $name "Mounting disks."
+		for disk in ${resources}; do
+			mkdir -p /hast/${disk}
+			fsck -p -y -t ufs /dev/hast/${disk}
+			mount /dev/hast/${disk} /hast/${disk}
+		done
+
+	;;
+
+	slave)
+		logger -p $log -t $name "Switching to secondary provider for ${resources}."
+
+		# Switch roles for the HAST resources
+		for disk in ${resources}; do
+			if ! mount | grep -q "^/dev/hast/${disk} on "
+			then
+			else
+				umount -f /hast/${disk}
+			fi
+			sleep $delay
+			hastctl role secondary ${disk} 2&gt;&amp;1
+			if [ $? -ne 0 ]; then
+				logger -p $log -t $name "Unable to switch role to secondary for resource ${disk}."
+				exit 1
+			fi
+			logger -p $log -t $name "Role switched to secondary for resource ${disk}."
+		done
+	;;
+esac</pre><p>In a nutshell, the script takes these actions when a
+	  node becomes <code class="literal">master</code> /
+	  <code class="literal">primary</code>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Promotes the <acronym class="acronym">HAST</acronym> pools to
+	      primary on a given node.</p></li><li class="listitem"><p>Checks the file system under the
+	      <acronym class="acronym">HAST</acronym> pool.</p></li><li class="listitem"><p>Mounts the pools at an appropriate place.</p></li></ul></div><p>When a node becomes <code class="literal">backup</code> /
+	  <code class="literal">secondary</code>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Unmounts the <acronym class="acronym">HAST</acronym> pools.</p></li><li class="listitem"><p>Degrades the <acronym class="acronym">HAST</acronym> pools to
+	      secondary.</p></li></ul></div><div xmlns="" class="caution"><h3 class="admontitle">Προσοχή: </h3><p xmlns="http://www.w3.org/1999/xhtml">Keep in mind that this is just an example script which
+	    serves as a proof of concept.  It does not handle all the
+	    possible scenarios and can be extended or altered in any
+	    way, for example, to start/stop required services.</p></div><div xmlns="" class="tip"><h3 class="admontitle">Υπόδειξη: </h3><p xmlns="http://www.w3.org/1999/xhtml">For this example, a standard UFS file system was used.
+	    To reduce the time needed for recovery, a journal-enabled
+	    UFS or ZFS file system can be used instead.</p></div><p>More detailed information with additional examples can
+	  be found in the <a class="link" href="http://wiki.FreeBSD.org/HAST" target="_top">HAST Wiki</a>
+	  page.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91343056"></a>19.16.5. Troubleshooting</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91343696"></a>19.16.5.1. General Troubleshooting Tips</h4></div></div></div><p><acronym class="acronym">HAST</acronym> should generally work without
+	  issues.  However, as with any other software product, there
+	  may be times when it does not work as supposed.  The sources
+	  of the problems may be different, but the rule of thumb is
+	  to ensure that the time is synchronized between all nodes of
+	  the cluster.</p><p>When troubleshooting <acronym class="acronym">HAST</acronym> problems,
+	  the debugging level of <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> should be increased by
+	  starting <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> with <code class="literal">-d</code>.  This
+	  argument may be specified multiple times to further increase
+	  the debugging level.  A lot of useful information may be
+	  obtained this way.  Consider also using
+	  <code class="literal">-F</code>, which starts <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> in the
+	  foreground.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="disks-hast-sb"></a>19.16.5.2. Recovering from the Split-brain Condition</h4></div></div></div><p><code class="literal">Split-brain</code> is when the nodes of the
+	  cluster are unable to communicate with each other, and both
+	  are configured as primary.  This is a dangerous condition
+	  because it allows both nodes to make incompatible changes to
+	  the data.  This problem must be corrected manually by the
+	  system administrator.</p><p>The administrator must decide which node has more
+	  important changes (or merge them manually) and let
+	  <acronym class="acronym">HAST</acronym> perform full synchronization of the
+	  node which has the broken data.  To do this, issue these
+	  commands on the node which needs to be
+	  resynchronized:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl role init &lt;resource&gt;</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>hastctl create &lt;resource&gt;</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>hastctl role secondary &lt;resource&gt;</code></strong></pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="swap-encrypting.html">Προηγ</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Πάνω</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top">19.15. Encrypting Swap Space </td><td width="20%" align="center"><a accesskey="h" href="index.html">Αρχή</a></td><td width="40%" align="right" valign="top"> Κεφάλαιο 20. GEOM: Διαχείριση Συστοιχιών Δίσκων</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

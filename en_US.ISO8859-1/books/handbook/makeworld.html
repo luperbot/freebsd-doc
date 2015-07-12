@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>24.6. Rebuilding World</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Handbook" /><link rel="up" href="updating-upgrading.html" title="Chapter 24. Updating and Upgrading FreeBSD" /><link rel="prev" href="synching.html" title="24.5. Synchronizing Source" /><link rel="next" href="small-lan.html" title="24.7. Tracking for Multiple Machines" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">24.6. Rebuilding World</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="synching.html">Prev</a> </td><th width="60%" align="center">Chapter 24. Updating and Upgrading FreeBSD</th><td width="20%" align="right"> <a accesskey="n" href="small-lan.html">Next</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="makeworld"></a>24.6. Rebuilding World</h2></div></div></div><a id="idp82468816" class="indexterm"></a><p>Once the local source tree is synchronized against a
+      particular version of FreeBSD such as FreeBSD-STABLE or FreeBSD-CURRENT,
+      the source tree can be used to rebuild the system.  This process
+      is known as rebuilding world.</p><p><span class="emphasis"><em>Before</em></span> rebuilding world, be sure to
+      perform the following tasks:</p><div class="procedure"><a id="idp82470864"></a><div class="procedure-title">Procedure 24.1. Perform These Tasks <span class="emphasis"><em>Before</em></span>
+	Building World</div><ol class="procedure" type="1"><li class="step"><p>Backup all important data to another system or removable
+	  media, verify the integrity of the backup, and have a
+	  bootable installation media at hand.  It cannot be stressed
+	  enough how important it is to make a backup of the system
+	  <span class="emphasis"><em>before</em></span> rebuilding the system.  While
+	  rebuilding world is an easy task, there will inevitably be
+	  times when mistakes in the source tree render the system
+	  unbootable.  You will probably never have to use the backup,
+	  but it is better to be safe than sorry!</p></li><li class="step"><a id="idp82473296" class="indexterm"></a><p>Review the recent <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-stable" target="_top">freebsd-stable</a> or <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current" target="_top">freebsd-current</a>
+	  entries, depending upon the branch being tracked.  Be aware
+	  of any known problems and which systems are affected.  If a
+	  known issue affects the version of synchronized code, wait
+	  for an <span class="quote">&#8220;<span class="quote">all clear</span>&#8221;</span> announcement to be posted
+	  stating that the problem has been solved.  Resynchronize the
+	  sources to ensure that the local version of source has the
+	  needed fix.</p></li><li class="step"><p>Read <code class="filename">/usr/src/UPDATING</code> for any
+	  extra steps necessary for that version of the source.  This
+	  file contains important information about potential problems
+	  and may specify the order to run certain commands.  Many
+	  upgrades require specific additional steps such as renaming
+	  or deleting specific files prior to installing the new
+	  world.  These will be listed at the end of this file where
+	  the currently recommended upgrade sequence is explicitly
+	  spelled out.  If <code class="filename">UPDATING</code> contradicts
+	  any steps in this chapter, the instructions in
+	  <code class="filename">UPDATING</code> take precedence and should be
+	  followed.</p></li></ol></div><div xmlns="" class="warning"><h3 class="admontitle">Do Not Use <code xmlns="http://www.w3.org/1999/xhtml" class="command">make world</code>: </h3><p xmlns="http://www.w3.org/1999/xhtml">Some older documentation recommends using <code class="command">make
+	  world</code>.  However, that command skips some important
+	steps and should only be used by experts.  For almost all
+	circumstances <code class="command">make world</code> is the wrong thing
+	to do, and the procedure described here should be used
+	instead.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="canonical-build"></a>24.6.1. Overview of Process</h3></div></div></div><p>The build world process assumes an upgrade from an older
+	FreeBSD version using the source of a newer version that was
+	obtained using the instructions in <a class="xref" href="synching.html" title="24.5. Synchronizing Source">Section 24.5, &#8220;Synchronizing Source&#8221;</a>.</p><p>In FreeBSD, the term <span class="quote">&#8220;<span class="quote">world</span>&#8221;</span> includes the
+	kernel, core system binaries, libraries, programming files,
+	and built-in compiler.  The order in which these components
+	are built and installed is important.</p><p>For example, the old compiler might have a bug and not be
+	able to compile the new kernel.  Since the new kernel should
+	be built with the new compiler, the new compiler must be
+	built, but not necessarily installed, before the new kernel is
+	built.</p><p>The new world might rely on new kernel features, so the
+	new kernel must be installed before the new world is
+	installed.  The old world might not run correctly on the new
+	kernel, so the new world must be installed immediately upon
+	installing the new kernel.</p><p>Some configuration changes must be made before the new
+	world is installed, but others might break the old world.
+	Hence, two different configuration upgrade steps are used.
+	For the most part, the update process only replaces or adds
+	files and existing old files are not deleted.  Since this can
+	cause problems, <code class="filename">/usr/src/UPDATING</code> will
+	indicate if any files need to be manually deleted and at which
+	step to do so.</p><p>These concerns have led to the recommended upgrade
+	sequence described in the following procedure.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">It is a good idea to save the output from running
+	  <code class="command">make</code> to a file.  If something goes wrong,
+	  a copy of the error message can be posted to one of the FreeBSD
+	  mailing lists.</p><p xmlns="http://www.w3.org/1999/xhtml">The easiest way to do this is to use
+	  <code class="command">script</code> with a parameter that specifies
+	  the name of the file to save all output to.  Do not save the
+	  output to <code class="filename">/tmp</code> as this directory may be
+	  cleared at next reboot.  A better place to save the file is
+	  <code class="filename">/var/tmp</code>.  Run this command immediately
+	  before rebuilding the world, and then type
+	  <strong class="userinput"><code>exit</code></strong> when the process has
+	  finished:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>script <em class="replaceable"><code>/var/tmp/mw.out</code></em></code></strong>
+Script started, output file is /var/tmp/mw.out</pre></div><div class="procedure"><a id="idp82493136"></a><div class="procedure-title">Procedure 24.2. Overview of Build World Process</div><p>The commands used in the build world process should be
+	  run in the order specified here.  This section summarizes
+	  the function of each command.</p><ol class="procedure" type="1"><li class="step"><p>If the build world process has previously been run on
+	    this system, a copy of the previous build may still exist
+	    in <code class="filename">/usr/obj</code>.  To
+	    speed up the new build world process, and possibly save
+	    some dependency headaches, remove this directory if it
+	    already exists:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chflags -R noschg /usr/obj/*</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -rf /usr/obj</code></strong></pre></li><li class="step"><p>Compile the new compiler and a few related tools, then
+	    use the new compiler to compile the rest of the new world.
+	    The result is saved to <code class="filename">/usr/obj</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make buildworld</code></strong></pre></li><li class="step"><p>Use the new compiler residing in <code class="filename">/usr/obj</code> to build the new
+	    kernel, in order to protect against compiler-kernel
+	    mismatches.  This is necessary, as certain memory
+	    structures may have changed, and programs like
+	    <code class="command">ps</code> and <code class="command">top</code> will fail
+	    to work if the kernel and source code versions are not the
+	    same.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make buildkernel</code></strong></pre></li><li class="step"><p>Install the new kernel and kernel modules, making it
+	    possible to boot with the newly updated kernel.  If
+	    <code class="varname">kern.securelevel</code> has been raised above
+	    <code class="literal">1</code> <span class="emphasis"><em>and</em></span>
+	    <code class="literal">noschg</code> or similar flags have been set
+	    on the kernel binary, drop the system into single-user
+	    mode first.  Otherwise, this command can be run from
+	    multi-user mode without problems.  See <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> for
+	    details about <code class="varname">kern.securelevel</code> and
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chflags&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">chflags</span>(1)</span></a> for details about the various file
+	    flags.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make installkernel</code></strong></pre></li><li class="step"><p>Drop the system into single-user mode in order to
+	    minimize problems from updating any binaries that are
+	    already running.  It also minimizes any problems from
+	    running the old world on a new kernel.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown now</code></strong></pre><p>Once in single-user mode, run these commands if the
+	    system is formatted with UFS:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -u /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount -a -t ufs</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>swapon -a</code></strong></pre><p>If the system is instead formatted with ZFS, run these
+	    two commands.  This example assumes a zpool name of
+	    <code class="literal">zroot</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set readonly=off zroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs mount -a</code></strong></pre></li><li class="step"><p>Optional: If a keyboard mapping other than the default
+	    US English is desired, it can be changed with
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kbdmap&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">kbdmap</span>(1)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kbdmap</code></strong></pre></li><li class="step"><p>Then, for either file system, if the
+	    <acronym class="acronym">CMOS</acronym> clock is set to local time (this
+	    is true if the output of <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=date&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">date</span>(1)</span></a> does not show the
+	    correct time and zone), run:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>adjkerntz -i</code></strong></pre></li><li class="step"><p>Remaking the world will not update certain
+	    directories, such as <code class="filename">/etc</code>,
+	    <code class="filename">/var</code> and <code class="filename">/usr</code>,
+	    with new or changed configuration files.  The next step is
+	    to perform some initial configuration file updates
+	    to <code class="filename">/etc</code> in
+	    preparation for the new world.  The following command
+	    compares only those files that are essential for the
+	    success of <code class="buildtarget">installworld</code>.  For
+	    instance, this step may add new groups, system accounts,
+	    or startup scripts which have been added to FreeBSD since the
+	    last update.  This is necessary so that the
+	    <code class="buildtarget">installworld</code> step will be able
+	    to use any new system accounts, groups, and scripts.
+	    Refer to <a class="xref" href="makeworld.html#mergemaster" title="24.6.4. Merging Configuration Files">Section 24.6.4, &#8220;Merging Configuration Files&#8221;</a> for more detailed
+	    instructions about this command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mergemaster -p</code></strong></pre></li><li class="step"><p>Install the new world and system binaries from
+	    <code class="filename">/usr/obj</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld</code></strong></pre></li><li class="step"><p>Update any remaining configuration files.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mergemaster -iF</code></strong></pre></li><li class="step"><p>Delete any obsolete files.  This is important as they
+	    may cause problems if left on the disk.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make delete-old</code></strong></pre></li><li class="step"><p>A full reboot is now needed to load the new kernel and
+	    new world with the new configuration files.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>reboot</code></strong></pre></li><li class="step"><p>Make sure that all installed ports have first been
+	    rebuilt before old libraries are removed using the
+	    instructions in  <a class="xref" href="ports-using.html#ports-upgrading" title="5.5.3. Upgrading Ports">Section 5.5.3, &#8220;Upgrading Ports&#8221;</a>.  When
+	    finished, remove any obsolete libraries to avoid conflicts
+	    with newer ones.  For a more detailed description of this
+	    step, refer to <a class="xref" href="makeworld.html#make-delete-old" title="24.6.5. Deleting Obsolete Files and Libraries">Section 24.6.5, &#8220;Deleting Obsolete Files and Libraries&#8221;</a>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make delete-old-libs</code></strong></pre></li></ol></div><a id="idp82564432" class="indexterm"></a><p>If the system can have a window of down-time, consider
+	compiling the system in single-user mode instead of compiling
+	the system in multi-user mode, and then dropping into
+	single-user mode for the installation.  Reinstalling the
+	system touches a lot of important system files, all the
+	standard system binaries, libraries, and include files.
+	Changing these on a running system, particularly one with
+	active users, is asking for trouble.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="src-updating"></a>24.6.2. Configuration Files</h3></div></div></div><a id="idp82566224" class="indexterm"></a><p>This build world process uses several configuration
+	files.</p><p>The <code class="filename">Makefile</code> located in
+	<code class="filename">/usr/src</code> describes how the programs that
+	comprise FreeBSD should be built and the order in which they
+	should be built.</p><p>The options available to <code class="command">make</code> are
+	described in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=make.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">make.conf</span>(5)</span></a> and some common examples are
+	included in
+	<code class="filename">/usr/share/examples/etc/make.conf</code>.  Any
+	options which are added to <code class="filename">/etc/make.conf</code>
+	will control the how <code class="command">make</code> runs and builds
+	programs.  These options take effect every time
+	<code class="command">make</code> is used, including compiling
+	applications from the Ports Collection, compiling custom C
+	programs, or building the FreeBSD operating system.  Changes to
+	some settings can have far-reaching and potentially surprising
+	effects.  Read the comments in both locations and keep in mind
+	that the defaults have been chosen for a combination of
+	performance and safety.</p><a id="idp82580176" class="indexterm"></a><p>How the operating system is built from source code is
+	controlled by <code class="filename">/etc/src.conf</code>.  Unlike
+	<code class="filename">/etc/make.conf</code>, the contents of
+	<code class="filename">/etc/src.conf</code> only take effect when the
+	FreeBSD operating system itself is being built.  Descriptions of
+	the many options available for this file are shown in
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=src.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">src.conf</span>(5)</span></a>.  Be cautious about disabling seemingly
+	unneeded kernel modules and build options.  Sometimes there
+	are unexpected or subtle interactions.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="make-buildworld"></a>24.6.3. Variables and Targets</h3></div></div></div><p>The general format for using <code class="command">make</code> is as
+	follows:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -<em class="replaceable"><code>x</code></em> -D<em class="replaceable"><code>VARIABLE</code></em> <em class="replaceable"><code>target</code></em></code></strong></pre><p>In this example,
+	<code class="option">-<em class="replaceable"><code>x</code></em></code> is an option
+	passed to <code class="command">make</code>.  Refer to <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=make&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">make</span>(1)</span></a> for
+	examples of the available options.</p><p>To pass a variable, specify the variable name with
+	<code class="option">-D<em class="replaceable"><code>VARIABLE</code></em></code>.  The
+	behavior of the <code class="filename">Makefile</code> is controlled by
+	variables.  These can either be set in
+	<code class="filename">/etc/make.conf</code> or they can be specified
+	when using <code class="command">make</code>.  For example, this
+	variable specifies that profiled libraries should not be
+	built:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -DNO_PROFILE <em class="replaceable"><code>target</code></em></code></strong></pre><p>It corresponds with this setting in
+	<code class="filename">/etc/make.conf</code>:</p><pre class="programlisting">NO_PROFILE=    true     #    Avoid compiling profiled libraries</pre><p>The <em class="replaceable"><code>target</code></em> tells
+	<code class="command">make</code> what to do and the
+	<code class="filename">Makefile</code> defines the available targets.
+	Some targets are used by the build process to break out the
+	steps necessary to rebuild the system into a number of
+	sub-steps.</p><p>Having separate options is useful for two reasons.  First,
+	it allows for a build that does not affect any components of a
+	running system.  Because of this,
+	<code class="buildtarget">buildworld</code> can be safely run on a
+	machine running in multi-user mode.  It is still recommended
+	that <code class="buildtarget">installworld</code> be run in part in
+	single-user mode, though.</p><p>Secondly, it allows <acronym class="acronym">NFS</acronym> mounts to be
+	used to upgrade multiple machines on a network, as described
+	in <a class="xref" href="small-lan.html" title="24.7. Tracking for Multiple Machines">Section 24.7, &#8220;Tracking for Multiple Machines&#8221;</a>.</p><p>It is possible to specify <code class="option">-j</code> which will
+	cause <code class="command">make</code> to spawn several simultaneous
+	processes.  Since much of the compiling process is
+	<acronym class="acronym">I/O</acronym>-bound rather than
+	<acronym class="acronym">CPU</acronym>-bound, this is useful on both single
+	<acronym class="acronym">CPU</acronym> and multi-<acronym class="acronym">CPU</acronym>
+	machines.</p><p>On a single-<acronym class="acronym">CPU</acronym> machine, run the
+	following command to have up to 4 processes running at any one
+	time.  Empirical evidence posted to the mailing lists shows
+	this generally gives the best performance benefit.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -j4 buildworld</code></strong></pre><p>On a multi-<acronym class="acronym">CPU</acronym> machine, try values
+	between <code class="literal">6</code> and <code class="literal">10</code> to see
+	how they speed things up.</p><a id="idp82607696" class="indexterm"></a><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">If any variables were specified to <code class="command">make
+	    buildworld</code>, specify the same variables to
+	  <code class="command">make installworld</code>.  However,
+	  <code class="option">-j</code> must <span class="emphasis"><em>never</em></span> be used
+	  with <code class="buildtarget">installworld</code>.</p><p xmlns="http://www.w3.org/1999/xhtml">For example, if this command was used:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -DNO_PROFILE buildworld</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Install the results with:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -DNO_PROFILE installworld</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Otherwise, the second command will try to install
+	  profiled libraries that were not built during the
+	  <code class="command">make buildworld</code> phase.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mergemaster"></a>24.6.4. Merging Configuration Files</h3></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp82623056" class="indexterm"></a><p>FreeBSD provides the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mergemaster&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mergemaster</span>(8)</span></a> Bourne script to aid
+	in determining the differences between the configuration files
+	in <code class="filename">/etc</code>, and the configuration files in
+	<code class="filename">/usr/src/etc</code>.  This is the recommended
+	solution for keeping the system configuration files up to date
+	with those located in the source tree.</p><p>Before using <code class="command">mergemaster</code>, it is
+	recommended to first copy the existing
+	<code class="filename">/etc</code> somewhere safe.  Include
+	<code class="option">-R</code> which does a recursive copy and
+	<code class="option">-p</code> which preserves times and the ownerships
+	on files:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp -Rp /etc /etc.old</code></strong></pre><p>When run, <code class="command">mergemaster</code> builds a
+	temporary root environment, from <code class="filename">/</code> down,
+	and populates it with various system configuration files.
+	Those files are then compared to the ones currently installed
+	in the system.  Files that differ will be shown in
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> format, with the <code class="option">+</code> sign
+	representing added or modified lines, and <code class="option">-</code>
+	representing lines that will be either removed completely or
+	replaced with a new file.  Refer to <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> for more
+	information about how file differences are shown.</p><p>Next, <code class="command">mergemaster</code> will display each
+	file that differs, and present options to: delete the new
+	file, referred to as the temporary file, install the temporary
+	file in its unmodified state, merge the temporary file with
+	the currently installed file, or view the results
+	again.</p><p>Choosing to delete the temporary file will tell
+	<code class="command">mergemaster</code> to keep the current file
+	unchanged and to delete the new version.  This option is not
+	recommended.  To get help at any time, type
+	<span class="keycap"><strong>?</strong></span> at the <code class="command">mergemaster</code>
+	prompt.  If the user chooses to skip a file, it will be
+	presented again after all other files have been dealt
+	with.</p><p>Choosing to install the unmodified temporary file will
+	replace the current file with the new one.  For most
+	unmodified files, this is the best option.</p><p>Choosing to merge the file will present a text editor, and
+	the contents of both files.  The files can be merged by
+	reviewing both files side by side on the screen, and choosing
+	parts from both to create a finished product.  When the files
+	are compared side by side, <span class="keycap"><strong>l</strong></span> selects the left
+	contents and <span class="keycap"><strong>r</strong></span> selects contents from the
+	right.  The final output will be a file consisting of both
+	parts, which can then be installed.  This option is
+	customarily used for files where settings have been modified
+	by the user.</p><p>Choosing to view the results again will redisplay the file
+	differences.</p><p>After <code class="command">mergemaster</code> is done with the
+	system files, it will prompt for other options.  It may prompt
+	to rebuild the password file and will finish up with an option
+	to remove left-over temporary files.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="make-delete-old"></a>24.6.5. Deleting Obsolete Files and Libraries</h3></div><div><span class="authorgroup">Based on notes provided by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Anton</span> <span class="surname">Shterenlikht</span></span>. </span></div></div></div><a id="idp82649808" class="indexterm"></a><p>As a part of the FreeBSD development lifecycle, files and
+	their contents occasionally become obsolete.  This may be
+	because functionality is implemented elsewhere, the version
+	number of the library has changed, or it was removed from the
+	system entirely.  These obsoleted files, libraries, and
+	directories should be removed when updating the system.
+	This ensures that the system is not cluttered with old files
+	which take up unnecessary space on the storage and backup
+	media.  Additionally, if the old library has a security or
+	stability issue, the system should be updated to the newer
+	library to keep it safe and to prevent crashes caused by the
+	old library.  Files, directories, and libraries which are
+	considered obsolete are listed in
+	<code class="filename">/usr/src/ObsoleteFiles.inc</code>.  The
+	following instructions should be used to remove obsolete files
+	during the system upgrade process.</p><p>After the <code class="command">make installworld</code> and the
+	subsequent <code class="command">mergemaster</code> have finished
+	successfully, check for obsolete files and libraries:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make check-old</code></strong></pre><p>If any obsolete files are found, they can be deleted using
+	the following command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make delete-old</code></strong></pre><p>A prompt is displayed before deleting each obsolete file.
+	To skip the prompt and let the system remove these files
+	automatically, use
+	<code class="varname">BATCH_DELETE_OLD_FILES</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make -DBATCH_DELETE_OLD_FILES delete-old</code></strong></pre><p>The same goal can be achieved by piping these commands
+	through <code class="command">yes</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>yes|make delete-old</code></strong></pre><div xmlns="" class="warning"><h3 class="admontitle">Warning: </h3><p xmlns="http://www.w3.org/1999/xhtml">Deleting obsolete files will break applications that
+	  still depend on those obsolete files.  This is especially
+	  true for old libraries.  In most cases, the programs, ports,
+	  or libraries that used the old library need to be recompiled
+	  before <code class="command">make delete-old-libs</code> is
+	  executed.</p></div><p>Utilities for checking shared library dependencies include
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/libchk/pkg-descr">sysutils/libchk</a> and
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/bsdadminscripts/pkg-descr">sysutils/bsdadminscripts</a>.</p><p>Obsolete shared libraries can conflict with newer
+	libraries, causing messages like these:</p><pre class="screen">/usr/bin/ld: warning: libz.so.4, needed by /usr/local/lib/libtiff.so, may conflict with libz.so.5
+/usr/bin/ld: warning: librpcsvc.so.4, needed by /usr/local/lib/libXext.so, may conflict with librpcsvc.so.5</pre><p>To solve these problems, determine which port installed
+	the library:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pkg which /usr/local/lib/libtiff.so</code></strong>
+  /usr/local/lib/libtiff.so was installed by package tiff-3.9.4
+<code class="prompt">#</code> <strong class="userinput"><code>pkg which /usr/local/lib/libXext.so</code></strong>
+  /usr/local/lib/libXext.so was installed by package libXext-1.1.1,1</pre><p>Then deinstall, rebuild, and reinstall the port.  To
+	automate this process,
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/ports-mgmt/portmaster/pkg-descr">ports-mgmt/portmaster</a> can be used.  After
+	all ports are rebuilt and no longer use the old libraries,
+	delete the old libraries using the following command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make delete-old-libs</code></strong></pre><p>If something goes wrong, it is easy to rebuild a
+	particular piece of the system.  For example, if
+	<code class="filename">/etc/magic</code> was accidentally deleted as
+	part of the upgrade or merge of <code class="filename">/etc</code>,
+	<code class="command">file</code> will stop working.  To fix this,
+	run:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/usr.bin/file</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make all install</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="updating-questions"></a>24.6.6. Common Questions</h3></div></div></div><div class="variablelist"><dl class="variablelist"><dt><span class="term">Do I need to re-make the world for every
+	      change?</span></dt><dd><p>It depends upon the nature of the change.  For
+	      example, if <span class="application">svn</span> only shows
+	      the following files as being updated:</p><pre class="screen"><code class="filename">src/games/cribbage/instr.c</code>
+<code class="filename">src/games/sail/pl_main.c</code>
+<code class="filename">src/release/sysinstall/config.c</code>
+<code class="filename">src/release/sysinstall/media.c</code>
+<code class="filename">src/share/mk/bsd.port.mk</code></pre><p>it probably is not worth rebuilding the entire
+	      world.  Instead, go into the appropriate sub-directories
+	      and run <code class="command">make all install</code>.  But if
+	      something major changes, such as
+	      <code class="filename">src/lib/libc/stdlib</code>, consider
+	      rebuilding world.</p><p>Some users rebuild world every fortnight and let
+	      changes accumulate over that fortnight.  Others only
+	      re-make those things that have changed and are careful
+	      to spot all the dependencies.  It all depends on how
+	      often a user wants to upgrade and whether they are
+	      tracking FreeBSD-STABLE or FreeBSD-CURRENT.</p></dd><dt><span class="term">What would cause a compile to fail with lots of
+	    signal 11<a id="idp82685136" class="indexterm"></a>
+	    (or other signal number) errors?</span></dt><dd><p>This normally indicates a hardware problem.
+	      Building world is an effective way to stress test
+	      hardware, especially memory.  A sure indicator of a
+	      hardware issue is when <span class="application">make</span>
+	      is restarted and it dies at a different point in the
+	      process.</p><p>To resolve this error, swap out the components in
+	      the machine, starting with RAM, to determine which
+	      component is failing.</p></dd><dt><span class="term">Can <code class="filename">/usr/obj</code>
+	      be removed when finished?</span></dt><dd><p>This directory contains all the object files that
+	      were produced during the compilation phase.  Normally,
+	      one of the first steps in the <code class="command">make
+		buildworld</code> process is to remove this
+	      directory and start afresh.  Keeping
+	      <code class="filename">/usr/obj</code> around when finished makes
+	      little sense, and its removal frees up a approximately
+	      2GB of disk space.</p></dd><dt><span class="term">Can interrupted builds be resumed?</span></dt><dd><p>This depends on how far into the process the
+	      problem occurs.  In general, <code class="command">make
+		buildworld</code> builds new copies of essential
+	      tools and the system libraries.  These tools and
+	      libraries are then installed, used to rebuild
+	      themselves, and are installed again.  The rest of the
+	      system is then rebuilt with the new system
+	      tools.</p><p>During the last stage, it is fairly safe to run
+	      these commands as they will not undo the work of the
+	      previous <code class="command">make buildworld</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make -DNO_CLEAN all</code></strong></pre><p>If this message appears:</p><pre class="screen">--------------------------------------------------------------
+Building everything..
+--------------------------------------------------------------</pre><p>in the <code class="command">make buildworld</code> output,
+	      it is probably fairly safe to do so.</p><p>If that message is not displayed, it is always
+	      better to be safe than sorry and to restart the build
+	      from scratch.</p></dd><dt><span class="term">Is it possible to speed up making the world?</span></dt><dd><p>Several actions can speed up the build world
+	      process.  For example, the entire process can be run
+	      from single-user mode.  However, this will prevent users
+	      from having access to the system until the process is
+	      complete.</p><p>Careful file system design or the use of ZFS
+	      datasets can make a difference.  Consider putting
+	      <code class="filename">/usr/src</code> and
+	      <code class="filename">/usr/obj</code> on
+	      separate file systems.  If possible, place the file
+	      systems on separate disks on separate disk controllers.
+	      When mounting <code class="filename">/usr/src</code>, use
+	      <code class="option">noatime</code> which prevents the file system
+	      from recording the file access time.  If <code class="filename">/usr/src</code> is not on its
+	      own file system, consider remounting <code class="filename">/usr</code> with
+	      <code class="option">noatime</code>.</p><p>The file system holding <code class="filename">/usr/obj</code> can be mounted
+	      or remounted with <code class="option">async</code> so that disk
+	      writes happen asynchronously.  The write completes
+	      immediately, and the data is written to the disk a few
+	      seconds later.  This allows writes to be clustered
+	      together, and can provide a dramatic performance
+	      boost.</p><div xmlns="" class="warning"><h3 class="admontitle">Warning: </h3><p xmlns="http://www.w3.org/1999/xhtml">Keep in mind that this option makes the file
+		system more fragile.  With this option, there is an
+		increased chance that, should power fail, the file
+		system will be in an unrecoverable state when the
+		machine restarts.</p><p xmlns="http://www.w3.org/1999/xhtml">If <code class="filename">/usr/obj</code> is the only
+		directory on this file system, this is not a problem.
+		If you have other, valuable data on the same file
+		system, ensure that there are verified backups before
+		enabling this option.</p></div><p>Turn off profiling by setting
+	      <span class="quote">&#8220;<span class="quote">NO_PROFILE=true</span>&#8221;</span> in
+	      <code class="filename">/etc/make.conf</code>.</p><p>Pass <code class="option">-j<em class="replaceable"><code>n</code></em></code>
+	      to <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=make&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">make</span>(1)</span></a> to run multiple processes in parallel.
+	      This usually helps on both single- and multi-processor
+	      machines.</p></dd><dt><span class="term">What if something goes wrong?</span></dt><dd><p>First, make absolutely sure that the environment has
+	      no extraneous cruft from earlier builds:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chflags -R noschg /usr/obj/usr</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -rf /usr/obj/usr</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong></pre><p>Yes, <code class="command">make cleandir</code> really should
+	      be run twice.</p><p>Then, restart the whole process, starting with
+	      <code class="command">make buildworld</code>.</p><p>If problems persist, send the error and the output
+	      of <code class="command">uname -a</code> to <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-questions" target="_top">FreeBSD general questions mailing list</a>.  Be
+	      prepared to answer other questions about the
+	      setup!</p></dd></dl></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="synching.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="updating-upgrading.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="small-lan.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">24.5. Synchronizing Source </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 24.7. Tracking for Multiple Machines</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

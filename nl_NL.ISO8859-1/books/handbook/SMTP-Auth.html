@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>28.10. SMTP-authenticatie</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="mail.html" title="Hoofdstuk 28. Elektronische mail" /><link rel="prev" href="SMTP-dialup.html" title="28.9. Mail gebruiken met een inbelverbinding" /><link rel="next" href="mail-agents.html" title="28.11. Mail User Agents" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">28.10. SMTP-authenticatie</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="SMTP-dialup.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 28. Elektronische mail</th><td width="20%" align="right"> <a accesskey="n" href="mail-agents.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-Auth"></a>28.10. SMTP-authenticatie</h2></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">James</span> <span class="surname">Gorham</span></span>. </span></div></div></div><p>Het hebben van <acronym class="acronym">SMTP</acronym>-authenticatie op een
+      mailserver heeft een aantal voordelen.  <acronym class="acronym">SMTP</acronym>-
+      authenticatie kan een extra beveiligingslaag toevoegen aan
+      <span class="application">sendmail</span>, en het geeft mobiele
+      gebruikers die van hosts wisselen de mogelijkheid om dezelfde
+      mailserver te gebruiken zonder dat ze telkens de instellingen van
+      hun mailclient moeten veranderen.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Installeer <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>
+	  vanuit de ports.  Deze port is te vinden in
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>.  De
+	  port <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>
+	  ondersteund een aantal opties tijdens de compilatie.  Voor de
+	  SMTP-authenticatiemethode die hier gebruikt wordt, dient de
+	  optie <code class="option">LOGIN</code> te zijn uitgezet.</p></li><li class="step"><p>Voeg nadat <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>
+	  is geïnstalleerd deze regel toe aan <code class="filename">
+	    /usr/local/lib/sasl2/Sendmail.conf</code>:</p><pre class="programlisting">pwcheck_method: saslauthd</pre></li><li class="step"><p>Installeer vervolgens
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2-saslauthd/pkg-descr">security/cyrus-sasl2-saslauthd</a>,
+	  en voeg de volgende regel toe aan
+	  <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">saslauthd_enable="YES"</pre><p>en start vervolgens het saslauthd-daemon op:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service saslauthd start</code></strong></pre><p>Deze daemon fungeert als een onderhandelaar voor
+	  <span class="application">sendmail</span> die zich tegen de FreeBSD
+	  <code class="filename">passwd</code>-database authenticeert.  Dit
+	  bespaart de moeite van het opnieuw creëren van een nieuwe
+	  verzameling gebruikersnamen en wachtwoorden voor elke
+	  gebruiker die <acronym class="acronym">SMTP</acronym>-authenticatie nodig
+	  heeft, en het houdt de wachtwoorden voor het inloggen en de
+	  mail hetzelfde.</p></li><li class="step"><p>Voeg de volgende regels toe aan <code class="filename">/etc/make.conf
+	    </code>:</p><pre class="programlisting">SENDMAIL_CFLAGS=-I/usr/local/include/sasl -DSASL
+SENDMAIL_LDFLAGS=-L/usr/local/lib
+SENDMAIL_LDADD=-lsasl2</pre><p>Deze regels geven <span class="application">sendmail</span> de
+	  juiste instelopties om tijdens het compileren met <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/cyrus-sal2/pkg-descr">cyrus-sal2</a> te linken.  Zorg ervoor
+	  dat <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/cyrus-sasl2/pkg-descr">cyrus-sasl2</a> is
+	  geïnstalleerd voordat <span class="application">sendmail</span>
+	  wordt gehercompileerd.</p></li><li class="step"><p>Hercompileer <span class="application">sendmail</span> door de
+	  volgende opdrachten uit te voeren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libsmutil</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make obj &amp;&amp; make</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libsm</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make obj &amp;&amp; make</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/usr.sbin/sendmail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make obj &amp;&amp; make &amp;&amp; make install</code></strong></pre><p>Het compileren van <span class="application">sendmail</span> zou
+	  geen problemen moeten geven indien <code class="filename">/usr/src
+	    </code> niet veel veranderd is en dat de benodigde
+	  gedeelde bibliotheken aanwezig zijn.</p></li><li class="step"><p>Nadat <span class="application">sendmail</span> is gecompileerd
+	  en opnieuw is gecompileerd, dient <code class="filename">
+	    /etc/mail/freebsd.mc</code> (of het plaatselijke
+	  <code class="filename">.mc</code>-bestand) gewijzigd te worden.  Veel
+	  beheerders kiezen ervoor om de uitvoer van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hostname&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">hostname</span>(1)</span></a>
+	  als <code class="filename">.mc</code>-bestandsnaam te gebruiken vanwege
+	  de uniciteit.  Voeg deze regels toe:</p><pre class="programlisting">dnl set SASL options
+TRUST_AUTH_MECH(`GSSAPI DIGEST-MD5 CRAM-MD5 LOGIN')dnl
+define(`confAUTH_MECHANISMS', `GSSAPI DIGEST-MD5 CRAM-MD5 LOGIN')dnl</pre><p>Deze opties stellen de verschillende beschikbare methoden
+	  voor <span class="application">sendmail</span> in om gebruikers te
+	  authenticeren.  Gebruik de bijgeleverde documentatie indien
+	  een andere methode dan <span class="application">pwcheck</span>
+	  gewenst is.</p></li><li class="step"><p>Voer als laatste <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=make&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">make</span>(1)</span></a> in <code class="filename">/etc/mail
+	    </code> uit.  Hierdoor wordt het nieuwe <code class="filename">.mc
+	    </code>-bestand uitgevoerd en wordt een bestand <code class="filename">
+	    freebsd.cf</code> (of de plaatselijke variant ervan)
+	  aangemaakt.  Voer hierna de opdracht <code class="command">make install
+	    restart</code> uit, wat het bestand naar <code class="filename">
+	    sendmail.cf</code> kopieert en <span class="application">sendmail
+	    </span> op de juiste manier herstart.  In <code class="filename">
+	    /etc/mail/Makefile</code> staat meer informatie over dit
+	  proces.</p></li></ol></div><p>Indien alles goed is gegaan, moet het mogelijk zijn om de
+      inloginformatie in de mailclient in te voeren en een testbericht
+      te versturen.  Zet voor verdere onderzoekingen de <code class="option">LogLevel
+	</code> van <span class="application">sendmail</span> op 13 en houdt
+      <code class="filename">/var/log/maillog</code> in de gaten voor
+      foutmeldingen.</p><p>Refereer naar de <span class="application">sendmail</span>-pagina
+      betreffende <a class="link" href="http://www.sendmail.org/~ca/email/auth.html" target="_top">
+	<acronym class="acronym">SMTP</acronym>-authenticatie</a> voor meer
+      informatie.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="SMTP-dialup.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="mail-agents.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">28.9. Mail gebruiken met een inbelverbinding </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 28.11. Mail User Agents</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

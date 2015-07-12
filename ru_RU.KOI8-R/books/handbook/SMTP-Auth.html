@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>24.9. SMTP аутентификация</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="mail.html" title="Глава 24. Электронная почта" /><link rel="prev" href="SMTP-dialup.html" title="24.8. Использование почты с коммутируемым соединением" /><link rel="next" href="mail-agents.html" title="24.10. Почтовые программы пользователей" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">24.9. SMTP аутентификация</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="SMTP-dialup.html">Пред.</a> </td><th width="60%" align="center">Глава 24. Электронная почта</th><td width="20%" align="right"> <a accesskey="n" href="mail-agents.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-Auth"></a>24.9. SMTP аутентификация</h2></div><div><span class="authorgroup">Написал <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">James</span> <span class="surname">Gorham</span></span>. </span></div></div></div><p>Наличие <acronym class="acronym">SMTP</acronym> аутентификации на почтовом сервере
+      дает множество преимуществ.  <acronym class="acronym">SMTP</acronym> аутентификация
+      может добавить дополнительный уровень безопасности к
+      <span class="application">sendmail</span>, и позволяет мобильным пользователям,
+      подключающимся к разным хостам, возможность использовать тот же
+      почтовый сервер без необходимости перенастройки почтового клиента
+      при каждом подключении.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Установите
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>
+	  из портов.  Вы можете найти этот порт в
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>.
+	  В пакете <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>
+	  есть множество параметров компиляции.  Для используемого здесь
+	  метода SMTP аутентификации убедитесь, что параметр
+	  <code class="option">LOGIN</code> не отключен.</p></li><li class="step"><p>После установки
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2/pkg-descr">security/cyrus-sasl2</a>,
+	  отредактируйте <code class="filename">/usr/local/lib/sasl2/Sendmail.conf</code>
+	  (или создайте его если он не существует) и добавьте следующую
+	  строку:</p><pre class="programlisting">pwcheck_method: saslauthd</pre></li><li class="step"><p>Затем установите
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/cyrus-sasl2-saslauthd/pkg-descr">security/cyrus-sasl2-saslauthd</a>
+	  и добавьте в <code class="filename">/etc/rc.conf</code> следующую
+	  строку:</p><pre class="programlisting">saslauthd_enable="YES"</pre><p>а затем запустите saslauthd:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service saslauthd start</code></strong></pre><p>Этот даемон является посредником для аутентификации
+	  <span class="application">sendmail</span> через базу данных
+	  <code class="filename">passwd</code> FreeBSD.  Это позволяет избежать
+	  проблем, связанных с созданием нового набора имен пользователей
+	  и паролей для каждого пользователя, которому необходима
+	  <acronym class="acronym">SMTP</acronym> аутентификация, пароль для входа в систему
+	  и для отправки почты будет одним и тем же.</p></li><li class="step"><p>Теперь отредактируйте <code class="filename">/etc/make.conf</code> и
+	  добавьте следующие строки:</p><pre class="programlisting">SENDMAIL_CFLAGS=-I/usr/local/include/sasl -DSASL
+SENDMAIL_LDFLAGS=-L/usr/local/lib
+SENDMAIL_LDADD=-lsasl2</pre><p>Эти параметры необходимы <span class="application">sendmail</span>
+	  для подключения <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/cyrus-sasl2/pkg-descr">cyrus-sasl2</a>
+	  во время компиляции.  Убедитесь, что <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/cyrus-sasl2/pkg-descr">cyrus-sasl2</a> был установлен до
+	  перекомпиляции <span class="application">sendmail</span>.</p></li><li class="step"><p>Перекомпилируйте <span class="application">sendmail</span>, выполнив
+	  следующие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libsmutil</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make obj &amp;&amp; make</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libsm</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make obj &amp;&amp; make</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/usr.sbin/sendmail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make obj &amp;&amp; make &amp;&amp; make install</code></strong></pre><p>Компиляция <span class="application">sendmail</span> должна пройти
+	  без проблем, если <code class="filename">/usr/src</code> не был сильно
+	  изменен и доступны необходимые разделяемые библиотеки.</p></li><li class="step"><p>После компилирования и переустановки
+	  <span class="application">sendmail</span>, отредактируйте файл
+	  <code class="filename">/etc/mail/freebsd.mc</code> (или тот файл, который
+	  используется в качестве <code class="filename">.mc</code>; многие
+	  администраторы используют в качестве имени этого файла
+	  вывод <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hostname&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">hostname</span>(1)</span></a> для обеспечения уникальности).
+	  Добавьте к нему следующие строки:</p><pre class="programlisting">dnl set SASL options
+TRUST_AUTH_MECH(`GSSAPI DIGEST-MD5 CRAM-MD5 LOGIN')dnl
+define(`confAUTH_MECHANISMS', `GSSAPI DIGEST-MD5 CRAM-MD5 LOGIN')dnl</pre><p>Эти параметры настраивают различные методы, доступные
+	  <span class="application">sendmail</span> для аутентификации пользователей.
+	  Если вы хотите использовать вместо
+	  <span class="application">pwcheck</span> другой метод, обратитесь к
+	  прилагаемой документации.</p></li><li class="step"><p>Наконец, запустите <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=make&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">make</span>(1)</span></a> в каталоге
+	  <code class="filename">/etc/mail</code>.  Из файла
+	  <code class="filename">.mc</code> будет создан файл
+	  <code class="filename">.cf</code>, называющийся
+	  <code class="filename">freebsd.cf</code> (или с тем именем, которое было
+	  использовано для файла <code class="filename">.mc</code>).  Затем
+	  используйте команду <code class="command">make install restart</code>,
+	  которая скопирует файл в <code class="filename">sendmail.cf</code>,
+	  и правильно перезапустит <span class="application">sendmail</span>.
+	  Дополнительная информация об этом процессе находится в
+	  <code class="filename">/etc/mail/Makefile</code>.</p></li></ol></div><p>Если все шаги пройдены успешно, введите информацию для
+      аутентификации в настройки почтового клиента и отправьте тестовое
+      сообщение.  Для определения причин возможных ошибок установите
+      параметр <span class="application">sendmail</span>
+      <code class="option">LogLevel</code> в 13 и просмотрите
+      <code class="filename">/var/log/maillog</code>.</p><p>За дальнейшей информацией обратитесь к странице
+      <span class="application">sendmail</span>, посвященной
+      <a class="link" href="http://www.sendmail.org/~ca/email/auth.html" target="_top">
+      <acronym class="acronym">SMTP</acronym> аутентификации</a>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="SMTP-dialup.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="mail-agents.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">24.8. Использование почты с коммутируемым соединением </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 24.10. Почтовые программы пользователей</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

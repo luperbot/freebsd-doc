@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>6.5. MAC 框架的内核体系结构</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="mac.html" title="第 6 章 TrustedBSD MAC 框架" /><link rel="prev" href="mac-background.html" title="6.4. 安全策略背景知识" /><link rel="next" href="mac-policy-architecture.html" title="6.6. MAC策略模块体系结构" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6.5. MAC 框架的内核体系结构</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-background.html">上一页</a> </td><th width="60%" align="center">第 6 章 TrustedBSD MAC 框架</th><td width="20%" align="right"> <a accesskey="n" href="mac-policy-architecture.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-framework-kernel-arch"></a>6.5. MAC 框架的内核体系结构</h2></div></div></div><p>TrustedBSD MAC 框架为大多数的访问控制模块提供基本设施，允许它们以内核模块的形式灵活地扩展系统中实施的安全策略。
+      如果系统中同时加载了多个策略，MAC 框架将负责将各个策略的授权结果以一种（某种程度上）有意义的方式组合，形成最后的决策。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-elements"></a>6.5.1. 内核元素</h3></div></div></div><p>MAC 框架由下列内核元素组成：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>框架管理接口</p></li><li class="listitem"><p>并发与同步原语</p></li><li class="listitem"><p>策略注册</p></li><li class="listitem"><p>内核对象的扩展性安全标记</p></li><li class="listitem"><p>策略入口函数的组合操作</p></li><li class="listitem"><p>标记管理原语</p></li><li class="listitem"><p>由内核服务调用的入口函数 API</p></li><li class="listitem"><p>策略模块的入口函数 API</p></li><li class="listitem"><p>入口函数的实现（包括策略生命周期管理、标记管理和访问控制检查三部分）</p></li><li class="listitem"><p>管理策略无关标记的系统调用</p></li><li class="listitem"><p>复用的<code class="function">mac_syscall()</code> 系统调用</p></li><li class="listitem"><p>以 MAC 的策略加载模块形式实现的各种安全策略</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-management"></a>6.5.2. 框架管理接口</h3></div></div></div><p>对 TrustedBSD MAC 框架进行直接管理的方式有三种:通过 sysctl 子系统、通过 loader 配置, 或者使用系统调用。</p><p>多数情况下，与同一个内核内部变量相关联的 sysctl 变量和 loader 参数的名字是相同的，
+        通过设置它们，可以控制保护措施的实施细节，比如，某个策略在各个内核子系统中的实施与否等等。
+        另外，如果在内核编译时选择支持 MAC 调试选项，内核将维护若干计数器以跟踪标记的分配使用情况。
+        通常不建议在实用环境下通过在不同子系统上设置不同的变量或参数来实施控制，因为这种方法将会作用于系统中所有的活跃策略。
+        如果希望对具体策略实施管理而不相影响其他活跃策略,则应当使用策略级别的控制，因为这种方法的控制粒度更细，
+        并能更好地保证策略模块的功能一致性。</p><p>与其他内核模块一样，系统管理员可以通过系统的模块管理系统调用和其他系统接口，包括 boot loader 变量，对策略模块执行加载与卸载操作；
+        策略模块可以在加载时,设置加载标志,来指示系统对其加载、卸载操作进行相应控制，比如阻止非期望的卸载操作。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-synchronization"></a>6.5.3. 策略链表的并发与同步</h3></div></div></div><p>在运行时,系统中活跃的策略集合可能发生变化，然而对策略入口函数的使用操作并不是原子性的，因此，当某一个入口函数正被使用时，
+        系统需要提供额外的同步机制来阻止对该策略模块的加载与卸载，以确保当前活跃的策略集合不会在此过程中发生改变。
+        通过使用"框架忙”计数器,就可以做到这一点：一旦某个入口函数被调用，计数器的值被增加1；而每当一个入口函数调用结束时，计数器的值被减少1。
+        检查计数器的值，如果其值为正，框架将阻止对策略链表的修改操作，请求操作的线程将被迫进入睡眠，直到计数器的值重新减少到0为止。
+        计数器本身由一个互斥锁保护，同时结合一个条件变量(用于唤醒等待对策略链表进行修改操作的睡眠线程)。
+        采用这种同步模型的一个副作用是，在同一个策略模块内部，允许嵌套地调用框架，不过这种情况其实很少出现。</p><p>为了减少由于采用计数器引入的额外开销，设计者采用了各种优化措施。其中包括，当策略链表为空或者其中仅含有静态表项
+        （那些只能在系统运行之前加载而且不能动态卸载的策略）时，框架不对计数器进行操作，其值总是为0，从而将此时的同步开销减到0。
+        另一个极端的办法是，使用一个编译选项来禁止在运行时对加载的策略链表进行修改，此时不再需要对策略链表的使用进行同步保护。</p><p>因为 MAC 框架不允许在某些入口函数之内阻塞，所以不能使用普通的睡眠锁。
+        故而，加载或卸载操作可能会为等待框架空闲而被阻塞相当长的一段时间。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-label-synchronization"></a>6.5.4. 标记同步</h3></div></div></div><p>MAC 框架必须对其负责维护的安全属性标记的存储访问提供同步保护。下列两种情形，可能导致对安全属性标记的不一致访问：
+       第一，作为安全属性标记的持有者，内核对象本身可能同时被多个线程访问；第二，MAC 框架代码是可重入的，
+       即允许多个线程同时在框架内执行。通常，MAC 框架使用内核对象数据上已有的内核同步机制来保护该其上附加的 MAC 安全标记。
+       例如，套接字上的 MAC 标记由已有的套接字互斥锁保护。类似的，对于安全标记的并发访问的过程与对其所在对象进行的并发访问在语义上是一样的，
+       例如，信任状安全标记,将保持与该数据结构中其他内容一致的"写时复制"的更新过程。
+       MAC 框架在引用一个内核对象时，将首先对访问该对象上的标记需要用到的锁进行断言。
+       策略模块的编写者必须了解这些同步语义， 因为它们可能会限制对安全标记所能进行的访问类型。
+       举个例子，如果通过入口函数传给策略模块的是对某个信任状的只读引用，那么在策略内部，只能读该结构对应的标记状态。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-policy-synchronization"></a>6.5.5. 策略间的同步与并发</h3></div></div></div><p>FreeBSD 内核是一个可抢占式的内核，因此，作为内核一部分的策略模块也必须是可重入的，也就是说，
+       在开发策略模块时必须假设多个内核线程可以同时通过不同的入口函数进入该模块。
+       如果策略模块使用可被修改的内核状态，那么还需要在策略内部使用恰当的同步原语，确保在策略内部的多个线程不会因此观察到不一致的内核状态，
+       从而避免由此产生的策略误操作。为此，策略可以使用 FreeBSD 现有的同步原语，包括互斥锁、睡眠锁、条件变量和计数信号量。
+	对这些同步原语的使用必须慎重，需要特别注意两点：第一，保持现有的内核上锁次序；
+       第二，在非睡眠的入口函数之内不要使用互斥锁和唤醒操作。</p><p>为避免违反内核上锁次序或造成递归上锁，策略模块在调用其他内核子系统之前，通常要释放所有在策略内部申请的锁。
+       这样做的结果是，在全局上锁次序形成的拓朴结构中，策略内部的锁总是作为叶子节点，
+       从而保证了这些锁的使用不会导致由于上锁次序混乱造成的死锁。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-registration"></a>6.5.6. 策略注册</h3></div></div></div><p>为了记录当前使用的策略模块集合，MAC 框架维护两个链表：一个静态链表和一个动态链表。
+       两个链表的数据结构和操作基本相同，只是动态链表还额外使用了一个"引用计数"以同步对其的访问操作。
+       当包含 MAC 框架策略的内核模块被加载时，该策略模块会通过 <code class="literal">SYSINIT</code> 调用一个注册函数；
+       相对应的，每当一个策略模块被卸载，<code class="literal">SYSINIT</code> 也会调用一个注销函数。
+       只有当遇到下列情况之一时，注册过程才会失败： 一个策略模块被加载多次，或者系统资源不足不能满足注册过程的需要（
+       例如，策略模块需要对内核对象添加标记而可用资源不足），或者其他的策略加载前提条件不满足（有些策略要求只能在系统引导之前加载）。
+       类似的，如果一个策略被标记为不可卸载的，对其调用注销过程将会失败。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-entrypoints"></a>6.5.7. 入口函数</h3></div></div></div><p>内核服务与 MAC 框架之间进行交互有两种途径：
+	一是，内核服务调用一系列 API 通知 MAC 框架安全事件的发生；
+	二是，内核服务向 MAC 框架提供一个指向安全对象的策略无关安全标记数据结构的指针。
+	标记指针由 MAC 框架经由标记管理入口函数进行维护，
+	并且，只要对管理相关对象的内核子系统稍作修改，就可以允许 MAC 框架向策略模块提供标记服务。
+	例如，在进程、进程信任状、套接字、管道、Mbuf、网络接口、IP 重组队列和其他各种安全相关的数据结构中均增加了指向安全标记的指针。
+	另外，当需要做出重要的安全决策时，内核服务也会调用 MAC 框架，以便各个策略模块根据其自己的标准（可以使用存储在安全标记中的数据）完善这些决策。
+	绝大多数安全相关的关键决策是显式的访问控制检查；
+	也有少数涉及更加一般的决策函数，比如，套接字的数据包匹配和程序执行时刻的标记转换。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-composition"></a>6.5.8. 策略组合</h3></div></div></div><p>如果内核中同时加载了多个策略模块，这些策略的决策结果将由框架使用一个合成运算子来进行组合汇总，得出最终的结果。
+	目前，该算子是硬编码的，并且只有当所有的活跃策略均对请求表示同意时才会返回成功。
+	由于各个策略返回的出错条件可能并不相同（成功、访问被拒绝、请求对象不存在等等），
+	需要使用一个选择子先从各个策略返回的错误条件集合中选择出一个作为最终返回结果。
+	一般情况下，与“访问被拒绝”相比，将更倾向于选择“请求对象不存在”。
+	尽管不能从理论上保证合成结果的有效性与安全性，但试验结果表明，对于许多实用的策略集合来说，事实的确如此。
+	例如，传统的可信系统常常采用类似的方法对多个安全策略进行组合。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-labels"></a>6.5.9. 标记支持</h3></div></div></div><p>与许多需要给对象添加安全标记的访问控制扩展一样，MAC 框架为各种用户可见的对象提供了一组用于管理策略无关标记的系统调用。
+	常用的标记类型有，partition标识符、机密性标记、完整性标记、区间（非等级类别）、域、角色和型。
+	“策略无关”的意思是指，标记的语法与使用它的具体策略模块无关，而同时策略模块能够完全独立地定义和使用与对象相关联的元数据的语义。
+	用户应用程序提供统一格式的基于字符串的标记，由使用它的策略模块负责解析其内在含义并决定其外在表示。
+	如果需要，应用程序可以使用多重标记元素。</p><p>内存中的标记实例被存放在由 slab 分配的<code class="varname">struct label</code>数据结构中。
+       该结构是一个固定长度的数组，每个元素是由一个 <code class="literal">void *</code>
+	指针和一个 <code class="literal">long</code>组成的联合结构。
+	申请标记存储的策略模块在向 MAC 注册时，将被分配一个“slot”值，作为框架分配给其使用的策略标记元素在整个标记存储结构中的位置索引。
+	而所分配的存储空间的语义则完全由该策略模块来决定：MAC 框架向策略模块提供了一系列入口函数用于对内核对象生命周期的各种事件进行控制，包括，
+	对象的初始化、标记的关联/创建和对象的注销。使用这些接口，可以实现诸如访问计数等存储模型。
+	MAC 框架总是给入口函数传入一个指向相关对象的指针和一个指向该对象标记的指针，因此，策略模块能够直接访问标记而无需知悉该对象的内部结构。
+	唯一的例外是进程信任状结构，指向其标记的指针必须由策略模块手动解析计算。今后的 MAC 框架实现可能会对此进行改进。</p><p>初始化入口函数通常有一个睡眠标志位，用来表明一个初始化操作是否允许中途睡眠等待；
+	如果不允许，则可能会失败返回，并要求撤销此次标记分配操作（乃至对象分配操作）。
+	例如，如果在网络栈上处理中断时因为不允许睡眠或者调用者持有一个互斥锁，就可能出现这种情况。
+	考虑到在处理中的网络数据包（Mbufs）上维护标记的性能损失太大，策略必须就自己对 Mbuf 进行标记的要求向 MAC 框架做出特别声明。
+	动态加载到系统中而又使用标记的策略必须为处理未被其初始化函数处理过的对象作好准备，
+	这些对象在策略加载之前就已经存在,故而无法在初始化时调用策略的相关函数进行处理。
+	MAC 框架向策略保证，没有被初始化的标记 slot 的值必为0或者 NULL，策略可以借此检测到未初始化的标记。
+	需要注意的是，因为对 Mbuf 标记的存储分配是有条件的，因此需要使用其标记的动态加载策略还可能需要处理 Mbuf 中值为 NULL 的标记指针。</p><p>对于文件系统对象的标记，MAC 框架在文件的扩展属性中为其分配永久存储。
+	只要可能，扩展属性的原子化的事务操作就被用于保证对 vnode 上安全标记的复合更新操作的一致性－－目前，该特性只被 UFS2 文件系统支持。
+	为了实现细粒度的文件系统对象标记（即每个文件系统对象一个标记），策略编写者可能选择使用一个（或者若干）扩展属性块。
+	为了提高性能，	vnode 数据结构中有一个标记 (<code class="literal">v_label</code>)字段，用作磁盘标记的缓冲；
+	vnode 结构实例化时，策略可以将标记值装入该缓冲，并在需要时对其进行更新。
+	如此，不必在每次进行访问控制检查时，均无条件地访问磁盘上的扩展属性。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">目前，如果一个使用标记的策略允许被动态卸载，则卸载该模块之后,其状态 slot 尚无法被系统回收重用，
+       由此导致了 MAC 框架对标记策略卸载－重载操作数目上的严格限制。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-framework-kernel-arch-syscalls"></a>6.5.10. 相关系统调用</h3></div></div></div><p>MAC 框架向应用程序提供了一组系统调用：其中大多数用于向进行查询和修改策略无关标记操作的应用 API提供支持。</p><p>这些标记管理系统调用，接受一个标记描述结构， <code class="varname">struct mac</code>，作为输入参数。
+       这个结构的主体是一个数组，其中每个元素包含了一个应用级的 MAC 标记形式。每个元素又由两部分组成:一个字符串名字，和其对应的值。
+	每个策略可以向系统声明一个特定的元素名字，这样一来，如果需要，就可以将若干个相互独立的元素作为一个整体进行处理。
+	策略模块经由入口函数，在内核标记和用户提供的标记之间作翻译转换的工作，这种实现提供了标记元素语义上的高度灵活性。
+	标记管理系统调用通常有对应的库函数包装，这些包装函数可以提供内存分配和错误处理功能，从而简化了用户应用程序的标记管理工作。</p><p>目前的FreeBSD 内核提供了下列 MAC 相关的系统调用：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">mac_get_proc()</code> 用于查询当前进程的安全标记。</p></li><li class="listitem"><p><code class="function">mac_set_proc()</code> 用于请求改变当前进程的安全标记。</p></li><li class="listitem"><p><code class="function">mac_get_fd()</code> 用于查询由文件描述符所引用的对象（ 文件、
+	  套接字、 管道文件等等） 的安全标记。</p></li><li class="listitem"><p><code class="function">mac_get_file()</code> 用于查询由文件系统路径所描述的对象的安全标记。</p></li><li class="listitem"><p><code class="function">mac_set_fd()</code> 用于请求改变由文件描述符所引用的对象（
+	  文件、套接字、 管道文件等等） 的安全标记。</p></li><li class="listitem"><p><code class="function">mac_set_file()</code> 用于请求改变由文件系统路径所描述的对象的安全标记。</p></li><li class="listitem"><p><code class="function">mac_syscall()</code> 通过复用该系统调用,策略模块能够在不修改系统调用表的前提下创建新的系统调用；
+	  其调用参数包括：目标策略名字、 操作编号和将被该策略内部使用的参数。</p></li><li class="listitem"><p><code class="function">mac_get_pid()</code> 用于查询由进程号指定的另一个进程的安全标记。</p></li><li class="listitem"><p><code class="function">mac_get_link()</code> 与
+	    <code class="function">mac_get_file()</code> 功能相同，
+	    只是当路径参数的最后一项为符号链接时，
+	    前者将返回该符号链接的安全标记，
+	    而后者将返回其所指文件的安全标记。</p></li><li class="listitem"><p><code class="function">mac_set_link()</code> 与
+	    <code class="function">mac_set_file()</code> 功能相同，
+	    只是当路径参数的最后一项为符号链接时，
+	    前者将设置该符号链接的安全标记，
+	    而后者将设置其所指文件的安全标记。</p></li><li class="listitem"><p><code class="function">mac_execve()</code> 与
+	    <code class="function">execve()</code> 功能类似，
+	    只是前者还可以在开始执行一个新程序时,根据传入的请求参数,设置执行进程的安全标记。
+	    由于执行一个新程序而导致的进程安全标记的改变,被称为“转换”。</p></li><li class="listitem"><p><code class="function">mac_get_peer()</code>，
+	  通过一个套接字选项自动实现，
+	  用于查询一个远程套接字对等实体的安全标记。</p></li></ul></div><p>除了上述系统调用之外，
+      也可以通过 <code class="literal">SIOCSIGMAC</code> 和 <code class="literal">SIOCSIFMAC</code>
+      网络接口的 ioctl 类系统调用来查询和设置网络接口的安全标记。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-background.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-policy-architecture.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">6.4. 安全策略背景知识 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 6.6. MAC策略模块体系结构</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

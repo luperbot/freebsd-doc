@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>16.14. Implementing a Secure Environment with MAC</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 使用手冊" /><link rel="up" href="mac.html" title="章 16. Mandatory Access Control" /><link rel="prev" href="mac-lomac.html" title="16.13. The MAC LOMAC Module" /><link rel="next" href="MAC-examplehttpd.html" title="16.15. Another Example: Using MAC to Constrain a Web Server" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">16.14. Implementing a Secure Environment with MAC</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-lomac.html">前一頁</a> </td><th width="60%" align="center">章 16. Mandatory Access Control</th><td width="20%" align="right"> <a accesskey="n" href="MAC-examplehttpd.html">下一頁</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-implementing"></a>16.14. Implementing a Secure Environment with MAC</h2></div></div></div><a id="idp79866704" class="indexterm"></a><p>The following demonstration will implement a secure
+      environment using various <acronym class="acronym">MAC</acronym> modules
+      with properly configured policies.  This is only a test and
+      should not be considered the complete answer to everyone's
+      security woes.  Just implementing a policy and ignoring it
+      never works and could be disastrous in a production
+      environment.</p><p>Before beginning this process, the
+      <code class="literal">multilabel</code> option must be set on each file
+      system as stated at the beginning of this chapter.  Not doing
+      so will result in errors.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79869008"></a>16.14.1. Create an insecure User Class</h3></div></div></div><p>Begin the procedure by adding the following user class
+       to the <code class="filename">/etc/login.conf</code> file:</p><pre class="programlisting">insecure:\
+:copyright=/etc/COPYRIGHT:\
+:welcome=/etc/motd:\
+:setenv=MAIL=/var/mail/$,BLOCKSIZE=K:\
+:path=~/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+:manpath=/usr/share/man /usr/local/man:\
+:nologin=/usr/sbin/nologin:\
+:cputime=1h30m:\
+:datasize=8M:\
+:vmemoryuse=100M:\
+:stacksize=2M:\
+:memorylocked=4M:\
+:memoryuse=8M:\
+:filesize=8M:\
+:coredumpsize=8M:\
+:openfiles=24:\
+:maxproc=32:\
+:priority=0:\
+:requirehome:\
+:passwordtime=91d:\
+:umask=022:\
+:ignoretime@:\
+:label=partition/13,mls/5:</pre><p>And adding the following line to the default user
+	class:</p><pre class="programlisting">:label=mls/equal,biba/equal,partition/15:</pre><p>Once this is completed, the following command must be
+	issued to rebuild the database:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79873104"></a>16.14.2. Boot with the Correct Modules</h3></div></div></div><p>Add the following lines to
+	<code class="filename">/boot/loader.conf</code> so the required
+	modules will load during system initialization:</p><pre class="programlisting">mac_biba_load="YES"
+mac_mls_load="YES"
+mac_seeotheruids_load="YES"
+mac_partition_load="YES"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79875024"></a>16.14.3. Set All Users to Insecure</h3></div></div></div><p>All user accounts that are not <code class="systemitem">root</code>
+	or system users will now require a login class.  The login
+	class is required otherwise users will be refused access
+	to common commands such as <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a>.
+	The following <code class="command">sh</code> script should do the
+	trick:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>for x in `awk -F: '($3 &gt;= 1001) &amp;&amp; ($3 != 65534) { print $1 }' \</code></strong>
+	<strong class="userinput"><code>/etc/passwd`; do pw usermod $x -L insecure; done;</code></strong></pre><p>The <code class="command">cap_mkdb</code> command will need to be
+	run on <code class="filename">/etc/master.passwd</code> after this
+	change.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79880272"></a>16.14.4. Complete the Configuration</h3></div></div></div><p>A contexts file should now be created; the following
+	example was taken from Robert Watson's example policy and
+	should be placed in
+	<code class="filename">/etc/policy.contexts</code>.</p><pre class="programlisting"># This is the default BIBA/MLS policy for this system.
+
+.*                              biba/high,mls/high
+/sbin/dhclient                  biba/high(low),mls/high(low)
+/dev(/.*)?                      biba/equal,mls/equal
+# This is not an exhaustive list of all "privileged" devices.
+/dev/mdctl                      biba/high,mls/high
+/dev/pci                        biba/high,mls/high
+/dev/k?mem                      biba/high,mls/high
+/dev/io                         biba/high,mls/high
+/dev/agp.*                      biba/high,mls/high
+(/var)?/tmp(/.*)?               biba/equal,mls/equal
+/tmp/\.X11-unix                 biba/high(equal),mls/high(equal)
+/tmp/\.X11-unix/.*              biba/equal,mls/equal
+/proc(/.*)?                     biba/equal,mls/equal
+/mnt.*                          biba/low,mls/low
+(/usr)?/home                    biba/high(low),mls/high(low)
+(/usr)?/home/.*                 biba/low,mls/low
+/var/mail(/.*)?                 biba/low,mls/low
+/var/spool/mqueue(/.*)?         biba/low,mls/low
+(/mnt)?/cdrom(/.*)?             biba/high,mls/high
+(/usr)?/home/(ftp|samba)(/.*)?  biba/high,mls/high
+/var/log/sendmail\.st           biba/low,mls/low
+/var/run/utmp                   biba/equal,mls/equal
+/var/log/(lastlog|wtmp)         biba/equal,mls/equal</pre><p>This policy will enforce security by setting restrictions
+	on both the downward and upward flow of information with
+	regards to the directories and utilities listed on the
+	left.</p><p>This can now be read into our system by issuing the
+	following command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /usr</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">The above file system layout may be different depending
+	  on environment.</p></div><p>The <code class="filename">/etc/mac.conf</code> file requires
+	the following modifications in the main section:</p><pre class="programlisting">default_labels file ?biba,?mls
+default_labels ifnet ?biba,?mls
+default_labels process ?biba,?mls,?partition
+default_labels socket ?biba,?mls</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79890768"></a>16.14.5. Testing the Configuration</h3></div></div></div><a id="idp79891408" class="indexterm"></a><p>Add a user with the <code class="command">adduser</code> command
+	and place that user in the <code class="literal">insecure</code>
+	class for these tests.</p><p>The examples below will show a mix of
+	<code class="systemitem">root</code> and regular user tests; use the
+	prompt to distinguish between the two.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79894352"></a>16.14.5.1. Basic Labeling Tests</h4></div></div></div><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>getpmac</code></strong>
+biba/15(15-15),mls/15(15-15),partition/15
+<code class="prompt">#</code> <strong class="userinput"><code>setpmac partition/15,mls/equal top</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">The top process will be killed before we start
+	    another top process.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79897552"></a>16.14.5.2. MAC Seeotheruids Tests</h4></div></div></div><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+biba/15(15-15),mls/15(15-15),partition/15  1096 #C:  S      0:00.03 -su (bash)
+biba/15(15-15),mls/15(15-15),partition/15  1101 #C:  R+     0:00.01 ps Zax</pre><p>We should not be permitted to see any processes
+	  owned by other users.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79899728"></a>16.14.5.3. MAC Partition Test</h4></div></div></div><p>Disable the <acronym class="acronym">MAC</acronym>
+	  <code class="literal">seeotheruids</code> policy for the rest of these
+	  tests:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl security.mac.seeotheruids.enabled=0</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+LABEL                                                   PID  TT  STAT      TIME COMMAND
+  biba/equal(low-high),mls/equal(low-high),partition/15  1122 #C:  S+     0:00.02 top
+  biba/15(15-15),mls/15(15-15),partition/15              1096 #C:  S      0:00.05 -su (bash)
+  biba/15(15-15),mls/15(15-15),partition/15              1123 #C:  R+     0:00.01 ps Zax</pre><p>All users should be permitted to see every process in
+	  their partition.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79908048"></a>16.14.5.4. Testing Biba and MLS Labels</h4></div></div></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac partition/15,mls/equal,biba/high\(high-high\) top</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+LABEL                                                   PID  TT  STAT    TIME   COMMAND
+  biba/high(high-high),mls/equal(low-high),partition/15   1251 #C:  S+     0:00.02 top
+  biba/15(15-15),mls/15(15-15),partition/15               1096 #C:  S      0:00.06 -su (bash)
+  biba/15(15-15),mls/15(15-15),partition/15               1157 #C:  R+     0:00.00 ps Zax</pre><p>The Biba policy allows us to read higher-labeled
+	  objects.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac partition/15,mls/equal,biba/low top</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+LABEL                                       PID  TT  STAT      TIME COMMAND
+  biba/15(15-15),mls/15(15-15),partition/15  1096 #C:  S      0:00.07 -su (bash)
+  biba/15(15-15),mls/15(15-15),partition/15  1226 #C:  R+     0:00.01 ps Zax</pre><p>The Biba policy does not allow lower-labeled objects
+	  to be read; however, <acronym class="acronym">MLS</acronym> does.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ifconfig bge0 | grep maclabel</code></strong>
+maclabel biba/low(low-low),mls/low(low-low)
+<code class="prompt">%</code> <strong class="userinput"><code>ping -c 1 192.0.34.166</code></strong>
+PING 192.0.34.166 (192.0.34.166): 56 data bytes
+ping: sendto: Permission denied</pre><p>Users are unable to ping
+	  <code class="systemitem">example.com</code>, or any domain
+	  for that matter.</p><p>To prevent this error from occurring, run the following
+	  command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl security.mac.biba.trust_all_interfaces=1</code></strong></pre><p>This sets the default interface label to insecure mode,
+	  so the default Biba policy label will not be enforced.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bge0 maclabel biba/equal\(low-high\),mls/equal\(low-high\)</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ping -c 1 192.0.34.166</code></strong>
+PING 192.0.34.166 (192.0.34.166): 56 data bytes
+64 bytes from 192.0.34.166: icmp_seq=0 ttl=50 time=204.455 ms
+--- 192.0.34.166 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 204.455/204.455/204.455/0.000 ms</pre><p>By setting a more correct label, we can issue
+	  <code class="command">ping</code> requests.</p><p>Now to create a few files for some read and write
+	  testing procedures:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch test1 test2 test3 test4 test5</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>getfmac test1</code></strong>
+test1: biba/equal,mls/equal
+<code class="prompt">#</code> <strong class="userinput"><code>setfmac biba/low test1 test2; setfmac biba/high test4 test5; \
+  setfmac mls/low test1 test3; setfmac mls/high test2 test4</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfmac mls/equal,biba/equal test3 &amp;&amp; getfmac test?</code></strong>
+test1: biba/low,mls/low
+test2: biba/low,mls/high
+test3: biba/equal,mls/equal
+test4: biba/high,mls/high
+test5: biba/high,mls/equal
+<code class="prompt">#</code> <strong class="userinput"><code>chown testuser:testuser test?</code></strong></pre><p>All of these files should now be owned by our
+	  <code class="systemitem">testuser</code> user.  And now for some read
+	  tests:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ls</code></strong>
+test1   test2   test3   test4   test5
+<code class="prompt">%</code> <strong class="userinput"><code>ls test?</code></strong>
+ls: test1: Permission denied
+ls: test2: Permission denied
+ls: test4: Permission denied
+test3   test5</pre><p>We should not be permitted to observe pairs; e.g.:
+	  <code class="literal">(biba/low,mls/low)</code>,
+	  <code class="literal">(biba/low,mls/high)</code> and
+	  <code class="literal">(biba/high,mls/high)</code>.  And of course,
+	  read access should be denied.  Now for some write
+	  tests:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>for i in `echo test*`; do echo 1 &gt; $i; done</code></strong>
+-su: test1: Permission denied
+-su: test4: Permission denied
+-su: test5: Permission denied</pre><p>Like with the read tests, write access should not be
+	  permitted to write pairs; e.g.:
+	  <code class="literal">(biba/low,mls/high)</code> and
+	  <code class="literal">(biba/equal,mls/equal)</code>.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cat test?</code></strong>
+cat: test1: Permission denied
+cat: test2: Permission denied
+1
+cat: test4: Permission denied</pre><p>And now as <code class="systemitem">root</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat test2</code></strong>
+1</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-lomac.html">前一頁</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">上一層</a></td><td width="40%" align="right"> <a accesskey="n" href="MAC-examplehttpd.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">16.13. The MAC LOMAC Module </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 16.15. Another Example: Using MAC to Constrain a Web Server</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>21.2. Het Z File System (ZFS)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="filesystems.html" title="Hoofdstuk 21. Ondersteuning van bestandssystemen" /><link rel="prev" href="filesystems.html" title="Hoofdstuk 21. Ondersteuning van bestandssystemen" /><link rel="next" href="filesystems-linux.html" title="21.3. Linux® bestandssystemen" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.2. Het Z File System (ZFS)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="filesystems.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 21. Ondersteuning van bestandssystemen</th><td width="20%" align="right"> <a accesskey="n" href="filesystems-linux.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="filesystems-zfs"></a>21.2. Het Z File System (ZFS)</h2></div></div></div><p>Het Z File System, ontwikkeld door <span class="trademark">Sun</span>&#8482;, is een
+      nieuwe technologie ontwikkeld om gebruik te maken van een
+      pool-gebaseerde opslagmethode.  Dit houdt in dat ruimte pas
+      wordt gebruikt wanneer het nodig is voor dataopslag.  Verder is
+      het ontworpen voor maximale integriteit van gegevens,
+      ondersteuning van gegevens-snapshots, meerdere kopieën, en
+      gegevenschecksums.  Ook is een nieuw gegevensreplicatiemodel,
+      bekend als <acronym class="acronym">RAID</acronym>-Z, toegevoegd;
+      <acronym class="acronym">RAID</acronym>-Z lijkt op <acronym class="acronym">RAID</acronym>5,
+      maar is ontworpen om corruptie tijdens het schrijven van
+      gegevens te voorkomen.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81499088"></a>21.2.1. ZFS tuning</h3></div></div></div><p>Het <acronym class="acronym">ZFS</acronym> subsysteem maakt gebruik van
+	veel systeembronnen waardoor het nodig kan zijn een en ander
+	af te stellen, zodat voor het dagelijks gebruik maximale
+	efficiëntie wordt behaald.  Doordat het een
+	experimentele eigenschap van FreeBSD is, kan dit in de nabije
+	toekomst veranderen; op dit moment echter, worden de volgende
+	stappen aangeraden.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81500496"></a>21.2.1.1. Geheugen</h4></div></div></div><p>De totale hoeveelheid systeemgeheugen dient minstens
+	  één gigabyte te zijn, maar twee gigabytes of meer
+	  wordt aanbevolen.  In alle voorbeelden hier heeft het systeem
+	  één gigabyte geheugen, met verschillende andere
+	  afstelmechanismen in werking.</p><p>Sommigen hebben succes gehad met minder dan een
+	  gigabyte geheugen, maar met een dergelijke, beperkte
+	  hoeveelheid geheugen is de kans groot dat onder zware
+	  belasting een kernelpanic in FreeBSD op zal treden door uitputting
+	  van het geheugen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81502032"></a>21.2.1.2. Kernelconfiguratie</h4></div></div></div><p>Het wordt aangeraden om ongebruikte
+	  stuurprogramma's en opties te verwijderen uit het
+	  kernelconfiguratiebestand.  Omdat de meeste
+	  stuurprogramma's beschikbaar zijn als modules kunnen ze
+	  alsnog worden geladen door middel van het bestand
+	  <code class="filename">/boot/loader.conf</code>.</p><p>Gebruikers van de <span class="trademark">i386</span>&#8482;-architectuur dienen de volgende
+	  optie aan hun kernelconfiguratiebestand toe te voegen, de
+	  kernel opnieuw te compileren, en opnieuw op te
+	  starten:</p><pre class="programlisting">options		KVA_PAGES=512</pre><p>Deze optie vergroot de kerneladresruimte, waarmee het
+	  mogelijk wordt gemaakt om de <code class="varname">vm.kvm_size</code>
+	  afstelling hoger dan de huidige limiet van 1 GB
+	  (2 GB voor <acronym class="acronym">PAE</acronym>) in te stellen.
+	  Deel, om de meest geschikte waarde voor deze optie te
+	  vinden, de gewenste hoeveelheid adresruimte door vier (4).
+	  In dit geval is dat <code class="literal">512</code> voor
+	  2 GB.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81506256"></a>21.2.1.3. Loader tunables</h4></div></div></div><p>De <code class="filename">kmem</code> adresruimte dient te
+	  worden vergroot op alle FreeBSD architecturen.  Op het
+	  testsysteem met één gigabyte fysiek geheugen werd
+	  succes behaald met de volgende opties, die in het bestand
+	  <code class="filename">/boot/loader.conf</code> geplaatst dienen te
+	  worden, waarna het systeem opnieuw moet worden
+	  opgestart:</p><pre class="programlisting">vm.kmem_size="330M"
+vm.kmem_size_max="330M"
+vfs.zfs.arc_max="40M"
+vfs.zfs.vdev.cache.size="5M"</pre><p>Zie voor een meer gedetailleerde lijst van aanbevelingen
+	  aangaande ZFS-afstelling:
+	  <code class="uri"><a class="uri" href="http://wiki.freebsd.org/ZFSTuningGuide" target="_top">http://wiki.freebsd.org/ZFSTuningGuide</a></code>
+	  .</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81509712"></a>21.2.2. Gebruik maken van <acronym class="acronym">ZFS</acronym></h3></div></div></div><p>Er is een opstartmechanisme dat FreeBSD in staat stelt om
+	<acronym class="acronym">ZFS</acronym> pools te mounten tijdens initialisatie van
+	het systeem.  Voer de volgende commando's uit om dit in te
+	stellen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'zfs_enable="YES"' &gt;&gt; /etc/rc.conf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>service zfs start</code></strong></pre><p>In het resterende deel van dit document wordt aangenomen
+	dat er drie <acronym class="acronym">SCSI</acronym>-schijven beschikbaar zijn,
+	en dat hun apparaatnamen respectievelijk
+	<code class="filename">da0</code>,
+	<code class="filename">da1</code> en
+	<code class="filename">da2</code> zijn.
+	Gebruikers van <acronym class="acronym">IDE</acronym>-hardware kunnen de
+	<code class="filename">ad</code>
+	apparaten gebruiken in plaats van
+	<acronym class="acronym">SCSI</acronym>-apparaten.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81524560"></a>21.2.2.1. Een pool op een enkele schijf</h4></div></div></div><p>Voer het commando <code class="command">zpool</code> uit om een simpele,
+	  niet-redundante <acronym class="acronym">ZFS</acronym>-pool op een enkele schijf aan
+	  te maken:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create example /dev/da0</code></strong></pre><p>Bestudeer de uitvoer van het commando
+	  <code class="command">df</code> om de nieuwe pool te zien:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem  1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a   2026030  235230  1628718    13%    /
+devfs               1       1        0   100%    /dev
+/dev/ad0s1d  54098308 1032846 48737598     2%    /usr
+example      17547136       0 17547136     0%    /example</pre><p>In deze uitvoer wordt duidelijk dat de
+	  <code class="literal">example</code>-pool niet alleen is aangemaakt,
+	  maar ook direct <span class="emphasis"><em>gemount</em></span> is.  Hij is ook
+	  toegankelijk, net als een gewoon bestandssysteem; er kunnen
+	  bestanden op worden aangemaakt en gebruikers kunnen er op
+	  rondkijken zoals in het volgende voorbeeld:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /example</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>touch testfile</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls -al</code></strong>
+total 4
+drwxr-xr-x   2 root  wheel    3 Aug 29 23:15 .
+drwxr-xr-x  21 root  wheel  512 Aug 29 23:12 ..
+-rw-r--r--   1 root  wheel    0 Aug 29 23:15 testfile</pre><p>Helaas benut deze pool nog geen
+	  <acronym class="acronym">ZFS</acronym>-mogelijkheden.  Maak een bestandssysteem
+	  aan op deze pool en activeer er compressie op:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set compression=gzip example/compressed</code></strong></pre><p><code class="literal">example/compressed</code> is nu een
+	  gecomprimeerd <acronym class="acronym">ZFS</acronym>-bestandssysteem.  Probeer
+	  er een paar grote bestanden naartoe te kopiëren door ze
+	  naar <code class="filename">/example/compressed</code>
+	  te kopiëren.</p><p>De compressie kan nu worden uitgeschakeld met:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set compression=off example/compressed</code></strong></pre><p>Voer het volgende commando uit om het bestandssysteem te
+	  unmounten, en controleer dat daarna met
+	  <code class="command">df</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs umount example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem  1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a   2026030  235232  1628716    13%    /
+devfs               1       1        0   100%    /dev
+/dev/ad0s1d  54098308 1032864 48737580     2%    /usr
+example      17547008       0 17547008     0%    /example</pre><p>Mount het bestandssysteem opnieuw om het weer
+	  toegankelijk te maken en controleer met
+	  <code class="command">df</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs mount example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a          2026030  235234  1628714    13%    /
+devfs                      1       1        0   100%    /dev
+/dev/ad0s1d         54098308 1032864 48737580     2%    /usr
+example             17547008       0 17547008     0%    /example
+example/compressed  17547008       0 17547008     0%    /example/compressed</pre><p>De pool en het bestandssysteem zijn ook zichtbaar in de
+	  uitvoer van <code class="command">mount</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+/dev/ad0s1a on / (ufs, local)
+devfs on /dev (devfs, local)
+/dev/ad0s1d on /usr (ufs, local, soft-updates)
+example on /example (zfs, local)
+example/data on /example/data (zfs, local)
+example/compressed on /example/compressed (zfs, local)</pre><p>Zoals is te zien kunnen
+	  <acronym class="acronym">ZFS</acronym>-bestandssystemen, nadat ze zijn
+	  gecreëerd, net als gewone bestandssystemen worden
+	  gebruikt; er zijn echter ook vele andere mogelijkheden
+	  beschikbaar.  In het volgende voorbeeld wordt er een nieuw
+	  bestandssysteem <code class="literal">data</code> gecreëerd.
+	  Er zullen belangrijke bestanden op worden bewaard, dus het
+	  bestandssysteem wordt zodanig ingesteld dat het twee
+	  kopieën van ieder gegevensblok opslaat:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create example/data</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set copies=2 example/data</code></strong></pre><p>Het is nu mogelijk om het gegevens- en ruimtegebruik te
+	  bekijken door <code class="command">df</code> opnieuw te
+	  draaien:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a          2026030  235234  1628714    13%    /
+devfs                      1       1        0   100%    /dev
+/dev/ad0s1d         54098308 1032864 48737580     2%    /usr
+example             17547008       0 17547008     0%    /example
+example/compressed  17547008       0 17547008     0%    /example/compressed
+example/data        17547008       0 17547008     0%    /example/data</pre><p>Merk op dat ieder bestandssysteem in de pool dezelfde
+	  hoeveelheid vrije ruimte heeft.  Dit is de reden dat
+	  <code class="command">df</code> steeds wordt gebruikt tussen de
+	  voorbeelden door, om te laten zien dat de bestandssystemen
+	  slechts zoveel ruimte gebruiken als ze nodig hebben en
+	  allemaal putten uit dezelfde pool.
+	  Het <acronym class="acronym">ZFS</acronym> bestandssysteem elimineert
+	  concepten als volumes en partities, en staat verschillende
+	  bestandssystemen toe om in dezelfde pool te bestaan.
+	  Verwijder nu de bestandssystemen en verwijder daarna de pool,
+	  omdat deze niet meer nodig zijn:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs destroy example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs destroy example/data</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool destroy example</code></strong></pre><p>Schijven gaan slechter werken en begeven het, een
+	  onvermijdelijke eigenschap.  Wanneer de schijf stukgaat
+	  zullen de gegevens verloren gaan.  Een methode om
+	  gegevensverlies ten gevolge van een kapotte harde schijf te
+	  vermijden is het implementeren van <acronym class="acronym">RAID</acronym>.
+	  <acronym class="acronym">ZFS</acronym> ondersteunt deze mogelijkheid in zijn
+	  pool-ontwerp en wordt beschreven in de volgende
+	  sectie.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81559632"></a>21.2.2.2. <acronym class="acronym">ZFS</acronym> RAID-Z</h4></div></div></div><p>Zoals eerder opgemerkt wordt in deze sectie aangenomen
+	  dat er drie <acronym class="acronym">SCSI</acronym>-schijven bestaan als de
+	  apparaten <code class="filename">da0</code>, <code class="filename">da1</code>
+	  en <code class="filename">da2</code> (of <code class="filename">ad0</code> en
+	  hoger als IDE-schijven worden gebruikt).  Voer het volgende commando
+	  uit om een <acronym class="acronym">RAID</acronym>-Z-pool te creëren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create storage raidz da0 da1 da2</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="trademark">Sun</span>&#8482; raadt aan om tussen de drie en negen schijven te gebruiken
+	    voor een <acronym class="acronym">RAID</acronym>-Z-configuratie.  Overweeg, als u
+	    een enkele pool met 10 of meer schijven nodig heeft, om deze te
+	    splitsen in kleine <acronym class="acronym">RAID</acronym>-Z-groepen.  Overweeg, als
+	    u slechts twee schijven heeft en nog steeds redundantie nodig heeft,
+	    om in plaats hiervan een <acronym class="acronym">ZFS</acronym>-spiegel te
+	    gebruiken.  Bekijk de handleidingpagina <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zpool&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zpool</span>(8)</span></a> voor meer
+	    details.</p></div><p>De <code class="literal">storage</code> zpool zou gecreëerd
+	  moeten zijn.  Dit kan worden geverifieerd met de
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mount&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mount</span>(8)</span></a> en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> commando's zoals eerder.  Er
+	  kunnen meer schijfapparaten worden toegewezen door ze aan het
+	  einde van de bovenstaande lijst toe te voegen.
+	  Maak een nieuw bestandssysteem in de pool, genaamd
+	  <code class="literal">home</code>, waar op den duur de
+	  gebruikersbestanden geplaatst zullen worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create storage/home</code></strong></pre><p>Het is nu mogelijk om compressie in te schakelen en extra
+	  kopieën te bewaren van de gebruikersmappen en
+	  -bestanden.  Dit kan net als eerder worden bewerkstelligd
+	  door de volgende commando's uit te voeren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set copies=2 storage/home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set compression=gzip storage/home</code></strong></pre><p>Kopieer, om dit als de nieuwe home-map voor gebruikers in
+	  te stellen, de gebruikersgegevens naar deze map en
+	  creëer de benodigde links:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp -rp /home/* /storage/home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -rf /home /usr/home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /storage/home /home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /storage/home /usr/home</code></strong></pre><p>De gebruikersgegevens zouden nu op het nieuw aangemaakte
+	  <code class="filename">/storage/home</code>
+	  bestandssysteem moeten staan.  Test dit door een nieuwe
+	  gebruiker aan te maken en daarmee in te loggen.</p><p>Probeer een snapshot te maken dat later weer hersteld kan
+	  worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot storage/home@08-30-08</code></strong></pre><p>Merk op dat de snapshot-optie alleen een echt
+	  bestandssysteem vastlegt, geen mappen of bestanden.  Het
+	  <code class="literal">@</code>-karakter wordt gebruikt als
+	  scheidingsteken tussen de naam van het bestandssysteem of de
+	  naam van het volume.  Wanneer de home-map van een gebruiker
+	  wordt weggegooid, kan deze worden hersteld met:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs rollback storage/home@08-30-08</code></strong></pre><p>Voer <code class="command">ls</code> in de
+	  <code class="filename">.zfs/snapshot</code>
+	  directory van het bestandssysteem uit om een lijst van alle
+	  beschikbare snapshots te krijgen.  Voer, om bijvoorbeeld
+	  het zojuist gemaakte snapshot te zien, het volgende commando
+	  uit:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /storage/home/.zfs/snapshot</code></strong></pre><p>Het is mogelijk om een script te schrijven dat
+	  maandelijks een snapshot van de gebruikersgegevens maakt; na
+	  verloop van tijd kunnen snapshots echter een grote
+	  hoeveelheid schrijfruimte in beslag nemen.  Het vorige
+	  snapshot kan worden verwijderd met het volgende
+	  commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs destroy storage/home@08-30-08</code></strong></pre><p>Na al dit testen is er geen reden om
+	  <code class="filename">/storage/home</code> in zijn
+	  huidige staat nog te bewaren.  Maak er het echte
+	  <code class="filename">/home</code>
+	  bestandssysteem van:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set mountpoint=/home storage/home</code></strong></pre><p>Het uitvoeren van de commando's <code class="command">df</code> en
+	  <code class="command">mount</code> laat zien dat het systeem ons
+	  bestandssysteem nu als de echte <code class="filename">/home</code> behandelt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+/dev/ad0s1a on / (ufs, local)
+devfs on /dev (devfs, local)
+/dev/ad0s1d on /usr (ufs, local, soft-updates)
+storage on /storage (zfs, local)
+storage/home on /home (zfs, local)
+<code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem   1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a    2026030  235240  1628708    13%    /
+devfs                1       1        0   100%    /dev
+/dev/ad0s1d   54098308 1032826 48737618     2%    /usr
+storage       26320512	     0 26320512     0%    /storage
+storage/home  26320512       0 26320512     0%    /home</pre><p>Hiermee is de <acronym class="acronym">RAID</acronym>-Z configuratie
+	  compleet.  Voer het volgende commando uit om status-updates
+	  van de gecreëerde bestandssystemen te krijgen tijdens
+	  het draaien van de nachtelijke <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=periodic&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">periodic</span>(8)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'daily_status_zfs_enable="YES"' &gt;&gt; /etc/periodic.conf</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81600080"></a>21.2.2.3. Het herstellen van <acronym class="acronym">RAID</acronym>-Z</h4></div></div></div><p>Iedere software-<acronym class="acronym">RAID</acronym> heeft een methode
+	  om zijn <code class="literal">status</code> te inspecteren.
+	  <acronym class="acronym">ZFS</acronym> is geen uitzondering.  De status van
+	  <acronym class="acronym">RAID</acronym>-Z-apparaten kan worden
+	  geïnspecteerd met het volgende commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status -x</code></strong></pre><p>Als alle pools in orde zijn en alles is normaal, dan
+	  wordt het volgende bericht weergegeven:</p><pre class="screen">all pools are healthy</pre><p>Als er een probleem is, misschien een schijf die offine
+	  is gegaan, dan wordt de status van de pool weergegeven en dat
+	  zal er als volgt uitzien:</p><pre class="screen">  pool: storage
+ state: DEGRADED
+status: One or more devices has been taken offline by the administrator.
+	Sufficient replicas exist for the pool to continue functioning in a
+	degraded state.
+action: Online the device using 'zpool online' or replace the device with
+	'zpool replace'.
+ scrub: none requested
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	storage     DEGRADED     0     0     0
+	  raidz1    DEGRADED     0     0     0
+	    da0     ONLINE       0     0     0
+	    da1     OFFLINE      0     0     0
+	    da2     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Hier staat dat het apparaat offline is gezet door de
+	  beheerder.  Dat is waar voor dit specifieke voorbeeld.  Om de
+	  schijf offline te zetten werd het volgende commando
+	  gebruikt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool offline storage da1</code></strong></pre><p>Het is nu mogelijk om de schijf
+	  <code class="filename">da1</code> te vervangen nadat het systeem
+	  uitgeschakeld is.  Zodra het systeem weer opgestart is, kan
+	  het volgende commando worden uitgevoerd om de schijf te
+	  vervangen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool replace storage da1</code></strong></pre><p>Nu kan de status opnieuw geïnspecteerd worden,
+	  dit keer zonder de <code class="option">-x</code> vlag, om de
+	  statusinformatie op te vragen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status storage</code></strong>
+ pool: storage
+ state: ONLINE
+ scrub: resilver completed with 0 errors on Sat Aug 30 19:44:11 2008
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	storage     ONLINE       0     0     0
+	  raidz1    ONLINE       0     0     0
+	    da0     ONLINE       0     0     0
+	    da1     ONLINE       0     0     0
+	    da2     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Zoals te zien in dit voorbeeld lijkt alles normaal te
+	  zijn.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81619152"></a>21.2.2.4. Gegevensverificatie</h4></div></div></div><p>Zoals eerder opgemerkt gebruikt <acronym class="acronym">ZFS</acronym>
+	  <code class="literal">checksums</code> om de integriteit van opgeslagen
+	  gegevens te verifiëren.  Ze worden automatisch
+	  ingeschakeld bij het creëeren van bestandssystemen en
+	  kunnen worden uitgeschakeld door middel van het volgende
+	  commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set checksum=off storage/home</code></strong></pre><p>Dit is echter geen verstandig idee, omdat checksums zeer
+	  weinig opslagruimte innemen en nuttiger zijn wanneer ze zijn
+	  ingeschakeld.  Het lijkt daarnaast ook geen merkbare invloed
+	  op de prestaties te hebben wanneer ze zijn ingeschakeld.
+	  Wanneer ze aanstaan is het mogelijk om <acronym class="acronym">ZFS</acronym>
+	  gegevensintegriteit te laten controleren door middel van
+	  checksum-verificatie.  Dit proces staat bekend als
+	  <span class="quote">&#8220;<span class="quote">scrubbing</span>&#8221;</span>.  Voer het volgende commando uit om
+	  de gegevensintegriteit van de <code class="literal">storage</code>-pool
+	  te controleren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool scrub storage</code></strong></pre><p>Dit proces kan, afhankelijk van de hoeveelheid opgeslagen
+	  gegevens, een aanzienlijke hoeveelheid tijd in beslag nemen.
+	  Het is daarnaast ook zeer <acronym class="acronym">I/O</acronym>-intensief,
+	  zozeer dat slechts één van deze operaties
+	  tegelijkertijd uitgevoerd kan worden.  Nadat de scrub is
+	  voltooid wordt de status bijgewerkt en kan deze worden
+	  bekeken door een statusaanvraag te doen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status storage</code></strong>
+ pool: storage
+ state: ONLINE
+ scrub: scrub completed with 0 errors on Sat Aug 30 19:57:37 2008
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	storage     ONLINE       0     0     0
+	  raidz1    ONLINE       0     0     0
+	    da0     ONLINE       0     0     0
+	    da1     ONLINE       0     0     0
+	    da2     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>De voltooiingstijd is in dit voorbeeld duidelijk
+	  zichtbaar.  Deze eigenschap helpt om gegevensintegriteit te
+	  garanderen gedurende een langere tijdsperiode.</p><p>Er zijn vele andere opties voor het Z-bestandssysteem, zie
+	  de handleidingpagina's <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zfs</span>(8)</span></a> en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zpool&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zpool</span>(8)</span></a>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81632848"></a>21.2.2.5. ZFS quota</h4></div></div></div><p>ZFS ondersteunt verschillende soorten quota: de refquota, de
+	  algemene quota, de gebruikersquota en de groepsquota.  Deze sectie
+	  legt de beginselen van ieder van deze uit en bevat wat instructies
+	  voor gebruik.</p><p>Quota beperken de hoeveelheid ruimte die een gegevensverzameling
+	  en zijn afstammelingen kunnen gebruiken en dwingen een limiet af op de
+	  hoeveelheid ruimte dat gebruikt wordt door bestandssystemen en
+	  snapshots voor deze afstammelingen.  Vanuit gebruikers zijn quota
+	  handig om de hoeveelheid ruimte die een bepaalde gebruiker kan
+	  gebruiken te beperken.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Quota kunnen niet op volumes worden ingesteld, aangezien de
+	    eigenschap <code class="literal">volsize</code> als een impliciet quotum
+	    optreedt.</p></div><p>De refquota,
+	  <code class="literal">refquota=grootte</code>,
+	  beperkt de hoeveelheid ruimte die een gegevensverzameling in beslag
+	  kan nemen door een harde grens aan de gebruikte ruimte te stellen.
+	  Deze harde grens bevat echter niet de ruimte gebruikt door
+	  afstammelingen, zoals bestandssystemen of snapshots.</p><p>Gebruik het volgende om een algemeen quotum van 10 GB voor
+	  <code class="filename">/home/storage/bob</code> af te dwingen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set quota=10G storage/home/bob</code></strong></pre><p>Gebruikersquota beperken de hoeveelheid ruimte die door de
+	  aangegeven gebruiker kan worden gebruikt.  Het algemene formaat is
+	  <code class="literal">userquota@gebruiker=grootte</code>
+	  waarbij de gebruikersnaam in één van de volgende
+	  formaten dient te zijn:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Naam compatibel met <acronym class="acronym">POSIX</acronym>
+	      (bijvoorbeeld <em class="replaceable"><code>jan</code></em>).</p></li><li class="listitem"><p>Numeriek <acronym class="acronym">POSIX</acronym>-ID
+	      (bijvoorbeeld <em class="replaceable"><code>789</code></em>).</p></li><li class="listitem"><p><acronym class="acronym">SID</acronym>-naam
+	      (bijvoorbeeld
+	      <em class="replaceable"><code>jan.bloggs@example.com</code></em>).</p></li><li class="listitem"><p>Numeriek <acronym class="acronym">SID</acronym>-ID
+	      (bijvoorbeeld <em class="replaceable"><code>S-1-123-456-789</code></em>).</p></li></ul></div><p>Gebruik het volgende om bijvoorbeeld een quotum van 50 GB
+	  voor een gebruiker <em class="replaceable"><code>jan</code></em> af te
+	  dwingen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set userquota@jan=50G</code></strong></pre><p>Gebruik in plaats hiervan, om het quotum te verwijderen of er
+	  zeker van te zijn dat er geen is ingesteld:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set userquota@jan=none</code></strong></pre><p>Eigenschappen van gebruikersquota worden niet weergegeven door
+	  <code class="command">zfs get all</code>.  Niet-<code class="systemitem">root</code>
+	  gebruikers kunnen alleen hun eigen quota zien tenzij het privilege
+	  <code class="literal">userquota</code> aan ze is gegeven.  Gebruikers met dit
+	  privilege kunnen ieders quota bekijken en instellen.</p><p>Groepsquota beperken de hoeveelheid ruimte die de gespecificeerde
+	  gebruikersgroep in beslag kan nemen.  Het algemene formaat is
+	  <code class="literal">groupquota@groep=grootte</code>.</p><p>Gebruik om het quotum voor de groep
+	  <em class="replaceable"><code>eerstegroep</code></em> op 50 GB in te
+	  stellen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set groupquota@eerstegroep=50G</code></strong></pre><p>Gebruik in plaats hiervan, om het quotum voor de groep
+	  <em class="replaceable"><code>eerstegroep</code></em> te verwijderen of om er voor te
+	  zorgen dat deze niet is ingesteld:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set groupquota@eerstegroep=none</code></strong></pre><p>Net zoals bij de eigenschappen van gebruikersquota kunnen
+	  niet-<code class="systemitem">root</code>-gebruikers alleen de quota zien die
+	  geassocieerd zijn met de gebruikersgroepen waar ze bij horen, een
+	  <code class="systemitem">root</code>-gebruiker of een gebruiker met het privilege
+	  <code class="literal">groupquota</code> kan alle quota voor alle groepen
+	  bekijken en instellen.</p><p>Het deelcommando <code class="command">zfs userspace</code> geeft de
+	  hoeveelheid ruimte weer die door elke gebruiker op de snapshot van het
+	  gespecificeerde bestandssysteem in beslag wordt genomen, tezamen met
+	  alle ingestelde quota.  Het deelcommando <code class="command">zfs
+	    groupspace</code> doet hetzelfde voor groepen.  Bekijk
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zfs&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">zfs</span>(1)</span></a> voor meer informatie over ondersteunde opties of het
+	  weergegeven van specifieke opties.</p><p>Gebruik het volgende om de quota voor
+	  <code class="filename">storage/home/bob</code> weer te geven, als u de juiste
+	  privileges heeft of <code class="systemitem">root</code> bent:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get quota storage/home/bob</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81664848"></a>21.2.2.6. Reserveringen in ZFS</h4></div></div></div><p>ZFS ondersteunt twee soorten van ruimtereserveringen.  Deze sectie
+	  legt de beginselen van elk van de twee uit en bevat enkele instructies
+	  voor gebruik.</p><p>De eigenschap <code class="literal">reservation</code> maakt het mogelijk om
+	  een gegarandeerde minimale hoeveelheid ruimte voor een
+	  gegevensverzameling en zijn afstammelingen te reserveren.
+	  Dit betekent dat als er een reservering van 10 GB is ingesteld
+	  voor <code class="filename">storage/home/bob</code> en de schijfruimte op
+	  raakt, er tenminste 10 GB aan ruimte is gereserveerd voor deze
+	  gegevensverzameling.  De eigenschap <code class="literal">reservation</code>
+	  stelt de minimale hoeveelheid ruimte in die gegarandeerd is voor een
+	  gegevensverzameling exclusief afstammelingen zoals snapshots, of geeft
+	  deze aan.  Als er bijvoorbeeld een snapshot is genomen van
+	  <code class="filename">storage/home/bob</code> moet er genoeg schijfruimte zijn
+	  buiten de <code class="literal">refreservation</code> hoeveelheid om de operatie
+	  te laten slagen omdat afstammelingen van de hoofdgegevensverzameling
+	  niet worden meegeteld in de <code class="literal">refreservation</code>
+	  hoeveelheid en dus niet stiekem de vastgestelde ruimte
+	  wijzigen.</p><p>Reserveringen kunnen in allerlei situaties nuttig zijn,
+	  bijvoorbeeld voor het plannen en testen van de geschiktheid van het
+	  toewijzen van schijfruimte in een nieuw systeem, of om ervoor te
+	  zorgen dat er genoeg schijfruimte beschikbaar is op bestandsssystemen
+	  voor systeemherstelprocedures en bestanden.</p><p>Het algemene formaat van de eigenschap
+	  <code class="literal">reservation</code> is
+	  <code class="literal">reservation=grootte</code>, dus
+	  gebruik het onderstaande commando om een reservering van 10 GB op
+	  <code class="filename">storage/home/bob</code> te plaatsen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set reservation=10G storage/home/bob</code></strong></pre><p>Gebruik, om te controleren of er geen reservatie is geplaatst of
+	  om een reservatie te verwijderen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set reservation=none storage/home/bob</code></strong></pre><p>Het zelfde principe kan worden toegepast op de eigenschap
+	  <code class="literal">refreservation</code> om een refreservation in te stellen,
+	  met het algemene formaat
+	  <code class="literal">refreservation=grootte</code>.</p><p>Gebruik één van de volgende commando's om te kijken
+	  of er een reservatie of refreservation bestaat op
+	  <code class="filename">storage/home/bob</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs get reservation storage/home/bob</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs get refreservation storage/home/bob</code></strong></pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="filesystems.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="filesystems.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="filesystems-linux.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">Hoofdstuk 21. Ondersteuning van bestandssystemen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 21.3. <span class="trademark">Linux</span>® bestandssystemen</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

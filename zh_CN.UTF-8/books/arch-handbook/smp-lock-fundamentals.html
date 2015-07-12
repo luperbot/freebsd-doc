@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>8.2. 基本工具与上锁的基础知识</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="smp.html" title="第 8 章 SMPng 设计文档" /><link rel="prev" href="smp.html" title="第 8 章 SMPng 设计文档" /><link rel="next" href="smp-design.html" title="8.3. 架构与设计概览" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8.2. 基本工具与上锁的基础知识</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="smp.html">上一页</a> </td><th width="60%" align="center">第 8 章 SMPng 设计文档</th><td width="20%" align="right"> <a accesskey="n" href="smp-design.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="smp-lock-fundamentals"></a>8.2. 基本工具与上锁的基础知识</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70968784"></a>8.2.1. 原子操作指令和内存栅</h3></div></div></div><a id="idp70969424" class="indexterm"></a><a id="idp70969936" class="indexterm"></a><p>关于内存栅和原子操作指令已经有很多介绍材料，
+	因此这一节并不打算对其进行详尽的介绍。 简而言之， 如果有对某一变量上写锁，
+	就不能在不获得相应的锁时对其进行读取操作。 也就是说，
+	内存栅的作用在于保证内存操作的相对顺序， 但并不保证内存操作的严格时序。
+	换言之， 内存栅并不保证 CPU 将本地快取缓存或存储缓冲的内容刷写回内存，
+	而是在锁释放时确保其所保护的数据， 对于能看到刚释放的那个锁的 CPU
+	或设备可见。 持有内存栅的 CPU
+	可以在其快取缓存或存储缓冲中将数据保持其所希望的、 任意长的时间，
+	但如果其它 CPU 在同一数据元上执行原子操作， 则第一个 CPU 必须保证，
+	其所更新的数据值， 以及内存栅所要求的任何其它操作， 对第二个 CPU 可见。</p><p>例如， 假设在一简单模型中， 认为在主存 (或某一全局快取缓存)
+	中的数据是可见的， 当某一 CPU 上触发原子操作时， 其它 CPU
+	的存储缓冲和快取缓存就必须对同一快取缓存线上的全部写操作，
+	以及内存栅之后的全部未完成操作进行刷写。</p><p>这样一来， 在使用由原子操作保护的内存单元时就需要特别小心。
+	例如， 在实现 sleep mutex 时， 我们就必须使用
+	<code class="function">atomic_cmpset</code> 而不是
+	<code class="function">atomic_set</code> 来打开
+	<code class="constant">MTX_CONTESTED</code> 位。 这样做的原因是，
+	我们需要把 <code class="varname">mtx_lock</code> 的值读到某个变量，
+	并据此进行决策。 然而， 我们读到的值可能是过时的，
+	也可能在我们进行决策的过程中发生变化。 因此， 当执行
+	<code class="function">atomic_set</code> 时， 最终可能会对另一值进行置位，
+	而不是我们进行决策的那一个。 这就必须通过
+	<code class="function">atomic_cmpset</code> 来保证只有在我们的决策依据是最新的时，
+	才对相应的变量进行置位。</p><p>最后， 原子操作只允许一次更新或读一个内存单元。
+	需要原子地更新多个单元时， 就必须使用锁来代替它了。
+	例如， 如果需要更新两个相互关联的计数器时，
+	就必须使用锁， 而不是两次单独的原子操作了。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70974544"></a>8.2.2. 读锁与写锁</h3></div></div></div><a id="idp70975184" class="indexterm"></a><a id="idp70975696" class="indexterm"></a><p>读锁并不需要像写锁那样强。 这两种类型的锁，
+	都需要确保通过它们访问的不是过时的数据。 然而，
+	只有写操作必须是排他的， 而多个线程则可以安全地读同一变量的值。
+	使用不同类型的锁用于读和写操作有许多各自不同的实现方式。</p><p>第一种方法是用 sx 锁， 它可以用于实现写时使用的排他锁，
+	而读时则作为共享锁。 这种方法十分简单明了。</p><p>第二种方法则略显晦涩。 可以用多个锁来保护同一数据元。
+	读时， 只需锁其中的一个读锁即可。 然而， 如果要写数据的话，
+	则需要首先上所有的写锁。 这会大大提高写操作的代价，
+	但当可能以多种方式访问数据时却可能非常有用。 例如，
+	父进程指针是同时受
+	<code class="varname">proctree_lock</code> sx 锁和进程 mutex 保护的。
+	在只希望检查已锁进程的父进程时， 用 proc 锁更为方便。
+	但是， 其它一些地方， 例如
+	<code class="function">inferior</code> 这类需要通过父指针在进程树上进行搜索，
+	并对每个进程上锁的地方就不能这样做了，
+	否则， 将无法保证在对我们所获得的结果执行操作时，
+	之前检查时的状况依旧有效。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70982480"></a>8.2.3. 上锁状态和结果</h3></div></div></div><p>如果您需要使用锁来保持所检查变量的状态， 并据此执行某些操作时，
+	是不能仅仅在读变量之前对其上锁， 并在执行操作之前解锁的。
+	过早解锁将使变量再次可变， 这可能会导致之前所做的决策失效。
+	因此， 在所做检测引发的动作结束之前， 必须继续保持上锁状态。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="smp.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="smp.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="smp-design.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 8 章 SMPng 设计文档 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 8.3. 架构与设计概览</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

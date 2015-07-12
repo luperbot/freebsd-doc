@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>31.11. Protokollierung von anderen Hosts mittels syslogd</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="network-servers.html" title="Kapitel 31. Netzwerkserver" /><link rel="prev" href="network-ntp.html" title="31.10. Die Uhrzeit mit NTP synchronisieren" /><link rel="next" href="firewalls.html" title="Kapitel 32. Firewalls" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">31.11. Protokollierung von anderen Hosts mittels
+      <code class="command">syslogd</code></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-ntp.html">Zurück</a> </td><th width="60%" align="center">Kapitel 31. Netzwerkserver</th><td width="20%" align="right"> <a accesskey="n" href="firewalls.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-syslogd"></a>31.11. Protokollierung von anderen Hosts mittels
+      <code class="command">syslogd</code></h2></div><div><span class="authorgroup">Beigetragen von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Benedict</span> <span class="surname">Reuschling</span></span>. </span></div></div></div><p>Die Interaktion mit Systemprotokollen ist ein wichtiger Aspekt,
+      sowohl was Sicherheit als auch Systemadministration anbelangt.
+      Überwachen der Protokolldateien von mehreren Hosts kann sehr
+      unhandlich werden, wenn diese Hosts über mittlere oder grosse
+      Netze verteilt sind oder wenn sie Teile von unterschiedlichen Netzwerken
+      sind.  In diesen Fällen macht die Konfiguration der Protokollierung
+      von anderen Hosts diesen Prozess wesentlich komfortabler.</p><p>Die zentralisierte Protokollierung auf einen bestimmten
+      Protokollierungshost kann manche der administrativen Belastungen der
+      Protokolldateiadministration reduzieren.  Protokolldateiaggregation,
+      -zusammenführung und -rotation kann an einer zentralen Stelle mit
+      den FreeBSD-eigenen Werkzeugen wie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> und <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newsyslog</span>(8)</span></a>
+      konfiguriert werden.  In der folgenden Beispielkonfiguration sammelt
+      Host <code class="systemitem">A</code>, genannt <code class="systemitem">logserv.example.com</code>, Protokollinformationen für
+      das lokale Netzwerk.  Host <code class="systemitem">B</code>, genannt
+      <code class="systemitem">logclient.example.com</code> wird seine
+      Protokollinformationen an den Server weiterleiten.  In realen
+      Konfigurationen benötigen beide Hosts passende Vorwärts- und
+      Umkehr-Einträge im <acronym class="acronym">DNS</acronym> oder
+      in <code class="filename">/etc/hosts</code>.  Andernfalls werden die Daten vom
+      Server abgelehnt.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90961616"></a>31.11.1. Konfiguration des Protokollierungs-Servers</h3></div></div></div><p>Protokollierungs-Server sind Maschinen, die konfiguriert sind,
+        Protokollinformationen von anderen Hosts zu akzeptieren.  In den
+        meisten Fällen wird dies zur Vereinfachung der Konfiguration
+        eingesetzt, in anderen Fällen ist es einfach nur ein Schritt in
+        eine bessere Verwaltung.  Was auch immer die Gründe sind, ein paar
+        Anforderungen müssen vorher erfüllt sein.</p><p>Ein richtig konfigurierter Protokollierungs-Server muss minimal die
+        folgenden Anforderungen erfüllen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Das Regelwerk der Firewall muss <acronym class="acronym">UDP</acronym> auf
+            Port 514 sowohl auf Client- als auch auf Serverseite
+            erlauben;</p></li><li class="listitem"><p>syslogd wurde so konfiguriert, dass es Nachrichten von anderen
+            Clientrechnern akzeptiert;</p></li><li class="listitem"><p>Der syslogd-Server und alle Clientrechner müssen
+            gültige Einträge für sowohl Vorwärts- als auch
+            Umkehr-<acronym class="acronym">DNS</acronym> besitzen, oder in
+            <code class="filename">/etc/hosts</code> korrekt eingetragen sein.</p></li></ul></div><p>Um den Protokollierungs-Server zu konfigurieren, muss der Client in
+        <code class="filename">/etc/syslog.conf</code> eingetragen sein und der
+        Verbindungsweg der Protokollierung muss spezifiziert sein:</p><pre class="programlisting">+logclient.example.com
+*.*     /var/log/logclient.log</pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Weitere Informationen zu den verschiedenen unterstützten
+	  und verfügbaren <span class="emphasis"><em>Verbindungswegen</em></span> finden
+	  sich in der Manualpage <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">syslog.conf</span>(5)</span></a>.</p></div><p>Einmal hinzugefügt, werden alle Nachrichten über
+        den <code class="literal">Verbindungsweg</code> in die zuvor angegebene Datei,
+        <code class="filename">/var/log/logclient.log</code> protokolliert.</p><p>Der Server benötigt ausserdem die folgenden Zeilen in der
+        <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">syslogd_enable="YES"
+syslogd_flags="-a logclient.example.com -v -v"</pre><p>Die erste Option aktiviert den <code class="command">syslogd</code>-Dienst
+        während des Systemstarts und die zweite Option erlaubt es, Daten
+        von dem spezifizierten Client auf diesem Server zu akzeptieren.  Die
+        Verwendung von <code class="option">-v -v</code> im letzten Teil erhöht die
+        Anzahl von Protokollnachrichten.  Dies ist sehr hilfreich für die
+        Feineinstellung der Verbindungspfade, da Administratoren auf diese
+        Weise erkennen, welche Arten von Nachrichten unter welchen
+        Einstellungen protokolliert werden.</p><p>Mehrere <code class="option">-a</code>-Optionen können angegeben werden,
+        um die Protokollierung von mehreren Clients zu erlauben.
+        <acronym class="acronym">IP</acronym>-Adressen und ganze Netzblöcke können
+        ebenfalls spezifiziert werden.  Lesen Sie dazu die
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">syslog</span>(3)</span></a>-Manualpage, um eine vollständige Liste von
+        möglichen Optionen zu erhalten.</p><p>Zum Schluss muss noch die Protokolldatei erstellt werden.  Auf
+        welche Weise dies geschieht ist nicht wichtig, aber in den meisten
+        Fällen funktioniert <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=touch&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">touch</span>(1)</span></a> grossartig, wie hier
+        dargestellt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/logclient.log</code></strong></pre><p>Zu diesem Zeitpunkt sollte der <code class="command">syslogd</code>-Dienst
+        neu gestartet und überprüft werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service syslogd restart</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>pgrep syslog</code></strong></pre><p>Wenn eine <acronym class="acronym">PID</acronym> zurückgegeben wird, wurde
+        der Server erfolgreich neu gestartet und die Clientkonfiguration kann
+        beginnen.  Wenn der Server nicht neu gestartet wurde, suchen Sie im
+        <code class="filename">/var/log/messages</code>-Protokoll nach eventuellen
+        Fehlermeldungen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90997840"></a>31.11.2. Konfiguration des Protokollierungs-Clients</h3></div></div></div><p>Ein Protokollierungs-Client ist eine Maschine, die
+        Protokollinformationen an einen Protokollierungs-Server sendet,
+        zusätzlich zu ihren lokalen Kopien.</p><p>Ähnlich wie Protokollierungs-Server müssen Clients auch
+        ein paar minimale Anforderungen erfüllen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> muss so konfiguriert sein, dass es Nachrichten
+            eines bestimmten Typs an einen Protokollierungs-Server schickt,
+            welcher diese akzeptieren muss;</p></li><li class="listitem"><p>Die Firewall muss <acronym class="acronym">UDP</acronym>-Pakete durch Port 514
+            erlauben;</p></li><li class="listitem"><p>Sowohl Vorwärts- als auch Umkehr-<acronym class="acronym">DNS</acronym>
+            muss konfiguriert sein oder es müssen passende Einträge in
+            <code class="filename">/etc/hosts</code> vorhanden sein.</p></li></ul></div><p>Die Clientkonfiguration ist ein bisschen entspannter, verglichen mit
+        der des Servers.  Der Clientrechner muss ebenfalls die folgenden
+        Einträge in der <code class="filename">/etc/rc.conf</code> besitzen:</p><pre class="programlisting">syslogd_enable="YES"
+syslogd_flags="-s -v -v"</pre><p>Wie zuvor aktivieren diese Einträge den
+        <code class="command">syslogd</code>-Dienst während des Systemstarts und
+        erhöhen die Anzahl der Protokollnachrichten.  Die Option
+        <code class="option">-s</code> verhindert, dass dieser Client Protokolle von anderen
+        Hosts akzeptiert.</p><p>Verbindungspfade beschreiben den Systemteil, für den eine
+        Nachricht generiert wird.  Beispielsweise sind <acronym class="acronym">ftp</acronym> und
+        <acronym class="acronym">ipfw</acronym> beides Verbindungspfade.  Wenn
+        Protokollnachrichten für diese beiden Dienste generiert werden,
+        sind diese beiden Werkzeuge normalerweise in jeder Protokollnachricht
+        enthalten.  Verbindungspfade sind mit einer Priorität oder Stufe
+        verbunden, die dazu verwendet wird, zu markieren, wie wichtig eine
+        Nachricht im Protokoll ist.  Die Häftigste ist
+        <code class="literal">warning</code> und <code class="literal">info</code>.  Bitte lesen Sie
+        die <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">syslog</span>(3)</span></a> Manualpage, um eine komplette Liste der
+        verfügbaren Verbindungspfade und Prioritäten zu
+        erhalten.</p><p>Der Protokollierungs-Server muss in der
+        <code class="filename">/etc/syslog.conf</code> des Clients eingetragen sein.  In
+        diesem Beispiel wird das <code class="literal">@</code>-Symbol benutzt, um
+        Protokolldaten an einen anderen Server zu senden. Der Eintrag sieht wie
+        folgt aus:</p><pre class="programlisting">*.*               @logserv.example.com</pre><p>Einmal hinzugefügt, muss <code class="command">syslogd</code> neu
+        gestartet werden, damit diese Änderungen wirksam werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service syslogd restart</code></strong></pre><p>Um zu testen, ob Protokollnachrichten über das Netzwerk
+        gesendet werden, kann <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=logger&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">logger</span>(1)</span></a> auf dem Client benutzt werden, um
+        eine Nachricht an <code class="command">syslogd</code> zu schicken:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>logger "Test message from logclient"</code></strong></pre><p>Diese Nachricht sollte jetzt sowohl in
+        <code class="filename">/var/log/messages</code> auf dem Client, als auch in
+        <code class="filename">/var/log/logclient.log</code> auf dem Server vorhanden
+        sein.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91024208"></a>31.11.3. Fehlerbehebung beim Protokollierungs-Server</h3></div></div></div><p>In bestimmten Fällen ist die Fehlerbehebung notwendig, wenn
+        Nachrichten nicht auf dem Protokollierungs-Server empfangen werden.  Es
+        gibt mehrere Gründe dafür, jedoch treten am häufigsten
+        Probleme bei der Netzwerkverbindung und beim <acronym class="acronym">DNS</acronym> auf.
+        Um diese Fälle zu überprüfen, stellen Sie sicher, dass
+        beide Hosts in der Lage sind, sich gegenseitig über den Hostnamen zu
+        erreichen, der in <code class="filename">/etc/rc.conf</code> angegeben ist.  Wenn
+        das funktioniert, ist möglicherweise eine Änderung der
+        <code class="literal">syslogd_flags</code>-Option in
+        <code class="filename">/etc/rc.conf</code> notwendig.</p><p>Im folgenden Beispiel ist <code class="filename">/var/log/logclient.log</code>
+        leer und die <code class="filename">/var/log/messages</code>-Dateien enthalten
+        keine Gründe für den Fehler.  Um die Fehlerausgabe zu
+        erhöhen, ändern Sie die <code class="literal">syslogd_flags</code>-Option
+        so, dass diese wie in dem folgenden Beispiel aussieht und initiieren Sie
+        dann einen Neustart:</p><pre class="programlisting">syslogd_flags="-d -a logclien.example.com -v -v"</pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service syslogd restart</code></strong></pre><p>Fehlerausgabedaten ähnlich der Folgenden werden sofort nach dem
+        Neustart auf dem Bildschirm erscheinen:</p><pre class="screen">logmsg: pri 56, flags 4, from logserv.example.com, msg syslogd: restart
+syslogd: restarted
+logmsg: pri 6, flags 4, from logserv.example.com, msg syslogd: kernel boot file is /boot/kernel/kernel
+Logging to FILE /var/log/messages
+syslogd: kernel boot file is /boot/kernel/kernel
+cvthname(192.168.1.10)
+validate: dgram from IP 192.168.1.10, port 514, name logclient.example.com;
+rejected in rule 0 due to name mismatch.</pre><p>Es scheint klar zu sein, dass die Nachrichten aufgrund eines
+        fehlerhaften Namens abgewiesen werden.  Nach genauer Untersuchung der
+        Konfiguration, kommt ein Tippfehler in der folgenden Zeile der
+        <code class="filename">/etc/rc.conf</code> als Fehler in Betracht:</p><pre class="programlisting">syslogd_flags="-d -a logclien.example.com -v -v"</pre><p>Die Zeile sollte <code class="literal">logclient</code> und nicht
+        <code class="literal">logclien</code> enthalten.  Nachdem die entsprechenden
+        Veränderungen gemacht wurden, ist ein Neustart fällig, mit den
+        entsprechenden Ergebnissen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service syslogd restart</code></strong>
+logmsg: pri 56, flags 4, from logserv.example.com, msg syslogd: restart
+syslogd: restarted
+logmsg: pri 6, flags 4, from logserv.example.com, msg syslogd: kernel boot file is /boot/kernel/kernel
+syslogd: kernel boot file is /boot/kernel/kernel
+logmsg: pri 166, flags 17, from logserv.example.com,
+msg Dec 10 20:55:02 &lt;syslog.err&gt; logserv.example.com syslogd: exiting on signal 2
+cvthname(192.168.1.10)
+validate: dgram from IP 192.168.1.10, port 514, name logclient.example.com;
+accepted in rule 0.
+logmsg: pri 15, flags 0, from logclient.example.com, msg Dec 11 02:01:28 trhodes: Test message 2
+Logging to FILE /var/log/logclient.log
+Logging to FILE /var/log/messages</pre><p>Zu diesem Zeitpunkt werden die Nachrichten korrekt empfangen und in
+        die richtige Datei geschrieben.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91042768"></a>31.11.4. Sicherheitsbedenken</h3></div></div></div><p>Wie mit jedem Netzwerkdienst, müssen Sicherheitsanforderungen in
+        Betracht gezogen werden, bevor diese Konfiguration umgesetzt wird.
+        Manchmal enthalten Protokolldateien sensitive Daten über aktivierte
+        Dienste auf dem lokalen Rechner, Benutzerkonten und Konfigurationsdaten.
+        Daten, die vom Client an den Server geschickt werden, sind weder
+        verschlüsselt noch mit einem Passwort geschützt.  Wenn ein
+        Bedarf für Verschlüsselung besteht, ist es möglich,
+        <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/stunnel/pkg-descr">security/stunnel</a> zu verwenden,
+        welches die Daten über einen verschlüsselten Tunnel
+        versendet.</p><p>Lokale Sicherheit ist ebenfalls ein Thema.  Protokolldateien sind
+        während der Verwendung oder nach ihrer Rotation nicht
+        verschlüsselt.  Lokale Benutzer versuchen vielleicht, auf diese
+        Dateien zuzugreifen, um zusätzliche Einsichten in die
+        Systemkonfiguration zu erlangen.  In diesen Fällen ist es absolut
+        notwendig, die richtigen Berechtigungen auf diesen Dateien zu setzen.
+        Das <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newsyslog</span>(8)</span></a>-Werkzeug unterstützt das Setzen von
+        Berechtigungen auf gerade erstellte oder rotierte Protokolldateien.
+        Protokolldateien mit Zugriffsmodus <code class="literal">600</code> sollten
+        verhindern, dass lokale Benutzer darin herumschnüffeln.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-ntp.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="network-servers.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="firewalls.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">31.10. Die Uhrzeit mit NTP synchronisieren </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Kapitel 32. Firewalls</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

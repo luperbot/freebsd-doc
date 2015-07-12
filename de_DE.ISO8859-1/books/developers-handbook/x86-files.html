@@ -1,0 +1,584 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.11. Arbeiten mit Dateien</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="x86.html" title="Kapitel 11. x86-Assembler-Programmierung" /><link rel="prev" href="x86-environment.html" title="11.10. Die UNIX®-Umgebung" /><link rel="next" href="x86-one-pointed-mind.html" title="11.12. One-Pointed Mind" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.11. Arbeiten mit Dateien</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="x86-environment.html">Zurück</a> </td><th width="60%" align="center">Kapitel 11. x86-Assembler-Programmierung</th><td width="20%" align="right"> <a accesskey="n" href="x86-one-pointed-mind.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="x86-files"></a>11.11. Arbeiten mit Dateien</h2></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Paul</span> <span class="surname">Keller</span></span> und <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Fabian</span> <span class="surname">Borschel</span></span>. </span></div></div></div><p>Wir haben bereits einfache Arbeiten mit Dateien gemacht:
+      Wir wissen wie wir sie öffnen und schliessen, oder wie
+      man sie mit Hilfe von Buffern liest und schreibt. Aber <span class="trademark">UNIX</span>®
+      bietet viel mehr Funktionalität wenn es um Dateien geht.
+      Wir werden einige von ihnen in dieser Sektion untersuchen und
+      dann mit einem netten Datei Konvertierungs Werkzeug
+      abschliessen.</p><p>In der Tat, Lasst uns am Ende beginnen, also mit dem Datei
+      Konvertierungs Werkzeug. Es macht Programmieren immer einfacher,
+      wenn wir bereits am Anfang wissen was das End Produkt bezwecken
+      soll.</p><p>Eines der ersten Programme die ich für <span class="trademark">UNIX</span>® schrieb
+      war <a class="link" href="ftp://ftp.int80h.org/unix/tuc/" target="_top"><span class="application">
+      tuc</span></a>, ein Text-Zu-<span class="trademark">UNIX</span>® Datei Konvertierer.
+      Es konvertiert eine Text Datei von einem anderen Betriebssystem
+      zu einer <span class="trademark">UNIX</span>® Text Datei. Mit anderen Worten, es ändert
+      die verschiedenen Arten von Zeilen Begrenzungen zu der Zeilen
+      Begrenzungs Konvention von <span class="trademark">UNIX</span>®. Es speichert die Ausgabe in
+      einer anderen Datei. Optional konvertiert es eine <span class="trademark">UNIX</span>® Text
+      Datei zu einer <acronym class="acronym">DOS</acronym> Text Datei.</p><p>Ich habe <span class="application">tuc</span> sehr oft benutzt,
+      aber nur von irgendeinem anderen <acronym class="acronym">OS</acronym> nach
+      <span class="trademark">UNIX</span>® zu konvertieren, niemals anders herum. Ich habe mir immer
+      gewünscht das die Datei einfach überschrieben wird
+      anstatt das ich die Ausgabe in eine andere Datei senden muss.
+      Meistens, habe ich diesen Befehl verwendet:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>tuc myfile tempfile</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>mv tempfile myfile</code></strong></pre><p>Es wäre schö ein  <span class="application">ftuc</span>
+      zu haben, also, <span class="emphasis"><em>fast tuc</em></span>, und es so zu
+      benutzen:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ftuc myfile</code></strong></pre><p>In diesem Kapitel werden wir dann, <span class="application">ftuc
+      </span> in Assembler schreiben (das Original
+      <span class="application">tuc</span> ist in C), und verschiedene
+      Datei-Orientierte Kernel Dienste in dem Prozess studieren.</p><p>Auf erste Sicht, ist so eine Datei Konvertierung sehr
+      simpel: Alles was du zu tun hast, ist die Wagenrückläufe
+      zu entfernen, richtig?</p><p>Wenn du mit ja geantwortet hast, denk nochmal darüber
+      nach: Dieses Vorgehen wird die meiste Zeit funktionieren
+      (zumindest mit <acronym class="acronym">MSDOS</acronym> Text Dateien), aber
+      gelegentlich fehlschlagen.</p><p>Das Problem ist das nicht alle <span class="trademark">UNIX</span>® Text Dateien ihre
+      Zeilen mit einer Wagen Rücklauf / Zeilenvorschub Sequenz
+      beenden. Manche benutzen Wagenrücklauf ohne Zeilenvorschub.
+      Andere kombinieren mehrere leere Zeilen in einen einzigen
+      Wagenrücklauf gefolgt von mehreren Zeilenvorschüben.
+      Und so weiter.</p><p>Ein Text Datei Konvertierer muss dann also in der Lage sein
+      mit allen möglichen Zeilenenden umzugehen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Wagenrücklauf / Zeilenvorschub</p></li><li class="listitem"><p>Wagenrücklauf</p></li><li class="listitem"><p>Zeilenvorschub / Wagenrücklauf</p></li><li class="listitem"><p>Zeilenvorschub</p></li></ul></div><p>Es sollte außerdem in der Lage sein mit Dateien
+      umzugehen die irgendeine Art von Kombination der oben stehenden
+      Möglichkeiten verwendet. (z.B., Wagenrücklauf gefolgt
+      von mehreren Zeilenvorschüben).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-finite-state-machine"></a>11.11.1. Endlicher Zustandsautomat</h3></div></div></div><p>Das Problem wird einfach gelöst in dem man eine
+	Technik benutzt die sich <span class="emphasis"><em>Endlicher
+	Zustandsautomat</em></span> nennt, ursprünglich wurde sie
+	von den Designern digitaler elektronischer Schaltkreise
+	entwickelt. Eine <span class="emphasis"><em>Endlicher Zustandsautomat</em></span>
+	ist ein digitaler Schaltkreis dessen Ausgabe nicht nur von der
+	Eingabe abhängig ist sondern auch von der vorherigen
+	Eingabe, d.h., von seinem Status. Der Mikroprozessor ist ein
+	Beispiel für einen <span class="emphasis"><em>Endlichen Zustandsautomaten
+	</em></span>: Unser Assembler Sprach Code wird zu
+	Maschinensprache übersetzt in der manche Assembler Sprach
+	Codes ein einzelnes Byte produzieren, während andere
+	mehrere Bytes produzieren. Da der Microprozessor die Bytes
+	einzeln aus dem Speicher liest, ändern manche nur seinen
+	Status anstatt eine Ausgabe zu produzieren. Wenn alle Bytes
+	eines OP Codes gelesen wurden, produziert der Mikroprozessor
+	eine Ausgabe, oder ändert den Wert eines Registers,
+	etc.</p><p>Aus diesem Grund, ist jede Software eigentlich nur eine
+	Sequenz von Status Anweisungen für den Mikroprozessor.
+	Dennoch, ist das Konzept eines <span class="emphasis"><em>Endlichen
+	Zustandsautomaten</em></span> auch im Software Design sehr
+	hilfreich.</p><p>Unser Text Datei Konvertierer kann als
+	<span class="emphasis"><em>Endlicher Zustandsautomat</em></span> mit 3
+	möglichen Stati desgined werden. Wir könnten diese
+	von 0-2 benennen, aber es wird uns das Leben leichter machen
+	wenn wir ihnen symbolische Namen geben:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="symbol">ordinary</span></p></li><li class="listitem"><p><span class="symbol">cr</span></p></li><li class="listitem"><p><span class="symbol">lf</span></p></li></ul></div><p>Unser Programm wird in dem <span class="symbol">ordinary</span> Status
+	starten. Während dieses Status, hängt die Aktion des
+	Programms von seiner Eingabe wie folgt ab:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Wenn die Eingabe etwas anderes als ein
+	    Wagenrücklauf oder einem Zeilenvorschub ist, wird die
+	    Eingabe einfach nur an die Ausgabe geschickt. Der Status
+	    bleibt unverändert.</p></li><li class="listitem"><p>Wenn die Eingabe ein Wagenrücklauf ist, wird der
+	    Status auf <span class="symbol">cr</span> gesetzt. Die Eingabe wird
+	    dann verworfen, d.h., es entsteht keine Ausgabe.</p></li><li class="listitem"><p>Wenn die Eingabe ein Zeilenvorschub ist, wird der
+	    Status auf <span class="symbol">lf</span> gesetzt. Die Eingabe wird
+	    dann verworfen.</p></li></ul></div><p>Wann immer wir in dem <span class="symbol">cr</span> Status sind,
+	ist das weil die letzte Eingabe ein Wagenrücklauf war,
+	welcher nicht verarbeitet wurde. Was unsere Software in
+	diesem Status macht hängt von der aktuellen Eingabe
+	ab:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Wenn die Eingabe irgendetwas anderes als ein
+	    Wagenrücklauf oder ein Zeilenvorschub ist, dann gib
+	    einen Zeilenvorschub aus, dann gib die Eingabe aus und
+	    dann ändere den Status zu
+	    <span class="symbol">ordinary</span>.</p></li><li class="listitem"><p>Wenn die Eingabe ein Wagenrücklauf ist, haben
+	    wir zwei (oder mehr) Wagenrückläufe in einer
+	    Reihe. Wir verwerfen die Eingabe, wir geben einen
+	    Zeilenvorschub aus und lassen den Status
+	    unverändert.</p></li><li class="listitem"><p>Wenn die Eingabe ein Zeilenvorschub ist, geben wir
+	    den Zeilenvorschub aus und ändern den Status zu
+	    <span class="symbol">ordinary</span>. Achte darauf, dass das nicht
+	    das gleiche wie in dem Fall oben drüber ist &#8211;
+	    würden wir versuchen beide zu kombinieren,
+	    würden wir zwei Zeilenvorschübe anstatt einen
+	    ausgeben.</p></li></ul></div><p>Letztendlich, sind wir in dem <span class="symbol">lf</span> Status
+	nachdem wir einen Zeilenvorschub empfangen haben der nicht
+	nach einem Wagenrücklauf kam. Das wird passieren wenn
+	unsere Datei bereits im <span class="trademark">UNIX</span>® Format ist, oder jedesmal wenn
+	mehrere Zeilen in einer Reihe durch einen einzigen
+	Wagenrücklauf gefolgt von mehreren Zeilenvorschüben
+	ausgedrückt wird, oder wenn die Zeile mit einer
+	Zeilenvorschub / Wagenrücklauf Sequenz endet. Wir
+	sollten mit unserer Eingabe in diesem Status folgendermaßen
+	umgehen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Wenn die Eingabe irgendetwas anderes als ein
+	    Wagenrücklauf oder ein Zeilenvorschub ist, geben wir
+	    einen Zeilenvorschub aus, geben dann  die Eingabe aus und
+	    ändern dann den Status zu <span class="symbol">ordinary</span>.
+	    Das ist exakt die gleiche Aktion wie in dem
+	    <span class="symbol">cr</span> Status nach dem Empfangen der selben
+	    Eingabe.</p></li><li class="listitem"><p>Wenn die Eingabe ein Wagenrücklauf ist, verwerfen
+	    wir die Eingabe, geben einen Zeilenvorschub aus und
+	    ändern dann den Status zu <span class="symbol">ordinary</span>.
+	    </p></li><li class="listitem"><p>Wenn die Eingabe ein Zeilenvorschub ist, geben wir den
+	    Zeilenvorschub aus und lassen den Status unverändert.
+	    </p></li></ul></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-final-state"></a>11.11.1.1. Der Endgültige Status</h4></div></div></div><p>Der obige <span class="emphasis"><em>Endliche Zustandsautomat</em></span>
+	  funktioniert für die gesamte Datei, aber lässt die
+	  Möglichkeit das die letzte Zeile ignoriert wird. Das
+	  wird jedesmal passieren wenn die Datei mit einem einzigen
+	  Wagenrücklauf oder einem einzigen Zeilenvorschub endet.
+	  Daran habe ich nicht gedacht als ich
+	  <span class="application">tuc</span> schrieb, nur um festzustellen,
+	  daß das letzte Zeilenende gelegentlich weggelassen
+	  wird.</p><p>Das Problem wird einfach dadurch gelöst, indem man
+	  den Status überprüft nachdem die gesamte Datei
+	  verarbeitet wurde. Wenn der Status nicht
+	  <span class="symbol">ordinary</span> ist, müssen wir nur den
+	  letzten Zeilenvorschub ausgeben.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Nachdem wir unseren Algorithmus nun als einen
+	    <span class="emphasis"><em>Endlichen Zustandsautomaten</em></span> formuliert
+	    haben, könnten wir einfach einen festgeschalteten
+	    digitalen elektronischen Schaltkreis (einen "Chip")
+	    designen, der die Umwandlung für uns übernimmt.
+	    Natürlich wäre das sehr viel teurer, als ein
+	    Assembler Programm zu schreiben.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-tuc-counter"></a>11.11.1.2. Der Ausgabe Zähler</h4></div></div></div><p>Weil unser Datei Konvertierungs Programm
+	  möglicherweise zwei Zeichen zu einem kombiniert,
+	  müssen wir einen Ausgabe Zähler verwenden. Wir
+	  initialisieren den Zähler zu <code class="constant">0</code>
+	  und erhöhen ihn jedes mal wenn wir ein Zeichen an die
+	  Ausgabe schicken. Am Ende des Programms, wird der
+	  Zähler uns sagen auf welche Grösse wir die Datei
+	  setzen müssen.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-software-fsm"></a>11.11.2. Implementieren von EZ als Software</h3></div></div></div><p>Der schwerste Teil beim arbeiten mit einer
+	<span class="emphasis"><em>Endlichen Zustandsmaschine</em></span> ist das
+	analysieren des Problems und dem ausdrücken als eine
+	<span class="emphasis"><em>Endliche Zustandsmaschine</em></span>. That geschafft,
+	schreibt sich die Software fast wie von selbst.</p><p>In eine höheren Sprache, wie etwa C, gibt es mehrere
+	Hauptansätze. Einer wäre ein <code class="function">switch</code> Angabe zu verwenden die
+	auswählt welche Funktion genutzt werden soll. Zum
+	Beispiel,</p><pre class="programlisting">
+	switch (state) {
+	default:
+	case REGULAR:
+		regular(inputchar);
+		break;
+	case CR:
+		cr(inputchar);
+		break;
+	case LF:
+		lf(inputchar);
+		break;
+	}
+      </pre><p>Ein anderer Ansatz ist es ein Array von Funktions Zeigern
+	zu benutzen, etwa wie folgt:</p><pre class="programlisting">
+	(output[state])(inputchar);
+      </pre><p>Noch ein anderer ist es aus <code class="varname">state</code> einen
+	Funktions Zeiger zu machen und ihn zu der entsprechenden
+	Funktion zeigen zu lassen:</p><pre class="programlisting">
+	(*state)(inputchar);
+      </pre><p>Das ist der Ansatz den wir in unserem Programm verwenden
+	werden, weil es in Assembler sehr einfach und schnell geht.
+	Wir werden einfach die Adresse der Prozedur in <code class="varname">EBX</code> speichern und dann einfach das
+	ausgeben:</p><pre class="programlisting">
+	call	ebx
+      </pre><p>Das ist wahrscheinlich schneller als die Adresse im Code
+	zu hardcoden weil der Mikroprozessor die Adresse nicht aus dem
+	Speicher lesen muss&#8212;es ist bereits in einer der Register
+	gespeichert. Ich sagte <span class="emphasis"><em>wahrscheinlich</em></span>
+	weil durch das Cachen neuerer Mikroprozessoren beide Varianten
+	in etwa gleich schnell sind.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="memory-mapped-files"></a>11.11.3. Speicher abgebildete Dateien</h3></div></div></div><p>Weil unser Programm nur mit einzelnen Dateien
+	funktioniert, können wir nicht den Ansatz verwedenden der
+	zuvor funktioniert hat, d.h., von einer Eingabe Datei zu lesen
+	und in eine Ausgabe Datei zu schreiben.</p><p><span class="trademark">UNIX</span>® erlaubt es uns eine Datei, oder einen Bereich einer
+	Datei, in den Speicher abzubilden. Um das zu tun, müssen
+	wir zuerst eine Datei mit den entsprechenden Lese/Schreib
+	Flags öffnen. Dann benutzen wir den <code class="function">mmap</code> system call um sie in den
+	Speicher abzubilden. Ein Vorteil von <code class="function">mmap</code> ist, das es automatisch mit
+	virtuellem Speicher arbeitet: Wir können mehr von der
+	Datei im Speicher abbilden als wir überhaupt
+	physikalischen Speicher zur Verfügung haben, noch immer
+	haben wir aber durch normale OP Codes wie <code class="function">mov</code>, <code class="function">lods</code>, und <code class="function">stos</code> Zugriff darauf. Egal welche
+	Änderungen wir an dem Speicherabbild der Datei vornehmen,
+	sie werden vom System in die Datei geschrieben. Wir
+	müssen die Datei nicht offen lassen: So lange sie
+	abgebildet bleibt, können wir von ihr lesen und in sie
+	schreiben.</p><p>Ein 32-bit Intel Mikroprozessor kann auf bis zu vier
+	Gigabyte Speicher zugreifen &#8211; physisch oder virtuell.
+	Das FreeBSD System erlaubt es uns bis zu der Hälfte
+	für die Datei Abbildung zu verwenden.</p><p>Zur Vereinfachung, werden wir in diesem Tutorial nur
+	Dateien konvertieren die in ihrere Gesamtheit im Speicher
+	abgebildet werden können. Es gibt wahrscheinlich nicht
+	all zu viele Text Dateien die eine Grösse von zwei
+	Gigabyte überschreiben. Falls unser Programm doch auf
+	eine trifft, wird es einfach eine Meldung anzeigen mit dem
+	Vorschlag das originale <span class="application">tuc</span> statt
+	dessen zu verwenden.</p><p>Wenn du deine Kopie von
+	<code class="filename">syscalls.master</code> überprüfst,
+	wirst du zwei verschiedene Systemaufrufe
+	finden die sich <code class="function">mmap</code>
+	nennen. Das kommt von der Entwicklung von <span class="trademark">UNIX</span>®: Es gab das
+	traditionelle <acronym class="acronym">BSD</acronym> <code class="function">mmap</code>, Systemaufruf 71. Dieses wurde
+	durch das <acronym class="acronym"><span class="trademark">POSIX</span>®</acronym> <code class="function">mmap</code> ersetzt, Systemaufruf 197. Das
+	FreeBSD System unterstützt beide, weil ältere
+	Programme mit der originalen <acronym class="acronym">BSD</acronym> Version
+	geschrieben wurden. Da neue Software die
+	<acronym class="acronym"><span class="trademark">POSIX</span>®</acronym> Version nutzt, werden wir diese
+	auch verwenden.</p><p>Die <code class="filename">syscalls.master</code> Datei zeigt die
+	<acronym class="acronym"><span class="trademark">POSIX</span>®</acronym> Version wie folgt:</p><pre class="programlisting">
+197	STD	BSD	{ caddr_t mmap(caddr_t addr, size_t len, int prot, \
+			    int flags, int fd, long pad, off_t pos); }
+      </pre><p>Das weicht etwas von dem ab was
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mmap&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">mmap</span>(2)</span></a> sagt. Das ist weil
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mmap&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">mmap</span>(2)</span></a> die C Version
+	beschreibt.</p><p>Der Unterschiede liegt in dem <code class="varname">long pad</code>
+	Argument, welches in der C Version nicht vorhanden ist. Wie
+	auch immer, der FreeBSD Systemaufruf fügt einen 32-bit
+	Block ein nachdem es ein 64-Bit Argument auf den Stack
+	ge<code class="function">push</code>t hat. In diesem
+	Fall, ist <code class="varname">off_t</code> ein 64-Bit Wert.</p><p>Wenn wir fertig sind mit dem Arbeiten einer im Speicher
+	abgebildeten Datei, entfernen wir das Speicherabbild mit dem
+	<code class="function">munmap</code> Systemaufruf:</p><div xmlns="" class="tip"><h3 class="admontitle">Tipp: </h3><p xmlns="http://www.w3.org/1999/xhtml">Für eine detailliert Behandlung von <code class="function">mmap</code>, sieh in W. Richard Stevens'
+	  <a class="link" href="http://www.int80h.org/cgi-bin/isbn?isbn=0130810819" target="_top">
+	  Unix Network Programming, Volume 2, Chapter 12</a>
+	  nach.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-file-size"></a>11.11.4. Feststellen der Datei Grösse</h3></div></div></div><p>Weil wir <code class="function">mmap</code> sagen
+	müssen wie viele Bytes von Datei wir im Speicher abbilden
+	wollen und wir außerdem die gesamte Datei abbilden wollen,
+	müssen wir die Grösse der Datei feststellen.</p><p>Wir können den <code class="function">fstat</code>	Systemaufruf verwenden um alle
+	Informationen über eine geöffnete Datei zu erhalten
+	die uns das System geben kann. Das beinhaltet die Datei
+	Grösse.</p><p>Und wieder, zeigt uns <code class="filename">syscalls.master</code>
+	zwei Versionen von <code class="function">fstat</code>,
+	eine traditionelle (Systemaufruf 62), und eine
+	<acronym class="acronym"><span class="trademark">POSIX</span>®</acronym> (Systemaufruf 189) Variante.
+	Natürlich, verwenden wir die <acronym class="acronym"><span class="trademark">POSIX</span>®</acronym>
+	Version:</p><pre class="programlisting">
+189	STD	POSIX	{ int fstat(int fd, struct stat *sb); }
+      </pre><p>Das ist ein sehr unkomplizierter Aufruf: Wir
+	übergeben ihm die Adresse einer
+	<code class="varname">stat</code> Structure und den Deskriptor
+	einer geöffneten Datei. Es wird den Inhalt der
+	<code class="varname">stat</code> Struktur ausfüllen.</p><p>Ich muss allerdings sagen, das ich versucht habe die
+	<code class="varname">stat</code> Struktur in dem
+	<code class="varname">.bss</code> Bereich zu deklarieren, und
+	<code class="function">fstat</code> mochte es nicht:
+	Es setzte das Carry Flag welches einen Fehler anzeigt.
+	Nachdem ich den Code veränderte so dass er die Struktur
+	auf dem Stack anlegt, hat alles gut funktioniert.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-ftruncate"></a>11.11.5. Ändern der Dateigrösse</h3></div></div></div><p>Dadurch das unser Programm
+      Wagenrücklauf/Zeilenvorschub-Sequenzen in einfache
+      Zeilenvorschübe zusammenfassen könnte, könnte
+      unsere Ausgabe kleiner sein als unsere Eingabe. Und da wir die
+      Ausgabe in dieselbe Datei um, aus der wir unsere Eingabe
+      erhalten, müssen wir eventuell die Dateigrösse
+      anpassen.</p><p>Der Systemaufruf <code class="function">ftruncate</code> erlaubt uns, dies zu tun.
+      Abgesehen von dem etwas unglücklich gewählten Namen
+      <code class="function">ftruncate</code> können wir
+      mit dieser Funktion eine Datei vergrössern, oder
+      verkleinern.</p><p>Und ja, wir werden zwei Versionen von <code class="function">ftruncate</code> in
+      <code class="filename">syscalls.master</code> finden, eine ältere
+      (130) und eine neuere (201). Wir werden die neuere Version
+      verwenden:</p><pre class="programlisting">
+201	STD	BSD	{ int ftruncate(int fd, int pad, off_t length); }
+      </pre><p>Beachten Sie bitte, dass hier wieder <code class="varname">int
+	pad</code> verwendet wird.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-ftuc"></a>11.11.6. ftuc</h3></div></div></div><p>Wir wissen jetzt alles nötige, um
+      <span class="application">ftuc</span> zu schreiben. Wir beginnen,
+      indem wir ein paar neue Zeilen der Datei
+      <code class="filename">system.inc</code> hinzufügen. Als erstes
+      definieren wir irgendwo am Anfang der Datei einige Konstanten
+      und Strukturen:</p><pre class="programlisting">
+;;;;;;; open flags
+%define	O_RDONLY	0
+%define	O_WRONLY	1
+%define	O_RDWR	2
+
+;;;;;;; mmap flags
+%define	PROT_NONE	0
+%define	PROT_READ	1
+%define	PROT_WRITE	2
+%define	PROT_EXEC	4
+;;
+%define	MAP_SHARED	0001h
+%define	MAP_PRIVATE	0002h
+
+;;;;;;; stat structure
+struc	stat
+st_dev		resd	1	; = 0
+st_ino		resd	1	; = 4
+st_mode		resw	1	; = 8, size is 16 bits
+st_nlink	resw	1	; = 10, ditto
+st_uid		resd	1	; = 12
+st_gid		resd	1	; = 16
+st_rdev		resd	1	; = 20
+st_atime	resd	1	; = 24
+st_atimensec	resd	1	; = 28
+st_mtime	resd	1	; = 32
+st_mtimensec	resd	1	; = 36
+st_ctime	resd	1	; = 40
+st_ctimensec	resd	1	; = 44
+st_size		resd	2	; = 48, size is 64 bits
+st_blocks	resd	2	; = 56, ditto
+st_blksize	resd	1	; = 64
+st_flags	resd	1	; = 68
+st_gen		resd	1	; = 72
+st_lspare	resd	1	; = 76
+st_qspare	resd	4	; = 80
+endstruc
+      </pre><p>Wir definieren die neuen Systemaufrufe:</p><pre class="programlisting">
+%define	SYS_mmap	197
+%define	SYS_munmap	73
+%define	SYS_fstat	189
+%define	SYS_ftruncate	201
+      </pre><p>Wir fügen die Makros hinzu:</p><pre class="programlisting">
+%macro	sys.mmap	0
+	system	SYS_mmap
+%endmacro
+
+%macro	sys.munmap	0
+	system	SYS_munmap
+%endmacro
+
+%macro	sys.ftruncate	0
+	system	SYS_ftruncate
+%endmacro
+
+%macro	sys.fstat	0
+	system	SYS_fstat
+%endmacro
+      </pre><p>Und hier ist unser Code:</p><pre class="programlisting">
+;;;;;;; Fast Text-to-Unix Conversion (ftuc.asm) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Started:	21-Dec-2000
+;; Updated:	22-Dec-2000
+;;
+;; Copyright 2000 G. Adam Stanislav.
+;; All rights reserved.
+;;
+;;;;;;; v.1 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%include	'system.inc'
+
+section	.data
+	db	'Copyright 2000 G. Adam Stanislav.', 0Ah
+	db	'All rights reserved.', 0Ah
+usg	db	'Usage: ftuc filename', 0Ah
+usglen	equ	$-usg
+co	db	"ftuc: Can't open file.", 0Ah
+colen	equ	$-co
+fae	db	'ftuc: File access error.', 0Ah
+faelen	equ	$-fae
+ftl	db	'ftuc: File too long, use regular tuc instead.', 0Ah
+ftllen	equ	$-ftl
+mae	db	'ftuc: Memory allocation error.', 0Ah
+maelen	equ	$-mae
+
+section	.text
+
+align 4
+memerr:
+	push	dword maelen
+	push	dword mae
+	jmp	short error
+
+align 4
+toolong:
+	push	dword ftllen
+	push	dword ftl
+	jmp	short error
+
+align 4
+facerr:
+	push	dword faelen
+	push	dword fae
+	jmp	short error
+
+align 4
+cantopen:
+	push	dword colen
+	push	dword co
+	jmp	short error
+
+align 4
+usage:
+	push	dword usglen
+	push	dword usg
+
+error:
+	push	dword stderr
+	sys.write
+
+	push	dword 1
+	sys.exit
+
+align 4
+global	_start
+_start:
+	pop	eax		; argc
+	pop	eax		; program name
+	pop	ecx		; file to convert
+	jecxz	usage
+
+	pop	eax
+	or	eax, eax	; Too many arguments?
+	jne	usage
+
+	; Open the file
+	push	dword O_RDWR
+	push	ecx
+	sys.open
+	jc	cantopen
+
+	mov	ebp, eax	; Save fd
+
+	sub	esp, byte stat_size
+	mov	ebx, esp
+
+	; Find file size
+	push	ebx
+	push	ebp		; fd
+	sys.fstat
+	jc	facerr
+
+	mov	edx, [ebx + st_size + 4]
+
+	; File is too long if EDX != 0 ...
+	or	edx, edx
+	jne	near toolong
+	mov	ecx, [ebx + st_size]
+	; ... or if it is above 2 GB
+	or	ecx, ecx
+	js	near toolong
+
+	; Do nothing if the file is 0 bytes in size
+	jecxz	.quit
+
+	; Map the entire file in memory
+	push	edx
+	push	edx		; starting at offset 0
+	push	edx		; pad
+	push	ebp		; fd
+	push	dword MAP_SHARED
+	push	dword PROT_READ | PROT_WRITE
+	push	ecx		; entire file size
+	push	edx		; let system decide on the address
+	sys.mmap
+	jc	near memerr
+
+	mov	edi, eax
+	mov	esi, eax
+	push	ecx		; for SYS_munmap
+	push	edi
+
+	; Use EBX for state machine
+	mov	ebx, ordinary
+	mov	ah, 0Ah
+	cld
+
+.loop:
+	lodsb
+	call	ebx
+	loop	.loop
+
+	cmp	ebx, ordinary
+	je	.filesize
+
+	; Output final lf
+	mov	al, ah
+	stosb
+	inc	edx
+
+.filesize:
+	; truncate file to new size
+	push	dword 0		; high dword
+	push	edx		; low dword
+	push	eax		; pad
+	push	ebp
+	sys.ftruncate
+
+	; close it (ebp still pushed)
+	sys.close
+
+	add	esp, byte 16
+	sys.munmap
+
+.quit:
+	push	dword 0
+	sys.exit
+
+align 4
+ordinary:
+	cmp	al, 0Dh
+	je	.cr
+
+	cmp	al, ah
+	je	.lf
+
+	stosb
+	inc	edx
+	ret
+
+align 4
+.cr:
+	mov	ebx, cr
+	ret
+
+align 4
+.lf:
+	mov	ebx, lf
+	ret
+
+align 4
+cr:
+	cmp	al, 0Dh
+	je	.cr
+
+	cmp	al, ah
+	je	.lf
+
+	xchg	al, ah
+	stosb
+	inc	edx
+
+	xchg	al, ah
+	; fall through
+
+.lf:
+	stosb
+	inc	edx
+	mov	ebx, ordinary
+	ret
+
+align 4
+.cr:
+	mov	al, ah
+	stosb
+	inc	edx
+	ret
+
+align 4
+lf:
+	cmp	al, ah
+	je	.lf
+
+	cmp	al, 0Dh
+	je	.cr
+
+	xchg	al, ah
+	stosb
+	inc	edx
+
+	xchg	al, ah
+	stosb
+	inc	edx
+	mov	ebx, ordinary
+	ret
+
+align 4
+.cr:
+	mov	ebx, ordinary
+	mov	al, ah
+	; fall through
+
+.lf:
+	stosb
+	inc	edx
+	ret
+      </pre><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Verwenden Sie dieses Programm nicht mit Dateien, die
+	  sich auf Datenträgern befinden, welche mit
+	  <acronym class="acronym"><span class="trademark">MS-DOS</span>®</acronym> oder <span class="trademark">Windows</span>® formatiert
+	  wurden. Anscheinend gibt es im Code von FreeBSD einen
+	  subtilen Bug, wenn <code class="function">mmap</code>
+	  auf solchen Datenträgern verwendet wird: Wenn die Datei
+	  eine bestimmte Grösse überschreitet, füllt
+	  <code class="function">mmap</code> den Speicher mit
+	  lauter Nullen, und überschreibt damit anschliessend den
+	  Dateiinhalt.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="x86-environment.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="x86.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="x86-one-pointed-mind.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">11.10. Die <span class="trademark">UNIX</span>®-Umgebung </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 11.12. One-Pointed Mind</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

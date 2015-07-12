@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>15.15. Другой пример: Использование MAC для защиты веб сервера</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="mac.html" title="Глава 15. Принудительный контроль доступа (MAC)" /><link rel="prev" href="mac-implementing.html" title="15.14. Реализация защищенной среды с MAC" /><link rel="next" href="mac-troubleshoot.html" title="15.16. Решение проблем с инфраструктурой MAC" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.15. Другой пример: Использование MAC для защиты веб сервера</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-implementing.html">Пред.</a> </td><th width="60%" align="center">Глава 15. Принудительный контроль доступа (MAC)</th><td width="20%" align="right"> <a accesskey="n" href="mac-troubleshoot.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="MAC-examplehttpd"></a>15.15. Другой пример: Использование MAC для защиты веб сервера</h2></div></div></div><p>Будет создано отдельное хранилище для веб данных,
+	к которому пользователи должны иметь доступ.  Это позволит
+	<code class="literal">biba/high</code> управлять доступом к веб
+	данным.</p><p>Начните с создания каталога для хранения веб
+	данных:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /usr/home/cvs</code></strong></pre><p>Теперь инициализируйте его командой
+	<code class="command">cvs</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cvs -d /usr/home/cvs init</code></strong></pre><p>Для начала необходимо включить политику <code class="literal">biba</code>,
+	добавив  <code class="literal">mac_biba_enable="YES"</code> в
+	<code class="filename">/boot/loader.conf</code>.  Предполагается, что
+	ядро скомпилировано с поддержкой <acronym class="acronym">MAC</acronym>.</p><p>Далее установите метку <code class="literal">biba/high</code> для всей
+	системы по умолчанию.</p><p>В файл <code class="filename">login.conf</code>, класс default,
+	необходимо внести следующие изменения:</p><pre class="programlisting">:ignoretime@:\
+	:umask=022:\
+	:label=biba/high:</pre><p>Каждого пользователя необходимо поместить в класс по
+	умолчанию; такая команда:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>for x in `awk -F: '($3 &gt;= 1001) &amp;&amp; ($3 != 65534) { print $1 }' \</code></strong>
+	<strong class="userinput"><code>/etc/passwd`; do pw usermod $x -L default; done;</code></strong></pre><p>быстро решит эту задачу.</p><p>Теперь создадим другой класс, web, копию класса default
+	с меткой, установленной в <code class="literal">biba/low</code>.</p><p>Создайте пользователя для работы с основными веб данными,
+	хранящимися в репозитории <span class="application">cvs</span>.
+	Этого пользователя необходимо поместить в новый класс,
+	<code class="systemitem">web</code>.</p><p>Поскольку метка по умолчанию <code class="literal">biba/high</code>,
+	на репозитории она будет той же.  Веб данные должны иметь
+	ту же метку, чтобы у пользователей был доступ к ним на
+	чтение/запись.  Веб сервер должен иметь доступ к тем же
+	данным, к которым есть доступ у пользователей с меткой
+	<code class="literal">biba/high</code>, для этого необходимо понизить
+	метку данных.</p><p>Все, что потребуется, это следующий <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> скрипт,
+	который может быть запущен из <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a>:</p><pre class="programlisting">PATH=/bin:/usr/bin:/usr/local/bin; export PATH;
+CVSROOT=/home/repo; export CVSROOT;
+cd /home/web;
+cvs -qR checkout -P htdocs;
+exit;</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Во многих случаях в веб файлы <code class="command">cvs</code>
+	  необходимо поместить теги Id.</p></div><p>Этот скрипт теперь может быть помещен в домашний каталог
+	каталог пользователя <code class="systemitem">web</code>,  необходимо
+	также добавить следующую запись <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crontab&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">crontab</span>(1)</span></a>:</p><pre class="programlisting"># Выполнять checkout web данных под меткой biba/low каждые 12 часов:
+0       */12       *       *       *       web    /home/web/checkout.sh</pre><p>Эта запись будет извлекать <acronym class="acronym">HTML</acronym> страницы
+	каждые двенадцать часов.</p><p>Метод запуска веб сервера по умолчанию также должен быть
+	изменен для запуска процесса с меткой <code class="literal">biba/low</code>.
+	Это может быть сделано путем следующего изменения в скрипте
+	<code class="filename">/usr/local/etc/rc.d/apache.sh</code>:</p><pre class="programlisting">command="setpmac biba/low /usr/local/sbin/httpd"</pre><p>Настройки <span class="application">Apache</span> должны быть изменены
+	для работы с политикой <code class="literal">biba/low</code>.  В этом
+	случае необходимо указать для хранения лог файлов каталог с
+	меткой <code class="literal">biba/low</code>, иначе будут возвращены
+	ошибки <span class="errorname">access denied</span>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">В этом примере необходимо указать в директиве
+	  <code class="literal">docroot</code> каталог
+	  <code class="filename">/home/web/htdocs</code>; или,
+	  <span class="application">Apache</span> не сможет
+	  найти каталог с документами.</p></div><p>Необходимо также изменить другие параметры конфигурации,
+	включая <acronym class="acronym">PID</acronym> файл,
+	<code class="literal">Scoreboardfile</code>,
+	<code class="literal">DocumentRoot</code>, или любые другие
+	настройки для каталогов, где необходим доступ на запись.
+	При использовании <code class="literal">biba</code> будет запрещен
+	доступ на запись во все каталоги сервера, на которых
+	нет метки <code class="literal">biba/low</code>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-implementing.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-troubleshoot.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">15.14. Реализация защищенной среды с MAC </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 15.16. Решение проблем с инфраструктурой MAC</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

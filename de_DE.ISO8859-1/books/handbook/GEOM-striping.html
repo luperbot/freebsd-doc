@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.3. RAID0 - Striping</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="GEOM.html" title="Kapitel 20. GEOM: Modulares Framework zur Plattentransformation" /><link rel="prev" href="GEOM-intro.html" title="20.2. Einführung in GEOM" /><link rel="next" href="GEOM-mirror.html" title="20.4. RAID1 - Spiegelung" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.3. RAID0 - Striping</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-intro.html">Zurück</a> </td><th width="60%" align="center">Kapitel 20. GEOM: Modulares Framework zur
+    Plattentransformation</th><td width="20%" align="right"> <a accesskey="n" href="GEOM-mirror.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-striping"></a>20.3. RAID0 - Striping</h2></div><div><span class="authorgroup">Geschrieben von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span> und <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Murray</span> <span class="surname">Stokely</span></span>. </span></div></div></div><a id="idp82414928" class="indexterm"></a><a id="idp82415696" class="indexterm"></a><p>Striping (stripe = Streifen) ist eine Methode, um
+      verschiedene Laufwerke in einem einzigen Datenträger
+      zusammenzufassen. In vielen Fällen wird dies durch die
+      Nutzung von Hardware-Controllern bewerkstelligt. Das
+      GEOM-Subsystem unterstützt
+      Software-<acronym class="acronym">RAID</acronym>0 (welches auch als Striping
+      bekannt ist).</p><p>In einem <acronym class="acronym">RAID</acronym>0-System werden die Daten
+      in einzelne Blöcke aufgeteilt, welche über alle
+      angeschlossenen Laufwerke in einem Datenfeld (Array) geschrieben
+      werden. Anstatt darauf warten zu müssen, dass 256K auf
+      ein einzelnes Laufwerk geschrieben werden, kann ein
+      <acronym class="acronym">RAID</acronym>0-System gleichzeitig 64K auf jedes von 4
+      Laufwerken schreiben mit entsprechend besserer I/O-Leistung.
+      Dieser Durchsatz kann durch die Verwendung mehrerer
+      Controller noch zusätzlich gesteigert werden.</p><p>Jedes Laufwerk in einem <acronym class="acronym">RAID</acronym>0-Stripe
+      muss die gleiche Größe haben, da
+      I/O-Anforderungen für das Lesen und Schreiben
+      abwechselnd auf mehrere Laufwerke parallel erfolgen.</p><div class="mediaobject" align="center"><img src="geom/striping.png" align="middle" alt="Disk Striping Illustration" /></div><div class="procedure"><a id="idp82421328"></a><div class="procedure-title">Prozedur 20.1. Erzeugen eines Stripe von unformatierten
+	ATA-Platten</div><ol class="procedure" type="1"><li class="step"><p>Laden Sie das
+	  <code class="filename">geom_stripe.ko</code>-Modul:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_stripe</code></strong></pre></li><li class="step"><p>Stellen Sie sicher, dass ein geeigneter Mount-Punkt
+	  existiert. Falls dieser Datenträger eine Root-Partition
+	  werden soll, dann nutzen Sie zeitweise einen anderen
+	  Mount-Punkt, beispielsweise <code class="filename">/mnt</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /mnt</code></strong></pre></li><li class="step"><p>Bestimmen Sie die Gerätenamen derjenigen Platten,
+	  welche gestriped werden sollen, und erzeugen Sie ein neues
+	  Stripe-Gerät.  Das folgende Beispiel verwendet zwei
+	  unbenutzte und unpartitionierte
+	  <acronym class="acronym">ATA</acronym>-Platten, die gestriped werden sollen.
+	  Lauten die Gerätenamen <code class="filename">/dev/ad2</code>
+	  und <code class="filename">/dev/ad3</code>, so verwenden Sie folgenden
+	  Befehl:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gstripe label -v st0 /dev/ad2 /dev/ad3</code></strong>
+Metadata value stored on /dev/ad2.
+Metadata value stored on /dev/ad3.
+Done.</pre></li><li class="step"><p>Schreiben Sie einen Standard-Label (auch als
+	  Partitions-Tabelle bekannt) auf den neuen Datenträger
+	  und installieren Sie den normalen Bootstrap-Code:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/stripe/st0</code></strong></pre></li><li class="step"><p>Dieser Prozess sollte zwei weitere Geräte im
+	  Verzeichnis <code class="filename">/dev/stripe</code> (zusätzlich zum
+	  Gerät <code class="filename">st0</code>) erzeugt haben. Diese
+	  schliessen <code class="filename">st0a</code> und
+	  <code class="filename">st0c</code> ein. Nun kann ein Dateisystem
+	  auf dem Gerät <code class="filename">st0a</code> mit dem
+	  <code class="command">newfs</code>-Dienstprogramm erzeugt
+	  werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/stripe/st0a</code></strong></pre><p>Viele Zahlen rauschen nun über Ihren Bildschirm
+	  und nach ein paar Sekunden wird der Prozess abgeschlossen
+	  sein. Der Datenträger wurde erzeugt und kann in den
+	  Verzeichnisbaum eingehängt werden.</p></li></ol></div><p>Um das erzeugte Stripe manuell zu mounten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/stripe/st0a /mnt</code></strong></pre><p>Um das erzeugte Dateisystem automatisch während des
+      Startvorgangs zu mounten, müssen Sie die
+      Datenträgerinformation in die Datei
+      <code class="filename">/etc/fstab</code> schreiben.  Dazu legen Sie einen
+      permanenten Mountpunkt namens
+      <code class="filename">stripe</code> an:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /stripe</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>echo "/dev/stripe/st0a /stripe ufs rw 2 2" \</code></strong>
+    <strong class="userinput"><code>&gt;&gt; /etc/fstab</code></strong></pre><p>Das <code class="filename">geom_stripe.ko</code>-Modul muss
+      ebenfalls automatisch beim Systemstart geladen werden (durch
+      die Aufnahme der folgenden Zeile in die Datei
+      <code class="filename">/boot/loader.conf</code>):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_stripe_load="YES"' &gt;&gt; /boot/loader.conf</code></strong></pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-intro.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM-mirror.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">20.2. Einführung in GEOM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 20.4. RAID1 - Spiegelung</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

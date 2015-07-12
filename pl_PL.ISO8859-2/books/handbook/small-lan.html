@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>21.5. Tracking for Multiple Machines</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Podręcznik FreeBSD" /><link rel="up" href="cutting-edge.html" title="Rozdział 21. The Cutting Edge" /><link rel="prev" href="makeworld.html" title="21.4. Rebuilding "world"" /><link rel="next" href="network-communication.html" title="Część IV. Komunikacja sieciowa" /><link rel="copyright" href="legalnotice.html" title="Informacja Prawna" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.5. Tracking for Multiple Machines</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="makeworld.html">Poprzedni</a> </td><th width="60%" align="center">Rozdział 21. The Cutting Edge</th><td width="20%" align="right"> <a accesskey="n" href="network-communication.html">Następny</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="small-lan"></a>21.5. Tracking for Multiple Machines</h2></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Mike</span> <span class="surname">Meyer</span></span>. </span></div></div></div><a id="idp90860112" class="indexterm"></a><p>If you have multiple machines that you want to track the
+      same source tree, then having all of them download sources and
+      rebuild everything seems like a waste of resources: disk space,
+      network bandwidth, and CPU cycles.  It is, and the solution is
+      to have one machine do most of the work, while the rest of the
+      machines mount that work via NFS.  This section outlines a
+      method of doing so.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="small-lan-preliminaries"></a>21.5.1. Preliminaries</h3></div></div></div><p>First, identify a set of machines that is going to run
+	the same set of binaries, which we will call a
+	<span class="emphasis"><em>build set</em></span>.  Each machine can have a
+	custom kernel, but they will be running the same userland
+	binaries.  From that set, choose a machine to be the
+	<span class="emphasis"><em>build machine</em></span>.  It is going to be the
+	machine that the world and kernel are built on. Ideally, it
+	should be a fast machine that has sufficient spare CPU to
+	run <code class="command">make buildworld</code> and
+	<code class="command">make buildkernel</code>.  You will also want to
+	choose a machine to be the <span class="emphasis"><em>test
+	machine</em></span>, which will test software updates before they
+	are put into production.  This <span class="emphasis"><em>must</em></span> be a
+	machine that you can afford to have down for an extended
+	period of time.  It can be the build machine, but need not be.</p><p>All the machines in this build set need to mount
+	<code class="filename">/usr/obj</code> and
+	<code class="filename">/usr/src</code> from the same machine, and at
+	the same point.  Ideally, those are on two different drives
+	on the build machine, but they can be NFS mounted on that machine
+	as well.  If you have multiple build sets,
+	<code class="filename">/usr/src</code> should be on one build machine, and
+	NFS mounted on the rest.</p><p>Finally make sure that
+	<code class="filename">/etc/make.conf</code> on all the machines in
+	the build set agrees with the build machine.  That means that
+	the build machine must build all the parts of the base
+	system that any machine in the build set is going to
+	install.  Also, each build machine should have its kernel
+	name set with <code class="varname">KERNCONF</code> in
+	<code class="filename">/etc/make.conf</code>, and the build machine
+	should list them all in <code class="varname">KERNCONF</code>, listing
+	its own kernel first.  The build machine must have the kernel
+	configuration files for each machine in
+	<code class="filename">/usr/src/sys/arch/conf</code>
+	if it is going to build their kernels.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90877648"></a>21.5.2. The Base System</h3></div></div></div><p>Now that all that is done, you are ready to build
+	everything.  Build the kernel and world as described in <a class="xref" href="makeworld.html#make-buildworld" title="21.4.7.2. Compile the Base System">Sekcja 21.4.7.2, "Compile the Base System"</a> on the build machine,
+	but do not install anything.  After the build has finished, go
+	to the test machine, and install the kernel you just
+	built.  If this machine mounts <code class="filename">/usr/src</code>
+	and <code class="filename">/usr/obj</code> via NFS, when you reboot
+	to single user you will need to enable the network and mount
+	them.  The easiest way to do this is to boot to multi-user,
+	then run <code class="command">shutdown now</code> to go to single user
+	mode.  Once there, you can install the new kernel and world and run
+	<code class="command">mergemaster</code> just as you normally would.  When
+	done, reboot to return to normal multi-user operations for this
+	machine.</p><p>After you are certain that everything on the test
+	machine is working properly, use the same procedure to
+	install the new software on each of the other machines in
+	the build set.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90881104"></a>21.5.3. Ports</h3></div></div></div><p>The same ideas can be used for the ports tree.  The first
+	critical step is mounting <code class="filename">/usr/ports</code> from
+	the same machine to all the machines in the build set.  You can
+	then set up <code class="filename">/etc/make.conf</code> properly to share
+	distfiles.  You should set <code class="varname">DISTDIR</code> to a
+	common shared directory that is writable by whichever user
+	<code class="systemitem">root</code> is mapped to by your NFS mounts.  Each
+	machine should set <code class="varname">WRKDIRPREFIX</code> to a
+	local build directory.  Finally, if you are going to be
+	building and distributing packages, you should set
+	<code class="varname">PACKAGES</code> to a directory similar to
+	<code class="varname">DISTDIR</code>.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="makeworld.html">Poprzedni</a> </td><td width="20%" align="center"><a accesskey="u" href="cutting-edge.html">Początek rozdziału</a></td><td width="40%" align="right"> <a accesskey="n" href="network-communication.html">Następny</a></td></tr><tr><td width="40%" align="left" valign="top">21.4. Rebuilding <span class="quote">"<span class="quote">world</span>"</span> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Spis treści</a></td><td width="40%" align="right" valign="top"> Część IV. Komunikacja sieciowa</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

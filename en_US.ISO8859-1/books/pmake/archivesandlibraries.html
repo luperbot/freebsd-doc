@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>4.2. Archives and Libraries</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="gods.html" title="Chapter 4. PMake for Gods" /><link rel="prev" href="gods.html" title="Chapter 4. PMake for Gods" /><link rel="next" href="condition.html" title="4.3. On the Condition..." /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4.2. Archives and Libraries</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="gods.html">Prev</a> </td><th width="60%" align="center">Chapter 4. PMake for Gods</th><td width="20%" align="right"> <a accesskey="n" href="condition.html">Next</a></td></tr></table><hr /></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="archivesandlibraries"></a>4.2. Archives and Libraries</h2></div></div></div><p><span class="trademark">UNIX</span>® and Sprite allow you to merge files into an archive
+      using the <code class="command">ar</code> command.  Further, if the files
+      are relocatable object files, you can run
+      <span class="application">ranlib</span> on the archive and get
+      yourself a library that you can link into any program you want.
+      The main problem with archives is they double the space you need
+      to store the archived files, since there is one copy in the
+      archive and one copy out by itself.  The problem with libraries
+      is you usually think of them as <code class="option">-lm</code> rather
+      than <code class="filename">/usr/lib/libm.a</code> and the linker thinks
+      they are out-of-date if you so much as look at them.</p><p><span class="application">PMake</span> solves the problem with
+      archives by allowing you to tell it to examine the files in the
+      archives (so you can remove the individual files without having
+      to regenerate them later).  To handle the problem with
+      libraries, <span class="application">PMake</span> adds an additional
+      way of deciding if a library is out-of-date: if the table of
+      contents is older than the library, or is missing, the library
+      is out-of-date.</p><p>A library is any target that looks like <code class="option">-lname</code>
+      or that ends in a suffix that was marked as a library using the
+      <code class="buildtarget">.LIBS</code> target.  <code class="filename">.a</code>
+      is so marked in the system makefile.  Members of an archive are
+      specified as <code class="literal">archive(member[member...])</code>.
+      Thus <code class="literal">libdix.a(window.o)</code> specifies the
+      file <code class="filename">window.o</code> in the archive
+      <code class="filename">libdix.a</code>.  You may also use
+      wildcards to specify the members of the archive.  Just
+      remember that most the wildcard characters will only find
+      existing files.  A file that is a member of an archive is
+      treated specially.  If the file does not exist, but it is
+      in the archive, the modification time recorded in the
+      archive is used for the file when determining if the file
+      is out-of-date.  When figuring out how to make an archived
+      member target (not the file itself, but the file in the
+      archive &#8211; the archive(member) target), special care
+      is taken with the transformation rules, as follows:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>archive(member) is made to depend on member.</p></li><li class="listitem"><p>The transformation from the member's suffix to the
+	  archive's suffix is applied to the archive(member) target.</p></li><li class="listitem"><p>The archive(member)'s <code class="varname">.TARGET</code>
+	  variable is set to the name of the member if member is
+	  actually a target, or the path to the member file if
+	  member is only a source.</p></li><li class="listitem"><p>The <code class="varname">.ARCHIVE</code> variable for the
+	  archive(member) target is set to the name of the
+	  archive.</p></li><li class="listitem"><p>The <code class="varname">.MEMBER</code> variable is set to the
+	  actual string inside the parentheses.  In most cases,
+	  this will be the same as the <code class="varname">.TARGET</code>
+	  variable.</p></li><li class="listitem"><p>The archive(member)'s place in the local variables of
+	  the targets that depend on it is taken by the value of its
+	  <code class="varname">.TARGET</code> variable.</p></li></ul></div><p>Thus, a program library could be created with the following
+      makefile:</p><pre class="programlisting">.o.a            :
+	...
+	rm -f $(.TARGET:T)
+OBJS            = obj1.o obj2.o obj3.o
+libprog.a       : libprog.a($(OBJS))
+	ar cru $(.TARGET) $(.OODATE)
+	ranlib $(.TARGET)</pre><p>This will cause the three object files to be compiled (if
+      the corresponding source files were modified after the object
+      file or, if that does not exist, the archived object file), the
+      out-of-date ones archived in <code class="filename">libprog.a</code>, a
+      table of contents placed in the archive and the newly-archived
+      object files to be removed.</p><p>All this is used in the <code class="filename">makelib.mk</code> system
+      makefile to create a single library with ease.  This makefile looks
+      like this:</p><pre class="programlisting">#
+# Rules for making libraries. The object files that make up the library
+# are removed once they are archived.
+#
+# To make several libraries in parallel, you should define the variable
+# "many_libraries". This will serialize the invocations of ranlib.
+#
+# To use, do something like this:
+#
+# OBJECTS = &lt;files in the library&gt;
+#
+# fish.a: fish.a($(OBJECTS)) MAKELIB
+#
+#
+
+#ifndef _MAKELIB_MK
+_MAKELIB_MK    =
+
+#include  &lt;po.mk&gt;
+
+.po.a .o.a     :
+	...
+	rm -f $(.MEMBER)
+
+ARFLAGS        ?= crl
+
+#
+# Re-archive the out-of-date members and recreate the library's table of
+# contents using ranlib. If many_libraries is defined, put the ranlib
+# off til the end so many libraries can be made at once.
+#
+MAKELIB        : .USE .PRECIOUS
+	ar $(ARFLAGS) $(.TARGET) $(.OODATE)
+#ifndef no_ranlib
+# ifdef many_libraries
+	...
+# endif many_libraries
+	ranlib $(.TARGET)
+#endif no_ranlib
+
+#endif _MAKELIB_MK</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="gods.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="gods.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="condition.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 4. PMake for Gods </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 4.3. On the Condition...</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

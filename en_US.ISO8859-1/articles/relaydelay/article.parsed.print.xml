@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!--
+    $FreeBSD$
+-->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Using Greylist with FreeBSD</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Tom</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Rhodes</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+        <address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">trhodes@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2004</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD Documentation Project</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">An article written for the sole purpose of explaining
+        the relaydelay system on a FreeBSD mail server.  A relaydelay
+	or greylisting server cuts down on spam simply by issuing
+	a <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> error message to
+	every incoming email.  The purpose behind this idea
+	is that most spammers use their personal computers with
+	software to do their spamming.  A real mail server should
+	queue the message and try to send it later.  Thus the
+	spammer most likely moves on to the next host in place
+	of trying to send the email again.  This is an excellent
+	idea; at least until the spammers begin to use software
+	that offers to try again.  But how does this work exactly?
+	Well, when an email is received the message
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym> is stored	in a database and the
+	<errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> is returned along with the
+	email.  If the email is resent, the message
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym> will be checked against the message
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym>s currently stored in the database.
+	If it exists in the database then the email is permitted to reach its
+	intended recipient.  Otherwise,	the <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym>
+	will be stored and a <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> will
+	be issued.  This cycle will repeat with every email which
+	comes into the server.  From my personal experience, this
+	really does cut out 90% of the spam.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Basic Configuration</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Install perl using
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">pkg install lang/perl5.16</userinput></screen>
+    </para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now for the database server;
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">MySQL</application> is perfect for this
+      sort of work.  Install the
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">databases/mysql40-server</package>
+      along with
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">databases/p5-DBD-mysql40</package>.
+      The previous port should imply the installation of
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">databases/p5-DBI-137</package>
+      so that knocks off another step.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Install the <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command> based portable
+      server plugin, <package xmlns:xlink="http://www.w3.org/1999/xlink">net/p5-Net-Daemon</package>
+      port.  Most of these port installations should have
+      been straight forward.  The next step will be more
+      involved.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now install the
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">mail/p5-Sendmail-Milter</package>
+      port.  As of this writing the <filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename>
+      contains a line beginning with <varname xmlns:xlink="http://www.w3.org/1999/xlink">BROKEN</varname>,
+      just remove it or comment it out.  It is only marked
+      this way because FreeBSD neither has nor installs
+      a threaded <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command> package by default.  Once that
+      line is removed it should build and install perfectly
+      fine.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Create a directory to hold temporary configuration
+      files:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir /tmp/relaydelay</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /tmp/relaydelay</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now that we have a temporary directory to work in, the
+      following <acronym xmlns:xlink="http://www.w3.org/1999/xlink">URL</acronym>s should be sent to the
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">fetch</command> command:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fetch http://projects.puremagic.com/greylisting/releases/relaydelay-0.04.tgz</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fetch http://lists.puremagic.com/pipermail/greylist-users/attachments/20030904/b8dafed9/relaydelay-0.04.bin</userinput></screen>
+
+<!-- NOTE TO TOM RHODES:  HAVING THE SOFTWARE LINKED HERE IS A BAD IDEA IN
+     CASE SOME ASSHOLE UPDATES IT.  I SHOULD PROBABLY ARCHIVE THE OTHER URL
+     SCRIPTS AND OTHER SHIT AS WELL.  -->
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The source code should now be unpacked:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gunzip -c relaydelay-0.04.tgz | tar xvf -</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There should now be several files into the temporary directory
+      by this point.  The appropriate information can now be passed to
+      the database server by importing it from the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">mysql.sql</filename> file:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mysql &lt; relaydelay-0.04/mysql.sql</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">And patch the other files with the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.bin</filename> by running:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">patch -d /tmp/relaydelay/relaydelay-0.04 &lt; relaydelay.bin</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Edit the <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.conf</filename> and the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">db_maintenance.pl</filename> file to append the
+      correct username and password for the
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">MySQL</application> database.  If the database was
+      built and installed like the above then no users or passwords
+      exist.  This should be altered before putting this into
+      production, that is covered in the database documentation and
+      is beyond the scope of this document.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Change the working directory to the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay-0.04</filename>
+      directory:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd relaydelay-0.04</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Copy or move the configuration files to their respective
+      directories:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mv db_maintenance.pl relaydelay.pl /usr/local/sbin</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mv relaydelay.conf /etc/mail</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mv relaydelay.sh /usr/local/etc/rc.d/</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Test the current configuration by running:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh /usr/local/etc/rc.d/relaydelay.sh start</userinput></screen>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This file will not exist if the previous <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">mv</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> commands
+	were neglected.</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">If everything worked correctly a new file,
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.log</filename>, should exist in
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var/log</filename>.  It should
+      contain something similar to the following text:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">Loaded Config File: /etc/mail/relaydelay.conf
+Using connection 'local:/var/run/relaydelay.sock' for filter relaydelay
+DBI Connecting to DBI:mysql:database=relaydelay:host=localhost:port=3306
+Spawned relaydelay daemon process 38277.
+Starting Sendmail::Milter 0.18 engine.</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">If this does not appear then something went wrong, review
+      the screen output or look for anything new in the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">messages</filename> log file.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Glue everything together by adding the following line to
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/mail/sendmail.mc</filename> or the customized
+      site specific <filename xmlns:xlink="http://www.w3.org/1999/xlink">mc</filename> file:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">INPUT_MAIL_FILTER(`relaydelay', `S=local:/var/run/relaydelay.sock, T=S:1m;R:2m;E:3m')dnl</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Rebuild and reinstall the files in the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/mail</filename> directory and restart
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">sendmail</command>.  A quick <command xmlns:xlink="http://www.w3.org/1999/xlink">make</command>
+      <buildtarget>restart</buildtarget> should do the trick.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Obtain the <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command> script located at
+      <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.puremagic.com/pipermail/greylist-users/2003-November/000327.html">
+      http://lists.puremagic.com/pipermail/greylist-users/2003-November/000327.html</link>
+      and save it in the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay-0.04</filename>
+      directory.  In the following examples this script is
+      referred to as <filename xmlns:xlink="http://www.w3.org/1999/xlink">addlist.pl</filename>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Edit the <filename xmlns:xlink="http://www.w3.org/1999/xlink">whitelist_ip.txt</filename> file and
+      modify it to include <acronym xmlns:xlink="http://www.w3.org/1999/xlink">IP</acronym> addresses of servers
+      which should have the explicit abilities to bypass the
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay</application> filters.  i.e., domains
+      from which email will not be issued a
+      <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> when received.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Some examples could include:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">192.168.   # My internal network.
+66.218.66       # Yahoo groups has unique senders.</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The <filename xmlns:xlink="http://www.w3.org/1999/xlink">blacklist_ip.txt</filename> file should
+      be treated similarly but with reversed rules.  List within
+      this file <acronym xmlns:xlink="http://www.w3.org/1999/xlink">IP</acronym>s which should be denied without
+      being issued a <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname>.  This list of
+      domains will never have the opportunity to prove that they are
+      legitimate email servers.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">These files should now be imported into the database with
+      the <filename xmlns:xlink="http://www.w3.org/1999/xlink">addlist.pl</filename> script obtained a few
+      lines ago:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">perl addlist.pl -whitelist 9999-12-31 23:59:59 &lt; whitelist_ip.txt</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">perl addlist.pl -blacklist 9999-12-31 23:59:59 &lt; blacklist_ip.txt</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">To have <application xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay</application> start with
+      every system boot, add the
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay_enable="YES"</option> to the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename> file.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var/log/relaydelay.log</filename> log file
+      should slowly fill up with success stories.  Lines like the
+      following should appear after a short time, depending on how
+      busy the mail server is.</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">=== 2004-05-24 21:03:22 ===
+Stored Sender: &lt;someasshole@flawed-example.com&gt;
+Passed Recipient: &lt;local_user@pittgoth.com&gt;
+  Relay: example.net [XXX.XX.XXX.XX] - If_Addr: MY_IP_ADDRESS
+  RelayIP: XX.XX.XX.XX - RelayName: example.net - RelayIdent:  - PossiblyForged: 0
+  From: someasshole@flawed-example.com - To: local_user
+  InMailer: esmtp - OutMailer: local - QueueID: i4P13Lo6000701111
+  Email is known but block has not expired.  Issuing a tempfail.  rowid: 51
+  IN ABORT CALLBACK - PrivData: 0&lt;someasshole@flawed-example.com&gt;</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The following line may now be added to
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/newsyslog.conf</filename> to cause for
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.log</filename> rotation at every
+      100 <acronym xmlns:xlink="http://www.w3.org/1999/xlink">Kb</acronym>:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink">/var/log/relaydelay.log                 644  3     100  *     Z</screen>
+
+    <!-- XXX What text does this note belong with? -->
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">At some point there was an error about improper
+        <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command> variables in the
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/mail/relaydelay.conf</filename>.  If those
+	two variables are commented out then configuration may
+	proceed as normal.  Just remember to uncomment them before
+	starting the <command xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay</command> process.</para>
+    </note>
+  </sect1>
+</article>

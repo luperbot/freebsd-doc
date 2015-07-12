@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>16.6. OS の種類やバージョンの識別</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD port 作成者のためのハンドブック" /><link rel="up" href="porting-dads.html" title="第16章 やっていいことといけないこと" /><link rel="prev" href="porting-wrkdirprefix.html" title="16.5. WRKDIRPREFIX" /><link rel="next" href="freebsd-versions.html" title="16.7. __FreeBSD_version の値" /><link rel="copyright" href="trademarks.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">16.6. OS の種類やバージョンの識別</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-wrkdirprefix.html">戻る</a>〓</td><th width="60%" align="center">第16章 やっていいことといけないこと</th><td width="20%" align="right">〓<a accesskey="n" href="freebsd-versions.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="porting-versions"></a>16.6. OS の種類やバージョンの識別</h2></div></div></div><p>どのバージョンの Unix で動かすかによって、
+	変更や条件つきコンパイルが必要なコードに出くわすこともあるでしょう。
+	そのような変更を行なう場合には、
+	古い FreeBSD システムへのバックポートや、
+	CSRG の 4.4BSD, BSD/386, 386BSD, NetBSD, OpenBSD 等、
+	他の BSD システムへの移植が可能なように、
+	できるだけ汎用的な変更を行なうことを心がけてください。</p><p>4.3BSD/Reno (1990) と、それより新しいバージョンの
+	BSD コードを区別するには、
+	<code class="filename">&lt;sys/param.h&gt;</code> で定義されている
+	<code class="literal">BSD</code> マクロを利用するのがよいでしょう。
+	このファイルがすでにインクルードされていれば良いのですが、
+	そうでない場合には、その <code class="filename">.c</code> ファイルの
+	適当な場所に以下のコードを追加してください。</p><pre class="programlisting">#if (defined(__unix__) || defined(unix)) &amp;&amp; !defined(USG)
+#include &lt;sys/param.h&gt;
+#endif</pre><p>これらの二つのシンボルが定義されているシステムには必ず
+	<code class="filename">sys/param.h</code> があるはずです。
+	もしそうでないシステムを発見したら、
+	<a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-ports" target="_top">FreeBSD ports メーリングリスト</a> までメールを送ってわたしたちに伝えてください。</p><p>あるいは、GNU Autoconf のスタイルを使用することもできます。</p><pre class="programlisting">#ifdef HAVE_SYS_PARAM_H
+#include &lt;sys/param.h&gt;
+#endif</pre><p>この方法を使用するときには、
+	<code class="filename">Makefile</code> 中の
+	<code class="varname">CFLAGS</code>に
+	<code class="literal">-DHAVE_SYS_PARAM_H</code>
+	を加えることを忘れないようにしてください。</p><p>いったん <code class="filename">sys/param.h</code>
+	がインクルードされると、</p><pre class="programlisting">#if (defined(BSD) &amp;&amp; (BSD &gt;= 199103))</pre><p>このようにしてそのコードが 4.3 Net2 コードベース、
+	またはそれより新しいもの
+	(例: FreeBSD 1.x, 4.3/Reno, NetBSD 0.9, 386BSD, BSD/386 1.1 とそれ以前)
+	の上でコンパイルされているかを検出できます。</p><pre class="programlisting">#if (defined(BSD) &amp;&amp; (BSD &gt;= 199306))</pre><p>これは、4.4コードベース、またはそれより新しいもの
+	(例: FreeBSD 2.x, 4.4, NetBSD 1.0, BSD/386 2.0 とそれ以後)
+	の上でコンパイルされているかどうかを検出するために使用します。</p><p>4.4BSD-Lite2 コードベースでは
+	<code class="literal">BSD</code> マクロの値は
+	<code class="literal">199506</code> になっています。
+	これは参考程度の意味合いしかありません。
+	4.4-Lite ベースの FreeBSD と 4.4-Lite2
+	での変更がマージされたバージョンとを区別するのに使用するべきものではありません。
+	この目的のためにはかわりに
+	<code class="literal">__FreeBSD__</code>
+	マクロを使用してください。</p><p>以下は控え目に使ってください。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">__FreeBSD__</code>
+	    はFreeBSDのすべての版で定義されています。
+	    変更が FreeBSD だけに適用されるとき以外は使用しないでください。
+	    port でよくある
+	    <code class="function">strerror()</code> ではなく
+	    <code class="literal">sys_errlist[]</code> を使うなどは
+	    FreeBSDでの変更ではなく BSD の流儀です。</p></li><li class="listitem"><p>FreeBSD 2.xでは <code class="literal">__FreeBSD__</code> が
+	    <code class="literal">2</code> と定義されています。
+	    それ以前の版では <code class="literal">1</code> になっています。
+	    その後の版でもメジャー番号に合うように上げています。</p></li><li class="listitem"><p>もし FreeBSD 1.x システムと FreeBSD 2.x
+	    以降のシステムを区別する必要があれば、
+	    上で述べた <code class="literal">BSD</code>
+	    マクロを使用するのが大抵の場合において正しい答です。
+	    もし FreeBSD 特有の変更であれば
+	    (<code class="command">ld</code> を使うときの共有ライブラリ用のオプションなど)、
+	    
+	    <code class="literal">__FreeBSD__</code>を使い
+	    <code class="literal">#if __FreeBSD__ &gt; 1</code>
+	    のようにFreeBSD 2.x および、
+	    それ以降のシステムを検出するのはかまいません。
+	    もし 2.0-RELEASE 以降の FreeBSD システムを細かく検出したければ、
+	    以下を使用することができます。</p><pre class="programlisting">#if __FreeBSD__ &gt;= 2
+#include &lt;osreldate.h&gt;
+#    if __FreeBSD_version &gt;= 199504
+         /* 2.0.5+ release specific code here */
+#    endif
+#endif</pre></li></ul></div><p>これまで、何百もの port が作られてきましたが、
+	<code class="literal">__FreeBSD__</code>
+	が正しく使われたのは一つか二つの場合だけでしょう。
+	以前の port が間違ってふさわしくない場所で
+	そのマクロを使っているからといって、
+	それをまねする理由はありません。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-wrkdirprefix.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="porting-dads.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="freebsd-versions.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">16.5. <code class="varname">WRKDIRPREFIX</code>〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓16.7. __FreeBSD_version の値</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

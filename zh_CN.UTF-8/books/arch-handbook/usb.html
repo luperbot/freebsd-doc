@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>第 13 章 USB设备</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="devicedrivers.html" title="部分 II. 设备驱动程序" /><link rel="prev" href="scsi-timeout.html" title="12.7. 超时处理" /><link rel="next" href="usb-hc.html" title="13.2. 主控器" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第 13 章 USB设备</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="scsi-timeout.html">上一页</a> </td><th width="60%" align="center">部分 II. 设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="usb-hc.html">下一页</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="usb"></a>第 13 章 USB设备</h2></div><div><span class="authorgroup">写作：<span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nick</span> <span class="surname">Hibma</span></span>. </span></div><div><span class="authorgroup">改编为手册：<span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Murray</span> <span class="surname">Stokely</span></span>. </span></div><div><span class="authorgroup">翻译：<span xmlns="http://www.w3.org/1999/xhtml" class="author"></span>. </span></div></div></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="usb.html#usb-intro">13.1. 简介</a></span></dt><dt><span class="sect1"><a href="usb-hc.html">13.2. 主控器</a></span></dt><dt><span class="sect1"><a href="usb-dev.html">13.3. USB设备信息</a></span></dt><dt><span class="sect1"><a href="usb-devprobe.html">13.4. 设备的探测和连接</a></span></dt><dt><span class="sect1"><a href="usb-protocol.html">13.5. USB驱动程序的协议信息</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="usb-intro"></a>13.1. 简介</h2></div></div></div><a id="idp72582864" class="indexterm"></a><a id="idp72583376" class="indexterm"></a><p>通用串行总线(USB)是将设备连接到个人计算机的一种新方法。总线
+      结构突出了双向通信的特色，并且其开发充分考虑到了设备正逐渐智能化
+      和需要与host进行更多交互的现实。对USB的支持包含在当前所有芯片中,
+      因此在新近制造的PC中都可用。苹果(Apple)引入仅带USB的iMac对硬件
+      制造商生产他们USB版本的设备是一个很大的激励。未来的PC规范指定
+      PC上的所有老连接器应当由一个或多个USB连接器取代，提供通用的
+      即插即用能力。对USB硬件的支持在NetBSD的相当早期就有了，它是由
+      Lennart Augustsson为NetBSD项目开发的。代码已经被移植到FreeBSD上，
+      我们目前维护着一个底层共享代码。对USB子系统的实现来说，许多USB的
+      特性很重要。</p><p><span class="emphasis"><em>Lennart Augustsson已经完成了NetBSD项目中USB支持的
+      大部分实现。十分感谢这项工作量惊人的工作。也十分感谢Ardy和Dirk
+      对本文稿的评论和校对。</em></span></p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>设备直接连接到计算机上的端口，或者连接到称为
+        集中器的设备，形成树型设备结构。</p></li><li class="listitem"><p>设备可在运行时连接或断开。</p></li><li class="listitem"><p>设备可以挂起自身并触发host系统的重新投入运行。
+        </p></li><li class="listitem"><p>由于设备可由总线供电，因此host软件必须跟踪每个
+        集中器的电源预算。</p></li><li class="listitem"><p>不同设备类型需要不同的服务质量，并且同一总线
+        可以连接最多126个设备，这就需要恰当地调度总线上的传输以充分
+	利用12Mbps的可用带宽。（USB 2.0超过400Mbps）</p></li><li class="listitem"><p>设备智能化并包含很容易访问到的关于自身的信息。
+        </p></li></ul></div><p>为USB子系统以及连接到它的设备开发驱动程序受已开发或将要开发的
+      规范的支持。这些规范可以从USB主页公开获得。苹果(Apple)通过使得
+      通用类驱动程序可从其操作系统MacOS中获得，而且不鼓励为每种新设备
+      使用单独的驱动程序来强烈推行基于标准的驱动程序。本章试图整理基本
+      信息以便对FreeBSD/NetBSD中USB栈的当前实现有个基本的了解。然而，
+      建议将下面参考中提及的相关规范与本章同时阅读。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72588752"></a>13.1.1. USB栈的结构</h3></div></div></div><p>FreeBSD中的USB支持可被分为三层。最底层包含主控器，向硬件
+        及其调度设施提供一个通用接口。它支持硬件初始化，对传输进行调度，
+	处理已完成/失败的传输。每个主控器驱动程序实现一个虚拟hub，
+	以硬件无关方式提供对控制机器背面根端口的寄存器的访问。</p><p>中间层处理设备连接和断开，设备的基本初始化，驱动程序的选择，
+        通信通道（管道）和资源管理。这个服务层也控制默认管道和其上传输的
+	设备请求。</p><p>顶层包含支持特定（类）设备的各个驱动程序。这些驱动程序实现
+        除默认管道外的其他管道上使用的协议。他们也实现额外功能，使得设备
+	对内核或用户空间是可见的。他们使用服务层暴露出的USB驱动程序接口
+	(USBDI)。</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="scsi-timeout.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="devicedrivers.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="usb-hc.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">12.7. 超时处理 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 13.2. 主控器</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

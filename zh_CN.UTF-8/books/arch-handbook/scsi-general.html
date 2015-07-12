@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>12.2. 通用基础结构</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="scsi.html" title="第 12 章 通用访问方法SCSI控制器" /><link rel="prev" href="scsi.html" title="第 12 章 通用访问方法SCSI控制器" /><link rel="next" href="scsi-polling.html" title="12.3. 轮询" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.2. 通用基础结构</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="scsi.html">上一页</a> </td><th width="60%" align="center">第 12 章 通用访问方法SCSI控制器</th><td width="20%" align="right"> <a accesskey="n" href="scsi-polling.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="scsi-general"></a>12.2. 通用基础结构</h2></div></div></div><a id="idp72103632" class="indexterm"></a><p>CAM代表通用访问方法（Common Access Method）。它以类SCSI方式寻址
+      I/O总线。这就允许将通用设备驱动程序和控制I/O总线的驱动程序分离开来：
+      例如磁盘驱动程序能同时控制SCSI、IDE、且/或任何其他总线上的磁盘，
+      这样磁盘驱动程序部分不必为每种新的I/O总线而重写（或拷贝修改）。
+      这样，两个最重要的活动实体是：</p><a id="idp72104528" class="indexterm"></a><a id="idp72105040" class="indexterm"></a><a id="idp72105552" class="indexterm"></a><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>外围设备模块</em></span> - 外围设备（磁盘，
+        磁带， CD-ROM等）的驱动程序</p></li><li class="listitem"><p><span class="emphasis"><em>SCSI接口模块</em></span>(SIM)
+        - 连接到I/O总线，如SCSI或IDE，的主机总线适配器驱动程序。
+      </p></li></ul></div><p>外围设备驱动程序从OS接收请求，将它们转换为SCSI命令序列并将
+      这些SCSI命令传递到SCSI接口模块。SCSI接口模块负责将这些命令传递给
+      实际硬件（或者如果实际硬件不是SCSI，而是例如IDE，则也要将这些SCSI
+      命令转换为硬件的native命令）。</p><p>由于这儿我们感兴趣的是编写SCSI适配器驱动程序，从此处开始我们
+      将从SIM的角度考虑所有的事情。</p><p>典型的SIM驱动程序需要包括如下的CAM相关的头文件：</p><pre class="programlisting">#include &lt;cam/cam.h&gt;
+#include &lt;cam/cam_ccb.h&gt;
+#include &lt;cam/cam_sim.h&gt;
+#include &lt;cam/cam_xpt_sim.h&gt;
+#include &lt;cam/cam_debug.h&gt;
+#include &lt;cam/scsi/scsi_all.h&gt;</pre><p>每个SIM驱动程序必须做的第一件事情是向CAM子系统注册它自己。
+      这在驱动程序的<code class="function">xxx_attach()</code>函数（此处和以后的
+      xxx_用于指带唯一的驱动程序名字前缀）期间完成。
+      <code class="function">xxx_attach()</code>函数自身由系统总线自动配置代码
+      调用，我们在此不描述这部分代码。</p><p>这需要好几步来完成：首先需要分配与SIM关联的请求队列：</p><pre class="programlisting">    struct cam_devq *devq;
+
+    if(( devq = cam_simq_alloc(SIZE) )==NULL) {
+        error; /* 一些处理错误的代码 */
+    }</pre><p>此处 <code class="literal">SIZE</code> 为要分配的队列的大小，
+      它能包含的最大请求数目。 它是 SIM
+      驱动程序在 SCSI 卡上能够并行处理的请求的数目。一般可以如下估算：</p><pre class="programlisting">SIZE = NUMBER_OF_SUPPORTED_TARGETS * MAX_SIMULTANEOUS_COMMANDS_PER_TARGET</pre><p>下一步为我们的SIM创建描述符：</p><pre class="programlisting">    struct cam_sim *sim;
+
+    if(( sim = cam_sim_alloc(action_func, poll_func, driver_name,
+            softc, unit, max_dev_transactions,
+            max_tagged_dev_transactions, devq) )==NULL) {
+        cam_simq_free(devq);
+        error; /* 一些错误处理代码 */
+    }</pre><p>注意如果我们不能创建SIM描述符，我们也释放
+      <code class="varname">devq</code>，因为我们对其无法做任何其他事情，
+      而且我们想节约内存。</p><a id="idp72114512" class="indexterm"></a><p>如果SCSI卡上有多条SCSI总线，则每条总线需要它自己的
+      <code class="varname">cam_sim</code> 结构。</p><p>一个有趣的问题是，如果SCSI卡有不只一条SCSI总线我们该怎么做，
+      每个卡需要一个<code class="varname">devq</code>结构还是每条SCSI总线？
+      在CAM代码的注释中给出的答案是：任一方式均可，由驱动程序的作者
+      选择。</p><p>参量为：
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">action_func</code> - 指向驱动程序
+	  <code class="function">xxx_action</code> 函数的指针。
+	  </p><div class="funcsynopsis"><table border="0" class="funcprototype-table" summary="Function synopsis" style="cellspacing: 0; cellpadding: 0;"><tr><td><code class="funcdef">static void
+            <strong class="fsfunc">xxx_action</strong>
+	  (</code></td><td><var class="pdparam">struct cam_sim *sim</var><var class="pdparam">union ccb *ccb</var><code>)</code>;</td><td> </td></tr></table><div class="paramdef-list"><code>
+	      <var class="pdparam">struct cam_sim *sim</var>,
+  	      <var class="pdparam">union ccb *ccb</var>
+	    </code>;</div><div class="funcprototype-spacer"> </div></div><p>
+	  </p></li><li class="listitem"><p><code class="function">poll_func</code> - 指向驱动程序
+	  <code class="function">xxx_poll()</code>函数的指针。
+	  </p><div class="funcsynopsis"><table border="0" class="funcprototype-table" summary="Function synopsis" style="cellspacing: 0; cellpadding: 0;"><tr><td><code class="funcdef">static void
+	    <strong class="fsfunc">xxx_poll</strong>
+	  (</code></td><td><var class="pdparam">struct cam_sim *sim</var><code>)</code>;</td><td> </td></tr></table><div class="paramdef-list"><code>
+	      <var class="pdparam">struct cam_sim *sim</var>
+	    </code>;</div><div class="funcprototype-spacer"> </div></div><p>
+	  </p></li><li class="listitem"><p>driver_name - 实际驱动程序的名字，例如
+          <span class="quote">“<span class="quote">ncr</span>”</span>或<span class="quote">“<span class="quote">wds</span>”</span>。</p></li><li class="listitem"><p><code class="varname">softc</code> - 指向这个SCSI卡
+          驱动程序的内部描述符的指针。这个指针以后被驱动程序用来获取
+          私有数据。</p></li><li class="listitem"><p>unit - 控制器单元号，例如对于控制器
+          <span class="quote">“<span class="quote">wds0</span>”</span>的此数字将为0。</p></li><li class="listitem"><p>max_dev_transactions - 无标签模式下每个SCSI目标的
+          最大并发（simultaneous）事务数。这个值一般几乎总是等于1，只有非
+	  SCSI卡才可能例外。此外，如果驱动程序希望执行一个事务的同时准备另
+          一个事务，可以将其设置为2，但似乎不值得增加这种复杂性。
+        </p></li><li class="listitem"><p>max_tagged_dev_transactions - 同样的东西，但是
+	  在标签模式下。标签是SCSI在设备上发起多个事务的方式：每个事务
+	  被赋予一个唯一的标签，并被发送到设备。当设备完成某些事务，它
+	  将结果连同标签一起发送回来，这样SCSI适配器（和驱动程序）就能知道
+	  哪个事务完成了。此参量也被认为是最大标签深度。它取决于SCSI
+	  适配器的能力。</p></li></ul></div><p>
+    </p><a id="idp72137552" class="indexterm"></a><p>最后我们注册与我们的SCSI适配器关联的SCSI总线。</p><pre class="programlisting">    if(xpt_bus_register(sim, bus_number) != CAM_SUCCESS) {
+        cam_sim_free(sim, /*free_devq*/ TRUE);
+        error; /* 一些错误处理代码 */
+    }</pre><p>如果每条SCSI总线有一个<code class="varname">devq</code>结构（即，
+      我们将带有多条总线的卡看作多个卡，每个卡带有一条总线），则总线号
+      总是为0，否则SCSI卡上的每条总线应当有不同的号。每条总线需要
+      它自己单独的cam_sim结构。</p><p>这之后我们的控制器完全挂接到CAM系统。现在
+      <code class="varname">devq</code>的值可以被丢弃：在所有以后从CAM发出的
+      调用中将以sim为参量，devq可以由它导出。</p><p>CAM为这些异步事件提供了框架。有些事件来自底层（SIM驱动程序），
+      有些来自外围设备驱动程序，还有一些来自CAM子系统本身。任何驱动
+      程序都可以为某些类型的异步事件注册回调，这样那些事件发生时它就
+      会被通知。</p><p>这种事件的一个典型例子就是设备复位。每个事务和事件以
+      <span class="quote">“<span class="quote">path</span>”</span>的方式区分它们所作用的设备。目标特定的事件
+      通常在与设备进行事务处理期间发生。因此那个事务的路径可以被重用
+      来报告此事件（这是安全的，因为事件路径的拷贝是在事件报告例程中进行的，
+      而且既不会被deallocate也不作进一步传递）。在任何时刻，包括中断例程中，
+      动态分配路径也是安全的，尽管那样会导致某些额外开销，并且这种方法
+      可能存在的一个问题是碰巧那时可能没有空闲内存。对于总线复位事件，
+      我们需要定义包括总线上所有设备在内的通配符路径。这样我们就能提前为
+      以后的总线复位事件创建路径，避免以后内存不足的问题：</p><pre class="programlisting">    struct cam_path *path;
+
+    if(xpt_create_path(&amp;path, /*periph*/NULL,
+                cam_sim_path(sim), CAM_TARGET_WILDCARD,
+                CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
+        xpt_bus_deregister(cam_sim_path(sim));
+        cam_sim_free(sim, /*free_devq*/TRUE);
+        error; /* 一些错误处理代码 */
+    }
+
+    softc-&gt;wpath = path;
+    softc-&gt;sim = sim;</pre><p>正如你所看到的，路径包括：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>外围设备驱动程序的ID（由于我们一个也没有，故此处为空）
+      </p></li><li class="listitem"><p>SIM驱动程序的ID
+        （<code class="function">cam_sim_path(sim)</code>）</p></li><li class="listitem"><p>设备的SCSI目标号（CAM_TARGET_WILDCARD的意思指
+        <span class="quote">“<span class="quote">所有devices</span>”</span>）</p></li><li class="listitem"><p>子设备的SCSI LUN号（CAM_LUN_WILDCARD的意思指
+        <span class="quote">“<span class="quote">所有LUNs</span>”</span>）</p></li></ul></div><p>如果驱动程序不能分配这个路径，它将不能正常工作，因此那样情况下
+      我们卸除（dismantle）那个SCSI总线。</p><p>我们在<code class="varname">softc</code>结构中保存路径指针以便以后
+      使用。这之后我们保存sim的值（或者如果我们愿意，也可以在从
+      <code class="function">xxx_probe()</code>退出时丢弃它）。</p><p>这就是最低要求的初始化所需要做的一切。为了把事情做正确无误，
+      还剩下一个问题。</p><p>对于SIM驱动程序，有一个特殊感兴趣的事件：何时目标设备被认为
+      找不到了。这种情况下复位与这个设备的SCSI协商可能是个好主意。因此我们
+      为这个事件向CAM注册一个回调。通过为这种类型的请求来请求CAM控制块上
+      的CAM动作，请求就被传递到CAM：（译注：参看下面示例代码和原文）</p><pre class="programlisting">    struct ccb_setasync csa;
+
+    xpt_setup_ccb(&amp;csa.ccb_h, path, /*优先级*/5);
+    csa.ccb_h.func_code = XPT_SASYNC_CB;
+    csa.event_enable = AC_LOST_DEVICE;
+    csa.callback = xxx_async;
+    csa.callback_arg = sim;
+    xpt_action((union ccb *)&amp;csa);</pre><p>现在我们看一下<code class="function">xxx_action()</code>
+      和<code class="function">xxx_poll()</code>的驱动程序入口点。</p><p>
+    </p><div class="funcsynopsis"><table border="0" class="funcprototype-table" summary="Function synopsis" style="cellspacing: 0; cellpadding: 0;"><tr><td><code class="funcdef">static void
+      <strong class="fsfunc">xxx_action</strong>
+      (</code></td><td><var class="pdparam">struct cam_sim *sim</var><var class="pdparam">union ccb *ccb</var><code>)</code>;</td><td> </td></tr></table><div class="paramdef-list"><code>
+        <var class="pdparam">struct cam_sim *sim</var>,
+        <var class="pdparam">union ccb *ccb</var>
+      </code>;</div><div class="funcprototype-spacer"> </div></div><p>
+    </p><p>响应CAM子系统的请求采取某些动作。Sim描述了请求的SIM，CCB为
+      请求本身。CCB代表<span class="quote">“<span class="quote">CAM Control Block</span>”</span>。它是很多特定
+      实例的联合，每个实例为某些类型的事务描述参量。所有这些实例共享
+      存储着参量公共部分的CCB头部。（译注：这一段不很准确，请自行参考原文）
+      </p><p>CAM既支持SCSI控制器工作于发起者(initiator)(<span class="quote">“<span class="quote">normal</span>”</span>)
+      模式，也支持SCSI控制器工作于目标(target)（模拟SCSI设备）模式。这儿
+      我们只考虑与发起者模式有关的部分。</p><p>定义了几个函数和宏（换句话说，方法）来访问结构sim中公共数据：
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">cam_sim_path(sim)</code> - 路径ID
+        （参见上面）</p></li><li class="listitem"><p><code class="function">cam_sim_name(sim)</code> -
+      sim的名字</p></li><li class="listitem"><p><code class="function">cam_sim_softc(sim)</code> -
+      指向softc（驱动程序私有数据）结构的指针</p></li><li class="listitem"><p><code class="function"> cam_sim_unit(sim)</code> -
+      单元号</p></li><li class="listitem"><p><code class="function"> cam_sim_bus(sim)</code> -
+      总线ID</p></li></ul></div><p>为了识别设备，<code class="function">xxx_action()</code>可以使用这些
+      函数得到单元号和指向它的softc结构的指针。</p><p>请求的类型被存储在
+      <code class="varname">ccb-&gt;ccb_h.func_code</code>。因此，通常
+      <code class="function">xxx_action()</code>由一个大的switch组成：</p><pre class="programlisting">    struct xxx_softc *softc = (struct xxx_softc *) cam_sim_softc(sim);
+    struct ccb_hdr *ccb_h = &amp;ccb-&gt;ccb_h;
+    int unit = cam_sim_unit(sim);
+    int bus = cam_sim_bus(sim);
+
+    switch(ccb_h-&gt;func_code) {
+    case ...:
+        ...
+    default:
+        ccb_h-&gt;status = CAM_REQ_INVALID;
+        xpt_done(ccb);
+        break;
+    }</pre><p>从default case语句部分可以看出（如果收到未知命令），命令的返回码
+      被设置到 <code class="varname">ccb-&gt;ccb_h.status</code> 中，并且通过
+      调用<code class="function">xpt_done(ccb)</code>将整个CCB返回到CAM中。</p><p><code class="function">xpt_done()</code>不必从
+      <code class="function">xxx_action()</code>中调用：例如I/O请求可以在SIM驱动程序
+      和/或它的SCSI控制器中排队。（译注：它指I/O请求？）
+      然后，当设备传递(post)一个中断信号，指示对此请求的处理已结束时，
+      <code class="function">xpt_done()</code>可以从中断处理例程中被调用。</p><p>实际上，CCB状态不是仅仅被赋值为一个返回码，而是始终有某种状态。
+      CCB被传递给<code class="function">xxx_action()</code>例程前，其取得状态
+      CCB_REQ_INPROG，表示其正在进行中。<code class="filename">/sys/cam/cam.h</code>
+      中定义了数量惊人的状态值，它们应该能非常详尽地表示请求的状态。
+      更有趣的是，状态实际上是一个枚举状态值（低6位）和一些可能出现的附加
+      类(似)旗标位（高位）的<span class="quote">“<span class="quote">位或(bitwise or)</span>”</span>。枚举值会在以后
+      更详细地讨论。对它们的汇总可以在错误概览节(Errors Summary section)
+      找到。可能的状态旗标为：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>CAM_DEV_QFRZN</em></span> - 当处理CCB时，
+        如果SIM驱动程序得到一个严重错误（例如，驱动程序不能响应选择或违反
+	了SCSI协议），它应当调用<code class="function">xpt_freeze_simq()</code>冻结
+	请求队列，把此设备的其他已入队但尚未被处理的CCB返回到CAM队列，
+	然后为有问题的CCB设置这个旗标并调用
+	<code class="function">xpt_done()</code>。这个旗标会使得CAM子系统处理错误后
+	解冻队列。</p></li><li class="listitem"><p><span class="emphasis"><em>CAM_AUTOSNS_VALID</em></span> - 如果设备
+        返回错误条件，且CCB中未设置旗标CAM_DIS_AUTOSENSE，SIM驱动程序
+	必须自动执行REQUEST SENSE命令来从设备抽取sense（扩展错误信息）
+	数据。如果这个尝试成功，sense数据应当被保存在CCB中且设置此旗标。
+	</p></li><li class="listitem"><p><span class="emphasis"><em>CAM_RELEASE_SIMQ</em></span> - 类似于
+        CAM_DEV_QFRZN，但用于SCSI控制器自身出问题(或资源短缺)的情况。
+	此后对控制器的所有请求会被<code class="function">xpt_freeze_simq()</code>
+	停止。SIM驱动程序克服这种短缺情况，并通过返回设置了此旗标的CCB
+	通知CAM后，控制器队列将会被重新启动。</p></li><li class="listitem"><p><span class="emphasis"><em>CAM_SIM_QUEUED</em></span> - 当SIM将一个
+        CCB放入其请求队列时应当设置此旗标（或当CCB出队但尚未返回给CAM时
+	去掉）。现在此旗标还没有在CAM代码的任何地方使用过，因此其目的
+	纯粹用于诊断）。</p></li></ul></div><p>函数<code class="function">xxx_action()</code>不允许睡眠，因此对资源
+      访问的所有同步必须通过冻结SIM或设备队列来完成。除了前述的旗标外，
+      CAM子系统提供了函数<code class="function">xpt_release_simq()</code>和
+      <code class="function">xpt_release_devq()</code>来直接解冻队列，而不必将
+      CCB传递到CAM。</p><p>CCB头部包含如下字段：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>path</em></span> - 请求的路径ID
+      </p></li><li class="listitem"><p><span class="emphasis"><em>target_id</em></span> - 请求的目标设备ID
+      </p></li><li class="listitem"><p><span class="emphasis"><em>target_lun</em></span> - 目标设备的LUN ID
+      </p></li><li class="listitem"><p><span class="emphasis"><em>timeout</em></span> -
+      这个命令的超时间隔，以毫秒计</p></li><li class="listitem"><p><span class="emphasis"><em>timeout_ch</em></span> - 一个为SIM驱动
+      程序存储超时处理函数的方便之所（CAM子系统自身并不对此作任何假设）
+      </p></li><li class="listitem"><p><span class="emphasis"><em>flags</em></span> - 有关请求的各个
+      信息位</p></li><li class="listitem"><p><span class="emphasis"><em>spriv_ptr0，spriv_ptr1</em></span> -
+      SIM驱动程序保留私用的字段
+      （例如链接到SIM队列或SIM私有控制块）；实际上，它们作为联合存在：
+      spriv_ptr0和spriv_ptr1具有类型(void *)，spriv_field0和
+      spriv_field1具有类型unsigned long，sim_priv.entries[0].bytes和
+      sim_priv.entries[1].bytes为与联合的其他形式大小一致的字节数组，
+      sim_priv.bytes为一个两倍大小的数组</p></li></ul></div><p>使用CCB的SIM私有字段的建议方法是为它们定义一些有意义的名字，
+      并且在驱动程序中使用这些有意义的名字，就像下面这样：</p><pre class="programlisting">#define ccb_some_meaningful_name    sim_priv.entries[0].bytes
+#define ccb_hcb spriv_ptr1 /* 用于硬件控制块 */</pre><p>最常见的发起者模式的请求是：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>XPT_SCSI_IO</em></span> - 执行I/O事务
+      </p><p>联合ccb的<span class="quote">“<span class="quote">struct ccb_scsiio csio</span>”</span>实例用于传递参量。
+        它们是：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><span class="emphasis"><em>cdb_io</em></span> -
+          指向SCSI命令缓冲区的指针或缓冲区本身</p></li><li class="listitem"><p><span class="emphasis"><em>cdb_len</em></span> -
+	  SCSI命令长度</p></li><li class="listitem"><p><span class="emphasis"><em>data_ptr</em></span> -
+	  指向数据缓冲区的指针（如果使用分散/集中会复杂一点）
+	  </p></li><li class="listitem"><p><span class="emphasis"><em>dxfer_len</em></span> -
+	  待传输数据的长度</p></li><li class="listitem"><p><span class="emphasis"><em>sglist_cnt</em></span> -
+	  分散/集中段的计数</p></li><li class="listitem"><p><span class="emphasis"><em>scsi_status</em></span> -
+	  返回SCSI状态的地方</p></li><li class="listitem"><p><span class="emphasis"><em>sense_data</em></span> -
+          命令返回错误时保存SCSI sense信息的缓冲区（这种情况下，如果没有
+	  设置CCB的旗标CAM_DIS_AUTOSENSE，则假定SIM驱动程序会自动运行
+	  REQUEST SENSE命令）
+	  </p></li><li class="listitem"><p><span class="emphasis"><em>sense_len</em></span> -
+          缓冲区的长度（如果碰巧大于sense_data的大小，SIM驱动程序必须
+	  悄悄地采用较小值）（译注：一点改动，参考原文及代码）
+          </p></li><li class="listitem"><p><span class="emphasis"><em>resid, sense_resid</em></span> -
+	  如果数据传输或SCSI sense返回错误，则它们
+	  就是返回的剩余（未传输）数据的计数。它们看起来并不是特别有意义，
+	  因此当很难计算的情况下（例如，计数SCSI控制器FIFO缓冲区中的字节
+	  数），使用近似值也同样可以。对于成功完成的传输，它们必须被设置
+	  为0。</p></li><li class="listitem"><p><span class="emphasis"><em>tag_action</em></span> -
+	  使用的标签的种类有：
+
+	  </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; "><li class="listitem"><p>CAM_TAG_ACTION_NONE - 事务不使用标签
+	  </p></li><li class="listitem"><p>MSG_SIMPLE_Q_TAG, MSG_HEAD_OF_Q_TAG,
+	  MSG_ORDERED_Q_TAG - 值等于适当的标签信息
+	  （见/sys/cam/scsi/scsi_message.h）；仅给出标签类型，SIM驱动程序
+	  必须自己赋标签值</p></li></ul></div><p>
+
+	  </p></li></ul></div><p>处理请求的通常逻辑如下：</p><p>要做的第一件事情是检查可能的竞争条件，确保命令位于队列中时
+        不会被中止：</p><pre class="programlisting">    struct ccb_scsiio *csio = &amp;ccb-&gt;csio;
+
+    if ((ccb_h-&gt;status &amp; CAM_STATUS_MASK) != CAM_REQ_INPROG) {
+        xpt_done(ccb);
+        return;
+    }</pre><p>我们也检查我们的控制器完全支持设备：</p><pre class="programlisting">    if(ccb_h-&gt;target_id &gt; OUR_MAX_SUPPORTED_TARGET_ID
+    || cch_h-&gt;target_id == OUR_SCSI_CONTROLLERS_OWN_ID) {
+        ccb_h-&gt;status = CAM_TID_INVALID;
+        xpt_done(ccb);
+        return;
+    }
+    if(ccb_h-&gt;target_lun &gt; OUR_MAX_SUPPORTED_LUN) {
+        ccb_h-&gt;status = CAM_LUN_INVALID;
+        xpt_done(ccb);
+        return;
+    }</pre><a id="idp72206416" class="indexterm"></a><p>然后分配我们处理请求所需的数据结构（如卡相关的硬件控制块等）。
+        如果我们不能分配则冻结SIM队列，记录下我们有一个挂起的操作，返回
+	CCB，请求CAM将CCB重新入队。以后当资源可用时，必须通过返回其
+	状态中设置 <code class="literal">CAM_SIMQ_RELEASE</code> 位的ccb来解冻SIM队列。否则，如果所有
+	正常，则将CCB与硬件控制块（HCB）链接，并将其标志为已入队。</p><pre class="programlisting">    struct xxx_hcb *hcb = allocate_hcb(softc, unit, bus);
+
+    if(hcb == NULL) {
+        softc-&gt;flags |= RESOURCE_SHORTAGE;
+        xpt_freeze_simq(sim, /*count*/1);
+        ccb_h-&gt;status = CAM_REQUEUE_REQ;
+        xpt_done(ccb);
+        return;
+    }
+
+    hcb-&gt;ccb = ccb; ccb_h-&gt;ccb_hcb = (void *)hcb;
+    ccb_h-&gt;status |= CAM_SIM_QUEUED;</pre><p>从CCB中提取目标数据到硬件控制块。检查是否要求我们分配一个
+        标签，如果是则产生一个唯一的标签并构造SCSI标签信息。SIM驱动程序
+	也负责与设备协商设定彼此支持的最大总线宽度、同步速率和偏移。
+        </p><pre class="programlisting">    hcb-&gt;target = ccb_h-&gt;target_id; hcb-&gt;lun = ccb_h-&gt;target_lun;
+    generate_identify_message(hcb);
+    if( ccb_h-&gt;tag_action != CAM_TAG_ACTION_NONE )
+        generate_unique_tag_message(hcb, ccb_h-&gt;tag_action);
+    if( !target_negotiated(hcb) )
+        generate_negotiation_messages(hcb);</pre><p>然后设置SCSI命令。可以在CCB中以多种有趣的方式指定命令的存储，
+        这些方式由CCB中的旗标指定。命令缓冲区可以包含在CCB中或者用指针
+	指向，后者情况下指针可以指向物理地址或虚地址。由于硬件通常需要
+	物理地址，因此我们总是将地址转换为物理地址。</p><p>不太相关的提示：通常这是通过调用<code class="function">vtophys()</code>来完成的，但由于
+        特殊的Alpha怪异之处，为了PCI设备（它们现在占SCSI控制器的大多数）
+	驱动程序向Alpha架构的可移植性，转换必须替代以 <code class="function">vtobus()</code> 来完成。
+        [IMHO 提供两个单独的函数 <code class="function">vtop()</code> 和 <code class="function">ptobus()</code>，而 <code class="function">vtobus()</code> 只是它们的
+	简单叠代，这样做要好得多。] 在请求物理地址的情况下，返回带有状态
+	<span class="errorname">CAM_REQ_INVALID</span> 的CCB是可以的，当前的驱动程序就是那样做的。但也
+	可能像这个例子（驱动程序中应当有不带条件编译的更直接做法）中那样
+	编译Alpha特定的代码片断。如果需要物理地址也能转换或映射回虚地址，
+	但那样代价很大，因此我们不那样做。</p><pre class="programlisting">    if(ccb_h-&gt;flags &amp; CAM_CDB_POINTER) {
+        /* CDB is a pointer */
+        if(!(ccb_h-&gt;flags &amp; CAM_CDB_PHYS)) {
+            /* CDB指针是虚拟的 */
+            hcb-&gt;cmd = vtobus(csio-&gt;cdb_io.cdb_ptr);
+        } else {
+            /* CDB指针是物理的 */
+#if defined(__alpha__)
+            hcb-&gt;cmd = csio-&gt;cdb_io.cdb_ptr | alpha_XXX_dmamap_or ;
+#else
+            hcb-&gt;cmd = csio-&gt;cdb_io.cdb_ptr ;
+#endif
+        }
+    } else {
+        /* CDB在ccb(缓冲区)中 */
+        hcb-&gt;cmd = vtobus(csio-&gt;cdb_io.cdb_bytes);
+    }
+    hcb-&gt;cmdlen = csio-&gt;cdb_len;</pre><p>现在是设置数据的时候了，又一次，可以在CCB中以多种有趣的方式
+        指定数据存储，这些方式由CCB中的旗标指定。首先我们得到数据传输的
+	方向。最简单的情况是没有数据需要传输的情况：</p><pre class="programlisting">    int dir = (ccb_h-&gt;flags &amp; CAM_DIR_MASK);
+
+    if (dir == CAM_DIR_NONE)
+        goto end_data;</pre><p>然后我们检查数据在一个chunk中还是在分散/集中列表中，并且是
+        物理地址还是虚地址。SCSI控制器可能只能处理有限数目有限长度的
+	大块。如果请求到达到这个限制我们就返回错误。我们使用一个特殊
+	函数返回CCB，并在一个地方处理HCB资源短缺。增加chunk的函数是
+	驱动程序相关的，此处我们不进入它们的详细实现。对于地址翻译问题
+	的细节可以参看SCSI命令(CDB)处理的描述。如果某些变体对于特定的卡
+	太困难或不可能实现，返回状态 <span class="errorname">CAM_REQ_INVALID</span>
+	是可以的。实际上，
+	现在的CAM代码中似乎哪儿也没有使用分散/集中能力。但至少必须实现
+	单个非分散虚拟缓冲区的情况，CAM中这种情况用得很多。</p><pre class="programlisting">    int rv;
+
+    initialize_hcb_for_data(hcb);
+
+    if((!(ccb_h-&gt;flags &amp; CAM_SCATTER_VALID)) {
+        /* 单个缓冲区 */
+        if(!(ccb_h-&gt;flags &amp; CAM_DATA_PHYS)) {
+            rv = add_virtual_chunk(hcb, csio-&gt;data_ptr, csio-&gt;dxfer_len, dir);
+            }
+        } else {
+            rv = add_physical_chunk(hcb, csio-&gt;data_ptr, csio-&gt;dxfer_len, dir);
+        }
+    } else {
+        int i;
+        struct bus_dma_segment *segs;
+        segs = (struct bus_dma_segment *)csio-&gt;data_ptr;
+
+        if ((ccb_h-&gt;flags &amp; CAM_SG_LIST_PHYS) != 0) {
+            /* SG列表指针是物理的 */
+            rv = setup_hcb_for_physical_sg_list(hcb, segs, csio-&gt;sglist_cnt);
+        } else if (!(ccb_h-&gt;flags &amp; CAM_DATA_PHYS)) {
+            /* SG缓冲区指针是虚拟的 */
+            for (i = 0; i &lt; csio-&gt;sglist_cnt; i++) {
+                rv = add_virtual_chunk(hcb, segs[i].ds_addr,
+                    segs[i].ds_len, dir);
+                if (rv != CAM_REQ_CMP)
+                    break;
+            }
+        } else {
+            /* SG缓冲区指针是物理的 */
+            for (i = 0; i &lt; csio-&gt;sglist_cnt; i++) {
+                rv = add_physical_chunk(hcb, segs[i].ds_addr,
+                    segs[i].ds_len, dir);
+                if (rv != CAM_REQ_CMP)
+                    break;
+            }
+        }
+    }
+    if(rv != CAM_REQ_CMP) {
+        /* 如果成功添加了一chunk，我们希望add_*_chunk()函数返回
+         * CAM_REQ_CMP，如果请求太大（太多字节或太多chunks）
+         * 则返回CAM_REQ_TOO_BIG, 其他情况下返回<span class="errorname">CAM_REQ_INVALID</span>。
+         */
+        free_hcb_and_ccb_done(hcb, ccb, rv);
+        return;
+    }
+    end_data:</pre><p>如果这个CCB不允许断开连接，我们就传递这个信息到hcb：
+      </p><pre class="programlisting">    if(ccb_h-&gt;flags &amp; CAM_DIS_DISCONNECT)
+        hcb_disable_disconnect(hcb);</pre><p>如果控制器能够完全自己运行REQUEST SENSE命令，则也应当将旗标
+      CAM_DIS_AUTOSENSE的值传递给它，这样可以在CAM子系统不想REQUEST SENSE
+      时阻止自动REQUEST SENSE。</p><p>剩下的唯一事情是设置超时，将我们的hcb传递给硬件并返回，余下的
+      由中断处理函数（或超时处理函数）完成。</p><pre class="programlisting">    ccb_h-&gt;timeout_ch = timeout(xxx_timeout, (caddr_t) hcb,
+        (ccb_h-&gt;timeout * hz) / 1000); /* 将毫秒转换为滴答数 */
+    put_hcb_into_hardware_queue(hcb);
+    return;</pre><p>这儿是返回CCB的函数的一个可能实现：</p><pre class="programlisting">    static void
+    free_hcb_and_ccb_done(struct xxx_hcb *hcb, union ccb *ccb, u_int32_t status)
+    {
+        struct xxx_softc *softc = hcb-&gt;softc;
+
+        ccb-&gt;ccb_h.ccb_hcb = 0;
+        if(hcb != NULL) {
+            untimeout(xxx_timeout, (caddr_t) hcb, ccb-&gt;ccb_h.timeout_ch);
+            /* 我们要释放hcb，因此资源短缺问题也就不存在了 */
+            if(softc-&gt;flags &amp; RESOURCE_SHORTAGE)  {
+                softc-&gt;flags &amp;= ~RESOURCE_SHORTAGE;
+                status |= CAM_RELEASE_SIMQ;
+            }
+            free_hcb(hcb); /* 同时从任何内部列表中移除hcb */
+        }
+        ccb-&gt;ccb_h.status = status |
+            (ccb-&gt;ccb_h.status &amp; ~(CAM_STATUS_MASK|CAM_SIM_QUEUED));
+        xpt_done(ccb);
+    }</pre></li><li class="listitem"><p><span class="emphasis"><em>XPT_RESET_DEV</em></span> - 发送SCSI
+    <span class="quote">“<span class="quote">BUS DEVICE RESET</span>”</span>消息到设备</p><p>除了头部外CCB中没有数据传输，其中最让人感兴趣的参量为target_id。
+      依赖于控制器硬件，硬件控制块就像XPT_SCSI_IO请求中那样被创建
+      （参看XPT_SCSI_IO请求的描述）并被发送到控制器，或者立即编程让SCSI
+      控制器发送RESET消息到设备，或者这个请求可能只是不被支持
+      （并返回状态 <span class="errorname">CAM_REQ_INVALID</span>）。而且请求完成时，目标的所有已断开
+      连接(disconnected)的事务必须被中止（可能在中断例程中）。</p><p>而且目标的所有当前协商在复位时会丢失，因此它们也可能被清除。
+      或者清除可能被延迟，因为不管怎样目标将会在下一次事务时请求重新协商。
+      </p></li><li class="listitem"><p><span class="emphasis"><em>XPT_RESET_BUS</em></span> -
+      发送RESET信号到SCSI总线</p><p>CCB中并不传递参量，唯一感兴趣的参量是由指向结构sim的指针标识
+      的SCSI总线。</p><p>最小实现会忘记总线上所有设备的SCSI协商，并返回状态
+      CAM_REQ_CMP。</p><p>恰当的实现实际上会另外复位SCSI总线（可能也复位SCSI控制器）并
+      将所有在硬件队列中的和断开连接的那些正被处理的CCB的完成状态标记为
+      CAM_SCSI_BUS_RESET。像这样：</p><pre class="programlisting">    int targ, lun;
+    struct xxx_hcb *h, *hh;
+    struct ccb_trans_settings neg;
+    struct cam_path *path;
+
+    /* SCSI总线复位可能会花费很长时间，这种情况下应当使用中断或超时来检查
+     * 复位是否完成。但为了简单，我们这儿假设复位很快。
+     */
+    reset_scsi_bus(softc);
+
+    /* 丢弃所有入队的CCB */
+    for(h = softc-&gt;first_queued_hcb; h != NULL; h = hh) {
+        hh = h-&gt;next;
+        free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_SCSI_BUS_RESET);
+    }
+
+    /* 协商的（清除操作后的）干净值，我们报告这个值 */
+    neg.bus_width = 8;
+    neg.sync_period = neg.sync_offset = 0;
+    neg.valid = (CCB_TRANS_BUS_WIDTH_VALID
+        | CCB_TRANS_SYNC_RATE_VALID | CCB_TRANS_SYNC_OFFSET_VALID);
+
+    /* 丢弃所有断开连接的CCB和干净的协商（译注：干净＝clean） */
+    for(targ=0; targ &lt;= OUR_MAX_SUPPORTED_TARGET; targ++) {
+        clean_negotiations(softc, targ);
+
+        /* 如果可能报告事件 */
+        if(xpt_create_path(&amp;path, /*periph*/NULL,
+                cam_sim_path(sim), targ,
+                CAM_LUN_WILDCARD) == CAM_REQ_CMP) {
+            xpt_async(AC_TRANSFER_NEG, path, &amp;neg);
+            xpt_free_path(path);
+        }
+
+        for(lun=0; lun &lt;= OUR_MAX_SUPPORTED_LUN; lun++)
+            for(h = softc-&gt;first_discon_hcb[targ][lun]; h != NULL; h = hh) {
+                hh=h-&gt;next;
+                free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_SCSI_BUS_RESET);
+            }
+    }
+
+    ccb-&gt;ccb_h.status = CAM_REQ_CMP;
+    xpt_done(ccb);
+
+    /* 报告事件 */
+    xpt_async(AC_BUS_RESET, softc-&gt;wpath, NULL);
+    return;</pre><p>将SCSI总线复位作为函数来实现可能是个好主意，因为如果事情出了差错，
+      它会被超时函数作为最后的报告来重用。</p></li><li class="listitem"><p><span class="emphasis"><em>XPT_ABORT</em></span> - 中止指定的CCB
+      </p><p>参量在联合ccb的实例<span class="quote">“<span class="quote">struct ccb_abort cab</span>”</span>
+      中传输。其中唯一的参量字段为：</p><p><span class="emphasis"><em>abort_ccb</em></span> - 指向被中止的ccb的指针
+      </p><p>如果不支持中断就返回CAM_UA_ABORT。这也是最小化实现这个调用的
+      简易方式，任何情况下都返回CAM_UA_ABORT。</p><p>困难方式则是真正地实现这个请求。首先检查应用到SCSI事务的中止：
+      </p><pre class="programlisting">    struct ccb *abort_ccb;
+    abort_ccb = ccb-&gt;cab.abort_ccb;
+
+    if(abort_ccb-&gt;ccb_h.func_code != XPT_SCSI_IO) {
+        ccb-&gt;ccb_h.status = CAM_UA_ABORT;
+        xpt_done(ccb);
+        return;
+    }</pre><p>然后需要在我们的队列中找到这个CCB。这可以通过遍历我们所有硬件
+      控制块列表，查找与这个CCB关联的控制块来完成：</p><pre class="programlisting">    struct xxx_hcb *hcb, *h;
+
+    hcb = NULL;
+
+    /* 我们假设softc-&gt;first_hcb是与此总线关联的所有HCB的列表头元素，
+     * 包括那些入队待处理的、硬件正在处理的和断开连接的那些。
+     */
+    for(h = softc-&gt;first_hcb; h != NULL; h = h-&gt;next) {
+        if(h-&gt;ccb == abort_ccb) {
+            hcb = h;
+            break;
+        }
+    }
+
+    if(hcb == NULL) {
+        /* 我们的队列中没有这样的CCB */
+        ccb-&gt;ccb_h.status = CAM_PATH_INVALID;
+        xpt_done(ccb);
+        return;
+    }
+
+    hcb=found_hcb;</pre><p>现在我们来看一下HCB当前的处理状态。它可能或呆在队列中正等待
+      被发送到SCSI总线，或此时正在传输中，或已断开连接并等待命令结果，
+      或者实际上已由硬件完成但尚未被软件标记为完成。为了确保我们不会
+      与硬件产生竞争条件，我们将HCB标记为中止(aborted)，这样如果这个
+      HCB要被发送到SCSI总线的话，SCSI控制器将会看到这个旗标并跳过它。
+    </p><pre class="programlisting">    int hstatus;
+
+    /* 此处显示为一个函数，有时需要特殊动作才能使得这个旗标对硬件可见
+     */
+    set_hcb_flags(hcb, HCB_BEING_ABORTED);
+
+    abort_again:
+
+    hstatus = get_hcb_status(hcb);
+    switch(hstatus) {
+    case HCB_SITTING_IN_QUEUE:
+        remove_hcb_from_hardware_queue(hcb);
+        /* 继续执行 */
+    case HCB_COMPLETED:
+        /* 这是一种简单的情况 */
+        free_hcb_and_ccb_done(hcb, abort_ccb, CAM_REQ_ABORTED);
+        break;</pre><p>如果CCB此时正在传输中，我们一般会以某种硬件相关的方式发信号
+      给SCSI控制器，通知它我们希望中止当前的传输。SCSI控制器会设置
+      SCSI ATTENTION信号，并当目标对其进行响应后发送ABORT消息。我们也复位
+      超时，以确保目标不会永远睡眠。如果命令不能在某个合理的时间，如
+      10秒内中止，超时例程就会运行并复位整个SCSI总线。由于命令会在某个
+      合理的时间后被中止，因此我们现在可以只将中止请求返回，当作成功完成，
+      并将被中止的CCB标记为中止（但还没有将它标记为完成）。</p><pre class="programlisting">    case HCB_BEING_TRANSFERRED:
+        untimeout(xxx_timeout, (caddr_t) hcb, abort_ccb-&gt;ccb_h.timeout_ch);
+        abort_ccb-&gt;ccb_h.timeout_ch =
+            timeout(xxx_timeout, (caddr_t) hcb, 10 * hz);
+        abort_ccb-&gt;ccb_h.status = CAM_REQ_ABORTED;
+        /* 要求控制器中止CCB，然后产生一个中断并停止
+         */
+        if(signal_hardware_to_abort_hcb_and_stop(hcb) &lt; 0) {
+            /* 哎呀，我们没有获得与硬件的竞争条件，在我们中止
+             * 这个事务之前它就脱离总线，再尝试一次
+	     * （译注：脱离＝getoff）*/
+            goto abort_again;
+        }
+
+        break;</pre><p>如果CCB位于断开连接的列表中，则将它设置为中止请求，并在硬件
+      队列的前端将它重新入队。复位超时，并报告中止请求完成。</p><pre class="programlisting">    case HCB_DISCONNECTED:
+        untimeout(xxx_timeout, (caddr_t) hcb, abort_ccb-&gt;ccb_h.timeout_ch);
+        abort_ccb-&gt;ccb_h.timeout_ch =
+            timeout(xxx_timeout, (caddr_t) hcb, 10 * hz);
+        put_abort_message_into_hcb(hcb);
+        put_hcb_at_the_front_of_hardware_queue(hcb);
+        break;
+    }
+    ccb-&gt;ccb_h.status = CAM_REQ_CMP;
+    xpt_done(ccb);
+    return;</pre><p>这就是关于ABORT请求的全部，尽管还有一个问题。由于ABORT消息
+      清除LUN上所有正在进行中的事务，我们必须将LUN上所有其他活动事务
+      标记为中止。那应当在中断例程中完成，且在中止事务之后。</p><p>将CCB中止作为函数来实现可能是个很好的主意，因为如果I/O事务超时
+      这个函数能够被重用。唯一的不同是超时事务将为超时请求返回状态
+      CAM_CMD_TIMEOUT。于是XPT_ABORT的case语句就会很小，像下面这样：
+      </p><pre class="programlisting">    case XPT_ABORT:
+        struct ccb *abort_ccb;
+        abort_ccb = ccb-&gt;cab.abort_ccb;
+
+        if(abort_ccb-&gt;ccb_h.func_code != XPT_SCSI_IO) {
+            ccb-&gt;ccb_h.status = CAM_UA_ABORT;
+            xpt_done(ccb);
+            return;
+        }
+        if(xxx_abort_ccb(abort_ccb, CAM_REQ_ABORTED) &lt; 0)
+            /* no such CCB in our queue */
+            ccb-&gt;ccb_h.status = CAM_PATH_INVALID;
+        else
+            ccb-&gt;ccb_h.status = CAM_REQ_CMP;
+        xpt_done(ccb);
+        return;</pre></li><li class="listitem"><p><span class="emphasis"><em>XPT_SET_TRAN_SETTINGS</em></span> -
+      显式设置SCSI传输设置的值</p><p>在联合ccb的实例<span class="quote">“<span class="quote">struct ccb_trans_setting cts</span>”</span>
+      中传输的参量：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><span class="emphasis"><em>valid</em></span> -
+      位掩码，显示应当更新那些设置：</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_SYNC_RATE_VALID</em></span>
+      - 同步传输速率</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_SYNC_OFFSET_VALID</em></span>
+      - 同步位移</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_BUS_WIDTH_VALID</em></span>
+      - 总线宽度</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_DISC_VALID</em></span> -
+      设置启用/禁用断开连接</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_TQ_VALID</em></span> -
+      设置启用/禁用带标签的排队</p></li><li class="listitem"><p><span class="emphasis"><em>flags</em></span> -
+      由两部分组成，两元参量和子操作标识。两元参量为：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; "><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_DISC_ENB</em></span> -
+	启用断开连接</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_TAG_ENB</em></span> -
+	启用带标签的排队</p></li></ul></div></li><li class="listitem"><p>子操作为：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; "><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_CURRENT_SETTINGS</em></span>
+        - 改变当前的协商</p></li><li class="listitem"><p><span class="emphasis"><em>CCB_TRANS_USER_SETTINGS</em></span>
+        - 记住希望的用户值 </p></li><li class="listitem"><p><span class="emphasis"><em>sync_period, sync_offset</em></span> -
+        自解释的，如果sync_offset==0则请求同步模式
+	</p></li><li class="listitem"><p><span class="emphasis"><em>bus_width</em></span> -
+	总线带宽，以位计（而不是字节）
+	</p><div xmlns="" class="tip"><h3 class="admontitle">译注: </h3><p xmlns="http://www.w3.org/1999/xhtml">参考原文和源码</p></div><p>
+	</p></li></ul></div></li></ul></div><p>支持两组协商参数，用户设置和当前设置。用户设置在SIM驱动程序中
+      实际上用得不多，这通常只是一片内存，供上层存储（并在以后恢复）其关于
+      参数的一些主张。设置用户参数并不会导致重新协商传输速率。但当SCSI
+      控制器协商时，它必须永远不能设置高于用户参数的值，因此它实质上是
+      上限。</p><p>当前设置，正如其名字所示，指当前的。改变它们意味着下一次传输时
+      必须重新协商参数。又一次，这些<span class="quote">“<span class="quote">new current settings</span>”</span>
+      并没有被假定为强制用于设备上，它们只是用作协商的起始步骤。此外，
+      它们必须受SCSI控制器的实际能力限制：例如，如果SCSI控制器有8位总线，
+      而请求要求设置16位传输，则在发送给设备前参数必须被悄悄地截取为8位。
+      </p><p>一个需要注意的问题就是总线宽度和同步两个参数是针对每目标的而言的，
+      而断开连接和启用标签两个参数是针对每lun而言的。</p><p>建议的实现是保持3组协商参数（总线宽度和同步传输）：
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><span class="emphasis"><em>user</em></span> - 用户的一组，如上
+      </p></li><li class="listitem"><p><span class="emphasis"><em>current</em></span> - 实际生效的那些
+      </p></li><li class="listitem"><p><span class="emphasis"><em>goal</em></span> -
+      通过设置<span class="quote">“<span class="quote">current</span>”</span>参数所请求的那些</p></li></ul></div><p>代码看起来像：</p><pre class="programlisting">    struct ccb_trans_settings *cts;
+    int targ, lun;
+    int flags;
+
+    cts = &amp;ccb-&gt;cts;
+    targ = ccb_h-&gt;target_id;
+    lun = ccb_h-&gt;target_lun;
+    flags = cts-&gt;flags;
+    if(flags &amp; CCB_TRANS_USER_SETTINGS) {
+        if(flags &amp; CCB_TRANS_SYNC_RATE_VALID)
+            softc-&gt;user_sync_period[targ] = cts-&gt;sync_period;
+        if(flags &amp; CCB_TRANS_SYNC_OFFSET_VALID)
+            softc-&gt;user_sync_offset[targ] = cts-&gt;sync_offset;
+        if(flags &amp; CCB_TRANS_BUS_WIDTH_VALID)
+            softc-&gt;user_bus_width[targ] = cts-&gt;bus_width;
+
+        if(flags &amp; CCB_TRANS_DISC_VALID) {
+            softc-&gt;user_tflags[targ][lun] &amp;= ~CCB_TRANS_DISC_ENB;
+            softc-&gt;user_tflags[targ][lun] |= flags &amp; CCB_TRANS_DISC_ENB;
+        }
+        if(flags &amp; CCB_TRANS_TQ_VALID) {
+            softc-&gt;user_tflags[targ][lun] &amp;= ~CCB_TRANS_TQ_ENB;
+            softc-&gt;user_tflags[targ][lun] |= flags &amp; CCB_TRANS_TQ_ENB;
+        }
+    }
+    if(flags &amp; CCB_TRANS_CURRENT_SETTINGS) {
+        if(flags &amp; CCB_TRANS_SYNC_RATE_VALID)
+            softc-&gt;goal_sync_period[targ] =
+                max(cts-&gt;sync_period, OUR_MIN_SUPPORTED_PERIOD);
+        if(flags &amp; CCB_TRANS_SYNC_OFFSET_VALID)
+            softc-&gt;goal_sync_offset[targ] =
+                min(cts-&gt;sync_offset, OUR_MAX_SUPPORTED_OFFSET);
+        if(flags &amp; CCB_TRANS_BUS_WIDTH_VALID)
+            softc-&gt;goal_bus_width[targ] = min(cts-&gt;bus_width, OUR_BUS_WIDTH);
+
+        if(flags &amp; CCB_TRANS_DISC_VALID) {
+            softc-&gt;current_tflags[targ][lun] &amp;= ~CCB_TRANS_DISC_ENB;
+            softc-&gt;current_tflags[targ][lun] |= flags &amp; CCB_TRANS_DISC_ENB;
+        }
+        if(flags &amp; CCB_TRANS_TQ_VALID) {
+            softc-&gt;current_tflags[targ][lun] &amp;= ~CCB_TRANS_TQ_ENB;
+            softc-&gt;current_tflags[targ][lun] |= flags &amp; CCB_TRANS_TQ_ENB;
+        }
+    }
+    ccb-&gt;ccb_h.status = CAM_REQ_CMP;
+    xpt_done(ccb);
+    return;</pre><p>此后当下一次要处理I/O请求时，它会检查其是否需要重新协商，
+      例如通过调用函数target_negotiated(hcb)。它可以如下实现：</p><pre class="programlisting">    int
+    target_negotiated(struct xxx_hcb *hcb)
+    {
+        struct softc *softc = hcb-&gt;softc;
+        int targ = hcb-&gt;targ;
+
+        if( softc-&gt;current_sync_period[targ] != softc-&gt;goal_sync_period[targ]
+        || softc-&gt;current_sync_offset[targ] != softc-&gt;goal_sync_offset[targ]
+        || softc-&gt;current_bus_width[targ] != softc-&gt;goal_bus_width[targ] )
+            return 0; /* FALSE */
+        else
+            return 1; /* TRUE */
+    }</pre><p>重新协商这些值后，结果值必须同时赋给当前和目的(goal)参数，
+      这样对于以后的I/O事务当前和目的参数将相同，且
+      <code class="function">target_negotiated()</code>会返回TRUE。当初始化卡
+      （在<code class="function">xxx_attach()</code>中）当前协商值必须被初始化为
+      最窄同步模式，目的和当前值必须被初始化为控制器所支持的最大值。
+      （译注：原文可能有误，此处未改）
+      </p></li><li class="listitem"><p><span class="emphasis"><em>XPT_GET_TRAN_SETTINGS</em></span> -
+    获得SCSI传输设置的值</p><p>此操作为XPT_SET_TRAN_SETTINGS的逆操作。用通过旗标
+      CCB_TRANS_CURRENT_SETTINGS或CCB_TRANS_USER_SETTINGS（如果同时设置则
+      现有驱动程序返回当前设置）所请求而得的数据填充CCB实例
+      <span class="quote">“<span class="quote">struct ccb_trans_setting cts</span>”</span>. </p></li><li class="listitem"><a id="idp72459472" class="indexterm"></a><p><span class="emphasis"><em>XPT_CALC_GEOMETRY</em></span> -
+      计算磁盘的逻辑（BIOS）结构(geometry)</p><p>参量在联合ccb的实例<span class="quote">“<span class="quote">struct ccb_calc_geometry ccg</span>”</span>
+      中传输：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><span class="emphasis"><em>block_size</em></span> -
+      输入，以字节计的块大小（也称为扇区）</p></li><li class="listitem"><p><span class="emphasis"><em>volume_size</em></span> -
+      输入，以字节计的卷大小</p></li><li class="listitem"><p><span class="emphasis"><em>cylinders</em></span> -
+      输出，逻辑柱面</p></li><li class="listitem"><p><span class="emphasis"><em>heads</em></span> -
+      输出，逻辑磁头</p></li><li class="listitem"><p><span class="emphasis"><em>secs_per_track</em></span> -
+      输出，每磁道的逻辑扇区</p></li></ul></div><a id="idp72470224" class="indexterm"></a><p>如果返回的结构与SCSI控制器BIOS所想象的差别很大，并且SCSI
+      控制器上的磁盘被作为可引导的，则系统可能无法启动。从aic7xxx
+      驱动程序中摘取的典型计算示例：</p><pre class="programlisting">    struct    ccb_calc_geometry *ccg;
+    u_int32_t size_mb;
+    u_int32_t secs_per_cylinder;
+    int   extended;
+
+    ccg = &amp;ccb-&gt;ccg;
+    size_mb = ccg-&gt;volume_size
+        / ((1024L * 1024L) / ccg-&gt;block_size);
+    extended = check_cards_EEPROM_for_extended_geometry(softc);
+
+    if (size_mb &gt; 1024 &amp;&amp; extended) {
+        ccg-&gt;heads = 255;
+        ccg-&gt;secs_per_track = 63;
+    } else {
+        ccg-&gt;heads = 64;
+        ccg-&gt;secs_per_track = 32;
+    }
+    secs_per_cylinder = ccg-&gt;heads * ccg-&gt;secs_per_track;
+    ccg-&gt;cylinders = ccg-&gt;volume_size / secs_per_cylinder;
+    ccb-&gt;ccb_h.status = CAM_REQ_CMP;
+    xpt_done(ccb);
+    return;</pre><p>这给出了一般思路，精确计算依赖于特定BIOS的癖好(quirk)。如果
+      BIOS没有提供方法设置EEPROM中的<span class="quote">“<span class="quote">extended translation</span>”</span>
+      旗标，则此旗标通常应当假定等于1。其他流行结构有：</p><pre class="programlisting">    128 heads, 63 sectors - Symbios控制器
+    16 heads, 63 sectors - 老式控制器</pre><p>一些系统BIOS和SCSI BIOS会相互竞争，胜负不定，例如Symbios
+      875/895 SCSI和Phoenix BIOS的结合在系统加电时会给出结构128/63，
+      而当冷启动或软启动后会是255/63。</p></li><li class="listitem"><p><span class="emphasis"><em>XPT_PATH_INQ</em></span> - 路径问询，
+      换句话说，获得SIM驱动程序和SCSI控制器（也称为HBA - 主机总线适配器）
+      的特性。</p><p>特性在联合ccb的实例<span class="quote">“<span class="quote">struct ccb_pathinq cpi</span>”</span>
+      中返回：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>version_num - SIM驱动程序号，当前所有驱动程序使用1
+      </p></li><li class="listitem"><p>hba_inquiry - 控制器所支持特性的位掩码：
+      </p></li><li class="listitem"><p>PI_MDP_ABLE - 支持MDP消息（来自SCSI3的一些东西?）
+      </p></li><li class="listitem"><p>PI_WIDE_32 - 支持32位宽SCSI
+      </p></li><li class="listitem"><p>PI_WIDE_16 - 支持16位宽SCSI
+      </p></li><li class="listitem"><p>PI_SDTR_ABLE - 可以协商同步传输速率
+      </p></li><li class="listitem"><p>PI_LINKED_CDB - 支持链接的命令
+      </p></li><li class="listitem"><p>PI_TAG_ABLE - 支持带标签的命令
+      </p></li><li class="listitem"><p>PI_SOFT_RST - 支持软复位选择
+        （硬复位和软复位在SCSI总线中是互斥的）
+        </p></li><li class="listitem"><p>target_sprt - 目标模式支持的旗标，如果不支持则为0
+        </p></li><li class="listitem"><p>hba_misc - 控制器特性杂项：
+        </p></li><li class="listitem"><p>PIM_SCANHILO - 从高ID到低ID的总线扫描
+        </p></li><li class="listitem"><p>PIM_NOREMOVE - 可移除设备不包括在扫描之列
+        </p></li><li class="listitem"><p>PIM_NOINITIATOR - 不支持发起者角色
+        </p></li><li class="listitem"><p>PIM_NOBUSRESET - 用户禁用初始BUS RESET
+        </p></li><li class="listitem"><p>hba_eng_cnt - 神秘的HBA引擎计数，与压缩有关的一些
+        东西，当前总是置为0</p></li><li class="listitem"><p>vuhba_flags - 供应商唯一的旗标，当前未用
+        </p></li><li class="listitem"><p>max_target - 最大支持的目标ID（对8位总线为7，
+        16位总线为15，光纤通道为127）</p></li><li class="listitem"><p>max_lun - 最大支持的LUN ID（对较老的SCSI控制器
+        为7，较新的为63）</p></li><li class="listitem"><p>async_flags - 安装的异步处理函数的位掩码，当前未用
+        </p></li><li class="listitem"><p>hpath_id - 子系统中最高的路径ID，当前未用
+        </p></li><li class="listitem"><p>unit_number - 控制器单元号，cam_sim_unit(sim)
+        </p></li><li class="listitem"><p>bus_id - 总线号，cam_sim_bus(sim)
+        </p></li><li class="listitem"><p>initiator_id - 控制器自己的SCSI ID
+        </p></li><li class="listitem"><p>base_transfer_speed - 异步窄传输的名义传输速率，
+        以KB/s计，对于SCSI等于3300</p></li><li class="listitem"><p>sim_vid - SIM驱动程序的供应商ID，以0结束的字符串，
+        包含结尾0在内的最大长度为SIM_IDLEN</p></li><li class="listitem"><p>hba_vid - SCSI控制器的供应商ID，以0结束的字符串，
+        包含结尾0在内的最大长度为HBA_IDLEN</p></li><li class="listitem"><p>dev_name - 设备驱动程序名字，以0结尾的字符串，
+        包含结尾0在内的最大长度为DEV_IDLEN，等于cam_sim_name(sim)
+	</p></li></ul></div><p>设置字符串字段的建议方法是使用strncpy，如：</p><pre class="programlisting">    strncpy(cpi-&gt;dev_name, cam_sim_name(sim), DEV_IDLEN);</pre><p>设置这些值后将状态设置为CAM_REQ_CMP，并将CCB标记为完成。</p></li></ul></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="scsi.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="scsi.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="scsi-polling.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 12 章 通用访问方法SCSI控制器 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 12.3. 轮询</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

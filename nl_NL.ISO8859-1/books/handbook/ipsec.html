@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>15.9. VPN via IPsec</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="security.html" title="Hoofdstuk 15. Beveiliging" /><link rel="prev" href="openssl.html" title="15.8. OpenSSL" /><link rel="next" href="openssh.html" title="15.10. OpenSSH" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.9. VPN via IPsec</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="openssl.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 15. Beveiliging</th><td width="20%" align="right"> <a accesskey="n" href="openssh.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ipsec"></a>15.9. VPN via IPsec</h2></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nik</span> <span class="surname">Clayton</span></span>. </span></div></div></div><a id="idp77648720" class="indexterm"></a><p>Een VPN opzetten met FreeBSD gateways tussen twee netwerken die
+      gescheiden zijn door Internet.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77649616"></a>15.9.1. IPsec begrijpen</h3></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Hiten M.</span> <span class="surname">Pandya</span></span>. </span></div></div></div><p>Deze paragraaf is een gids in het proces van het opzetten
+	van IPsec.  Voordat IPsec opgezet kan worden dient de lezer
+	bekend te zijn met de concepten die nodig zijn om een aangepaste
+	kernel te bouwen (zie <a class="xref" href="kernelconfig.html" title="Hoofdstuk 9. De FreeBSD-kernel instellen">Hoofdstuk 9, <em>De FreeBSD-kernel instellen</em></a>).</p><p><span class="emphasis"><em>IPsec</em></span> is een protocol dat bovenop de
+	Internet Protocol (IP) laag ligt.  Hiermee kunnen twee of meer
+	host op een veilige manier communiceren (vandaar de naam).  De
+	FreeBSD IPsec <span class="quote">&#8220;<span class="quote">netwerk wachtrij (stack)</span>&#8221;</span> is gebaseerd
+	op de
+	<a class="link" href="http://www.kame.net/" target="_top">KAME</a>-implementatie,
+	die zowel de protocolfamilies IPv4 als de IPv6 ondersteunt.</p><a id="idp77659344" class="indexterm"></a><a id="idp77660496" class="indexterm"></a><p>IPsec bestaat uit twee subprotocollen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>Encapsulated Security Payload
+	      (ESP)</em></span> beschermt de IP-pakketdata tegen
+	    inmenging door een derde partij door de inhoud te
+	    versleutelen met symmetrische
+	    versleutelingsalgoritmes (zoals Blowfish en 3DES).</p></li><li class="listitem"><p><span class="emphasis"><em>Authentication Header (AH)</em></span>
+	    beschermt de IP-pakketkop tegen inmenging door een derde
+	    partij en spoofing door een cryptografische checksum te
+	    berekenen en de IP-pakketkopvelden te hashen met een
+	    veilige hashfunctie.  Hierna wordt een extra kop ingevoegd
+	    die de hash bevat zodat de informatie in het pakket
+	    geautenticeerd kan worden.</p></li></ul></div><p><acronym class="acronym">ESP</acronym> en <acronym class="acronym">AH</acronym> kunnen
+	samen of apart gebruikt worden, afhankelijk van de
+	omgeving.</p><a id="idp77669712" class="indexterm"></a><a id="idp77670224" class="indexterm"></a><a id="idp77671376" class="indexterm"></a><p>IPsec kan gebruikt worden om het verkeer tussen twee hosts
+	direct te versleutelen (dat heet <span class="emphasis"><em>Transport
+	Mode</em></span>) of door <span class="quote">&#8220;<span class="quote">virtuele tunnels</span>&#8221;</span> te
+	bouwen tussen twee subnetten die gebruikt kunnen worden voor
+	veilige communicatie tussen twee bedrijfsnetwerken (dat heet
+	<span class="emphasis"><em>Tunnel Mode</em></span>).  De laatste versie staat
+	beter bekend als <span class="emphasis"><em>Virtual Private Network
+	(VPN)</em></span>.  In <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipsec&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ipsec</span>(4)</span></a> staat gedetailleerde
+	informatie over het IPsec subsysteem in FreeBSD.</p><p>Voor ondersteuning voor IPsec in de kernel zijn de
+	volgende opties nodig in het
+	kernelinstellingenbestand:</p><a id="idp77675600" class="indexterm"></a><pre class="screen">options   IPSEC        #IP-beveiliging
+device    crypto</pre><a id="idp77677264" class="indexterm"></a><p>Als er ook fouten in IPsec (debugging) verwijderd moeten
+	kunnen worden, dan is de volgende optie ook nodig:</p><pre class="screen">options   IPSEC_DEBUG  #debug voor IP-beveiliging</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77679312"></a>15.9.2. Het probleem</h3></div></div></div><p>Er bestaat geen standaard voor wat een VPN is.  VPN's
+	kunnen opgezet worden met behulp van een aantal verschillende
+	technologieën die allemaal hun eigen voor- en nadelen
+	hebben.  Dit onderdeel bevat een scenario en de
+	strategieën die gebruikt kunnen worden voor het
+	implementeren van een VPN in iedere situatie.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77680464"></a>15.9.3. Het scenario: twee netwerken, de ene thuisgebaseerd en de
+	andere bedrijfgebaseerd.  Beide zijn verbonden met het Internet,
+	en er wordt van verwacht dat ze zich via dit
+	<acronym class="acronym">VPN</acronym> als één gedragen.</h3></div></div></div><a id="idp77681488" class="indexterm"></a><p>Dit is het uitgangspunt:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Er zijn tenminste twee locaties</p></li><li class="listitem"><p>Beide locaties gebruiken IP</p></li><li class="listitem"><p>Beide locaties hebben een Internetverbinding via een
+	    gateway waarop FreeBSD draait.</p></li><li class="listitem"><p>De gateway op ieder netwerk heeft tenminste
+	    één publiek <acronym class="acronym">IP</acronym>-adres.</p></li><li class="listitem"><p>De interne adressen van de twee netwerken mogen
+	    publieke of private <acronym class="acronym">IP</acronym>-adressen zijn,
+	    dat maakt niet uit.  Ze mogen alleen niet botsen;
+	    bijvoorbeeld: ze mogen niet beide <code class="systemitem">192.168.1.x</code> gebruiken.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77688912"></a>15.9.4. IPsec configureren op FreeBSD</h3></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><p>Om te beginnen moet de port <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/ipsec-tools/pkg-descr">security/ipsec-tools</a>
+	geïnstalleerd zijn vanuit de Portscollectie.  Dit
+	softwarepakket van een derde partij biedt een aantal applicaties
+	die helpen de configuratie te ondersteunen.</p><p>De volgende benodigdheid is om twee <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gif&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gif</span>(4)</span></a>
+	pseudo-apparaten aan te maken om de pakketten te tunnelen en
+	beide netwerken in staat stellen om op een juiste wijze te
+	communiceren.  Draai als <code class="systemitem">root</code> de volgende
+	commando's, waarbij de items <em class="replaceable"><code>intern</code></em>
+	en <em class="replaceable"><code>extern</code></em> met de echte interne en
+	externe gateways:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0 create</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0 intern1 intern2</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0 tunnel extern1 extern2</code></strong></pre><p>Het publieke <acronym class="acronym">IP</acronym> van het
+	<acronym class="acronym">LAN</acronym> van de onderneming is bijvoorbeeld
+	<code class="systemitem">172.16.5.4</code> en het heeft een
+	privaat <acronym class="acronym">IP</acronym> <code class="systemitem">10.246.38.1</code>.  Het publieke
+	<acronym class="acronym">IP</acronym> van het <acronym class="acronym">LAN</acronym> van huis is
+	<code class="systemitem">192.168.1.12</code> met een intern
+	privaat <acronym class="acronym">IP</acronym> <code class="systemitem">10.0.0.5</code>.</p><p>Dit kan verwarrend lijken, dus bekijk de volgende
+	voorbeeld van het commando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>:</p><pre class="programlisting">Gateway 1:
+
+gif0: flags=8051 mtu 1280
+tunnel inet 172.16.5.4 --&gt; 192.168.1.12
+inet6 fe80::2e0:81ff:fe02:5881%gif0 prefixlen 64 scopeid 0x6
+inet 10.246.38.1 --&gt; 10.0.0.5 netmask 0xffffff00
+
+Gateway 2:
+
+gif0: flags=8051 mtu 1280
+tunnel inet 192.168.1.12 --&gt; 172.16.5.4
+inet 10.0.0.5 --&gt; 10.246.38.1 netmask 0xffffff00
+inet6 fe80::250:bfff:fe3a:c1f%gif0 prefixlen 64 scopeid 0x4</pre><p>Eenmaal compleet zouden beide private
+	<acronym class="acronym">IP</acronym>'s bereikbaar moeten zijn met het commando
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> zoals de volgende uitvoer suggereert:</p><pre class="programlisting">priv-net# ping 10.0.0.5
+PING 10.0.0.5 (10.0.0.5): 56 data bytes
+64 bytes from 10.0.0.5: icmp_seq=0 ttl=64 time=42.786 ms
+64 bytes from 10.0.0.5: icmp_seq=1 ttl=64 time=19.255 ms
+64 bytes from 10.0.0.5: icmp_seq=2 ttl=64 time=20.440 ms
+64 bytes from 10.0.0.5: icmp_seq=3 ttl=64 time=21.036 ms
+--- 10.0.0.5 ping statistics ---
+4 packets transmitted, 4 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 19.255/25.879/42.786/9.782 ms
+
+corp-net# ping 10.246.38.1
+PING 10.246.38.1 (10.246.38.1): 56 data bytes
+64 bytes from 10.246.38.1: icmp_seq=0 ttl=64 time=28.106 ms
+64 bytes from 10.246.38.1: icmp_seq=1 ttl=64 time=42.917 ms
+64 bytes from 10.246.38.1: icmp_seq=2 ttl=64 time=127.525 ms
+64 bytes from 10.246.38.1: icmp_seq=3 ttl=64 time=119.896 ms
+64 bytes from 10.246.38.1: icmp_seq=4 ttl=64 time=154.524 ms
+--- 10.246.38.1 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 28.106/94.594/154.524/49.814 ms</pre><p>Zoals verwacht hebben beide kanten de mogelijkheid om
+	<acronym class="acronym">ICMP</acronym>-pakketten te verzenden en te ontvangen
+	van de privaat geconfigureerde adressen.  Vervolgens dient aan
+	beide gateways verteld te worden hoe pakketten te routeren om op
+	de juiste wijze verkeer van een van de netwerken te versturen.
+	Het volgende commando doet dit:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>corp-net# route add 10.0.0.0 10.0.0.5 255.255.255.0</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>corp-net# route add net 10.0.0.0: gateway 10.0.0.5</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>priv-net# route add 10.246.38.0 10.246.38.1 255.255.255.0</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>priv-net# route add host 10.246.38.0: gateway 10.246.38.1</code></strong></pre><p>Op dit moment dienen interne machines bereikbaar te zijn
+	vanuit elke gateway alsook als vanuit machines achter de
+	gateways.  Dit is eenvoudig te zien aan het volgende
+	voorbeeld:</p><pre class="programlisting">corp-net# ping 10.0.0.8
+PING 10.0.0.8 (10.0.0.8): 56 data bytes
+64 bytes from 10.0.0.8: icmp_seq=0 ttl=63 time=92.391 ms
+64 bytes from 10.0.0.8: icmp_seq=1 ttl=63 time=21.870 ms
+64 bytes from 10.0.0.8: icmp_seq=2 ttl=63 time=198.022 ms
+64 bytes from 10.0.0.8: icmp_seq=3 ttl=63 time=22.241 ms
+64 bytes from 10.0.0.8: icmp_seq=4 ttl=63 time=174.705 ms
+--- 10.0.0.8 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 21.870/101.846/198.022/74.001 ms
+
+priv-net# ping 10.246.38.107
+PING 10.246.38.1 (10.246.38.107): 56 data bytes
+64 bytes from 10.246.38.107: icmp_seq=0 ttl=64 time=53.491 ms
+64 bytes from 10.246.38.107: icmp_seq=1 ttl=64 time=23.395 ms
+64 bytes from 10.246.38.107: icmp_seq=2 ttl=64 time=23.865 ms
+64 bytes from 10.246.38.107: icmp_seq=3 ttl=64 time=21.145 ms
+64 bytes from 10.246.38.107: icmp_seq=4 ttl=64 time=36.708 ms
+--- 10.246.38.107 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 21.145/31.721/53.491/12.179 ms</pre><p>De tunnels opzetten is het eenvoudige deel.  Het
+	configureren van een veilige verbinding is een veel diepgaander
+	proces.  De volgende configuratie gebruikt vooraf gedeelde
+	(<acronym class="acronym">PSK</acronym>) <acronym class="acronym">RSA</acronym>-sleutels.
+	Afgezien van de <acronym class="acronym">IP</acronym>-adressen zijn beide
+	bestanden <code class="filename">/usr/local/etc/racoon/racoon.conf</code>
+	identiek en zien ze er ongeveer als volgt uit:</p><pre class="programlisting">path    pre_shared_key  "/usr/lcoal/etc/racoon/psk.txt"; # plaats van bestand vooraf gedeelde sleutels
+log     debug;  # verbositeitsinstelling van loggen: op 'notify' zetten als testen en debuggen klaar is
+
+padding # opties moeten niet veranderd worden
+{
+        maximum_length  20;
+        randomize       off;
+        strict_check    off;
+        exclusive_tail  off;
+}
+
+timer   # timingopties, veranderen indien nodig
+{
+        counter         5;
+        interval        20 sec;
+        persend         1;
+#       natt_keepalive  15 sec;
+        phase1          30 sec;
+        phase2          15 sec;
+}
+
+listen  # adres [poort] waarop racoon luistert
+{
+        isakmp          172.16.5.4 [500];
+        isakmp_natt     172.16.5.4 [4500];
+}
+
+remote  192.168.1.12 [500]
+{
+        exchange_mode   main,aggressive;
+        doi             ipsec_doi;
+        situation       identity_only;
+        my_identifier   address 172.16.5.4;
+        peers_identifier        address 192.168.1.12;
+        lifetime        time 8 hour;
+        passive         off;
+        proposal_check  obey;
+#       nat_traversal   off;
+        generate_policy off;
+
+                        proposal {
+                                encryption_algorithm    blowfish;
+                                hash_algorithm          md5;
+                                authentication_method   pre_shared_key;
+                                lifetime time           30 sec;
+                                dh_group                1;
+                        }
+}
+
+sainfo  (address 10.246.38.0/24 any address 10.0.0.0/24 any)   # adres $netwerk/$netmasker $type adres $netwerk/$netmasker $type ( $type is any of esp)
+{
+        pfs_group       1;
+        lifetime        time    3600 sec;
+        encryption_algorithm    blowfish,3des,des;
+        authentication_algorithm        hmac_md5,hmac_sha1;
+        compression_algorithm   deflate;
+}</pre><p>Het uitleggen van elke beschikbare optie, samen met diegenen
+	in deze voorbeelden valt buiten het bereik van dit document.
+	De configuratiehandleiding van <span class="application">racoon</span>
+	staat vol relevante informatie.</p><p>De <acronym class="acronym">SPD</acronym>-beleiden moeten geconfigureerd
+	worden zodat FreeBSD en <span class="application">racoon</span> in staat
+	zijn om netwerkverkeer tussen hosts te versleutelen en te
+	ontsleutelen.</p><p>Deze taak kan met een eenvoudig shellscript zoals het
+	volgende dat op de gateway van de onderneming staat worden
+	uitgevoerd.  Dit bestand wordt gebruikt tijdens de
+	systeeminitialisatie en dient bewaard te worden als
+	<code class="filename">/usr/local/etc/racoon/setkey.conf</code>.</p><pre class="programlisting">flush;
+spdflush;
+# Naar het thuisnetwerk
+spdadd 10.246.38.0/24 10.0.0.0/24 any -P out ipsec esp/tunnel/172.16.5.4-192.168.1.12/use;
+spdadd 10.0.0.0/24 10.246.38.0/24 any -P in esp/tunnel/192.168.1.12-172.16.5.4/use;</pre><p>Eenmaal aanwezig kan <span class="application">racoon</span> op
+	beide gateways gestart worden met het volgende commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/local/sbin/racoon -F -f /usr/local/etc/racoon/racoon.conf -l /var/log/racoon.log</code></strong></pre><p>De uitvoer moet ongeveer gelijk zijn aan de volgende:</p><pre class="programlisting">corp-net# /usr/local/sbin/racoon -F -f /usr/local/etc/racoon/racoon.conf
+Foreground mode.
+2006-01-30 01:35:47: INFO: begin Identity Protection mode.
+2006-01-30 01:35:48: INFO: received Vendor ID: KAME/racoon
+2006-01-30 01:35:55: INFO: received Vendor ID: KAME/racoon
+2006-01-30 01:36:04: INFO: ISAKMP-SA established 172.16.5.4[500]-192.168.1.12[500] spi:623b9b3bd2492452:7deab82d54ff704a
+2006-01-30 01:36:05: INFO: initiate new phase 2 negotiation: 172.16.5.4[0]192.168.1.12[0]
+2006-01-30 01:36:09: INFO: IPsec-SA established: ESP/Tunnel 192.168.1.12[0]-&gt;172.16.5.4[0] spi=28496098(0x1b2d0e2)
+2006-01-30 01:36:09: INFO: IPsec-SA established: ESP/Tunnel 172.16.5.4[0]-&gt;192.168.1.2[0] spi=47784998(0x2d92426)
+2006-01-30 01:36:13: INFO: respond new phase 2 negotiation: 172.16.5.4[0]192.168.1.12[0]
+2006-01-30 01:36:18: INFO: IPsec-SA established: ESP/Tunnel 192.168.1.12[0]-&gt;172.16.5.4[0] spi=124397467(0x76a279b)
+2006-01-30 01:36:18: INFO: IPsec-SA established: ESP/Tunnel 172.16.5.4[0]-&gt;192.168.1.12[0] spi=175852902(0xa7b4d66)</pre><p>Om er zeker van te zijn dat de tunnel correct werkt, dient
+	naar een ander console geschakeld te worden en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a>
+	gebruikt te worden om hiermee het netwerkverkeer te bekijken.
+	Vervang <code class="literal">em0</code> door de netwerkinterfacekaart
+	indien nodig.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>tcpdump -i em0 host 172.16.5.4 and dst 192.168.1.12</code></strong></pre><p>Gegevens lijkend op de volgende zouden op het console moeten
+	verschijnen.  Indien niet, dan is er iets aan de hand, en is het
+	nodig om de teruggegeven gegevens te debuggen.</p><pre class="programlisting">01:47:32.021683 IP corporatenetwork.com &gt; 192.168.1.12.privatenetwork.com: ESP(spi=0x02acbf9f,seq=0xa)
+01:47:33.022442 IP corporatenetwork.com &gt; 192.168.1.12.privatenetwork.com: ESP(spi=0x02acbf9f,seq=0xb)
+01:47:34.024218 IP corporatenetwork.com &gt; 192.168.1.12.privatenetwork.com: ESP(spi=0x02acbf9f,seq=0xc)</pre><p>Op dit punt zouden beide netwerken beschikbaar moeten zijn en
+	deel lijken van hetzelfde netwerk.  Waarschijnlijk zijn beide
+	netwerken beschermt door een firewall, zoals het hoort.  Om
+	verkeer tussen hen toe te staan, moeten er regels worden
+	toegevoegd om pakketten heen en terug door te laten.  Voeg voor
+	de firewall <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> de volgende regels toe aan het
+	instellingenbestand van de firewall:</p><pre class="programlisting">ipfw add 00201 allow log esp from any to any
+ipfw add 00202 allow log ah from any to any
+ipfw add 00203 allow log ipencap from any to any
+ipfw add 00204 allow log udp from any 500 to any</pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Afhankelijk van de huidige hostconfiguratie dienen de
+	  regelnummers gewijzigd te worden.</p></div><p>Voor gebruikers van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pf&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">pf</span>(4)</span></a> of <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> zouden de
+	volgende regels moeten volstaan:</p><pre class="programlisting">pass in quick proto esp form any to any
+pass in quick proto ah from any to any
+pass in quick proto ipencap from any to any
+pass in quick proto udp form any port = 500 to any port = 500
+pass in quick on gif0 from any to any
+pass out quick proto esp from any to any
+pass out quick proto ah from any to any
+pass out quick ptoto ipencap from any to any
+pass out quick proto udp from any port = 500 to any port = 500
+pass out quick on gif0 from any to any</pre><p>Ter afsluiting, voeg de volgende regels toe aan
+	<code class="filename">/etc/rc.conf</code> om de machine toe te staan om
+	ondersteuning voor het <acronym class="acronym">VPN</acronym> te starten tijdens
+	de systeeminitialisatie:</p><pre class="programlisting">ipsec_enable="YES"
+ipsec_program="/usr/local/sbin/setkey"
+ipsec_file="/usr/local/etc/racoon/setkey.conf" # staat toe om spd-beleiden tijdens het opstarten op te zetten
+racoon_enable="yes"</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="openssl.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="openssh.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">15.8. OpenSSL </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 15.10. OpenSSH</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

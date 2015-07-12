@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!--
+     The FreeBSD Russian Documentation Project
+
+     $FreeBSD$
+     $FreeBSDru: frdp/doc/ru_RU.KOI8-R/articles/relaydelay/article.xml,v 1.2 2007/05/15 19:31:54 gad Exp $
+
+     Original revision: r43184
+-->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="ru">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Использование технологии серых списков во FreeBSD</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Том</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Родес</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">trhodes@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2004</year>
+
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD Documentation Project</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Эта статья создана исключительно для описания технологии задержки
+	передачи сообщений на почтовом сервере FreeBSD.  Сервер с технологией
+	задержки передачи (relaydelay) или попаданием в серый список
+	(greylisting) снижает уровень спама просто за счёт выдачи
+	диагностического сообщения <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> на каждое
+	входящее почтовое сообщение.  Смысл этой технологии заключается в том,
+	что большинство спамеров для выполнения своей работы используют
+	собственные персональные компьютеры и специализированное программное
+	обеспечение.  Настоящий почтовый сервер должен помещать сообщения в
+	очередь и пытаться доставить его позже.  Таким образом, скорее всего,
+	спамер перейдёт к следующему хосту вместо того, чтобы попытаться снова
+	послать электронное послание.  Это прекрасная идея; по крайней мере,
+	до тех пор, пока спамеры не начнут использовать программное
+	обеспечение, которое будет обеспечивать повтор передачи.  Но как именно
+	это работает?  Итак, в процессе приёма сообщения электронной почты
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym> сообщения сохраняется в базе данных, а в качестве
+	результата возвращается <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> вместе с
+	электронной почтой.  Если сообщение электронной почты посылается
+	повторно, то <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym> сообщения будет сверяться с
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym> сообщений, сохранёнными в базе данных.  Если в
+	базе данных оно существует, то посланию электронной почты разрешается
+	доставка по назначению.  В противном случае <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ID</acronym>
+	сохраняется, а в качестве результата возвратится
+	<errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname>.  Этот цикл будет повторяться для
+	каждого сообщения, поступающего на сервер.  По моему личному опыту,
+	это действительно отсекает 90% спама.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Базовая настройка</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Нам потребуется <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command> с поддержкой многопоточного
+      выполнения.  Установите <package xmlns:xlink="http://www.w3.org/1999/xlink">lang/perl5.8</package>
+      с установленной переменной <varname xmlns:xlink="http://www.w3.org/1999/xlink">USE_THREADS=yes</varname>.  Сначала
+      может потребоваться удалить текущую версию <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command>; на
+      необходимость сделать это укажут ошибки в процессе установки.</para>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">При этом потребуется, чтобы все порты, которым нужен
+	<command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command>, были перестроены и переустановлены;
+	<package xmlns:xlink="http://www.w3.org/1999/xlink">ports-mgmt/portupgrade</package> хорошо для
+	этого подходит.  По крайней мере, он укажет, какие порты были удалены и
+	какие необходимо переустановить.</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь что касается сервера базы данных;
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">MySQL</application> прекрасно подходит для такого типа
+      работы.  Установите <package xmlns:xlink="http://www.w3.org/1999/xlink">databases/mysql40-server</package> вместе с <package xmlns:xlink="http://www.w3.org/1999/xlink">databases/p5-DBD-mysql40</package>.  Предыдущий порт
+      должен подразумевать установку <package xmlns:xlink="http://www.w3.org/1999/xlink">databases/p5-DBI-137</package>, так что один шаг будет
+      пропущен.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Установите переносимый подключаемый серверный модуль на базе
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command>, порт <package xmlns:xlink="http://www.w3.org/1999/xlink">net/p5-Net-Daemon</package>.  Большинство установок этих
+      портов должны проходить без проблем.  Следующий шаг будет более
+      трудоёмким.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь установите порт <package xmlns:xlink="http://www.w3.org/1999/xlink">mail/p5-Sendmail-Milter</package>.  На момент написания
+      этого документа в файле <filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename> имелась строка,
+      начинающаяся с <varname xmlns:xlink="http://www.w3.org/1999/xlink">BROKEN</varname>, просто уберите или
+      закомментируйте её.  Она помечена так лишь потому, что в FreeBSD по
+      умолчанию не включался и не устанавливался пакет <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command>
+      с поддержкой многопоточного выполнения.  После удаления этой строки он
+      должен строиться и устанавливаться без ошибок.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Создайте каталог для размещения временных конфигурационных
+      файлов:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir /tmp/relaydelay</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /tmp/relaydelay</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь, когда у нас имеется временный каталог для работы, команде
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">fetch</command> нужно передать следующие
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">URL</acronym>-адреса:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fetch http://projects.puremagic.com/greylisting/releases/relaydelay-0.04.tgz</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fetch http://lists.puremagic.com/pipermail/greylist-users/attachments/20030904/b8dafed9/relaydelay-0.04.bin</userinput></screen>
+
+    <!-- ЗАМЕЧАНИЕ ДЛЯ ТОМА РОДЕСА: РАЗМЕЩАТЬ ПРОГРАММНОЕ ОБЕСПЕЧЕНИЕ ЗДЕСЬ
+	 ЯВЛЯЕТСЯ ПЛОХОЙ ИДЕЕЙ НА ТОТ СЛУЧАЙ, ЕСЛИ КАКОЙ-НИБУДЬ МУДАК ЗАМЕНИТ
+	 ЕГО.  НАВЕРНОЕ, Я ДОЛЖЕН ЗААРХИВИРОВАТЬ СКРИПТЫ И ОСТАЛЬНУЮ ШНЯГУ. -->
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь необходимо распаковать исходный код:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gunzip -c relaydelay-0.04.tgz | tar xvf -</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">На этот момент во временном каталоге должно оказаться несколько
+      файлов.  Теперь необходимая информация может передаваться серверу базы
+      данных импортированием её из файла <filename xmlns:xlink="http://www.w3.org/1999/xlink">mysql.sql</filename>:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mysql &lt; relaydelay-0.04/mysql.sql</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Установите патч <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.bin</filename> для остальных
+      файлов, запустив такую команду:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">patch -d /tmp/relaydelay/relaydelay-0.04 &lt; relaydelay.bin</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Отредактируйте файлы <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.conf</filename> и
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">db_maintenance.pl</filename>, добавив в них корректное имя
+      пользователя и пароль для СУБД <application xmlns:xlink="http://www.w3.org/1999/xlink">MySQL</application>.  Если
+      СУБД была построена и установлена так, как описано выше, то в ней
+      отсутствуют пользователи и пароли.  Эта ситуация должна быть исправлена
+      до перевода системы в промышленную эксплуатацию, что описано в
+      документации к СУБД и выходит за рамки данной статьи.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Смените рабочий каталог на <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay-0.04</filename>:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd relaydelay-0.04</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Скопируйте или переместите конфигурационные файлы в соответствующие
+      каталоги:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mv db_maintenance.pl relaydelay.pl /usr/local/sbin</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mv relaydelay.conf /etc/mail</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mv relaydelay.sh /usr/local/etc/rc.d/</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Протестируйте получившуюся конфигурацию, выполнив такую
+      команду:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh /usr/local/etc/rc.d/relaydelay.sh start</userinput></screen>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Этот файл не будет существовать, если предыдущие команды <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">mv</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>
+	не были выполнены.</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Если всё отработало корректно, то в каталоге <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var/log</filename> должен появиться новый файл,
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.log</filename>.  В нём должен находиться текст,
+      подобный следующему:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">Loaded Config File: /etc/mail/relaydelay.conf
+Using connection 'local:/var/run/relaydelay.sock' for filter relaydelay
+DBI Connecting to DBI:mysql:database=relaydelay:host=localhost:port=3306
+Spawned relaydelay daemon process 38277.
+Starting Sendmail::Milter 0.18 engine.</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Если файл не появился, то что-то сработало неправильно, пересмотрите
+      экранную диагностику или просмотрите журнальный файл
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">messages</filename> на предмет появления новой
+      информации.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Объедините всё вместе, добавив следующую строку в файл
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/mail/sendmail.mc</filename> или специфичный для вашей
+      системы <filename xmlns:xlink="http://www.w3.org/1999/xlink">mc</filename>-файл:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">INPUT_MAIL_FILTER(`relaydelay', `S=local:/var/run/relaydelay.sock, T=S:1m;R:2m;E:3m')dnl</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Перестройте и переустановите файлы в каталоге
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/mail</filename> и перезапустите
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">sendmail</command>.  Короткая команда <command xmlns:xlink="http://www.w3.org/1999/xlink">make</command>
+      <buildtarget>restart</buildtarget> должна сделать всё необходимое.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Сгрузите скрипт на языке <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command>, размещённый по
+      адресу <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.puremagic.com/pipermail/greylist-users/2003-November/000327.html">http://lists.puremagic.com/pipermail/greylist-users/2003-November/000327.html</link>
+      и сохраните его в каталог <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay-0.04</filename>.  В следующем примере этот
+      скрипт обозначается как <filename xmlns:xlink="http://www.w3.org/1999/xlink">addlist.pl</filename>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Отредактируйте файл <filename xmlns:xlink="http://www.w3.org/1999/xlink">whitelist_ip.txt</filename>,
+      модифицировав его так, чтобы в него были включены
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">IP</acronym>-адреса серверов, которые должны иметь возможность
+      игнорировать фильтры <application xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay</application>.  То есть это
+      домены, при получении электронной почты от которых диагностическое
+      сообщение <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname> выдаваться не будет.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Как пример можно привести:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">192.168.   # My internal network.
+66.218.66       # Yahoo groups has unique senders.</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Файл <filename xmlns:xlink="http://www.w3.org/1999/xlink">blacklist_ip.txt</filename> должен иметь похожее
+      назначение, но с обратными правилами.  Укажите в этом файле
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">IP</acronym>-адреса, которые должны отвергаться без выдачи
+      диагностического сообщения <errorname xmlns:xlink="http://www.w3.org/1999/xlink">TEMPFAIL</errorname>.  Этот
+      перечень доменов никогда не получит даже возможность сообщить о том, что
+      они являются реально существующими почтовыми серверами.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Эти файлы теперь должны быть импортированы в базу данных посредством
+      скрипта <filename xmlns:xlink="http://www.w3.org/1999/xlink">addlist.pl</filename>, который был получен несколькими
+      строками выше:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">perl addlist.pl -whitelist 9999-12-31 23:59:59 &lt; whitelist_ip.txt</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">perl addlist.pl -blacklist 9999-12-31 23:59:59 &lt; blacklist_ip.txt</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Для включения технологии <application xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay</application> при
+      каждой загрузке системы, добавьте строчку
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay_enable="YES"</option> в файл
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Журнальный файл <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var/log/relaydelay.log</filename> должен
+      постепенно пополняться удачными прохождениями.  В зависимости от загрузки
+      вашего почтового сервера, вскоре должны появиться строчки, подобные
+      следующим.</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">=== 2004-05-24 21:03:22 ===
+Stored Sender: &lt;someasshole@flawed-example.com&gt;
+Passed Recipient: &lt;local_user@pittgoth.com&gt;
+  Relay: example.net [XXX.XX.XXX.XX] - If_Addr: MY_IP_ADDRESS
+  RelayIP: XX.XX.XX.XX - RelayName: example.net - RelayIdent:  - PossiblyForged: 0
+  From: someasshole@flawed-example.com - To: local_user
+  InMailer: esmtp - OutMailer: local - QueueID: i4P13Lo6000701111
+  Email is known but block has not expired.  Issuing a tempfail.  rowid: 51
+  IN ABORT CALLBACK - PrivData: 0&lt;someasshole@flawed-example.com&gt;</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">В файл <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/newsyslog.conf</filename> теперь можно добавить
+      следующую строку, которая обеспечивает ротацию журналов
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay.log</filename> при достижении размера в 100
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">Кбайт</acronym>:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink">/var/log/relaydelay.log                 644  3     100  *     Z</screen>
+
+    <!-- XXX К какому тексту относится это замечание? -->
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">В какой-то момент появлялась ошибка о неполном определении
+	переменных <command xmlns:xlink="http://www.w3.org/1999/xlink">perl</command> в файле
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/mail/relaydelay.conf</filename>.  Если те две переменные
+	раскомментированы, то конфигурационный файл может быть обработан
+	нормально.  Просто не забудьте убрать их из комментариев до того, как
+	начать работу с технологией <command xmlns:xlink="http://www.w3.org/1999/xlink">relaydelay</command>.</para>
+    </note>
+  </sect1>
+</article>

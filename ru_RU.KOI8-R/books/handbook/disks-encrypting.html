@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>17.16. Шифрование дисковых разделов</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="disks.html" title="Глава 17. Устройства хранения" /><link rel="prev" href="quotas.html" title="17.15. Квотирование файловых систем" /><link rel="next" href="swap-encrypting.html" title="17.17. Шифрование области подкачки" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">17.16. Шифрование дисковых разделов</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="quotas.html">Пред.</a> </td><th width="60%" align="center">Глава 17. Устройства хранения</th><td width="20%" align="right"> <a accesskey="n" href="swap-encrypting.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-encrypting"></a>17.16. Шифрование дисковых разделов</h2></div><div><span class="authorgroup">Текст предоставил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Lucky</span> <span class="surname">Green</span></span>. </span></div></div></div><a id="idp92336336" class="indexterm"></a><p>FreeBSD предоставляет прекрасную возможность по защите от
+      несанкционированного доступа к данным.  Права на доступ к файлам и
+      технология принудительного контроля доступа MAC (Mandatory Access Control)
+      (смотрите see <a class="xref" href="mac.html" title="Глава 15. Принудительный контроль доступа (MAC)">Глава 15, <em>Принудительный контроль доступа (MAC)</em></a>) помогают предотвратить
+      несанкционированный доступ посторонних лиц к данным, при условии работы
+      операционной системы и компьютера.  Однако права доступа, контролируемые
+      операционной системой, не имеют значения, если нападающий получает
+      физический доступ к компьютеру и может просто перенести жёсткий диск на
+      другую машину для копирования и дальнейшего анализа важных данных.</p><p>Вне зависимости от того, как атакующий завладел жёстким диском или
+      выключенным компьютером, технологии <span class="application">gbde</span> (GEOM
+      Based Disk Encryption - шифрование диска на уровне GEOM) и
+      криптографическая подсистема <code class="command">geli</code> FreeBSD могут защитить
+      данные файловой системы компьютера даже против очень заинтересованной
+      атакующей стороны с достаточными ресурсами.  В отличие от громоздких
+      систем шифрования, которые шифруют отдельные файлы,
+      <code class="command">gbde</code> и <code class="command">geli</code> шифруют в прозрачном режиме файловую
+      систему в целом, при этом данные в открытом виде на диск никогда не
+      записываются.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92340304"></a>17.16.1. Шифрование диска при помощи gbde</h3></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Получите права пользователя <code class="systemitem">root</code></strong></p><p>Настройка <span class="application">gbde</span> требует права доступа
+	    администратора системы.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su -</code></strong>
+Password:</pre></li><li class="step"><p class="title"><strong>Включите поддержку <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a> в конфигурационный
+	    файл ядра</strong></p><p>Добавьте
+	    следующую строку в файл конфигурации вашего ядра:</p><p><code class="literal">options GEOM_BDE</code></p><p>Перестройте ядро
+	    FreeBSD.  Этот процесс описан в <a class="xref" href="kernelconfig.html" title="Глава 9. Настройка ядра FreeBSD">Глава 9, <em>Настройка ядра FreeBSD</em></a>.</p><p>Перезагрузитесь, запустив новое ядро.</p></li><li class="step"><p>Альтернативой пересборке ядра является использование
+	    <code class="command">kldload</code> для загрузки модуля
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_bde</code></strong></pre></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92351056"></a>17.16.1.1. Подготовка зашифрованного жёсткого диска</h4></div></div></div><p>В следующем примере предполагается, что в вашу систему вы
+	добавляете новый винчестер, на котором будет располагаться единственный
+	раздел с зашифрованными данными.  Этот раздел будет монтироваться в
+	каталог <code class="filename">/private</code>.  <span class="application">gbde</span>
+	может также использоваться для шифрования <code class="filename">/home</code> и
+	<code class="filename">/var/mail</code>, но это требует более сложной
+	последовательности действий, что выходит за рамки этого вводного
+	материала.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Подключите новый жёсткий диск</strong></p><p>Установите новый диск в систему, как это описано в <a class="xref" href="disks-adding.html" title="17.3. Добавление дисков">Раздел 17.3, <<Добавление дисков>></a>.  В рамках этого примера раздел,
+	    соответствующий новому жёсткому диску, будет называться
+	    <code class="filename">/dev/ad4s1c</code>.  Устройства
+	    <code class="filename">/dev/ad0s1<em class="replaceable"><code>*</code></em></code>
+	    представляют существующие стандартные разделы FreeBSD нашей
+	    тестовой системы.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4</pre></li><li class="step"><p class="title"><strong>Создайте каталог для размещения файлов блокировок GBDE</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/gbde</code></strong></pre><p>Файл блокировки <span class="application">gbde</span> содержит
+	    информацию, которая нужна <span class="application">gbde</span> для
+	    доступа к зашифрованному разделу.  Не имея доступа к файлу
+	    блокировки, <span class="application">gbde</span> не сможет расшифровать
+	    данные, хранимые в зашифрованном разделе, без значительного ручного
+	    вмешательства, что программно не поддерживается.  Каждый
+	    зашифрованный раздел использует отдельный файл блокировки.</p></li><li class="step"><p class="title"><strong>Инициализируйте раздел gbde</strong></p><p>Перед началом работы с разделом <span class="application">gbde</span>
+	    его необходимо проинициализировать.  Эта инициализация производится
+	    только один раз:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde init /dev/ad4s1c -i -L /etc/gbde/ad4s1c.lock</code></strong></pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> запустит редактор, что позволит вам задать
+	    в шаблоне различные конфигурационные параметры.  При работе с
+	    файловыми системами UFS1 и UFS2 задайте значение sector_size равным
+	    2048:</p><pre class="programlisting">$FreeBSD: src/sbin/gbde/template.txt,v 1.1 2002/10/20 11:16:13 phk Exp $
+#
+# Sector size is the smallest unit of data which can be read or written.
+# Making it too small decreases performance and decreases available space.
+# Making it too large may prevent filesystems from working.  512 is the
+# minimum and always safe.  For UFS, use the fragment size
+#
+sector_size     =       2048
+[...]</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> дважды запросит ввод пароля, который будет
+	    использоваться для защиты данных.  Пароль в обоих случаях должен
+	    вводиться одинаковый.  Возможности <span class="application">gbde</span>
+	    по защите ваших данных полностью зависят от качества выбранной
+	    вами ключевой фразы.
+	    <a href="#ftn.idp92382544" class="footnote" id="idp92382544"><sup class="footnote">[9]</sup></a></p><p>По команде <code class="command">gbde init</code> создаётся файл
+	    блокировок для вашего раздела <span class="application">gbde</span>,
+	    который в нашем случае будет иметь имя
+	    <code class="filename">/etc/gbde/ad4s1c.lock</code>.
+	    Для того, чтобы файлы блокировок корректно распознавались
+	    стартовым скриптом <code class="filename">/etc/rc.d/gbde</code>,
+	    их имена должны заканчиваться на <span class="quote"><<<span class="quote">.lock</span>>></span>.</p><div xmlns="" class="caution"><h3 class="admontitle">Внимание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Резервные копии файлов блокировок
+	      <span class="application">gbde</span> <span class="emphasis"><em>должны</em></span>
+	      храниться вместе с содержимым шифруемых разделов.  Хотя удаление
+	      только блокировочного файла не сможет противостоять дешифрации
+	      атакующим раздела <span class="application">gbde</span>, без этого
+	      файла даже легитимный пользователь не сможет получить доступ к
+	      данным без определённых и значительных усилий, что не
+	      поддерживается <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> и его разработчиком.</p></div></li><li class="step"><p class="title"><strong>Подключите зашифрованный раздел к системе</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c.lock</code></strong></pre><p>Будет выдан запрос на ввод ключевой фразы, которую вы выбирали
+	    во время инициализации зашифрованного раздела.  Новое защищённое
+	    устройство будет видно в каталоге <code class="filename">/dev</code> под
+	    названием <code class="filename">/dev/device_name.bde</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4        /dev/ad4s1c.bde</pre></li><li class="step"><p class="title"><strong>Создайте файловую систему на зашифрованном устройстве</strong></p><p>Как только защищённое устройство будет подключено к системе,
+	    вы сможете создать на нём файловую систему.  Для этого используется
+	    утилита <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a>.  Так как инициализация новой файловой
+	    системы UFS2 происходит быстрее, чем инициализация файловой системы
+	    старого формата UFS1, то рекомендуется использовать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> с
+	    параметром <code class="option">-O2</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U -O2 /dev/ad4s1c.bde</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Запуск команды <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> должен выполняться над
+	      подключенном разделе <span class="application">gbde</span>, который
+	      идентифицируется по расширению
+	      <code class="filename"><em class="replaceable"><code>*</code></em>.bde</code> в имени
+	      устройства.</p></div></li><li class="step"><p class="title"><strong>Смонтируйте зашифрованный раздел</strong></p><p>Создайте точку монтирования для зашифрованной файловой
+	    системы.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /private</code></strong></pre><p>Смонтируйте защищённую файловую систему.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre></li><li class="step"><p class="title"><strong>Проверьте доступность зашифрованной файловой системы</strong></p><p>Защищённая файловая система теперь должна быть доступна утилите
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> и доступной для использования.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem        Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a      1037M    72M   883M     8%
+/devfs            1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f       8.1G    55K   7.5G     0%    /home
+/dev/ad0s1e      1037M   1.1M   953M     0%    /tmp
+/dev/ad0s1d       6.1G   1.9G   3.7G    35%    /usr
+/dev/ad4s1c.bde   150G   4.1K   138G     0%    /private</pre></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92418896"></a>17.16.1.2. Монтирование имеющихся зашифрованных файловых систем</h4></div></div></div><p>После каждой загрузки для каждой защищённой файловой системы перед
+	их использованием должны выполняться повторное подключение к системе,
+	проверка на наличие ошибок и монтирование.  Требуемые для этого команды
+	должны выполняться пользователем <code class="systemitem">root</code>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Подключение gbde-раздела к системе</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c.lock</code></strong></pre><p>Будет выдан запрос на ввод ключевой фразы, выбранной на этапе
+	    инициализации зашифрованного раздела <span class="application">gbde</span>.</p></li><li class="step"><p class="title"><strong>Проверка файловой системы на наличие ошибок</strong></p><p>Так как защищаемая файловая система не может пока быть указана
+	    в файле <code class="filename">/etc/fstab</code> для автоматического
+	    монтирования, то она должны проверяться на наличие ошибок
+	    посредством ручного запуска <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> до её монтирования.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -p -t ffs /dev/ad4s1c.bde</code></strong></pre></li><li class="step"><p class="title"><strong>Монтирование зашифрованной файловой системы</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre><p>Теперь защищённая файловая система доступна для работы.</p></li></ol></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92436816"></a>17.16.1.2.1. Автоматическое монтирование зашифрованных разделов</h5></div></div></div><p>Для автоматического подключения, проверки и монтирования
+	  зашифрованного раздела можно создать скрипт, но по соображениям
+	  безопасности в этом скрипте пароля для <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> быть не должно.
+	  Поэтому рекомендуется запускать такие скрипты вручную, а пароль
+	  задавать с консоли или сеанса <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a>.</p><p>Кроме того, базовая система содержит
+	  скрипт <code class="filename">rc.d</code> для автоматического монтирования шифрованных разделов.
+	  Его аргументы могут быть указаны в файле <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>:</p><pre class="programlisting">gbde_autoattach_all="YES"
+gbde_devices="ad4s1c"
+gbde_lockdir="/etc/gbde"</pre><p>При этом ключевая фраза для <span class="application">gbde</span>
+	  должна быть введена на этапе загрузки.  После введения ключевой
+	  фразы зашифрованный раздел будет смонтирован автоматически.
+	  Такой подход может быть очень удобным для использования
+	  <span class="application">gbde</span> на ноутбуках.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92451024"></a>17.16.1.3. Криптографическая защита, применяемая в gbde</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> шифрует содержимое секторов при помощи 128-битного
+	AES в режиме CBC.  Каждый сектор диска шифруется различным ключом
+	AES.  Более полная информацию о системе шифрования
+	<span class="application">gbde</span>, включая алгоритм генерации ключей
+	для секторов из ключевой фразы, вводимой пользователем, можно найти
+	на страницах справочной системы о <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92453968"></a>17.16.1.4. Вопросы совместимости</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> несовместим с устройствами, зашифрованными
+	<span class="application">gbde</span>.  Все устройства
+	<code class="filename"><em class="replaceable"><code>*</code></em>.bde</code> перед
+	запуском <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> должны быть отключены от системы, или
+	эта утилита аварийно завершит работу на этапе обнаружения устройств.
+	Для отключения защищённого устройства, используемого в нашем примере,
+	воспользуйтесь такой командой:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde detach /dev/ad4s1c</code></strong></pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92458704"></a>17.16.2. Шифрование дисков при помощи <code class="command">geli</code></h3></div><div><span class="authorgroup">Предоставлено <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p>Во FreeBSD имеется альтернативный криптографический класс GEOM
+	- <code class="command">geli</code>.  В настоящий момент он поддерживается
+	Pawel Jakub Dawidek <code class="email">&lt;<a xmlns="" class="email" href="mailto:pjd@FreeBSD.org">pjd@FreeBSD.org</a>&gt;</code>.  Утилита <code class="command">geli</code> отличается от
+	<code class="command">gbde</code>; она предоставляет другой комплекс
+	возможностей и использует иную схему криптования.</p><p>Наиболее значимыми особенностями <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> являются:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Использование инфраструктуры <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crypto&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">crypto</span>(9)</span></a>: при наличии
+	    аппаратной криптографической поддержки, <code class="command">geli</code>
+	    автоматически использует ее.</p></li><li class="listitem"><p>Поддержка разнообразных криптоалгоритмов (в настоящее время
+	     AES, Blowfish и 3DES).</p></li><li class="listitem"><p>Поддержка шифрованного корневого раздела.  Для загрузки
+	    в такой ситуации потребуется ввести ключевую фразу.</p></li><li class="listitem"><p>Поддержка двух независимых ключей шифрования (например,
+	    <span class="quote"><<<span class="quote">основного ключа</span>>></span> и <span class="quote"><<<span class="quote">ключа
+	    компании</span>>></span>).</p></li><li class="listitem"><p>Высокая скорость работы <code class="command">geli</code> за счет
+	    простого криптования сектор-сектор.</p></li><li class="listitem"><p>Поддержка архивирования основных ключей.  При необходимости
+	    текущие ключи могут быть уничтожены, а в дальнейшем доступ к
+	    данным восстановлен при помощи архивированных ключей.</p></li><li class="listitem"><p>Поддержка криптования файловых систем случайным одноразовым
+	    ключом - например, для разделов подкачки или временных
+	    файловых систем.</p></li></ul></div><p>Другие возможности класса <code class="command">geli</code> описаны в его
+	странице справочника: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.</p><p>Несколько следующих страниц будут посвящены описанию процесса
+	конфигурации <code class="command">geli</code> в ядре FreeBSD, а также объяснят,
+	как создавать и использовать криптографический провайдер
+	<code class="command">geli</code>.</p><p>Поскольку в процессе настройки возникнет необходимость внесения
+	изменений в конфигурацию ядра, потребуются также
+	привилегии суперпользователя.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Добавление поддержки <code class="command">geli</code> в ядро</strong></p><p>Добавьте в конфигурационный файл ядра следующие строки:</p><pre class="programlisting">options GEOM_ELI
+device crypto</pre><p>Перестройте ядро, как описано в разделе <a class="xref" href="kernelconfig.html" title="Глава 9. Настройка ядра FreeBSD">Глава 9, <em>Настройка ядра FreeBSD</em></a>.</p><p>Помимо этого, поддержка <code class="command">geli</code> может быть
+	    активирована модулем ядра на этапе загрузки.  Для этого добавьте
+	    в файл <code class="filename">/boot/loader.conf</code> строку:</p><pre class="programlisting">geom_eli_load="YES"</pre><p>Теперь ядро должно поддерживать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.</p></li><li class="step"><p class="title"><strong>Генерация главного ключа</strong></p><p>Предлагаемый пример описывает процесс генерации ключевого
+	    файла, который послужит частью главного ключа для шифрованного
+	    провайдера, монтируемого в каталог <code class="filename">/private</code>.  При помощи содержимого
+	    ключевого файла создается набор случайных данных, которым
+	    зашифровывается главный ключ.  Кроме того, он будет защищен
+	    кодовой фразой.  Размер сектора провайдера будет составлять
+	    4kB.  Наконец, мы обсудим, как присоединиться к провайдеру
+	    <code class="command">geli</code>, создать на базе его файловую систему,
+	    как ее смонтировать и работать с ней, и, в заключение, как
+	    корректно завершить работу.</p><p>Больший чем обычно размер сектора (как в нашем примере, 4 кБ)
+	    рекомендуется для увеличения производительности.</p><p>Главный ключ будет защищен кодовой фразой; данные для
+	    ключевого файла берутся из <code class="filename">/dev/random</code>.
+	    Размер сектора создаваемого нами шифрованного провайдера
+	    <code class="filename">/dev/da2.eli</code> - 4кБ.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/root/da2.key bs=64 count=1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli init -s 4096 -K /root/da2.key /dev/da2</code></strong>
+Enter new passphrase:
+Reenter new passphrase:</pre><p>Использование одновременно кодовой фразы и ключевого файла
+	    не обязательно: любой из этих методов защиты главного ключа может
+	    применяться независимо.</p><p>Если в качестве имени ключевого файла указан <span class="quote"><<<span class="quote">-</span>>></span>,
+	    используется стандартный ввод.  Это позволяет использовать более
+	    одного ключевого файла:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat keyfile1 keyfile2 keyfile3 | geli init -K - /dev/da2</code></strong></pre></li><li class="step"><p class="title"><strong>Свяжите сгенерированный ключ с провайдером</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>geli attach -k /root/da2.key /dev/da2</code></strong>
+Enter passphrase:</pre><p>Созданный при этом файл дискового устройства будет называться
+	    <code class="filename">/dev/<em class="replaceable"><code>da2</code></em>.eli</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/da2*</code></strong>
+/dev/da2  /dev/da2.eli</pre></li><li class="step"><p class="title"><strong>Создайте новую файловую систему</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/dev/da2.eli bs=1m</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/da2.eli</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da2.eli /private</code></strong></pre><p>Зашифрованная файловая система будет видна в выводе утилиты
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> и готова к использованию:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem     Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a    248M    89M   139M    38%    /
+/devfs         1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f    7.7G   2.3G   4.9G    32%    /usr
+/dev/ad0s1d    989M   1.5M   909M     0%    /tmp
+/dev/ad0s1e    3.9G   1.3G   2.3G    35%    /var
+/dev/da2.eli   150G   4.1K   138G     0%    /private</pre></li><li class="step"><p class="title"><strong>Размонтирование и деактивация провайдера</strong></p><p>После завершения работы с шифрованным разделом, когда
+	    содержимое каталога <code class="filename">/private</code>
+	    больше не нужно, будет разумным отключить раздел от
+	    системы.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /private</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli detach da2.eli</code></strong></pre></li></ol></div><p>Дополнительную информацию о <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> можно найти на
+	соответствующей странице справочника.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92515664"></a>17.16.2.1. Использование стартового скрипта <code class="filename">rc.d</code>
+	  <code class="filename">geli</code></h4></div></div></div><p>Для удобства использования подсистемы <code class="command">geli</code>
+	  в комплект базовой системы FreeBSD входит стартовый скрипт, работой
+	  которого можно управлять из <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>:</p><pre class="programlisting">geli_devices="da2"
+geli_da2_flags="-p -k /root/da2.key"</pre><p>При этом дисковый раздел <code class="filename">/dev/da2</code> будет
+	  сконфигурирован как провайдер <code class="command">geli</code>, связан с
+	  ключевым файлом <code class="filename">/root/da2.key</code>, а кодовая
+	  фраза не будет использоваться (отметим, что это возможно только
+	  в том случае, если при инициализации <code class="literal">geli init</code> был
+	  указан ключ <code class="option">-P</code>).  Шифрованный провайдер <code class="command">geli</code>
+	  будет отсоединен перед выключением системы.</p><p>Дополнительную информацию о конфигурации скриптов <code class="filename">rc.d</code> можно
+	  найти в соответствующей
+	  <a class="link" href="configtuning-rcd.html" title="12.7. Использование rc во FreeBSD 5.X и последующих версиях">главе</a> Руководства.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp92382544" class="footnote"><p><a href="#idp92382544" class="para"><sup class="para">[9] </sup></a>Советы по выбору легко запоминающихся ключевых фраз можно
+		найти на сайте <a class="link" href="http://world.std.com/~reinhold/diceware.html" target="_top">Diceware
+		Passphrase</a>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="quotas.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="swap-encrypting.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">17.15. Квотирование файловых систем </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 17.17. Шифрование области подкачки</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>6.3. Dépassement de capacité</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="secure.html" title="Chapitre 6. Programmation sécurisée" /><link rel="prev" href="secure-philosophy.html" title="6.2. Méthodologie de développement sécurisé" /><link rel="next" href="ch06s04.html" title="6.4. Les problèmes liés à SetUID" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6.3. Dépassement de capacité</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="secure-philosophy.html">Précédent</a> </td><th width="60%" align="center">Chapitre 6. Programmation sécurisée</th><td width="20%" align="right"> <a accesskey="n" href="ch06s04.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp67644624"></a>6.3. Dépassement de capacité</h2></div></div></div><p>Les dépassements de capacité ("Buffer Overflows") existent depuis
+      les débuts de l'architecture de Von-Neuman <a class="xref" href="bi01.html#COD">1</a>.
+      Ils gagnèrent une grande notoriété en 1988 avec le ver pour Internet
+      de Morris. Malheureusement, la même attaque basique reste effective
+      aujourd'hui. Des 17 rapports de sécurité du CERT de 1999, 10
+      furent causés directement des bogues logiciels de dépassement de
+      capacité. De loin la plus commune de types d'attaques par dépassement de
+       capacité est basée sur la corruption de la pile.</p><p>La plupart des systèmes informatiques modernes utilise une pile
+      pour passer les arguments aux procédures et stocker les variables locales
+      Une pile est une zone mémoire dernier entré-premier sorti (Last In-First
+       Out : LIFO) dans la zone de mémoire haute de l'image d'un processus.
+      Quand un programme invoque une fonction une nouvelle structure pile est
+      créée. Cette structure pile consiste dans les arguments passés à la
+      fonction aussi bien que dans une quantité dynamique d'espace pour
+      la variable locale. Le pointeur de pile est un registre qui référence la
+      position courante du sommet de la pile. Etant donné que cette valeur
+      change constamment au fur et à mesure que de nouvelles valeurs sont
+      ajoutées au sommet de la pile, beaucoup d'implémentations fournissent
+      aussi un pointeur de structure qui est positionné dans le voisinage du
+      début de la structure pile de façon à ce que les variables locales soient
+      plus facilement adressables relativement à cette valeur.
+      <a class="xref" href="bi01.html#COD">1</a> L'adresse de retour des appels de fonction est aussi
+      stocké dans la pile, et cela est la cause des découvertes des
+      dépassements de pile puisque faire déborder une variable locale dans une
+      fonction peut écraser l'adresse de retour de cette fonction, permettant
+      potentiellement à un utilisateur malveillant d'exécuter le code qu'il ou
+      elle désire.</p><p>Bien que les attaques basées sur les dépassements de pile soient
+      de loin les plus communes, il serait aussi possible de faire exploser
+      la pile avec une attaque du tas (malloc/free).</p><p>Le langage de programmation C ne réalise pas de vérifications
+      automatiques des limites sur les tableaux ou pointeurs comme d'autres
+      langages le font. De plus, la librairie standard du C est remplie d'une
+      poignée de fonctions très dangereuses.</p><div class="informaltable"><table border="1"><colgroup><col /><col /></colgroup><tbody><tr><td><code class="function">strcpy</code>(char *dest, const char
+          *src)</td><td><p>Peut faire déborder le tampon dest</p></td></tr><tr><td><code class="function">strcat</code>(char *dest, const char
+          *src)</td><td><p>Peut faire déborder le tampon dest</p></td></tr><tr><td><code class="function">getwd</code>(char *buf)</td><td><p>Peut faire déborder le tampon buf</p></td></tr><tr><td><code class="function">gets</code>(char *s)</td><td><p>Peut faire déborder le tampon s</p></td></tr><tr><td><code class="function">[vf]scanf</code>(const char *format,
+          ...)</td><td><p>Peut faire déborder ses arguments.</p></td></tr><tr><td><code class="function">realpath</code>(char *path, char
+          resolved_path[])</td><td><p>Peut faire déborder le tampon path</p></td></tr><tr><td><code class="function">[v]sprintf</code>(char *str, const char
+          *format, ...)</td><td><p>Peut faire déborder le tampon str.</p></td></tr></tbody></table></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67658832"></a>6.3.1. Exemple de dépassement de capacité</h3></div></div></div><p>L'exemple de code suivant contient un dépassement de capacité
+      conçu pour écraser l'adresse de retour et "sauter" l'instruction suivant
+      immédiatement l'appel de la fonction. (Inspiré
+      par <a class="xref" href="bi01.html#Phrack">4</a>)</p><pre class="programlisting">#include <code class="sgmltag-element">stdio.h</code>
+
+void manipulate(char *buffer) {
+  char newbuffer[80];
+  strcpy(newbuffer,buffer);
+}
+
+int main() {
+  char ch,buffer[4096];
+  int i=0;
+
+  while ((buffer[i++] = getchar()) != '\n') {};
+
+  i=1;
+  manipulate(buffer);
+  i=2;
+  printf("La valeur de i est : %d\n",i);
+  return 0;
+}</pre><p>Examinons quel serait l'aspect de l'image mémoire de ce processus
+      si nous avions entré 160 espaces dans notre petit programme avant
+      d'appuyer sur <span class="keycap"><strong>Entrée</strong></span>.</p><p>[XXX Schéma ici!]</p><p>Evidemment une entrée plus malveillante pourrait être imaginée pour
+      exécuter des instructions déjà compilées (comme exec(/bin/sh)).</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67670864"></a>6.3.2. Eviter les dépassements de capacité</h3></div></div></div><p>La solution la plus simple au problème de débordement de pile
+      est de toujours utiliser de la mémoire restreinte en taille et
+      les fonctions de copie de chaîne de caractères. <code class="function">strncpy</code>
+      et <code class="function">strncat</code> font parties de la libraire standard du
+      C. Ces fonctions acceptent une valeur de longueur comme paramètre qui
+      qui ne devrait pas être plus grande que la taille du tampon de
+      destination. Ces fonctions vont ensuite copier `taille' octets de la
+      source vers la destination. Toutefois, il y a un certain nombre de
+      problèmes avec ces fonctions. Aucune fonction ne garantit une terminaison
+      par le caractère NULL si la taille du tampon d'entrée est aussi grand
+      que celui de destination. Le paramètre taille est aussi utilisé de façon
+      illogique entre <code class="function">strncpy</code> et <code class="function">strncat</code>
+      aussi il est facile pour les programmeurs d'être déroutés sur leur
+      utilisation convenable. Il y a aussi une perte significative des
+      performances comparé à <code class="function">strcpy</code> lorsque l'on copie
+      une courte chaîne dans un grand tampon puisque <code class="function">strncpy</code>
+      remplit de caractères NULL jusqu'à la taille spécifiée.</p><p>Dans OpenBSD, une autre implémentation de la copie de mémoire
+      a été créée pour contourner ces problèmes. Les fonctions <code class="function">strlcpy</code>
+      et <code class="function">strlcat</code> garantissent qu'elles termineront
+      toujours le tampon de destination par un caractère NULL losque l'argument
+      de taille est différent de zéro. Pour plus d'informations sur ces
+      fonctions, voir <a class="xref" href="bi01.html#OpenBSD">6</a>. Les fonctions <code class="function">strlcpy</code> et
+      <code class="function">strlcat</code> d'OpenBSD ont été inclues dans FreeBSD
+      depuis la version 3.5.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67676368"></a>6.3.2.1. V#233;rifications des limites en fonctionnement basées sur le compilateur</h4></div></div></div><p>Malheureusement il y a toujours un très important assortiment de
+        code en utilisation publique qui copie aveuglément la mémoire sans
+        utiliser une des routines de copie limitée dont nous venons juste de
+        discuter. Heureusement, il y a une autre solution.  Plusieurs produits
+        complémentaires pour compilateur et librairies existent pour faire
+        de la vérification de limites pendant le fonctionnement en C/C++.</p><p>StackGuard est un de ces produits qui est implémenté comme un
+        petit correctif ("patch") pour le générateur de code gcc. Extrait du
+        site Internet de StackGuard, http://immunix.org/stackguard.html :
+        </p><div class="blockquote"><blockquote class="blockquote"><p>"StackGuard détecte et fait échouer les attaques
+        par débordement de pile en empêchant l'adresse de retour sur la pile
+        d'être altérée. StackGuard place un mot "canari"
+        <a href="#ftn.idp67678160" class="footnote" id="idp67678160"><sup class="footnote">[12]</sup></a>
+        à côté de l'adresse de retour quand la fontion est appelée. Si le mot
+        "canari" a été altéré au retour de la fonction, alors une attaque par
+        débordement de pile a été tentée et le programme répond en envoyant
+        une alerte d'intrusion dans la trace système (syslog) et
+        s'arrête alors."</p></blockquote></div><p>
+
+        </p><div class="blockquote"><blockquote class="blockquote"><p>"StackGuard est implémenté comme un petit correctif
+        au générateur de code gcc, spécifiquement sur les routines
+        function_prolog() et function_epilog().  function_prolog() a été
+        amélioré pour laisser des "canaris" sur la pile quand les fonctions
+        démarrent, et function_epilog vérifie l'intégrité des "canaris" quand
+        la fonction se termine. Tout essai pour corrompre l'adresse de retour
+        est alors détectée avant que la fonction ne retourne."</p></blockquote></div><p>
+        </p><p>Recompiler votre application avec StackGuard est un
+        moyen efficace pour stopper la plupart des attques par dépassement de
+        capacité, mais cela peut toujours être compromis.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67680080"></a>6.3.2.2. Vérifications des limites en fonctionnement basées sur les librairies</h4></div></div></div><p>Les mécanismes basés sur le compilateur sont totalement inutiles
+        pour logiciel seulement binaire que vous ne pouvez recompiler. Pour
+        ces situations, il existe un nombre de librairies qui re-implémente
+        les fonctions peu sûres de la librairie C
+        (<code class="function">strcpy</code>, <code class="function">fscanf</code>,
+        <code class="function">getwd</code>, etc..) et assurent que ces
+        fonctions ne peuvent pas écrire plus loin que le pointeur de pile.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">libsafe</li><li class="listitem">libverify</li><li class="listitem">libparnoia</li></ul></div><p>Malheureusement ces défenses basées sur les librairies possèdent
+	un certain nombre de défauts. Ces librairies protègent seulement d'un
+        très petit ensemble de problèmes liés à la sécurité et oublient de
+        réparer le problème actuel. Ces défenses peuvent échouer si
+        l'application a été compilée avec -fomit-frame-pointer. De même, les
+        variables d'environnement LD_PRELOAD et LD_LIBRARY_PATH peuvent être
+        réécrites/non définies par l'utilisateur.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp67678160" class="footnote"><p><a href="#idp67678160" class="para"><sup class="para">[12] </sup></a>NDT : Jaune de préférence pour être bien visible</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="secure-philosophy.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="secure.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch06s04.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">6.2. Méthodologie de développement
+      sécurisé </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 6.4. Les problèmes liés à SetUID</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

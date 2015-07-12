@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>12.4. Differentiating operating systems and OS versions</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter's Handbook" /><link rel="up" href="porting-dads.html" title="章 12. Dos and Don'ts" /><link rel="prev" href="porting-wrkdirprefix.html" title="12.3. WRKDIRPREFIX" /><link rel="next" href="freebsd-versions.html" title="12.5. FreeBSD 版本速查表(__FreeBSD_version)" /><link rel="copyright" href="trademarks.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.4. Differentiating operating systems and OS versions</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-wrkdirprefix.html">前一頁</a> </td><th width="60%" align="center">章 12. Dos and Don'ts</th><td width="20%" align="right"> <a accesskey="n" href="freebsd-versions.html">下一頁</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="porting-versions"></a>12.4. Differentiating operating systems and OS versions</h2></div></div></div><p>You may come across code that needs modifications or conditional
+	  compilation based upon what version of Unix it is running under.  If
+	  you need to make such changes to the code for conditional
+	  compilation, make sure you make the changes as general as possible
+	  so that we can back-port code to older FreeBSD systems and cross-port
+	  to other BSD systems such as 4.4BSD from CSRG, BSD/386, 386BSD,
+	  NetBSD, and OpenBSD.</p><p>The preferred way to tell 4.3BSD/Reno (1990) and newer versions
+	  of the BSD code apart is by using the <code class="literal">BSD</code> macro
+	  defined in
+	  <a class="link" href="http://cvsweb.freebsd.org/src/sys/sys/param.h" target="_top">sys/param.h</a>.
+	  Hopefully that
+	  file is already included; if not, add the code:</p><pre class="programlisting">#if (defined(__unix__) || defined(unix)) &amp;&amp; !defined(USG)
+#include &lt;sys/param.h&gt;
+#endif</pre><p>to the proper place in the <code class="filename">.c</code> file.  We
+	  believe that every system that defines these two symbols has
+	  <code class="filename">sys/param.h</code>.  If you find a system that
+	  does not, we would like to know.  Please send mail to the
+	  <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-ports" target="_top">FreeBSD ports 郵遞論壇</a>.</p><p>Another way is to use the GNU Autoconf style of doing
+	  this:</p><pre class="programlisting">#ifdef HAVE_SYS_PARAM_H
+#include &lt;sys/param.h&gt;
+#endif</pre><p>Do not forget to add <code class="literal">-DHAVE_SYS_PARAM_H</code> to the
+	  <code class="varname">CFLAGS</code> in the <code class="filename">Makefile</code> for
+	  this method.</p><p>Once you have <code class="filename">sys/param.h</code> included, you may
+	  use:</p><pre class="programlisting">#if (defined(BSD) &amp;&amp; (BSD &gt;= 199103))</pre><p>to detect if the code is being compiled on a 4.3 Net2 code base
+	  or newer (e.g. FreeBSD 1.x, 4.3/Reno, NetBSD 0.9, 386BSD, BSD/386
+	  1.1 and below).</p><p>Use:</p><pre class="programlisting">#if (defined(BSD) &amp;&amp; (BSD &gt;= 199306))</pre><p>to detect if the code is being compiled on a 4.4 code base or
+	  newer (e.g. FreeBSD 2.x, 4.4, NetBSD 1.0, BSD/386 2.0 or
+	  above).</p><p>The value of the <code class="literal">BSD</code> macro is
+	  <code class="literal">199506</code> for the 4.4BSD-Lite2 code base.  This is
+	  stated for informational purposes only.  It should not be used to
+	  distinguish between versions of FreeBSD based only on 4.4-Lite vs.
+	  versions that have merged in changes from 4.4-Lite2.  The
+	  <code class="literal">__FreeBSD__</code> macro should be used instead.</p><p>Use sparingly:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">__FreeBSD__</code> is defined in all versions of
+	      FreeBSD.  Use it if the change you are making
+	      <span class="emphasis"><em>only</em></span> affects FreeBSD.  Porting gotchas like
+	      the use of <code class="literal">sys_errlist[]</code> vs
+	      <code class="function">strerror()</code> are Berkeley-isms, not FreeBSD
+	      changes.</p></li><li class="listitem"><p>In FreeBSD 2.x, <code class="literal">__FreeBSD__</code> is defined to
+	      be <code class="literal">2</code>.  In earlier versions, it is
+	      <code class="literal">1</code>.  Later versions always bump it to match
+	      their major version number.</p></li><li class="listitem"><p>If you need to tell the difference between a FreeBSD 1.x
+	      system and a FreeBSD 2.x or above system, usually the right answer
+	      is to use the <code class="literal">BSD</code> macros described above.  If
+	      there actually is a FreeBSD specific change (such as special
+	      shared library options when using <code class="command">ld</code>) then it
+	      is OK to use <code class="literal">__FreeBSD__</code> and <code class="literal">#if
+		__FreeBSD__ &gt; 1</code> to detect a FreeBSD 2.x and later
+	      system.  If you need more granularity in detecting FreeBSD
+	      systems since 2.0-RELEASE you can use the following:</p><pre class="programlisting">#if __FreeBSD__ &gt;= 2
+#include &lt;osreldate.h&gt;
+#    if __FreeBSD_version &gt;= 199504
+	 /* 2.0.5+ release specific code here */
+#    endif
+#endif</pre></li></ul></div><p>In the hundreds of ports that have been done, there have only
+	  been one or two cases where <code class="literal">__FreeBSD__</code> should
+	  have been used.  Just because an earlier port screwed up and used it
+	  in the wrong place does not mean you should do so too.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-wrkdirprefix.html">前一頁</a> </td><td width="20%" align="center"><a accesskey="u" href="porting-dads.html">上一層</a></td><td width="40%" align="right"> <a accesskey="n" href="freebsd-versions.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">12.3. <code class="varname">WRKDIRPREFIX</code> </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 12.5. FreeBSD 版本速查表(__FreeBSD_version)</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

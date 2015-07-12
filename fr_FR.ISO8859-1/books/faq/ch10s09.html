@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>10.9.  Pourquoi ppp tente de se connecter sans raison em mode -auto ?</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Questions Fréquemment Posées sur FreeBSD 2.X, 3.X et 4.X" /><link rel="up" href="network.html" title="Chapitre 10. Réseaux. **Mise à jour en cours**" /><link rel="prev" href="ch10s08.html" title="10.8. Ma connexion se termine au bout de 3 minutes" /><link rel="next" href="ch10s10.html" title="10.10. Je ne peux pas créer un périphérique /dev/ed0 !" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.9.  Pourquoi ppp tente de se connecter sans raison em mode -auto ?  </th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch10s08.html">Précédent</a> </td><th width="60%" align="center">Chapitre 10. Réseaux. **Mise à jour en cours**</th><td width="20%" align="right"> <a accesskey="n" href="ch10s10.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp68174672"></a>10.9.  Pourquoi ppp tente de se connecter sans raison em mode -auto ?  </h2></div></div></div><p>
+Si <span class="emphasis"><em>ppp</em></span> tente de se comnnecter
+sans raison aucune, vous devez en déterminer la cause et mettre en place
+des filtrages d'appels (dfilters) pour prévenir de tels appels.
+
+        </p><p>
+Afin d'en déterminer la cause, utilisez la ligne suivant :
+
+        </p><pre class="programlisting">
+set log +tcp/ip
+        </pre><p>
+
+        </p><p>
+Cela tracera tous le trafic à travers une connexion. La prochaine fois
+que la connexion se mettra en place de manière inattendue, vous verrez
+la  raison tracé avec le moment où cela s'est produit à côté.
+        </p><p>
+Vous pouvez à présent désactiver les appels sous ces circonstances.
+D'habitude, ces sortes de problèmes arrivent à cause des DNS lookup.
+Pour empêcher le DNS lookup d'établir une connexion (cela n'empêchera
+<span class="emphasis"><em>pas</em></span> <span class="emphasis"><em>ppp</em></span>
+de passer les paquets à travers une connexion établie), utilisez les
+lignes suivantes :
+
+        </p><pre class="programlisting">
+set dfilter 1 deny udp src eq 53
+set dfilter 2 deny udp dst eq 53
+set dfilter 3 permit 0/0 0/0
+        </pre><p>
+
+        </p><p>
+Cela ne convient pas toujours  puisqu'il
+enlèvera effectivement vos fonctionnalités de demandes d'appels - la
+plupart des programmes auront besoin du DNS lookup
+avant de faire quelque chose ayant un rapport avec le réseau.
+
+        </p><p>
+Dans le cas DNS, vous pouvez essayer de déterminer qui est-ce qui essaye
+actuellement de résoudre le nom de l'hôte.
+La plupart du temps, c'est
+<a class="link" href="http://www.freebsd.org/cgi/man.cgi?sendmail" target="_top">sendmail</a> le coupable.
+Vous devez vous assurer que vous avez dit à sendmail de ne faire aucun
+DNS lookup dans ses fichiers de configuration,
+regardez la section sur
+<a class="link" href="ispmail" target="_top">la configuration du mail</a> pour les détails de comment créer son propre fichier de
+comfiguration, et qu'est ce qu'on doit mettre dedans.
+Vous pouvez aussi vouloir ajouter les lignes suivantes dans votre
+fichier <span class="emphasis"><em>.mc</em></span> :
+
+        </p><pre class="programlisting">
+define(`confDELIVERY_MODE', `d')dnl
+        </pre><p>
+
+        </p><p>
+Cela fera que sendmail mettra tout en file d'attente
+jusqu'à ce que la file soit lancée (habituellement, sendmail est
+invoqué avec ``-bd -q30m'', lui disant de lancer la file
+d'attente toutes les 30 minutes) ou jusqu'à ce que un
+``sendmail -q'' soit effectué (peut-être dans votre fichier ppp.linkup).
+
+      </p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68182352"></a>10.9.1.  Que veulent dire ces erreurs CCP ?  </h3></div></div></div><p>
+Je n'arrête  pas de voir les erreurs suivantes dans mon fichier log :
+        </p><pre class="programlisting">
+CCP: CcpSendConfigReq
+CCP: Received Terminate Ack (1) state = Req-Sent (6)
+        </pre><p>
+
+        </p><p>
+Ceci est obtenu parce que ppp est en train de négocier la compression
+Predictor1 et que l'autre parti ne veut pas du tout négocier de compression.
+Ces messages sont sans conséquences aucune, mais si vous voulez les enleverm
+vous pouvez désactiver la compression Predictor1 aussi en local.
+
+        </p><pre class="programlisting">
+disable pred1
+        </pre><p>
+
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68184528"></a>10.9.2. Ppp se bloque durant les transferts de fichiers avec une erreur IO.  </h3></div></div></div><p>
+Sous FreeBSD 2.2.2 et avant, il y avait un bug dans le driver tun
+qui stoppait tous les paquets entrants d'une taille plus grande que la taille
+MTU de l'interace tun.
+La réception de paquets plus grands que la taille du MTU
+résultait en une erreur IO qui était alors tracé avec syslogd,
+        </p><p>
+Les spécifications ppp disent qu'un MTU de 1500 devrait
+<span class="emphasis"><em>toujours</em></span> être accepté
+comme un minimum, ceci
+quelque soit la négociation LCP. Il est toutefois possible que vous
+diminuez le MTU à moins de 1500, votre ISP vous transmettra des paquets
+de 1500 sans s'en préoccuper, et cela vous bloquera,
+gelant ainsi la ligne.
+
+        </p><p>
+Ce problème peut être contourné en ne réglant jamais un MTU en dessous
+de 1500 sous FreeBSD 2.2.2 et avant.
+
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68191184"></a>10.9.3.  Pourquoi ppp ne trace-t-il pas ma vitesse de connexion ?  </h3></div></div></div><p>
+La façon de tracer toutes les lignes de la ``conversation'' de
+votre modem est d'activer :
+
+        </p><pre class="programlisting">
+set log +connect
+        </pre><p>
+
+        </p><p>
+Cela permettra à
+<a class="link" href="http://www.freebsd.org/cgi/man.cgi?ppp" target="_top">ppp</a>
+de tout tracer jusqu'à la dernière chaîne de requête d'"attente"
+     </p><p>
+Si vous voulez voir votre vitesse de connexion et que vous utilisez
+PAP ou CHAP (et donc ne rien avoir avec "chat" après le CONNECT
+dans le script dial - pas de script "set login"), vous devez
+vous assurer que vous prévenez ppp de s'attendre tout la ligne CONNECT,
+quelque chose comme :
+
+        </p><pre class="programlisting">
+set dial "ABORT BUSY ABORT NO\\sCARRIER TIMEOUT 4 \"\" ATZ OK-ATZ-OK ATDT\\T TIMEOUT 60 CONNECT \\c \\n"
+        </pre><p>
+
+        </p><p>
+Ici, nous avons notre CONNECT, ne rien envoyer, et puis attendre
+un saut de ligne, forçant
+<span class="emphasis"><em>ppp</em></span> à lire  toute la réponse
+CONNECT.
+
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68195280"></a>10.9.4. Ppp ignore le caractère `\' dans mon script chat</h3></div></div></div><p>
+Ppp parse chacune des lignes de votre fichier de configuration, de telle
+sorte qu'il puisse interprêter des chaines comme
+<span class="emphasis"><em>set phone "123 456 789"</em></span> correctement
+(et réaliser qu'il n'y a que  <span class="emphasis"><em>un</em></span>
+seul argument.
+Pour pouvoir spécifier un caractère ``"'', vous devez
+l'échapper avec un backslash (``\'').
+
+        </p><p>
+Quand l'interprêteur chat parse chaque argument, il re-interprête
+l'argument de telle sorte à trouver des séquences de caractères
+d'échappement comme
+``\P'' ou ``\T'' (voir les pages de manuel). En conséquence de
+ce double-parsing, vous devez vous souvenir d'utiliser le nombre
+correct d'échappement.
+        </p><p>
+Si vous voulez envoyer un caractère ``\'' à votre modem,
+vous aurez besoin de faire quelque chose comme :
+
+        </p><pre class="programlisting">
+set dial "\"\" ATZ OK-ATZ-OK AT\\\\X OK"
+        </pre><p>
+
+        </p><p>
+qui se résultera en la séquence suivante :
+
+        </p><pre class="programlisting">
+ATZ
+OK
+AT\X
+OK
+        </pre><p>
+
+        </p><p>
+ou encore
+
+        </p><pre class="programlisting">
+set phone 1234567
+set dial "\"\" ATZ OK ATDT\\T"
+        </pre><p>
+
+        </p><p>
+résultera en la séquence suivante :
+
+        </p><pre class="programlisting">
+ATZ
+OK
+ATDT1234567
+        </pre><p>
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68201040"></a>10.9.5. Ppp reçoit une erreur de segmentation, mais je ne trouve pas de fichier <span class="emphasis"><em>ppp.core</em></span></h3></div></div></div><p>
+Ppp (ou n'importe quel programme dans le même cas) ne devrait jamais
+faire de coredump. Parce que ppp tourne avec une identité d'utilisateur
+effectif de 0, le système d'exploitation n'écrira pas d'image du core sur le
+disque avant de l'avoir terminé. Si, malgrè tout, ppp se
+<span class="emphasis"><em>termine</em></span> actuellement à cause d'une violation
+de segmentation, ou n'importe quel autre signal qui cause normalement un
+core dump, <span class="emphasis"><em>et</em></span> que vous êtes sûr
+que vous utilisez la dernière version (voir le début de cette section),
+alors vous devriez faire la chose suivante :
+        </p><pre class="programlisting">
+$ tar xfz ppp-*.src.tar.gz
+$ cd ppp*/ppp
+$ echo STRIP= &gt;&gt;Makefile
+$ echo CFLAGS+=-g &gt;&gt;Makefile
+$ make clean all
+$ su
+make install
+chmod 555 /usr/sbin/ppp
+        </pre><p>
+
+        </p><p>
+Vous aurez alors une version déboguable de ppp installé. Vous aurez à être
+root pour lancer ppp puisque tous ses privilèges auront été révoqués. Quand
+vous démarrez ppp,  retenez soigneusement le répertoire courant  dans lequel
+vous étiez.
+
+        </p><p>
+A présent, si et quand ppp recevra une violation de segmentation, cela
+crééra un fichier core nommé ppp.core. Vous aurez alors à faire la chose
+suivante :
+
+        </p><pre class="programlisting">
+$ su
+gdb /usr/sbin/ppp ppp.core
+(gdb) bt
+.....
+(gdb) f 0
+.....
+(gdb) i args
+.....
+(gdb) l
+.....
+        </pre><p>
+
+        </p><p>
+Toutes ces informations devront être données suivant votre question,
+rendant ainsi possible le diagnostique de votre problème.
+        </p><p>
+Si vous êtes familier avec gdb, vous pouvez vouloir trouver d'autres
+techniques pour trouver ce qui a causé le dump, et les adresses et
+valeurs des variables concernées.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68205776"></a>10.9.6.  Le processus qui force un appel en mode auto ne se connecte jamais.  </h3></div></div></div><p>
+Cela est un problème connu quand <span class="emphasis"><em>ppp</em></span>
+est réglé de telle sorte à négocier une adresse IP dynamique avec son
+homologue. Quand ce programme initial appelle
+<a class="link" href="http://www.freebsd.org/cgi/man.cgi?connect" target="_top"> connect(2) </a>,
+l'adresse IP de l'interface tun est assignée à l'extrêmité de la
+socket. Le noyau crée le premier paquet sortant et l'écrit sur le
+périphérique tun. <span class="emphasis"><em>Ppp</em></span>
+lit alors le paquet et établit alors la connexion. Si, comme
+résultat de l'assignation dynamique de
+<span class="emphasis"><em>ppp</em></span>,
+l'adresse de l'interface est changée, l'extrêmité  originale de
+la socket sera invalide. Tout paquet envoyé à l'autre parti sera alors
+en principe perdu. Et même s'il ne l'était pas, toute réponse ne
+pourrait pas être renvoyée à la machine originelle puisque l'adresse IP
+ne serait plus possèdée par cette machine.
+
+        </p><p>
+Théoriquement, il y a plusieurs manières d'aborder ce problème.
+Le mieux serait que l'homologue re-assigne la même adresse IP si
+possible <span class="emphasis"><em>:-)</em></span>
+
+        </p><p>
+La meilleure méthode de notre côté, serait de ne jamais changer
+l'adresse IP de l'interface tun, mais à la place, changer tous les
+paquets sortant de telle sorte que les adresses IP de la source soient
+changées de l'interface Ip à l'IP négocié au vol. C'est essentiellement ce
+que
+<a class="link" href="http://www.freebsd.org/cgi/man.cgi?libalias" target="_top"> libalias(3) </a>
+(et l'option <span class="emphasis"><em>-alias</em></span> de ppp)
+font actuellement.
+        </p><p>
+Une autre alternative (et probablement la plus sûre); est d'implémenter
+un appel système qui change tous  les sockets reliées depuis une
+adresse IP à une autre.
+<span class="emphasis"><em>Ppp</em></span> utiliserait cet appel pour
+modifier la socket de tous les programmes existant lorsqu'une nouvelle
+adresse IP est négociée.
+
+        </p><p>
+
+Une troisième possibilité est d'autoriser à une interface de
+s'activer sans adresse IP. Les paquets sortant auront une adresse IP de
+255.255.255.255 jusqu'à ce que le premier  SIOCAIFADDR ioctl soit fait.
+Cela reviendrait à lier entièrement la socket, et
+ça serait à <span class="emphasis"><em>ppp</em></span>
+de changer l'adresse IP source, mais seulement si il est à
+255.255.255.255, et seulement si le numéro IP et le checksum IP
+doivent être changés. Quoiqu'il en soit, c'est de la
+bidouille puisque le noyau enverra des paquets invalides à une
+interface mal configurée, en supposant que d'autres
+mécanismes seront capables de réparer les choses
+retrospectivement.
+
+        </p><p>
+Aucune de ces solutions n'a (encore) été implémentée.
+
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68217552"></a>10.9.7. Pourquoi la plupart des jeux ne marchent pas avec l'option  -alias ?</h3></div></div></div><p>
+La raison pour laquelle les jeux et assimilés ne marchent pas avec
+libalias est que la machine extérieure essaye d'ouvrir une connexion
+ou envoyer des paquets UDP (non sollicités) à  la machine
+interne. Le logiciel packet alias ne sait alors pas qu'il faut envoyer
+ces paquets à une machine interne.
+        </p><p>
+Pour que ça marche, assurez vous que la seule chose qui tourne est le
+logiciel avec lequel vous avez des problèmes, puis alors, soit vous
+lancez tcpdump sur votre interface tun de votre routeur, soit vous
+activez le login ppp tcp/ip (``set log +tcp/ip'') sur votre routeur.
+
+        </p><p>
+Quand vous démarrez le logiciel incriminé, vous devriez voir les paquets
+passer à travers la machine routeur. Quand quelque chose revient depuis
+l'extérieur, il sera retiré (c'est ça le problème). Noter le numéro
+de port de ces paquets, puis arrêtez le logiciel incriminé. Faite ceci
+quelques fois pour voir si les numéro de ports sont consistants. Si ils
+le sont, alors la ligne suivante dans la section appropriée de
+/etc/ppp/ppp.conf rendra le logiciel fonctionnel.
+
+        </p><pre class="programlisting">
+alias port proto internalmachine:port port
+        </pre><p>
+
+        </p><p>
+où ``proto'' est soit ``tcp'' ou ``udp'',
+``internalmachine'' est la machine à laquelle vous voulez que les
+paquets soient envoyés et ``port'' le numéro de port de destination des
+paquets.
+
+        </p><p>
+Vous ne pourrez pas utiliser le logiciel sur d'autres machines sans
+changer la commande du dessus, et lancer le logiciel sur 2 machines
+internes en même temps est hors de question - après tout, le monde
+extérieur voit tout votre réseau entier comme une seule machine.
+        </p><p>
+Si les numéros de ports ne sont pas consistants, il y a 3 autres
+options :
+
+        </p><p>
+<span class="emphasis"><em>1)</em></span> Soumettre le support dans libalias.
+Des exemples de ``cas spéciaux'' peuvent être trouvés dans
+/usr/src/lib/libalias/alias_*.c (alias_ftp.c
+iest un bon prototype).
+Cela implique habituellement la lecture de certains paquets sortant
+reconnus, identification des instructions qui dit à la machine
+extérieure d'initialiser la connexion en retour vers machine interne sur un port
+(aléatoire) spécifique, et mettre en place une
+``route'' dans la table d'alias de telle sorte que les paquets concernés
+sachent où aller.
+
+        </p><p>
+C'est la solution la plus difficile, mais c'est la meilleure et
+permettra au logiciel de marcher sur plusieurs machines
+
+        </p><p>
+<span class="emphasis"><em>2)</em></span>
+Utiliser un proxy. L'application peut pouvoir supporter socks5 par
+exemple, ou (comme dans le cas de ``cvsup'') peut avoir une option
+``passive'' qui évite d'avoir à toujours demander que l'autre parti
+ouvre une connexion en retour sur la machine locale.
+
+        </p><p>
+<span class="emphasis"><em>3)</em></span>
+Tout rediriger vers une machine interne utilisant
+``alias addr''.  C'est l'approche "bourrin".
+
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp68224080"></a>10.9.8. Rien de cela ne marche - je suis désespéré !</h3></div></div></div><p>
+Si tout le reste échoue, envoyer autant d'informations que vous pouvez,
+y compris vos fichiers de configuration, comment vous avez démarré
+<span class="emphasis"><em>ppp</em></span>, les parties pertinentes de
+votre fichier log, et la sortie de la commande
+<a class="link" href="http://www.freebsd.org/cgi/man.cgi?netstat" target="_top"> netstat -rn </a>(avant et après connexion)  à la liste de diffusion
+<a class="link" href="mailto:freebsd-questions@FreeBSD.org" target="_top"> freebsd-questions@FreeBSD.org </a>ou au newsgroup
+<a class="link" href="news:comp.unix.bsd.freebsd.misc" target="_top"> comp.unix.bsd.freebsd.misc, </a>et quelqu'un devrait vous orienter dans la bonne direction.
+      </p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch10s08.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="network.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch10s10.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">10.8. Ma connexion se termine au bout de 3 minutes </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 10.10. Je ne peux pas créer un périphérique <span class="emphasis"><em>/dev/ed0</em></span> !  </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

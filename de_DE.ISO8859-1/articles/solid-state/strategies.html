@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>5. Systemstrategien für kleine und Nur-Lese-Umgebungen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD und Solid State-Geräte" /><link rel="up" href="index.html" title="FreeBSD und Solid State-Geräte" /><link rel="prev" href="ar01s04.html" title="4. Ein Dateisystem von Grund auf neu erstellen" /><link rel="copyright" href="trademarks.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5. Systemstrategien für kleine und Nur-Lese-Umgebungen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ar01s04.html">Zurück</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> </td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="strategies"></a>5. Systemstrategien für kleine und Nur-Lese-Umgebungen</h2></div></div></div><p>In <a class="xref" href="ro-fs.html" title="3. Die rc-Subsysteme und nur-Lese Dateisysteme">Abschnitt 3, &#8222;Die <code class="literal">rc</code>-Subsysteme und nur-Lese
+      Dateisysteme&#8220;</a> wurde darauf hingewiesen, dass
+      das <code class="filename">/var</code>-Dateisystem von
+      <code class="filename">/etc/rc.d/var</code> konstruiert wurde und die
+      Präsenz eines Nur-Lese-Wurzeldateisystems Probleme mit vielen in
+      FreeBSD gebrächlichen Softwarepaketen verursacht.  In diesem
+      Artikel werden Vorschläge für das erfolgreiche Betreiben von
+      cron, syslog, Installationen von Ports und dem Apache-Webserver
+      unterbreitet.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63846480"></a>5.1. cron</h3></div></div></div><p>Während des Bootvorgangs wird <code class="filename">/var</code> von
+        <code class="filename">/etc/rc.d/var</code> anhand der Liste aus
+        <code class="filename">/etc/mtree/BSD.var.dist</code> gefüllt, damit
+        <code class="filename">cron</code>, <code class="filename">cron/tabs</code>, <code class="filename">at</code> und ein paar weitere
+        Standardverzeichnisse erstellt werden.</p><p>Jedoch löst das noch nicht das Problem, Crontabs über
+	Neustarts des Systems hinaus zu erhalten.  Wenn das System neu
+	gestartet wird, verschwindet das
+	<code class="filename">/var</code>-Dateiystem, welches sich im
+	Hauptspeicher befunden hat und jegliche Crontabs, die Sie
+	hatten werden ebenfalls verschwinden. Aus diesem Grund besteht
+	eine Lösung darin, Crontabs für diejenigen Benutzer zu
+	erstellen, die diese auch benötigen.  Dazu sollte das
+	<code class="filename">/</code>-Dateisystem lesend und schreibend
+	eingehängt und diese Crontabs an einen sicheren Ort kopiert
+	werden, wie beispielsweise <code class="filename">/etc/tabs</code>.
+	Fügen Sie dann eine Zeile an das Ende der Datei
+	<code class="filename">/etc/rc.initdiskless</code> hinzu, die diese
+	Crontabs in <code class="filename">/var/cron/tabs</code> kopiert,
+	nachdem dieses Verzeichnis während der Systeminitialisierung
+	erstellt wurde.  Sie werden auch eine Zeile hinzufügen mössen,
+	welche die Besitzer und Berechtigungen auf diesen
+	Verzeichnissen, die Sie erstellen und den dazugehörigen
+	Dateien, die Sie mittels
+	<code class="filename">/etc/rc.initdiskless</code> kopieren,
+	setzen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63880656"></a>5.2. syslog</h3></div></div></div><p>Die Datei <code class="filename">syslog.conf</code> spezifiziert
+	den Ort von bestimmten Logdateien, welche in
+	<code class="filename">/var/log</code> existieren.  Diese Dateien
+	werden nicht von <code class="filename">/etc/rc.d/var</code> während
+	der Systeminitialisierung erstellt.  Aus diesem Grund müssen
+	Sie irgendwo in <code class="filename">/etc/rc.d/var</code> nach dem
+	Abschnitt, der die Verzeichnisse in <code class="filename">/var</code>
+	erstellt, eine Zeile ähnlich der folgenden hinzufügen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/security /var/log/maillog /var/log/cron /var/log/messages</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 0644 /var/log/*</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63892560"></a>5.3. Installation von Ports</h3></div></div></div><p>Bevor die notwendigen Änderungen erkärt werden, einen
+	Ports-Baum zu verwenden, ist es notwendig, Sie an die
+	Nur-Lese-Besonderheit Ihres Dateisystems auf dem Flash-Medium
+	zu erinnern.  Da dieses nur lesend verfügbar ist, müssen Sie
+	es vorübergehend mit Schreibrechten ausstatten, indem Sie die
+	mount-Syntax, wie in <a class="xref" href="ro-fs.html" title="3. Die rc-Subsysteme und nur-Lese Dateisysteme">Abschnitt 3, &#8222;Die <code class="literal">rc</code>-Subsysteme und nur-Lese
+      Dateisysteme&#8220;</a> dargestellt wird,
+	verwenden.  Sie sollten immer diese Dateisysteme erneut mit
+	nur-Lese-Rechten einhängen wenn Sie damit fertig sind -
+	unnötige Schreibvorgänge auf dem Flash-Medium kann dessen
+	Lebenszeit erheblich verkürzen.</p><p>Um es zu ermöglichen, in das Ports-Verzeichnis zu wechseln
+	und erfolgreich <code class="command">make</code>
+	<code class="buildtarget">install</code> auszuführen, müssen wir ein
+	Paketverzeichnis auf einem Nicht-Hauptspeicherdateisystem
+	erstellen, welches die Pakete über Neustarts hinweg im Auge
+	behält.  Weil es sowieso nötig ist, Ihre Dateisysteme mit
+	Lese-Schreibrechten für die Installation eines Pakets
+	einzuhängen, ist es sinnvoll anzunehmen, dass ein Bereich
+	Ihres Flash-Mediums ebenfalls für Paketinformationen, die
+	darauf abgespeichert werden, verwendet wird.</p><p>Erstellen Sie zuerst ein Verzeichnis für die
+	Paketdatenbank.  Normalerweise ist dies
+	<code class="filename">/var/db/pkg</code>, jedoch können wir es dort
+	nicht unterbringen, da es jedesmal verschwinden wird, wenn das
+	System neu gestartet wird.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/pkg</code></strong></pre><p>Fügen Sie nun eine Zeile in
+	<code class="filename">/etc/rc.d/var</code> hinzu, welche das
+	<code class="filename">/etc/pkg</code>-Verzeichnis mit
+	<code class="filename">/var/db/pkg</code> verknüpft.  Ein
+	Beispiel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/pkg /var/db/pkg</code></strong></pre><p>Nun wird jedes Mal, wenn Sie Ihre Dateisysteme mit
+	Lese-Schreibrechten einbinden und ein Paket installieren, der
+	Befehl <code class="command">make</code>
+	<code class="buildtarget">install</code> funktionieren und
+	Paketinformationen werden erfolgreich nach
+	<code class="filename">/etc/pkg</code> geschrieben (da zu diesem
+	Zeitpunkt das Dateisystem mit Lese-Schreibrechten eingebunden
+	ist), welche dann stets dem Betriebssystem als
+	<code class="filename">/var/db/pkg</code> zur Verfügung stehen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63922128"></a>5.4. Apache Webserver</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Anweisungen in diesem Abschnitt sind nur notwendig,
+	  wenn Apache so eingerichtet ist, dass dieser seine PID oder
+	  Protokollierungsinformationen ausserhalb von <code class="filename">/var</code> ablegt.  Standardmässig
+	  bewahrt Apache seine PID-Datei in <code class="filename">/var/run/httpd.pid</code> und seine
+	  Protokolldateien in <code class="filename">/var/log</code> auf.</p></div><p>Es wird nun davon ausgegangen, dass Apache seine
+	Protokolldateien in einem Verzeichnis namens <code class="filename">apache_log_dir</code>
+	ausserhalb von <code class="filename">/var</code>
+	speichert.  Wenn dieses Verzeichnis auf einem
+	nur-Lese-Dateisystem existiert, wird Apache nicht in der Lage
+	sein, Protokolldateien zu speichern und wird vermutlich nicht
+	richtig funktionieren.  Wenn dies der Fall ist, muss ein neues
+	Verzeichnis zu der Liste der Verzeichnisse in
+	<code class="filename">/etc/rc.d/var</code> hinzugefügt werden, um
+	dieses in <code class="filename">/var</code> zu erstellen und um
+	<code class="filename">apache_log_dir</code>
+	nach <code class="filename">/var/log/apache</code> zu verknüpfen.  Es
+	ist auch nötig, Berechtigungen und Besitzer auf diesem neuen
+	Verzeichnis zu setzen.</p><p>Fügen Sie zuerst das Verzeichnis
+	<code class="literal">log/apache</code> zu der Liste von Verzeichnissen
+	hinzu, die in <code class="filename">/etc/rc.d/var</code> angelegt
+	werden sollen.</p><p>Danach tragen Sie die folgenden Befehle in
+	<code class="filename">/etc/rc.d/var</code> nach dem Abschnitt zum
+	Erstellen der Verzeichnisse ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chmod 0774 /var/log/apache</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chown nobody:nobody /var/log/apache</code></strong></pre><p>Schliesslich löschen Sie das bestehende <code class="filename">apache_log_dir</code>
+	Verzeichnis und ersetzen es mit einer Verknüpfung:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm -rf apache_log_dir</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /var/log/apache apache_log_dir</code></strong></pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ar01s04.html">Zurück</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> </td></tr><tr><td width="40%" align="left" valign="top">4. Ein Dateisystem von Grund auf neu erstellen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

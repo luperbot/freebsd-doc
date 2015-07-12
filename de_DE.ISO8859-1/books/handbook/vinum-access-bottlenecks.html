@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>23.3. Mögliche Engpässe</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="vinum-vinum.html" title="Kapitel 23. Der Vinum Volume Manager" /><link rel="prev" href="vinum-intro.html" title="23.2. Ihre Platten sind zu klein." /><link rel="next" href="vinum-data-integrity.html" title="23.4. Datenintegrität" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">23.3. Mögliche Engpässe</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-intro.html">Zurück</a> </td><th width="60%" align="center">Kapitel 23. Der Vinum Volume Manager</th><td width="20%" align="right"> <a accesskey="n" href="vinum-data-integrity.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-access-bottlenecks"></a>23.3. Mögliche Engpässe</h2></div></div></div><p>Moderne Systeme müssen häufig parallel auf
+      Daten zugreifen.  Große FTP- und HTTP-Server
+      können beispielsweise Tausende von parallelen Sitzungen
+      verwalten und haben mehrere 100 MBit/s-Verbindungen
+      zur Außenwelt.  Diese Bandbreite überschreitet
+      die durchschnittliche Transferrate der meisten Platten
+      bei weitem.</p><p>Aktuelle Plattenlaufwerke können Daten mit bis zu
+      70 MB/s sequentiell übertragen, wobei dieser Wert
+      in einer Umgebung, in der viele unabhängige Prozesse auf
+      eine gemeinsame Platte zugreifen, die jeweils nur einen
+      Bruchteil dieses Wertes erreichen, von geringer Aussagekraft
+      ist.  In solchen Fällen ist es interessanter, das Problem
+      vom Blickwinkel des Platten-Subsystems aus zu betrachten.
+      Der wichtigste Parameter ist dabei die Last, die eine
+      Übertragung auf dem Subsystem verursacht.  Unter Last
+      versteht man dabei die Zeit, in der die Platte mit der
+      Übertragung der Daten beschäftigt ist.</p><p>Bei jedem Plattenzugriff muss das Laufwerk zuerst die
+      Köpfe positionieren und auf den ersten Sektor warten, bis
+      er den Lesekopf passiert.  Dann wird die Übertragung
+      gestartet.  Diese Aktionen können als atomar betrachtet
+      werden, da es keinen Sinn macht, diese zu unterbrechen.</p><p><a id="vinum-latency"></a>Nehmen wir beispielsweise an,
+      dass wir 10 kB transferieren wollen.  Aktuelle
+      hochperformante Platten können die Köpfe im Durchschnitt
+      in 3,5 ms positionieren und drehen sich mit maximal
+      15.000 U/min.  Daher beträgt die durchschnittliche
+      Rotationslatenz (eine halbe Umdrehung) 2 ms.
+      Bei einer Transferrate von 70 MB/s dauert die eigentliche
+      Übertragung von 10 kB etwa 150 &#956;s, fast
+      nichts im Vergleich zur Positionierungszeit.  In einem solchen
+      Fall beträgt die effektive Transferrate nur etwas mehr
+      als 1 MB/s.  Die Tranferrate ist also stark von der
+      Größe der zu tranferierenden Daten
+      abhängig.</p><p>Die traditionelle und offensichtliche Lösung zur
+      Beseitigung dieses Flaschenhalses sind <span class="quote">&#8222;<span class="quote">mehr
+      Spindeln</span>&#8220;</span>.  Statt einer einzigen großen Platte werden
+      mehrere kleinere Platten mit demselben Gesamtspeicherplatz
+      benutzt.  Jede Platte ist in der Lage, unabhängig zu
+      positionieren und zu transferieren, weshalb der effektive
+      Durchsatz um einen Faktor nahe der Zahl der eingesetzten Platten
+      steigt.</p><p>Obwohl die Platten Daten parallel transferieren können,
+      ist es nicht möglich, Anfragen gleichmäßig auf
+      die einzelnen Platten zu verteilen.  Daher wird die Last auf
+      bestimmten Laufwerken immer höher sein als auf anderen
+      Laufwerken.  Daraus ergibt sich auch, dass die exakte Verbesserung
+      des Datendurchsatzes immer kleiner ist als die Anzahl der
+      involvierten Platten.</p><a id="idp84136784" class="indexterm"></a><a id="idp84137552" class="indexterm"></a><p>Die gleichmäßige Verteilung der Last auf die einzelnen
+      Platten ist stark abhängig von der Art, wie die Daten auf die
+      Laufwerke aufgeteilt werden.  In den folgenden Ausführungen
+      wird eine Platte als eine große Anzahl von Datensektoren
+      dargestellt, die durch Zahlen adressierbar sind (ähnlich
+      den Seiten eines Buches).  Die naheliegendste Methode ist es,
+      die virtuelle Platte (wieder analog den Seiten eines Buches)
+      in Gruppen aufeinanderfolgender Sektoren zu unterteilen, die
+      jeweils der Größe der einzelnen physischen Platten
+      entsprechen.  Diese Vorgehensweise wird als
+      <span class="emphasis"><em>Konkatenation</em></span> bezeichnet und hat den
+      Vorteil, dass die Platten keine spezielle
+      Größenbeziehung haben müssen.  Sie funktioniert
+      gut, solange der Zugriff gleichmäßig auf den
+      Adressraum der virtuellen Platte verteilt wird.  Wenn sich der
+      Zugriff allerdings auf einen kleinen Bereich konzentriert, ist die
+      Verbesserung vernachlässigbar klein.
+      <a class="xref" href="vinum-access-bottlenecks.html#vinum-concat" title="Abbildung 23.1. Konkatenierte Anordnung">Abbildung 23.1, &#8222;Konkatenierte Anordnung&#8220;</a> verdeutlicht die Verteilung der
+      Speichereinheiten in einer konkatenierten Anordnung.</p><p>
+      </p><div class="figure"><a id="vinum-concat"></a><div class="figure-title">Abbildung 23.1. Konkatenierte Anordnung</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-concat.png" alt="Konkatenierte Anordnung" /></div></div></div><p><br class="figure-break" />
+    </p><a id="idp84146000" class="indexterm"></a><a id="idp84146768" class="indexterm"></a><a id="idp84147920" class="indexterm"></a><p>Ein alternatives Mapping unterteilt den Adressraum in
+      kleinere, gleich große Komponenten und speichert diese
+      sequentiell auf verschiedenen Geräten.  Zum Beispiel werden
+      die ersten 256 Sektoren auf der ersten Platte, die nächsten
+      256 Sektoren auf der zweiten Platte gespeichert und so
+      weiter.  Nachdem die letzte Platte beschrieben wurde, wird dieser
+      Vorgang solange wiederholt, bis die Platten voll sind.  Dieses
+      Mapping nennt man <span class="emphasis"><em>Striping</em></span> oder
+      <acronym class="acronym">RAID-0</acronym>.
+    <a href="#ftn.idp84149712" class="footnote" id="idp84149712"><sup class="footnote">[13]</sup></a></p><p>Striping erfordert einen etwas größeren Aufwand,
+      um die Daten zu
+      lokalisieren, und kann zusätzliche E/A-Last verursachen,
+      wenn eine Übertragung über mehrere Platten verteilt
+      ist.  Auf der anderen Seite erlaubt es aber eine
+      gleichmäßigere Verteilung der Last auf die einzelnen
+      Platten.  <a class="xref" href="vinum-access-bottlenecks.html#vinum-striped" title="Abbildung 23.2. Striped-Anordnung">Abbildung 23.2, &#8222;Striped-Anordnung&#8220;</a> veranschaulicht
+      die Abfolge, in der Speichereinheiten in einer striped-Anordnung
+      alloziert werden.</p><p>
+      </p><div class="figure"><a id="vinum-striped"></a><div class="figure-title">Abbildung 23.2. Striped-Anordnung</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-striped.png" alt="Striped-Anordnung" /></div></div></div><p><br class="figure-break" />
+    </p><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp84149712" class="footnote"><p><a href="#idp84149712" class="para"><sup class="para">[13] </sup></a><acronym class="acronym">RAID</acronym> steht für <span class="emphasis"><em>Redundant
+        Array of Inexpensive Disks</em></span> und bietet verschiedene
+        Formen der Fehlertorleranz, obwohl der letzte Begriff etwas
+        irreführend ist, da RAID keine Redundanz bietet.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-intro.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-data-integrity.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">23.2. Ihre Platten sind zu klein. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 23.4. Datenintegrität</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.7. DMA</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver-busmem.html" title="10.6. 总线内存映射" /><link rel="next" href="isa-driver-probe.html" title="10.8. xxx_isa_probe" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.7. DMA</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-busmem.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-probe.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-dma"></a>10.7. DMA</h2></div></div></div><a id="idp71939536" class="indexterm"></a><p>
+          ISA总线中Direct Memory Access (DMA)是通过DMA控制器（实际上是它们
+          中的两个，但这只是无关细节）实现的。为了使以前的ISA设备简单便宜，
+          总线控制和地址产生的逻辑都集中在DMA控制器中。幸运的是，FreeBSD
+          提供了一套函数，这些函数大多把DMA控制器的繁琐细节对设备驱动程序
+          隐藏了起来。
+        </p><p>
+          最简单情况是那些比较智能的设备。就象PCI上的总线主设备一样，
+          它们自己能产生总线周期和内存地址。它们真正从DMA控制器需要的
+          唯一事情是总线仲裁。所以为了此目的，它们假装是级联从DMA控制器。
+          当连接驱动程序时，系统DMA控制器需要做的唯一事情就是通过调用
+          如下函数在一个DMA通道上激活级联模式。
+        </p><p>
+          <code class="function">void isa_dmacascade(int channel_number)</code>
+        </p><p>
+          所有进一步的活动通过对设备编程完成。当卸载驱动程序时，不需要
+          调用DMA相关的函数。
+        </p><p>
+          对于较简单的设备，事情反而变得复杂。使用的函数包括：
+        </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>
+            <code class="function">int isa_dma_acquire(int chanel_number)</code>
+          </p><p>
+            保留一个DMA通道。成功则返回0，如果通道已经被保留或被其它
+            驱动程序保留则返回EBUSY。大多数的ISA设备都不能共享DMA通道，
+            因此这个函数通常在连接设备时调用。总线资源的现代接口使得
+            这种保留成为多余，但目前仍必须使用。如果不使用，则后面其它
+            DMA例程将会panic。
+          </p></li><li class="listitem"><p>
+            <code class="function">int isa_dma_release(int chanel_number)</code>
+          </p><p>
+            释放先前保留的DMA通道。释放通道时必须不能有正在进行中的
+            传输（另外，释放通道后设备必须不能再试图发起传输）。
+          </p></li><li class="listitem"><p>
+            <code class="function">void isa_dmainit(int chan, u_int
+            bouncebufsize)</code>
+          </p><p>
+            分配由特定通道使用的反弹缓冲区。请求的缓冲区大小不能超过
+            64KB。以后，如果传输缓冲区碰巧不是物理连续的，或超出ISA
+            总线可访问的内存范围，或跨越64KB的边界，则会自动使用反弹
+            缓冲区。如果传输总是使用符合上述条件的缓冲区（例如，由
+            <code class="function">bus_dmamem_alloc()</code>分配的那些），则
+            不需要调用<code class="function">isa_dmainit()</code>。但使用此函数
+            会让通过DMA控制器传输任意数据变得非常方便。
+          </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                    <span class="emphasis"><em>chan</em></span> - 通道号
+                  </p></li><li class="listitem"><p>
+                    <span class="emphasis"><em>bouncebufsize</em></span> - 以字节计数的反弹
+                    缓冲区的大小
+                  </p></li></ul></div></li><li class="listitem"><p>
+            <code class="function">void isa_dmastart(int flags, caddr_t addr, u_int
+            nbytes, int chan)</code>
+          </p><p>
+            准备启动DMA传输。实际启动设备上的传输之前必需调用此函数
+            来设置DMA控制器。它检查缓冲区是否连续的且在ISA内存范围
+            之内，如果不是则自动使用反弹缓冲区。如果需要反弹缓冲区，
+            但反弹缓冲区没有用<code class="function">isa_dmainit()</code>
+            设置，或对于请求的传输大小来说太小，则系统将panic。
+            写请求且使用反弹缓冲区的情况下，数据将被自动拷贝到反弹
+            缓冲区。
+          </p></li><li class="listitem"><p>flags - 位掩码，决定将要完成的操作的类型。方向位B_READ和
+            B_WRITE互斥。
+          </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                B_READ - 从ISA总线读到内存
+              </p></li><li class="listitem"><p>
+                B_WRITE - 从内存写到ISA总线上
+              </p></li><li class="listitem"><p>
+                B_RAW - 如果设置则DMA控制器将会记住缓冲区，并在传输结束后
+                自动重新初始化它自己，再次重复传输同一缓冲区（当然，驱动
+                程序可能发起设备的另一个传输之前改变缓冲区中的数据）。
+                如果没有设置，参数只对一次传输有效，在发起下一次传输之前
+                必须再次调用<code class="function">isa_dmastart()</code>。只有在不
+                使用反弹缓冲区时使用B_RAW才有意义。
+              </p></li></ul></div></li><li class="listitem"><p>
+            addr - 缓冲区的虚地址
+          </p></li><li class="listitem"><p>
+            nbytes - 缓冲区长度。必须小于等于64KB。不允许长度为0：因为
+            DMA控制器将会理解为64KB，而内核代码把它理解为0，那样就会导致
+            不可预测的效果。对于通道号等于和高于4的情况，长度必需为偶数，
+            因为这些通道每次传输2字节。奇数长度情况下，最后一个字节不被
+            传输。
+          </p></li><li class="listitem"><p>
+            chan - 通道号
+          </p></li><li class="listitem"><p>
+            <code class="function">void isa_dmadone(int flags, caddr_t addr, int
+            nbytes, int chan)</code>
+          </p><p>
+            设备报告传输完成后，同步内存。如果是使用反弹缓冲区的读操作，
+            则将数据从反弹缓冲区拷贝到原始缓冲区。参量与
+            <code class="function">isa_dmastart()</code>的相同。允许使用B_RAW标志，
+            但它一点也不会影响<code class="function">isa_dmadone()</code>。
+          </p></li><li class="listitem"><p>
+            <code class="function">int isa_dmastatus(int channel_number)</code>
+          </p><p>
+            返回当前传输中剩余的字节数。在
+            <code class="function">isa_dmastart()</code>中设置了B_READ的情况下，
+            返回的数字一定不会等于零。传输结束时它会被自动复位到缓冲区的
+            长度。正式的用法是在设备发信号指示传输已完成时检查剩余的字节数。
+            如果字节数不为0，则此次传输可能有问题。
+          </p></li><li class="listitem"><p>
+            <code class="function">int isa_dmastop(int channel_number)</code>
+          </p><p>
+            放弃当前的传输并返回剩余未传输的字节数。
+          </p></li></ul></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-busmem.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-probe.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.6. 总线内存映射 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.8. xxx_isa_probe</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Implementing UFS Journaling on a Desktop PC</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Manolis</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Kiagias</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">manolis@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2008</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink" role="mailto:manolis@FreeBSD.org">Manolis Kiagias</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <quote xmlns:xlink="http://www.w3.org/1999/xlink">&#8482;</quote> or the
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">®</quote> symbol.</para>
+    </legalnotice>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">A journaling file system uses a log to record all transactions
+	that take place in the file system, and preserves its integrity in the
+	event of a system crash or power failure.  Although it is still
+	possible to lose unsaved changes to files, journaling almost
+	completely eliminates the possibility of file system corruption caused
+	by an unclean shutdown.  It also shortens to a minimum the time
+	required for after-failure file system checking.  Although the UFS
+	file system employed by FreeBSD does not implement journaling itself,
+	the new journal class of the GEOM framework in FreeBSD 7.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">X</replaceable> can be
+	used to provide file system independent journaling. This article
+	explains how to implement UFS journaling on a typical desktop PC
+	scenario.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="introduction">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Introduction</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">While  professional servers are usually well protected from
+      unforeseen shutdowns, the typical desktop is at the mercy of power
+      failures, accidental resets, and other user related incidents that can
+      lead to unclean shutdowns.  Soft Updates usually protect the file system
+      efficiently in such cases, although most of the times a lengthy
+      background check is required.  On rare occasions, file system corruption
+      reaches a point where user intervention is required and data may be
+      lost.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The new journaling capability provided by GEOM can greatly assist
+      in such scenarios, by virtually eliminating the time required for
+      file system checking, and ensuring that the file system is quickly
+      restored to a consistent state.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This article describes a procedure for implementing UFS journaling
+      on a typical desktop PC scenario (one hard disk used for both operating
+      system and data).  It should be followed during a fresh installation of
+      FreeBSD.  The steps are simple enough and do not require overly complex
+      interaction with the command line.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">After reading this article, you will know:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">How to reserve space for journaling during a new installation of
+	  FreeBSD.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">How to load and enable the <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal>
+	  module (or build support for it in your custom kernel).</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">How to convert your existing file systems to utilize journaling,
+	  and what options to use in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> to mount
+	  them.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">How to implement journaling in new (empty) partitions.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">How to troubleshoot common problems associated with
+	  journaling.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Before reading this article, you should be able to:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Understand basic <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">UNIX</trademark> and FreeBSD concepts.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Be familiar with the installation procedure of FreeBSD and the
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> utility.</para>
+      </listitem>
+    </itemizedlist>
+
+    <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The procedure described here is intended for preparing a new
+	installation where no actual user data is stored on the disk yet.
+	While it is possible to modify and extend this procedure for
+	systems already in production, you should <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">backup</emphasis>
+	all important data before doing so.  Messing around with disks and
+	partitions at a low level can lead to fatal mistakes and data
+	loss.</para>
+    </warning>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="understanding-journaling">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Understanding Journaling in FreeBSD</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The journaling provided by GEOM in FreeBSD 7.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">X</replaceable> is not file system
+      specific (unlike for example the ext3 file system in <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark>) but is
+      functioning at the block level.  Though this means it can be applied
+      to different file systems, for FreeBSD 7.0-RELEASE, it can only be used
+      on UFS2.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This functionality is provided by loading the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal.ko</filename> module into the kernel (or
+      building it into a custom kernel) and using the
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> command to configure the file systems.
+      In general, you would like to journal large file systems, like
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>.  You will need however (see the following
+      section) to reserve some free disk space.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">When a file system is journaled, some disk space is needed to keep
+      the journal itself.  The disk space that holds the actual data is
+      referred to as the <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">data provider</emphasis>, while the one
+      that holds the journal is referred to as the
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">journal provider</emphasis>.  The data and journal providers
+      need to be on different partitions when journaling an existing
+      (non-empty) partition.  When journaling a new partition, you have the
+      option to use a single provider for both data and journal.  In any case,
+      the <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> command combines both providers to
+      create the final journaled file system.  For example:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">You wish to journal your <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> file system,
+	  stored in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f</filename> (which
+	  already contains data).</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">You reserved some free disk space in a partition in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1g</filename>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Using <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command>, a new <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f.journal</filename> device is created
+	  where <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f</filename> is the data
+	  provider, and <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1g</filename> is
+	  the journal provider.  This new device is then used for all
+	  subsequent file operations.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The amount of disk space you need to reserve for the journal
+      provider depends on the usage load of the file system and not on the
+      size of the data provider.  For example on a typical office desktop,
+      a 1 GB journal provider for the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> file system
+      will suffice, while a machine that deals with heavy disk I/O (i.e.
+      video editing) may need more.  A kernel panic will occur if the
+      journal space is exhausted before it has a chance to be
+      committed.</para>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The journal sizes suggested here, are highly unlikely to cause
+	problems in typical desktop use (such as web browsing, word
+	processing and playback of media files).  If your workload
+	includes intense disk activity, use the following rule for maximum
+	reliability: Your RAM size should fit in 30% of the journal provider's
+	space.  For example, if your system has 1 GB RAM, create an
+	approximately 3.3 GB journal provider. (Multiply your
+	RAM size with 3.3 to obtain the size of the journal).</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">For more information about journaling, please read the manual
+      page of <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="reserve-space">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Steps During the Installation of FreeBSD</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Reserving Space for Journaling</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">A typical desktop machine usually has one hard disk that stores
+	both the OS and user data.  Arguably, the default partitioning scheme
+	selected by <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> is more or less
+	suitable:  A desktop machine does not need a large
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> partition, while <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>
+	is allocated the bulk of the disk space, since user data and a lot of
+	packages are installed into its subdirectories.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The default partitioning (the one obtained by pressing
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">A</keycap> at the FreeBSD partition editor, called <application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application>) does not leave any
+	unallocated space.  Each partition that will be journaled, requires
+	another	partition for the journal.  Since the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>
+	partition is the largest, it makes sense to shrink this partition
+	slightly, to obtain the space required for journaling.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">In our example, an 80 GB disk is used.  The following screenshot
+	shows the default partitions created by <application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application> during
+	installation:</para>
+
+      <mediaobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	<imageobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <imagedata fileref="disklabel1"/>
+	</imageobject>
+      </mediaobject>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">If this is more or less what you need, it is very easy to adjust
+	for journaling.  Simply use the
+	arrow keys to move the highlight to the
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> partition and press <keycap xmlns:xlink="http://www.w3.org/1999/xlink">D</keycap> to
+	delete it.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Now, move the highlight to the disk name at the top of the screen
+	and press <keycap xmlns:xlink="http://www.w3.org/1999/xlink">C</keycap> to create a new partition for
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>.  This new partition should be smaller by
+	1 GB (if you intend to journal <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> only), or
+	2 GB (if you intend to journal both <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>).  From the pop-up that appears, opt to
+	create a file system, and type <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> as the mount
+	point.</para>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Should you journal the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> partition?
+	  Normally, journaling makes sense on quite large partitions.  You may
+	  decide not to journal <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>, although doing so
+	  on a typical desktop will cause no harm.  If the file system is
+	  lightly used (quite probable for a desktop) you may wish to
+	  allocate less disk space for its journal.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">In our example, we journal both <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.  You may of course adjust the procedure
+	  to your own needs.</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To keep things as easy going as possible, we are going to use
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> to create the partitions
+	required for journaling.  However, during installation,
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> insists on asking a mount point
+	for each partition you create.  At this point, you do not have any
+	mount points for the partitions that will hold the journals, and in
+	reality you <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">do not even need them</emphasis>.  These are
+	not partitions that we are ever going to mount somewhere.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To avoid these problems with
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>, we are going to create the
+	journal partitions as swap space.  Swap is never mounted, and
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> has no problem creating as many
+	swap partitions as needed.  After the first reboot,
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> will have to be edited, and the extra
+	swap space entries removed.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To create the swap, again use the
+	arrow keys to move the highlight to the top of
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application> screen, so that the disk name itself is
+	highlighted.  Then press <keycap xmlns:xlink="http://www.w3.org/1999/xlink">N</keycap>, enter the desired size
+	(<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">1024M</replaceable>), and select
+	<quote xmlns:xlink="http://www.w3.org/1999/xlink">swap space</quote> from the pop-up menu that appears.  Repeat
+	for every journal you wish to create.  In our example, we create two
+	partitions to provide for the journals of <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.  The final result is shown in the following
+	screenshot:</para>
+
+      <mediaobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	<imageobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <imagedata fileref="disklabel2"/>
+	</imageobject>
+      </mediaobject>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">When you have completed creating the partitions, we suggest you
+	write down the partition names, and mount points, so you can easily
+	refer to this information during the configuration phase.  This will
+	help alleviate mistakes that may damage your installation.  The
+	following table shows our notes for the sample configuration:</para>
+
+      <table xmlns:xlink="http://www.w3.org/1999/xlink" pgwide="1">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Partitions and Journals</title>
+	<tgroup xmlns:xlink="http://www.w3.org/1999/xlink" cols="3">
+	<thead xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Partition</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Mount Point</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Journal</entry>
+	  </row>
+	</thead>
+
+	  <tbody xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink">/var</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1h</entry>
+	    </row>
+
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink">/usr</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1g</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </table>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Continue the installation as you would normally do.  We would
+	however suggest you postpone installation of third party software
+	(packages) until you have completely setup journaling.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="first-boot">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Booting for the first time</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Your system will come up normally, but you will need to edit
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> and remove the extra swap partitions
+	you created for the journals.  Normally, the swap partition you will
+	actually use is the one with the <quote xmlns:xlink="http://www.w3.org/1999/xlink">b</quote> suffix (i.e.
+	ad0s1b in our example).  Remove all other swap space entries and
+	reboot so that FreeBSD will stop using them.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">When the system comes up again, we will be ready to configure
+	journaling.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="configure-journal">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Setting Up Journaling</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="running-gjournal">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Executing <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Having prepared all the required partitions, it is quite easy
+	to configure journaling.  We will need to switch to single user
+	mode, so login as <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> and type:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">shutdown now</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Press <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap> to get the default shell.  We will need to unmount
+	the partitions that will be journaled, in our example
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">umount /usr /var</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Load the module required for journaling:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal load</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Now, use your notes to determine which partition will be used
+	for each journal.  In our example,  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> is
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f</filename> and its journal will be
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1g</filename>, while
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> is <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d</filename> and will
+	be journaled to <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1h</filename>.
+	The following commands are required:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad0s1f ad0s1g</userinput>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad0s1d ad0s1h</userinput>
+
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.</screen>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">If the last sector of either partition is used,
+	  <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> will return an error.  You will have
+	  to run the command using the <option xmlns:xlink="http://www.w3.org/1999/xlink">-f</option> flag to force an
+	  overwrite, i.e.:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label -f ad0s1d ad0s1h</userinput></screen>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Since this is a new installation, it is highly unlikely that
+	  anything will be actually overwritten.</para></note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">At this point, two new devices are created, namely
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d.journal</filename> and
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f.journal</filename>.  These represent
+	the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> and <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>
+	partitions we have to mount.  Before mounting, we must however set
+	the journal flag on them and clear the Soft Updates flag:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J enable -n disable ad0s1d.journal</userinput>
+
+tunefs: gjournal set
+tunefs: soft updates cleared
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J enable -n disable ad0s1f.journal</userinput>
+
+tunefs: gjournal set
+tunefs: soft updates cleared</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Now, mount the new devices manually at their respective places
+	(note that we can now use the <option xmlns:xlink="http://www.w3.org/1999/xlink">async</option> mount
+	option):</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o async /dev/ad0s1d.journal /var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o async /dev/ad0s1f.journal /usr</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Edit <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> and update the entries for
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f.journal     /usr            ufs     rw,async      2       2
+/dev/ad0s1d.journal     /var            ufs     rw,async      2       2</programlisting>
+
+      <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Make sure the above entries are correct, or you will have
+	  trouble starting up normally after you reboot!</para>
+      </warning>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Finally, edit <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> and add the
+	following line so the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> module is loaded at every
+	boot:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load="YES"</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Congratulations! Your system is now set for journaling.  You can
+	either type <userinput xmlns:xlink="http://www.w3.org/1999/xlink">exit</userinput> to return to multi-user mode, or
+	reboot to test your configuration (recommended).  During the boot you
+	will see messages like the following:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink">ad0: 76293MB XEC XE800JD-00HBC0 08.02D08 at ata0-master SATA150
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">After an unclean shutdown, the messages will vary slightly,
+	i.e.:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink">GEOM_JOURNAL: Journal ad0s1d consistent.</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This usually means that <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> used the information in
+	the journal provider to return the file system to a consistent
+	state.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="gjournal-new">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Journaling Newly Created Partitions</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">While the above procedure is necessary for journaling partitions
+	that already contain data, journaling an empty partition is somewhat
+	easier, since both the data and the journal provider can be stored
+	in the same partition.  For example, assume a new disk was installed,
+	and a new partition <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad1s1d</filename>
+	was created.  Creating the journal would be as simple as:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad1s1d</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The journal size will be 1 GB by default. You may adjust it by
+	using the <option xmlns:xlink="http://www.w3.org/1999/xlink">-s</option> option.  The value can be given in
+	bytes, or appended by <literal xmlns:xlink="http://www.w3.org/1999/xlink">K</literal>, <literal xmlns:xlink="http://www.w3.org/1999/xlink">M</literal> or
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">G</literal> to denote Kilobytes, Megabytes or Gigabytes
+	respectively.  Note that <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> will not allow
+	you to create unsuitably small journal sizes.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">For example, to create a 2 GB journal, you could use the following
+	command:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label -s 2G ad1s1d</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">You can then create a file system on your new partition, and
+	enable journaling using the <option xmlns:xlink="http://www.w3.org/1999/xlink">-J</option> option:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs -J /dev/ad1s1d.journal</userinput></screen>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="configure-kernel">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Building Journaling into Your Custom Kernel</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">If you do not wish to load <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal> as a
+	module, you can build its functions right into your kernel.  Edit your
+	custom kernel configuration file, and make sure it includes these two
+	lines:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options UFS_GJOURNAL # Note: This is already in GENERIC
+
+options GEOM_JOURNAL # You will have to add this one</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Rebuild and reinstall your kernel following the relevant
+	<link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/handbook/kernelconfig.html">instructions in
+	the FreeBSD Handbook.</link></para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Do not forget to remove the relevant <quote xmlns:xlink="http://www.w3.org/1999/xlink">load</quote> entry
+	from <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> if you have previously
+	used it.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="troubleshooting-gjournal">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Troubleshooting Journaling</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The following section covers frequently asked questions regarding
+      problems related to journaling.</para>
+
+    <qandaset xmlns:xlink="http://www.w3.org/1999/xlink">
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernel-panic">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">I am getting kernel panics during periods of high disk
+	    activity.  How is this related to journaling?</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The journal probably fills up before it has a chance to get
+	    committed (flushed) to disk.  Keep in mind the size of the
+	    journal depends on the usage load, and not the size of the data
+	    provider.  If your disk activity is high, you need a larger
+	    partition for the journal.  See the note in the <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="understanding-journaling">Understanding Journaling</link> section.</para>
+	</answer>
+      </qandaentry>
+
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="unable-boot">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">I made some mistake during configuration, and I cannot boot
+	    normally now.  Can this be fixed some way?</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">You either forgot (or misspelled) the entry in
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>, or there are errors in
+	    your <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> file.  These are usually easy
+	    to fix.  Press <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap> to get to the default single user shell.  Then
+	    locate the root of the problem:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cat /boot/loader.conf</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">If the <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load</literal> entry is missing
+	    or misspelled, the journaled devices are never created. Load the
+	    module manually,  mount all partitions, and continue with
+	    multi-user boot:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal load</userinput>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -a</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">exit</userinput>
+<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">(boot continues)</emphasis></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">If, on the other hand, this entry is correct, have a look at
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>.  You will probably find a
+	    misspelled or missing entry.  In this case, mount all remaining
+	    partitions by hand and continue with the multi-user boot.</para>
+	</answer>
+      </qandaentry>
+
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="remove-journaling">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Can I remove journaling and return to my standard file system
+	      with Soft Updates?</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Sure. Use the following procedure, which reverses the
+	    changes.  The partitions you created for the journal providers
+	    can then be used for other purposes, if you so wish.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Login as <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> and switch to single user mode:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">shutdown now</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Unmount the journaled partitions:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">umount /usr /var</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Synchronize the journals:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal sync</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Stop the journaling providers:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal stop ad0s1d.journal</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal stop ad0s1f.journal</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Clear journaling metadata from all the devices used:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1d</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1f</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1g</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1h</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Clear the file system journaling flag, and restore the Soft
+	    Updates flag:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J disable -n enable ad0s1d</userinput>
+
+tunefs: gjournal cleared
+tunefs: soft updates set
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J disable -n enable ad0s1f</userinput>
+
+tunefs: gjournal cleared
+tunefs: soft updates set</screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Remount the old devices by hand:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o rw /dev/ad0s1d /var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o rw /dev/ad0s1f /usr</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Edit <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> and restore it to its
+	    original state:</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f     /usr            ufs     rw      2       2
+/dev/ad0s1d     /var            ufs     rw      2       2</programlisting>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Finally, edit <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>, remove
+	    the entry that loads the <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal> module
+	    and reboot.</para>
+
+	</answer>
+      </qandaentry>
+    </qandaset>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="further-reading">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Further Reading</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Journaling is a fairly new feature of FreeBSD, and as such, it is
+      not very well documented yet.  You may however find the following
+      additional references useful:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/handbook/geom-gjournal.html">new section on journaling</link>
+	  is now part of the FreeBSD Handbook.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.freebsd.org/pipermail/freebsd-current/2006-June/064043.html">This post</link>
+	  in <link xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current">freebsd-current</link> by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>'s developer, Pawel Jakub Dawidek <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">pjd@FreeBSD.org</email>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.freebsd.org/pipermail/freebsd-questions/2008-April/173501.html">This post</link>
+	  in <link xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-questions">freebsd-questions</link> by Ivan Voras <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">ivoras@FreeBSD.org</email>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The manual pages of <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> and <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+</article>

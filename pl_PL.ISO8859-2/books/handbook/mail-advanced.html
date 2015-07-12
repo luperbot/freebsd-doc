@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>24.6. Advanced Topics</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Podręcznik FreeBSD" /><link rel="up" href="mail.html" title="Rozdział 24. Electronic Mail" /><link rel="prev" href="mail-trouble.html" title="24.5. Troubleshooting" /><link rel="next" href="SMTP-UUCP.html" title="24.7. SMTP with UUCP" /><link rel="copyright" href="legalnotice.html" title="Informacja Prawna" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">24.6. Advanced Topics</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mail-trouble.html">Poprzedni</a> </td><th width="60%" align="center">Rozdział 24. Electronic Mail</th><td width="20%" align="right"> <a accesskey="n" href="SMTP-UUCP.html">Następny</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mail-advanced"></a>24.6. Advanced Topics</h2></div></div></div><p>The following section covers more involved topics such as mail
+      configuration and setting up mail for your entire domain.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mail-config"></a>24.6.1. Basic Configuration</h3></div></div></div><a id="idp93130960" class="indexterm"></a><p>Out of the box, you should be able to send email to external
+        hosts as long as you have set up
+	<code class="filename">/etc/resolv.conf</code> or are running your own
+	name server.  If you would like to have mail for your host
+	delivered to the MTA (e.g., <span class="application">sendmail</span>) on your own FreeBSD host, there are two methods:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Run your own name server and have your own domain.  For
+	    example, <code class="systemitem">FreeBSD.org</code></p></li><li class="listitem"><p>Get mail delivered directly to your host.  This is done by
+	    delivering mail directly to the current DNS name for your
+	    machine.  For example, <code class="systemitem">example.FreeBSD.org</code>.</p></li></ul></div><a id="idp93136336" class="indexterm"></a><p>Regardless of which of the above you choose, in order to have
+        mail delivered directly to your host, it must have a permanent
+        static IP address (not a dynamic address, as with most PPP dial-up configurations).  If you are behind a
+        firewall, it must pass SMTP traffic on to you.  If you want to
+        receive mail directly at your host, you need to be sure of either of two
+        things:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Make sure that the (lowest-numbered) MX record<a id="idp93138000" class="indexterm"></a> in your DNS points to your
+	    host's IP address.</p></li><li class="listitem"><p>Make sure there is no MX entry in your DNS for your
+	    host.</p></li></ul></div><p>Either of the above will allow you to receive mail directly at
+        your host.</p><p>Try this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hostname</code></strong>
+example.FreeBSD.org
+<code class="prompt">#</code> <strong class="userinput"><code>host example.FreeBSD.org</code></strong>
+example.FreeBSD.org has address 204.216.27.XX</pre><p>If that is what you see, mail directly to
+        <code class="email">&lt;yourlogin@example.FreeBSD.org&gt;</code> should work without
+        problems (assuming <span class="application">sendmail</span> is
+        running correctly on <code class="systemitem">example.FreeBSD.org</code>).</p><p>If instead you see something like this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>host example.FreeBSD.org</code></strong>
+example.FreeBSD.org has address 204.216.27.XX
+example.FreeBSD.org mail is handled (pri=10) by hub.FreeBSD.org</pre><p>All mail sent to your host (<code class="systemitem">example.FreeBSD.org</code>) will end up being
+	collected on <code class="systemitem">hub</code> under the same username instead
+	of being sent directly to your host.</p><p>The above information is handled by your DNS server.  The DNS
+        record that carries mail routing information is the
+        <span class="emphasis"><em>M</em></span>ail e<span class="emphasis"><em>X</em></span>change entry.  If
+        no MX record exists, mail will be delivered directly to the host by
+        way of its IP address.</p><p>The MX entry for <code class="systemitem">freefall.FreeBSD.org</code> at one time looked like
+        this:</p><pre class="programlisting">freefall		MX	30	mail.crl.net
+freefall		MX	40	agora.rdrop.com
+freefall		MX	10	freefall.FreeBSD.org
+freefall		MX	20	who.cdrom.com</pre><p>As you can see, <code class="systemitem">freefall</code> had many MX entries.
+        The lowest MX number is the host that receives mail directly if
+        available; if it is not accessible for some reason, the others
+        (sometimes called <span class="quote">"<span class="quote">backup MXes</span>"</span>) accept messages
+        temporarily, and pass it along when a lower-numbered host becomes
+        available, eventually to the lowest-numbered host.</p><p>Alternate MX sites should have separate Internet connections
+        from your own in order to be most useful.  Your ISP or another
+        friendly site should have no problem providing this service for
+        you.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mail-domain"></a>24.6.2. Mail for Your Domain</h3></div></div></div><p>In order to set up a <span class="quote">"<span class="quote">mailhost</span>"</span> (a.k.a. mail
+        server) you need to have any mail sent to various workstations
+	directed to it.  Basically, you want to <span class="quote">"<span class="quote">claim</span>"</span> any
+	mail for any hostname in your domain (in this case <code class="systemitem">*.FreeBSD.org</code>) and divert it to your mail
+	server so your users can receive their mail on
+	the master mail server.</p><a id="idp93162064" class="indexterm"></a><p>To make life easiest, a user account with the same
+        <span class="emphasis"><em>username</em></span> should exist on both machines.  Use
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=adduser&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">adduser</span>(8)</span></a> to do this.</p><p>The mailhost you will be using must be the designated mail
+        exchanger for each workstation on the network.  This is done in
+	your DNS configuration like so:</p><pre class="programlisting">example.FreeBSD.org	A	204.216.27.XX		; Workstation
+			MX	10 hub.FreeBSD.org	; Mailhost</pre><p>This will redirect mail for the workstation to the mailhost no
+        matter where the A record points.  The mail is sent to the MX
+	host.</p><p>You cannot do this yourself unless you are running a DNS
+        server.  If you are not, or cannot run your own DNS server, talk
+	to your ISP or whoever provides your DNS.</p><p>If you are doing virtual email hosting, the following
+        information will come in handy.  For this example, we
+	will assume you have a customer with his own domain, in this
+	case <code class="systemitem">customer1.org</code>, and you want
+	all the mail for <code class="systemitem">customer1.org</code>
+	sent to your mailhost, <code class="systemitem">mail.myhost.com</code>.  The entry in your DNS
+	should look like this:</p><pre class="programlisting">customer1.org		MX	10	mail.myhost.com</pre><p>You do <span class="emphasis"><em>not</em></span> need an A record for <code class="systemitem">customer1.org</code> if you only
+        want to handle email for that domain.</p><div xmlns="" class="note"><h3 class="admontitle">Uwaga: </h3><p xmlns="http://www.w3.org/1999/xhtml">Be aware that pinging <code class="systemitem">customer1.org</code> will not work unless
+	  an A record exists for it.</p></div><p>The last thing that you must do is tell
+        <span class="application">sendmail</span> on your mailhost what domains
+	and/or hostnames it should be accepting mail for.  There are a few
+	different ways this can be done.  Either of the following will
+	work:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Add the hosts to your
+	  <code class="filename">/etc/mail/local-host-names</code> file if you are using the
+	  <code class="literal">FEATURE(use_cw_file)</code>.  If you are using
+	  a version of <span class="application">sendmail</span> earlier than 8.10, the file is
+	  <code class="filename">/etc/sendmail.cw</code>.</p></li><li class="listitem"><p>Add a <code class="literal">Cwyour.host.com</code> line to your
+	    <code class="filename">/etc/sendmail.cf</code> or
+	    <code class="filename">/etc/mail/sendmail.cf</code> if you are using
+	    <span class="application">sendmail</span> 8.10 or higher.</p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mail-trouble.html">Poprzedni</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Początek rozdziału</a></td><td width="40%" align="right"> <a accesskey="n" href="SMTP-UUCP.html">Następny</a></td></tr><tr><td width="40%" align="left" valign="top">24.5. Troubleshooting </td><td width="20%" align="center"><a accesskey="h" href="index.html">Spis treści</a></td><td width="40%" align="right" valign="top"> 24.7. SMTP with UUCP</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

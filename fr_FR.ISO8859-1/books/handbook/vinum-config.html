@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>21.8. Configuration de Vinum</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="vinum-vinum.html" title="Chapitre 21. Le gestionnaire de volume Vinum" /><link rel="prev" href="ch21s07.html" title="21.7. Appellation des objets" /><link rel="next" href="virtualization.html" title="Chapitre 22. Virtualisation" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.8. Configuration de Vinum</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch21s07.html">Précédent</a> </td><th width="60%" align="center">Chapitre 21. Le gestionnaire de volume Vinum</th><td width="20%" align="right"> <a accesskey="n" href="virtualization.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-config"></a>21.8. Configuration de Vinum</h2></div></div></div><p>Le noyau <code class="filename">GENERIC</code> ne contient pas le
+      support Vinum.  Il est possible de compiler un noyau spécial
+      qui inclut vinum, mais cela n'est pas recommandé.  La
+      méthode standard de lancement de Vinum est d'utiliser un module du
+      noyau (<acronym class="acronym">kld</acronym>).  Vous n'avez même pas
+      besoin d'utiliser <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kldload&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">kldload</span>(8)</span></a> pour Vinum: quand vous lancez
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vinum</span>(8)</span></a>, il contrôle si le module a été
+      chargé ou non, si ce n'est pas le cas, il le charge
+      automatiquement.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81680080"></a>21.8.1. Démarrage</h3></div></div></div><p>Vinum stocke l'information de configuration sur les
+	  tranches des disques sous la même forme que dans les
+	  fichiers de configuration.  En lisant à partir de la base
+	  de données de configuration, Vinum reconnaît un certain
+	  nombre de mots clés qui ne sont pas autorisés dans
+	  les fichiers de configuration.  Par exemple, une
+	  configuration de disque pourrait contenir le texte
+	  suivant:</p><pre class="programlisting">volume myvol state up
+volume bigraid state down
+plex name myvol.p0 state up org concat vol myvol
+plex name myvol.p1 state up org concat vol myvol
+plex name myvol.p2 state init org striped 512b vol myvol
+plex name bigraid.p0 state initializing org raid5 512b vol bigraid
+sd name myvol.p0.s0 drive a plex myvol.p0 state up len 1048576b driveoffset 265b plexoffset 0b
+sd name myvol.p0.s1 drive b plex myvol.p0 state up len 1048576b driveoffset 265b plexoffset 1048576b
+sd name myvol.p1.s0 drive c plex myvol.p1 state up len 1048576b driveoffset 265b plexoffset 0b
+sd name myvol.p1.s1 drive d plex myvol.p1 state up len 1048576b driveoffset 265b plexoffset 1048576b
+sd name myvol.p2.s0 drive a plex myvol.p2 state init len 524288b driveoffset 1048841b plexoffset 0b
+sd name myvol.p2.s1 drive b plex myvol.p2 state init len 524288b driveoffset 1048841b plexoffset 524288b
+sd name myvol.p2.s2 drive c plex myvol.p2 state init len 524288b driveoffset 1048841b plexoffset 1048576b
+sd name myvol.p2.s3 drive d plex myvol.p2 state init len 524288b driveoffset 1048841b plexoffset 1572864b
+sd name bigraid.p0.s0 drive a plex bigraid.p0 state initializing len 4194304b driveoff set 1573129b plexoffset 0b
+sd name bigraid.p0.s1 drive b plex bigraid.p0 state initializing len 4194304b driveoff set 1573129b plexoffset 4194304b
+sd name bigraid.p0.s2 drive c plex bigraid.p0 state initializing len 4194304b driveoff set 1573129b plexoffset 8388608b
+sd name bigraid.p0.s3 drive d plex bigraid.p0 state initializing len 4194304b driveoff set 1573129b plexoffset 12582912b
+sd name bigraid.p0.s4 drive e plex bigraid.p0 state initializing len 4194304b driveoff set 1573129b plexoffset 16777216b</pre><p>Ici les différences évidentes sont la
+	  présence d'une information explicite sur l'emplacement et le
+	  nom (les deux sont également autorisés, mais
+	  leur utilisation est déconseillée à
+	  l'utilisateur) et de l'information sur les états (qui ne
+	  sont pas disponibles à l'utilisateur).  Vinum ne stocke pas
+	  d'informations au sujet des disques dans la configuration:
+	  il localise les disques en recherchant les disques
+	  configurés pour les partitions dans le label Vinum.
+	  Cela permet à Vinum d'identifier correctement les disques
+	  même s'ils ont un identifiant de disque UNIX&#8482;
+	  différent.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81681872"></a>21.8.1.1. Démarrage automatique</h4></div></div></div><p>Afin de lancer automatiquement Vinum au démarrage du
+	    système, assurez-vous d'avoir la ligne suivante dans votre
+	    fichier <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">start_vinum="YES"		# set to YES to start vinum</pre><p>Si vous n'avez pas de fichier
+	  <code class="filename">/etc/rc.conf</code>, créez en un avec cette
+	  ligne.  Cela provoquera le chargement du module Vinum au
+	  démarrage du système, et le lancement de tout objet
+	  mentionné dans la configuration.  Cela est fait avant de
+	  monter les systèmes de fichiers, il est donc possible
+	  d'utiliser automatiquement <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> sur des systèmes de
+	  fichiers puis de les monter sur des volumes Vinum.</p><p>quand vous démarrez avec la commande <code class="command">vinum
+	  start</code>, Vinum lit la base de données de
+	  configuration à partir d'un des disques Vinum.  Dans des
+	  circonstances normales, chaque disque contient une copie
+	  identique de la base de données de configuration, il importe
+	  donc peu quel disque est lu.  Après un crash, Vinum doit
+	  déterminer quel disque a été mis à jour
+	  le plus récemment et lire la configuration à partir
+	  de ce disque.  Il met ensuite à jour la configuration si
+	  nécessaire à partir de disques progressivement de
+	  plus en plus anciens.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch21s07.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="virtualization.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">21.7. Appellation des objets </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Chapitre 22. Virtualisation</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

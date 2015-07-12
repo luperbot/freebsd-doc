@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>24.5. Поиск и устранение неисправностей</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="mail.html" title="Глава 24. Электронная почта" /><link rel="prev" href="mail-changingmta.html" title="24.4. Установка другой почтовой программы" /><link rel="next" href="mail-advanced.html" title="24.6. Расширенное руководство" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">24.5. Поиск и устранение неисправностей</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mail-changingmta.html">Пред.</a> </td><th width="60%" align="center">Глава 24. Электронная почта</th><td width="20%" align="right"> <a accesskey="n" href="mail-advanced.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mail-trouble"></a>24.5. Поиск и устранение неисправностей</h2></div></div></div><a id="idp96600016" class="indexterm"></a><div class="qandaset"><a id="idp96601168"></a><dl><dt>24.5.1. <a href="mail-trouble.html#idp96601424">Почему я должен использовать FQDN для хостов вне моей
+	    подсети?</a></dt><dt>24.5.2. <a href="mail-trouble.html#idp96616656">sendmail выдает ошибку
+	    mail loops back to myself</a></dt><dt>24.5.3. <a href="mail-trouble.html#idp96624720">Как организовать работу почтового сервера при коммутируемом
+	    соединении с Интернет?</a></dt><dt>24.5.4. <a href="mail-trouble.html#idp96646480">Почему я продолжаю получать ошибки Relaying
+	    Denied при отправки почты через другие
+	    хосты?</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp96601424"></a><a id="idp96601680"></a><p><strong>24.5.1.</strong></p></td><td align="left" valign="top"><p>Почему я должен использовать FQDN для хостов вне моей
+	    подсети?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Вы, видимо, обнаружили, что хост, к которому вы обратились,
+	    оказался на самом деле в другом домене; например, если вы
+	    находитесь в домене <code class="systemitem">foo.bar.edu</code> и
+	    хотите обратиться к хосту <code class="systemitem">mumble</code> в домене <code class="systemitem">bar.edu</code>, то должны указать его полное
+	    доменное имя, <code class="systemitem">mumble.bar.edu</code>, а не
+	    просто <code class="systemitem">mumble</code>.</p><p>Традиционно, программа разрешения имен BSD BIND<a id="idp96610128" class="indexterm"></a> позволяла это
+	    делать.  Однако, текущая версия <span class="application">BIND</span>,
+	    поставляемая с FreeBSD, больше не добавляет имена доменов,
+	    отличающихся от того, в котором вы находитесь, для не полностью
+	    указанных имен хостов.  То есть, имя <code class="systemitem">mumble</code> будет
+	    опознан как <code class="systemitem">mumble.foo.bar.edu</code> или
+	    будет искаться в корневом домене.</p><p>Это отличается от предыдущего поведения, при котором поиск
+	    продолжался в доменах <code class="systemitem">mumble.bar.edu</code> и <code class="systemitem">mumble.edu</code>.  Если вам интересны причины
+	    объявления такого поведения плохой практикой и даже ошибкой в
+	    безопасности, обратитесь к RFC 1535.</p><p>Хорошим решением будет поместить строку</p><pre class="programlisting">search foo.bar.edu bar.edu</pre><p>вместо ранее используемой:</p><pre class="programlisting">domain foo.bar.edu</pre><p>в файл <code class="filename">/etc/resolv.conf</code>.  Однако
+	    удостоверьтесь, что порядок поиска не нарушает <span class="quote"><<<span class="quote">границ
+	    полномочий между локальным и внешним администрированием</span>>></span>, в
+	    терминологии RFC 1535.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp96616656"></a><a id="idp96617040"></a><p><strong>24.5.2.</strong></p></td><td align="left" valign="top"><p><span class="application">sendmail</span> выдает ошибку
+	    <span class="errorname">mail loops back to myself</span></p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>В FAQ по <span class="application">sendmail</span> дан следующий
+	    ответ:</p><pre class="programlisting">Я получаю такие сообщения об ошибке:
+
+553 MX list for domain.net points back to relay.domain.net
+554 &lt;user@domain.net&gt;... Local configuration error
+
+Как можно решить эту проблему?
+
+Согласно записям MX, почта для домена <code class="systemitem">domain.net</code> перенаправляется на хост
+<code class="systemitem">relay.domain.net</code>, однако последний не распознается как
+<code class="systemitem">domain.net</code>.  Добавьте <code class="systemitem">domain.net</code> в файл
+<code class="filename">/etc/mail/local-host-names</code>
+[известный как /etc/sendmail.cw до версии 8.10]
+(если вы используете
+FETURE(use_cw_file)) или добавьте <span class="quote"><<<span class="quote">Cw domain.net</span>>></span> в файл
+<code class="filename">/etc/mail/sendmail.cf</code>.</pre><p>FAQ по <span class="application">sendmail</span> можно найти на
+	    <code class="uri"><a class="uri" href="http://www.sendmail.org/faq/" target="_top">http://www.sendmail.org/faq/</a></code> и рекомендуется
+	    прочесть его при желании произвести некоторые
+	    <span class="quote"><<<span class="quote">усовершенствования</span>>></span> настроек почтовой системы.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp96624720"></a><a id="idp96624976"></a><p><strong>24.5.3.</strong></p></td><td align="left" valign="top"><p>Как организовать работу почтового сервера при коммутируемом
+	    соединении с Интернет?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Вы хотите подключить к интернет компьютер с FreeBSD, работающий
+	    в локальной сети.  Компьютер с FreeBSD будет почтовым шлюзом
+	    для локальной сети.  PPP соединение не выделенное.</p><p>Существует как минимум два пути, чтобы сделать это.  Один
+	    способ это использование UUCP<a id="idp96626768" class="indexterm"></a>.</p><p>Другой способ это использование постоянно работающего интернет
+	    сервера для обеспечения вторичного MX<a id="idp96627792" class="indexterm"></a> сервиса вашего домена.
+	    Например, домен вашей компании <code class="systemitem">example.com</code>, и провайдер интернет
+	    настроил <code class="systemitem">example.net</code>
+	    для обеспечения вторичного MX сервиса:</p><pre class="programlisting">example.com.          MX        10      example.com.
+                      MX        20      example.net.</pre><p>Только один хост должен быть указан в качестве последнего
+	    получателя (добавьте запись <code class="literal">Cw example.com</code> в
+	    файл <code class="filename">/etc/mail/sendmail.cf</code> на машине
+	    <code class="systemitem">example.com</code>).</p><p>Когда программа <code class="command">sendmail</code> (со стороны
+	    отправителя) <span class="quote"><<<span class="quote">захочет</span>>></span> доставить почту, она
+	    попытается соединиться с вашим хостом (<code class="systemitem">example.com</code>) через модемное подключение.
+	    Скорее всего, ей это не удастся (вы,
+	    вероятнее всего, не будете подключены к интернет).
+	    Программа <span class="application">sendmail</span>
+	    автоматически перейдет ко вторичному MX серверу, т.е. вашему
+	    провайдеру (<code class="systemitem">example.net</code>).
+	    Вторичный MX сервер будет периодически пытаться соединиться с
+	    вашим хостом и доставить почту на основной сервер MX
+	    (<code class="systemitem">example.com</code>).</p><p>Вы можете воспользоваться следующим сценарием, чтобы забирать
+	    почту каждый раз, когда вы входите в систему:</p><pre class="programlisting">#!/bin/sh
+# Put me in /usr/local/bin/pppmyisp
+( sleep 60 ; /usr/sbin/sendmail -q ) &amp;
+/usr/sbin/ppp -direct pppmyisp</pre><p>Если же вы хотите написать отдельный пользовательский скрипт,
+	    лучше воспользоваться командой
+	    <code class="command">sendmail -qRexample.com</code> вместо вышеприведенного
+	    сценария, так как в этом случае вся почта в очереди для хоста
+	    <code class="systemitem">example.com</code> будет обработана
+	    немедленно.</p><p>Рассмотрим эту ситуацию подробнее:</p><p>Вот пример сообщения из <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-isp" target="_top">freebsd-isp</a>.</p><pre class="programlisting">&gt; Мы предоставляем вторичный MX для наших клиентов.  Вы соединяетесь
+&gt; с нашим сервером несколько раз в день, чтобы забрать почту для вашего
+&gt; первичного (главного) MX (мы не соединяемся с ним каждый раз, когда
+&gt; приходит новая почта для его доменов).  Далее, sendmail отправляет
+&gt; почту, находящуюся в очереди каждые 30 минут, и клиент должен быть
+&gt; подключен к Интернет в течении 30 минут, чтобы удостовериться, что
+&gt; вся почта <span class="quote"><<<span class="quote">ушла</span>>></span> на основной MX-сервер.
+&gt;
+&gt; Может быть, есть какая-либо команда, которая заставит sendmail
+&gt; немедленно отправить все почту, находящуюся в очереди?  Естественно,
+&gt; пользователи не обладают какими-либо повышенными привилегиями на
+&gt; нашем сервере.
+
+В разделе <span class="quote"><<<span class="quote">privacy flags</span>>></span> файла
+<code class="filename">sendmail.cf</code>, определяется опция
+<code class="option">Opgoaway,restrictqrun</code>
+
+Уберите <code class="literal">restrictqrun</code>, чтобы разрешить рядовым
+пользователям инициировать работу с очередью.  Вам также может понадобиться
+изменить порядок MX-серверов.  Так, если вы предоставляете первый (основной)
+MX-сервер для ваши пользователей, мы указываем:
+
+# If we are the best MX for a host, try directly instead of generating
+# local config error.
+OwTrue
+
+Таким образом, удаленный хост будет доставлять почту непосредственно к вам,
+не пытаясь установить соединение с клиентом.  Затем уже вы, в свою очередь,
+отсылаете ее клиенту.  Удостоверьтесь, что в DNS есть записи про
+<span class="quote"><<<span class="quote">customer.com</span>>></span> и <span class="quote"><<<span class="quote">hostname.customer.com</span>>></span>.  Просто
+добавьте запись A в DNS для <span class="quote"><<<span class="quote">customer.com</span>>></span>.</pre></td></tr><tr class="question"><td align="left" valign="top"><a id="idp96646480"></a><a id="idp96646736"></a><p><strong>24.5.4.</strong></p></td><td align="left" valign="top"><p>Почему я продолжаю получать ошибки <span class="errorname">Relaying
+	    Denied</span> при отправки почты через другие
+	    хосты?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>В установке FreeBSD по умолчанию,
+	    <span class="application">sendmail</span> настроен для отправки
+	    почты только от хоста, на котором он работает.  Например,
+	    если доступен <acronym class="acronym">POP</acronym> сервер, пользователи
+	    смогут проверять почту из школы, с работы или других
+	    удаленных точек, но не смогут отправлять письма.  Обычно,
+	    через некоторое время после попытки будет отправлено письмо
+	    от <span class="application">MAILER-DAEMON</span> с сообщением
+	    об ошибке <span class="errorname">5.7 Relaying Denied</span>.</p><p>Есть несколько путей разрешения этой ситуации.  Самый прямой
+	    путь это использование адреса вашего провайдера в файле
+	    relay-domains, расположенном в
+	    <code class="filename">/etc/mail/relay-domains</code>.  Быстрый способ
+	    сделать это:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "your.isp.example.com" &gt; /etc/mail/relay-domains</code></strong></pre><p>После создания или редактирования этого файла вы должны
+	    перезапустить <span class="application">sendmail</span>.  Это отлично
+	    работает, если вы администратор сервера и не хотите отправлять
+	    почту локально, или хотите воспользоваться почтовым
+	    клиентом/системой на другом компьютере или даже через другого
+	    провайдера.  Это также очень полезно, если у вас настроены одна
+	    или две почтовые записи.  Если необходимо добавить несколько
+	    адресов, вы можете просто открыть этот файл в текстовом редакторе и
+	    добавить домены, по одному на строку:</p><pre class="programlisting">your.isp.example.com
+other.isp.example.net
+users-isp.example.org
+www.example.org</pre><p>Теперь будет отправляться любая почта, посылаемая через вашу
+	    систему любым хостом из этого списка (предоставляемого
+	    пользователем, имеющим учетную запись в вашей системе).
+	    Это отличный способ разрешить пользователям отправлять почту
+	    через вашу систему удаленно, одновременно он блокирует отправку
+	    спама.</p></td></tr></tbody></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mail-changingmta.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="mail-advanced.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">24.4. Установка другой почтовой программы </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 24.6. Расширенное руководство</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

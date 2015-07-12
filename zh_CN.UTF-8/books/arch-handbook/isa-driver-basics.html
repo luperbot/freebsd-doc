@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.2. 基本信息</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="next" href="isa-driver-device-t.html" title="10.3. Device_t指针" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.2. 基本信息</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-device-t.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-basics"></a>10.2. 基本信息</h2></div></div></div><p>典型的ISA驱动程序需要以下包含文件：</p><pre class="programlisting">#include &lt;sys/module.h&gt;
+#include &lt;sys/bus.h&gt;
+#include &lt;machine/bus.h&gt;
+#include &lt;machine/resource.h&gt;
+#include &lt;sys/rman.h&gt;
+
+#include &lt;isa/isavar.h&gt;
+#include &lt;isa/pnpvar.h&gt;</pre><p>它们描述了针对ISA和通用总线子系统的东西。</p><a id="idp71466320" class="indexterm"></a><p>总线子系统是以面向对象的方式实现的，其主要结构通过相关联的
+      方法函数来访问。</p><a id="idp71467344" class="indexterm"></a><p>ISA驱动程序实现的总线方法的列表与任何其他总线的很相似。
+      对于名字为“xxx”的假想驱动程序，它们将是：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">static void xxx_isa_identify (driver_t *,
+          device_t);</code> 通常用于总线驱动程序而不是设备驱动程序。
+          但对于ISA设备，这个方法有特殊用途：如果设备提供某些设备特定的
+          （非PnP）方法自动侦测设备，这个例程可以实现它。</p></li><li class="listitem"><p><code class="function">static int xxx_isa_probe (device_t
+          dev);</code> 在已知（或PnP）位置探测设备。对于已经部分配置的
+          设备，这个例程也能够提供设备特定的对某些参数的自动侦测。</p></li><li class="listitem"><p><code class="function">static int xxx_isa_attach (device_t
+          dev);</code> 挂接和初始化设备。</p></li><li class="listitem"><p><code class="function">static int xxx_isa_detach (device_t
+          dev);</code> 卸载设备驱动模块前解挂设备。</p></li><li class="listitem"><p><code class="function">static int xxx_isa_shutdown (device_t
+          dev);</code> 系统关闭前执行设备的关闭。</p></li><li class="listitem"><p><code class="function">static int xxx_isa_suspend (device_t
+          dev);</code> 系统进入节能状态前挂起设备。也可以中止
+          切换到节能状态。</p></li><li class="listitem"><p><code class="function">static int xxx_isa_resume (device_t
+ 	  dev);</code> 从节能状态返回后恢复设备的活动状态。</p></li></ul></div><p><code class="function">xxx_isa_probe()</code>和
+      <code class="function">xxx_isa_attach()</code>是必须提供的，其余例程根据设备的
+      需要可以有选择地实现。</p><p>使用下面一组描述符将设备驱动链接到系统。</p><pre class="programlisting">    /* 支持的总线方法表 */
+    static device_method_t xxx_isa_methods[] = {
+        /* 列出驱动程序支持的所有总线方法函数 */
+        /* 略去不支持的函数 */
+        DEVMETHOD(device_identify,  xxx_isa_identify),
+        DEVMETHOD(device_probe,     xxx_isa_probe),
+        DEVMETHOD(device_attach,    xxx_isa_attach),
+        DEVMETHOD(device_detach,    xxx_isa_detach),
+        DEVMETHOD(device_shutdown,  xxx_isa_shutdown),
+        DEVMETHOD(device_suspend,   xxx_isa_suspend),
+        DEVMETHOD(device_resume,    xxx_isa_resume),
+
+	{ 0, 0 }
+    };
+
+    static driver_t xxx_isa_driver = {
+        "xxx",
+        xxx_isa_methods,
+        sizeof(struct xxx_softc),
+    };
+
+
+    static devclass_t xxx_devclass;
+
+    DRIVER_MODULE(xxx, isa, xxx_isa_driver, xxx_devclass,
+        load_function, load_argument);</pre><a id="idp71621072" class="indexterm"></a><p>此处的结构<code class="varname">xxx_softc</code>是一个设备
+        特定的结构，它包含私有的驱动程序数据和驱动程序资源的描述符。
+        总线代码会自动按需要为每个设备分配一个softc描述符。</p><a id="idp71622480" class="indexterm"></a><p>如果驱动程序作为可加载模块实现，当驱动程序被加载或卸载时，
+        会调用<code class="function">load_function()</code>函数进行驱动程序特定的
+        初始化或清理工作，并将load_argument作为函数的一个参量传递进去。
+        如果驱动程序不支持动态加载（换句话说，它必须被链接到内核中），则
+        这些值应当被设置为0，最后的定义将看起来如下所示：</p><pre class="programlisting"> DRIVER_MODULE(xxx, isa, xxx_isa_driver,
+       xxx_devclass, 0, 0);</pre><a id="idp71624272" class="indexterm"></a><p>如果驱动程序是为支持PnP的设备而写的，那么就必须定义一个包含
+        所有支持的PnP ID的表。这个表由此驱动程序所支持的PnP ID的列表
+        和以人可读的形式给出的、与这些ID对应的硬件类型和型号的描述
+        组成。看起来如下：</p><pre class="programlisting">    static struct isa_pnp_id xxx_pnp_ids[] = {
+        /* 每个所支持的PnP ID占一行 */
+        { 0x12345678,   "Our device model 1234A" },
+        { 0x12345679,   "Our device model 1234B" },
+        { 0,        NULL }, /* 表结束 */
+    };</pre><p>如果驱动程序不支持PnP设备，它仍然需要一个空的PnP ID表，
+        如下所示：</p><pre class="programlisting">    static struct isa_pnp_id xxx_pnp_ids[] = {
+        { 0,        NULL }, /* 表结束 */
+    };</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-device-t.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 10 章 ISA设备驱动程序 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.3. Device_t指针</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

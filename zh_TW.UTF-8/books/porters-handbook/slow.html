@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>章 4. Slow Porting</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter's Handbook" /><link rel="up" href="index.html" title="FreeBSD Porter's Handbook" /><link rel="prev" href="porting-submitting.html" title="3.6. 提交(Submit) port" /><link rel="next" href="slow-sources.html" title="4.2. 取得原始的 source 檔" /><link rel="copyright" href="trademarks.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">章 4. Slow Porting</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-submitting.html">前一頁</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="slow-sources.html">下一頁</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slow"></a>章 4. Slow Porting</h1></div></div></div><div class="toc"><div class="toc-title">內容目錄</div><dl class="toc"><dt><span class="sect1"><a href="slow.html#slow-work">4.1. How things work</a></span></dt><dt><span class="sect1"><a href="slow-sources.html">4.2. 取得原始的 source 檔</a></span></dt><dt><span class="sect1"><a href="slow-modifying.html">4.3. 量身打造 port</a></span></dt><dt><span class="sect1"><a href="slow-patch.html">4.4. Patching</a></span></dt><dt><span class="sect1"><a href="slow-configure.html">4.5. 設定</a></span></dt><dt><span class="sect1"><a href="slow-user-input.html">4.6. 處理使用者輸入</a></span></dt></dl></div><p>Ok...事實上並不太可能這麼簡單，port
+	方面可能需要作些修改才能正常使用。  因此，
+	本節將一步一步來介紹如何修改上一章的樣本以正常使用。</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slow-work"></a>4.1. How things work</h2></div></div></div><p>首先，先介紹一下在你所作的 port 目錄內打 <code class="command">make</code>
+	  時，所會作哪些事情的順序吧。
+	  你可以另開一窗來看 <code class="filename">bsd.port.mk</code>
+	  內容，以便瞭解我們下面在講什麼。</p><p>但別太擔心是否完全看懂
+	  <code class="filename">bsd.port.mk</code> 在做啥，很多人都還沒完全看完...
+	  <span class="emphasis"><em>:-&gt;</em></span></p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>首先，進行 <code class="buildtarget">fetch</code> 階段。
+	      <code class="buildtarget">fetch</code> 是確認 tarball 檔有沒有已在
+	      <code class="varname">DISTDIR</code> 內了？若 <code class="buildtarget">fetch</code>
+	      在 <code class="varname">DISTDIR</code> 找不到的話，它會搜尋 Makefile
+	      內的 <code class="varname">MASTER_SITES</code> URL
+	      ，或者是主 FTP 站專門放備份 distfiles 的目錄 <code class="uri"><a class="uri" href="ftp://ftp.FreeBSD.org/pub/FreeBSD/ports/distfiles/" target="_top">ftp://ftp.FreeBSD.org/pub/FreeBSD/ports/distfiles/</a></code>
+	      。  假設都找不到的話，但是網路有接上 Internet 的話，它會試著用
+	      <code class="varname">FETCH</code> 來抓所指定的檔案。
+	      抓到之後，它會把檔案存到 <code class="varname">DISTDIR</code>
+	      以便開始使用或日後運用。</p></li><li class="step"><p>其次，進行 <code class="buildtarget">extract</code> 階段，它會從
+	      <code class="varname">DISTDIR</code> 內找出該 port 所需的檔案(通常是 gzip
+	      格式的 tarball)，然後解壓縮到 <code class="varname">WRKDIR</code>
+	      所設定的臨時目錄名稱(預設是 <code class="filename">work</code> 目錄)內
+	      。</p></li><li class="step"><p>之後，進行 <code class="buildtarget">patch</code> 階段，
+	      一開始會先套用 <code class="varname">PATCHFILES</code> 所指定的任何 patch
+	      檔。  接著是 <code class="varname">PATCHDIR</code>(預設是
+	      <code class="filename">files</code> 子目錄) 內的檔名為
+	      <code class="filename">patch-*</code>
+	      之類的檔案，會以字母順序而逐一套用 patch。</p></li><li class="step"><p>接著是 <code class="buildtarget">configure</code> 階段，可以照 port
+	      的類型來作各種不同設定以調整，比如：</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>若有放 <code class="filename">scripts/configure</code> 的話，
+		  那麼就會跑裡面的設定。</p></li><li class="listitem"><p>若有設 <code class="varname">HAS_CONFIGURE</code> 或是
+		  <code class="varname">GNU_CONFIGURE</code> 的話，那麼就會跑
+		  <code class="filename">WRKSRC/configure</code></p></li><li class="listitem"><p>若有設 <code class="varname">USE_IMAKE</code> 的話，那麼就會跑
+		  <code class="varname">XMKMF</code> (預設是 <code class="command">xmkmf
+		    -a</code>) 。</p></li></ol></div></li><li class="step"><p>最後是 <code class="buildtarget">build</code> 階段，它會在該
+	      port 的 working directory(由 <code class="varname">WRKSRC</code> 所設定)
+	      內開始編譯。  若有設 <code class="varname">USE_GMAKE</code> 的話，
+	      那麼就會改用 GNU <code class="command">make</code> 來編譯，
+	      否則就用系統本身的 <code class="command">make</code> 來編譯。</p></li></ol></div><p>上面講的都是打 <code class="command">make</code> 時的預設階段。
+	  此外，還可以設定各階段之前、之後要作的事情：透過定義
+	  <code class="buildtarget">pre-<em class="replaceable"><code>something</code></em></code> 或
+	  <code class="buildtarget">post-<em class="replaceable"><code>something</code></em></code>，
+	  或者把這些檔名的 script 丟到 <code class="filename">scripts</code> 子目錄去，
+	  這樣子它們就會在各預設階段的之前、之後進行囉。</p><p>舉例來說，若在 <code class="filename">Makefile</code> 內設定
+	  <code class="buildtarget">post-extract</code>，而且在
+	  <code class="filename">scripts</code> 子目錄內又有
+	  <code class="filename">pre-build</code> 檔的話，那麼在作解壓縮之後，就會開始
+	  <code class="buildtarget">post-extract</code> 階段以進行解壓縮後的後續動作，
+	  而在跑 build 階段之前，就會先執行 <code class="filename">pre-build</code>
+	  這隻 script 作先期準備。  通常較簡單的修改動作，建議直接放在
+	  <code class="filename">Makefile</code> 內就好了，
+	  因為這樣會比較方便加上這些原本沒有的階段，同時也方便他人協助除錯
+	  。</p><p>預設的各階段動作都是照 <code class="filename">bsd.port.mk</code> 內的
+	  <code class="buildtarget">do-<em class="replaceable"><code>something</code></em></code>
+	  之類所定義的。  舉例：<code class="buildtarget">do-extract</code>
+	  就是定義怎麼把檔案解壓縮的。
+	  若對預設方式覺得不妥的話，都可以在該 port 的
+	  <code class="filename">Makefile</code> 重新定義。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">The <span class="quote">“<span class="quote">main</span>”</span> targets (e.g.,
+	    <code class="buildtarget">extract</code>,
+	    <code class="buildtarget">configure</code>, etc.) do nothing more than
+	    make sure all  the stages up to that one are completed and call
+	    the real targets or scripts, and they are not intended to be
+	    changed.  If you want to fix the extraction, fix
+	    <code class="buildtarget">do-extract</code>, but never ever change
+	    the way <code class="buildtarget">extract</code> operates!</p></div><p>現在，你已經知道打 <code class="command">make</code> 到底會作些什麼事囉，
+	  接下來會教你如何作更完美的 port。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-submitting.html">前一頁</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="slow-sources.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">3.6. 提交(Submit) port </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 4.2. 取得原始的 source 檔</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

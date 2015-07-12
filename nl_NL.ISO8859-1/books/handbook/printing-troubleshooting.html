@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>10.7. Problemen oplossen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="printing.html" title="Hoofdstuk 10. Afdrukken" /><link rel="prev" href="printing-lpd-alternatives.html" title="10.6. Alternatieven voor het standaard wachtrijsysteem" /><link rel="next" href="linuxemu.html" title="Hoofdstuk 11. Linux® binaire compatibiliteit" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.7. Problemen oplossen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="printing-lpd-alternatives.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 10. Afdrukken</th><td width="20%" align="right"> <a accesskey="n" href="linuxemu.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="printing-troubleshooting"></a>10.7. Problemen oplossen</h2></div></div></div><p>Na het uitvoeren van een simpele test met <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lptest&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lptest</span>(1)</span></a> is
+      mogelijk een van onderstaande resultaten verkregen, in plaats
+      van de juiste uitvoer:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Het werkte na enige tijd of er kwam geen volle
+	  pagina.</span></dt><dd><p>De printer drukte bovenstaande af, maar wachtte enige
+	    tijd zonder iets te doen.  Het was zelfs nodig om een
+	    PRINT REMAINING, of FORM FEED-knop op te printer in te
+	    drukken om enig resultaat te krijgen.</p><p>Als dit het geval is, dan stond de printer
+	    waarschijnlijk te wachten of er nog meer gegevens van de
+	    opdracht zouden komen, alvorens iets af te drukken.  Om dit
+	    probleem op te lossen, kan het tekstfilter worden aangepast
+	    zodat deze een FORM FEED-karakter (of wat er ook nodig is)
+	    naar de printer stuurt.  Dit is meestal voldoende om een
+	    printer zover te krijgen om tekst af te drukken die zich
+	    nog in de interne buffer bevindt.  Het is ook nuttig om er
+	    zeker van te zijn dat elke afdrukopdracht eindigt op een
+	    hele pagina, zodat de volgende opdracht niet ergens midden
+	    op de laatste pagina van de vorige opdracht begint.</p><p>De volgende vervanging voor het shellscript
+	    <code class="filename">/usr/local/libexec/if-simple</code> drukt een
+	    form feed af nadat de opdracht naar een printer is
+	    gestuurd:</p><pre class="programlisting">#!/bin/sh
+#
+# if-simple - Eenvoudige tekst invoerfilter voor lpd
+# Geïinstalleerd in /usr/local/libexec/if-simple
+#
+# Kopieert eenvoudig stdin naar stdout.  Negeer alle filterargumenten.
+# Schrijft een form feed karakter (\f) na het afdrukken van de opdracht.
+
+/bin/cat &amp;&amp; printf "\f" &amp;&amp; exit 0
+exit 2</pre></dd><dt><span class="term">De opdracht produceerde een getrapt effect.</span></dt><dd><p>Het resultaat ziet er als volgt uit:</p><pre class="screen">!"#$%&amp;'()*+,-./01234
+                "#$%&amp;'()*+,-./012345
+                                 #$%&amp;'()*+,-./0123456</pre><a id="idp74395600" class="indexterm"></a><a id="idp74400336" class="indexterm"></a><a id="idp74400848" class="indexterm"></a><p>Dit krijgen slachtoffers van het
+	    <span class="emphasis"><em>trapeffect</em></span> te zien.  Het wordt
+	    veroorzaakt door conflicterende interpretaties van de
+	    karakters die een regeleinde aangeven.  <span class="trademark">UNIX</span>®-achtige
+	    besturingssystemen gebruiken een enkel karakter: ASCII-code
+	    10, de line feed (LF).  <span class="trademark">MS-DOS</span>®, <span class="trademark">OS/2</span>® en andere
+	    besturingssystemen gebruiken twee karakters: ASCII-code 10
+	    <span class="emphasis"><em>en</em></span> ASCII-code 13 (de carriage return,
+	    CR).  Veel printers gebruiken de <span class="trademark">MS-DOS</span>®-conventie voor
+	    het representeren van regeleinden.</p><p>Als onder FreeBSD wordt afgedrukt, bevat de tekst alleen
+	    het line feed-karakter.  Na het zien van een line
+	    feed-karakter vervolgt de printer zijn werk op de volgende
+	    regel, maar behoudt dezelfde horizontale positie op de
+	    pagina voor het afdrukken van het volgende teken.  Hier is
+	    de carriage return voor bedoeld: om het volgende karakter
+	    af te drukken aan de linkerkant van de pagina.</p><p>Dit is wat FreeBSD wil dat de printer doet:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>Printer ontvangt CR</td><td>Printer drukt CR af</td></tr><tr><td>Printer ontvangt LF</td><td>Printer drukt CR + LF af</td></tr></tbody></table></div><p>Hier volgen een aantal manieren om dit te
+	    bereiken:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Gebruik de instellingentoetsen of het
+		bedieningspaneel van de printer om de interpretatie van
+		deze karakters aan te passen.  Controleer de
+		handleiding van de printer om uit te vinden hoe dit
+		moet.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Als een systeem in een ander besturingssysteem
+		  dan FreeBSD wordt opgestart, kan het nodig zijn een
+		  printer <span class="emphasis"><em>opnieuw</em></span> in te stellen,
+		  zodat die een interpretatie voor CR- en LF-karakters
+		  gebruikt die bij dat andere besturingssysteem horen.
+		  Het kan de voorkeur genieten een van onderstaande
+		  oplossingen te gebruiken.</p></div></li><li class="listitem"><p>Zorg dat het seriële lijnstuurprogramma van
+		FreeBSD automatisch LF naar CR+LF converteert.  Dit werkt
+		natuurlijk <span class="emphasis"><em>alleen</em></span> voor printers op
+		een seriële poort.  Gebruik de optie
+		<code class="literal">ms#</code> en zet de modus
+		<code class="literal">onlcr</code> in het bestand
+		<code class="filename">/etc/printcap</code> voor de printer om
+		deze functionaliteit in te schakelen.</p></li><li class="listitem"><p>Stuur een <span class="emphasis"><em>escape-code</em></span> naar een
+		printer om tijdelijk LF-karakters anders te behandelen.
+		Raadpleeg hiervoor de handleiding van de printer om
+		escape-codes te achterhalen die de printer ondersteunt.
+		Als de juiste escape-code is gevonden, moet de
+		tekstfilter worden aangepast zodat deze eerst de code
+		stuurt en vervolgens de afdrukopdracht.</p><a id="idp74415568" class="indexterm"></a><p>Hier volgt een eenvoudig tekstfilter voor printers
+		die HP PCL-escape-codes begrijpen.  Dit filter zorgt dat
+		een printer LF-karakters behandelt als LF en CR,
+		vervolgens verstuurt het de opdracht en tot slot een
+		form feed om de laatste pagina in de opdracht uit te
+		voeren.  Het zou met alle HP printers moeten
+		werken.</p><pre class="programlisting">#!/bin/sh
+#
+# hpif - Eenvoudig tekst invoerfilter voor lpd voor HP PCL-printers
+# Geïnstalleerd in /usr/local/libexec/hpif
+#
+# Kopieert eenvoudig stdin naar stdout.  Negeert alle filterargumenten.
+# Vertelt de printer om LF te zien als CR+LF.
+# Werpt de pagina uit na voltooiing.
+
+printf "\033&amp;k2G" &amp;&amp; cat &amp;&amp; printf "\033&amp;l0H" &amp;&amp; exit 0
+exit 2</pre><p>Nu volgt een voorbeeldbestand
+		<code class="filename">/etc/printcap</code> voor host
+		<code class="systemitem">orchid</code>.  Er is een printer aangesloten
+		op de eerste parallelle poort; een HP LaserJet 3Si,
+		genaamd <code class="literal">teak</code>.  Die gebruikt
+		bovenstaand script als tekstfilter:</p><pre class="programlisting">#
+#  /etc/printcap voor host orchid
+#
+teak|hp|laserjet|HP LaserJet 3Si:\
+        :lp=<code class="filename">/dev/lpt0</code>:sh:sd=<code class="filename">/var/spool/lpd/teak</code>:mx#0:\
+        :if=<code class="filename">/usr/local/libexec/hpif</code>:</pre></li></ul></div></dd><dt><span class="term">De regels zijn over elkaar afgedrukt.</span></dt><dd><p>De printer is nooit een regel opgeschoven.  Alle regels
+	    tekst lopen over elkaar en zijn op dezelfde regel
+	    afgedrukt.</p><p>Dit probleem is het <span class="quote">&#8220;<span class="quote">omgekeerde</span>&#8221;</span> van het
+	    trapeffect, zoals boven beschreven, en is veel zeldzamer.
+	    Ergens worden de LF-karakters die FreeBSD gebruikt om een
+	    regel te eindigen gezien als CR-karakters om de
+	    afdruklocatie te verplaatsen naar de linkerkant van het
+	    papier, zonder óók een regel naar beneden te
+	    gaan.</p><p>Gebruik de instellingentoetsen, of het bedieningspaneel
+	    van de printer om de volgende interpretatie van LF en CR af
+	    te dwingen:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Printer ontvangt</th><th>Printer drukt af</th></tr></thead><tbody><tr><td>CR</td><td>CR</td></tr><tr><td>LF</td><td>CR + LF</td></tr></tbody></table></div></dd><dt><span class="term">De printer is karakters kwijt.</span></dt><dd><p>Tijdens het afdrukken heeft de printer een paar
+	    karakters per regel niet afgedrukt.  Het kan zijn dat het
+	    probleem erger werd naarmate de printer zijn werk deed,
+	    steeds meer karakters verliezend.</p><p>Het probleem is dat de printer de snelheid waarmee de
+	    computer gegevens over een seriële lijn stuurt niet
+	    bij kan houden (dit probleem zou zich niet voor moeten doen
+	    met printers op een parallelle poort).  Er zijn twee
+	    manieren om dit probleem te verhelpen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Als de printer XON/XOFF flow-control ondersteunt,
+		zorg dan dat FreeBSD dit gebruikt door de modus
+		<code class="literal">ixon</code> in de optie
+		<code class="literal">ms#</code> te specificeren.</p></li><li class="listitem"><p>Als de printer de Request to Send / Clear to Send
+		hardware-handshake ondersteunt, (ook bekend als
+		<code class="literal">RTS/CTS</code>), specificeer dan de modus
+		<code class="literal">crtscts</code> in de optie
+		<code class="literal">ms#</code>.  Zorg dat de bedrading
+		van de kabel die printer met de computer verbindt juist
+		is voor hardware flow-control.</p></li></ul></div></dd><dt><span class="term">Er werd onzin afgedrukt.</span></dt><dd><p>Het lijkt alsof de printer willekeurige onzin afdrukte
+	    en niet de gewenste tekst.</p><p>Dit is meestal een ander symptoom van verkeerde
+	    communicatieparameters voor een seriële printer.
+	    Controleer de bps-snelheid in de optie
+	    <code class="literal">br</code> en de instelling voor pariteit in de
+	    optie <code class="literal">ms#</code>.  Wees er zeker van dat de
+	    printer dezelfde instellingen gebruikt als in het bestand
+	    <code class="filename">/etc/printcap</code> worden opgegeven.</p></dd><dt><span class="term">Er gebeurde niets.</span></dt><dd><p>Als er niets gebeurde, ligt het probleem waarschijnlijk
+	    bij FreeBSD en niet bij de hardware.  Voeg de optie
+	    logboekbestand (<code class="literal">lf</code>) toe in
+	    <code class="filename">/etc/printcap</code> voor de betreffende
+	    printer.  Hier is bijvoorbeeld de definitie voor
+	    <code class="literal">rattan</code> met de optie
+	    <code class="literal">lf</code>:</p><pre class="programlisting">rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:sd=<code class="filename">/var/spool/lpd/rattan</code>:\
+        :lp=<code class="filename">/dev/lpt0</code>:\
+        :if=<code class="filename">/usr/local/libexec/if-simple</code>:\
+        :lf=<code class="filename">/var/log/rattan.log</code></pre><p>Probeer vervolgens nogmaals af te drukken.  Controleer
+	    het logboekbestand (in dit voorbeeld
+	    <code class="filename">/var/log/rattan.log</code>) op mogelijke
+	    foutmeldingen.  Probeer op basis van deze melding het
+	    probleem te verhelpen.</p><p>Als er geen optie <code class="literal">lf</code> is opgegeven,
+	    gebruikt <span class="application">LPD</span>
+	    <code class="filename">/dev/console</code> als
+	    standaard.</p></dd></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="printing-lpd-alternatives.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="printing.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="linuxemu.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">10.6. Alternatieven voor het standaard wachtrijsysteem </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> Hoofdstuk 11. <span class="trademark">Linux</span>® binaire compatibiliteit</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

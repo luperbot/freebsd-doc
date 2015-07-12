@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>11.5. Starting Services</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Podręcznik FreeBSD" /><link rel="up" href="config-tuning.html" title="Rozdział 11. Configuration and Tuning" /><link rel="prev" href="configtuning-appconfig.html" title="11.4. Application Configuration" /><link rel="next" href="configtuning-cron.html" title="11.6. Configuring the cron Utility" /><link rel="copyright" href="legalnotice.html" title="Informacja Prawna" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.5. Starting Services</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="configtuning-appconfig.html">Poprzedni</a> </td><th width="60%" align="center">Rozdział 11. Configuration and Tuning</th><td width="20%" align="right"> <a accesskey="n" href="configtuning-cron.html">Następny</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="configtuning-starting-services"></a>11.5. Starting Services</h2></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp84165328" class="indexterm"></a><p>Many users choose to install third party software on FreeBSD
+      from the Ports Collection.  In many of these situations it
+      may be necessary to configure the software in a manner which
+      will allow it to be started upon system initialization.  Services,
+      such as <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/postfix/pkg-descr">mail/postfix</a> or
+      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/www/apache13/pkg-descr">www/apache13</a> are just two
+      of the many software packages which may be started during system
+      initialization.  This section explains the procedures available
+      for starting third party software.</p><p>In FreeBSD, most included services, such as <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a>, are
+      started through the system start up scripts.  These scripts may
+      differ depending on FreeBSD or vendor version; however, the most
+      important aspect to consider is that their start up configuration
+      can be handled through simple startup scripts.</p><p>Before the advent of <code class="filename">rc.d</code>, applications would drop a
+      simple start up script into the
+      <code class="filename">/usr/local/etc/rc.d</code>
+      directory which would be read by the system initialization
+      scripts.  These scripts would then be executed during the latter
+      stages of system start up.</p><p>While many individuals have spent hours trying to merge the
+      old configuration style into the new system, the fact remains
+      that some third party utilities still require a script simply
+      dropped into the aforementioned directory.  The subtle differences
+      in the scripts depend whether or not <code class="filename">rc.d</code> is being used.  Prior
+      to FreeBSD 5.1 the old configuration style is used and in
+      almost all cases a new style script would do just fine.</p><p>While every script must meet some minimal requirements, most
+      of the time these requirements are FreeBSD version
+      agnostic.  Each script must have a <code class="filename">.sh</code>
+      extension appended to the end and every script must be
+      executable by the system.  The latter may be achieved by using
+      the <code class="command">chmod</code> command and setting the unique permissions
+      of <code class="literal">755</code>.  There should also be, at minimal,
+      an option to <code class="literal">start</code> the application and an
+      option to <code class="literal">stop</code> the application.</p><p>The simplest start up script would probably look a little
+      bit like this one:</p><pre class="programlisting">#!/bin/sh
+echo -n ' utility'
+
+case "$1" in
+start)
+        /usr/local/bin/utility
+        ;;
+stop)
+        kill -9 `cat /var/run/utility.pid`
+        ;;
+*)
+        echo "Usage: `basename $0` {start|stop}" &gt;&amp;2
+        exit 64
+        ;;
+esac
+
+exit 0</pre><p>This script provides for a <code class="literal">stop</code> and
+      <code class="literal">start</code> option for
+      the application hereto referred simply as
+      <code class="literal">utility</code>.</p><p>Could be started manually with:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/local/etc/rc.d/utility.sh start</code></strong></pre><p>While not all third party software requires the line in
+      <code class="filename">rc.conf</code>, almost every day a new port will
+      be modified to accept this configuration.  Check the final output
+      of the installation for more information on a specific
+      application.  Some third party software will provide start up
+      scripts which permit the application to be used with
+      <code class="filename">rc.d</code>; although, this will be discussed in the next section.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84177232"></a>11.5.1. Extended Application Configuration</h3></div></div></div><p>Now that FreeBSD includes <code class="filename">rc.d</code>, configuration
+	of application startup has become easier, and more
+	featureful.  Using the key words discussed in the
+	<a class="link" href="configtuning-rcd.html" title="11.7. Using rc under FreeBSD">rc.d</a> section,
+	applications may now be set to start after certain other
+	services for example <acronym class="acronym">DNS</acronym>; may permit extra
+	flags to be passed through <code class="filename">rc.conf</code> in
+	place of hard coded flags in the start up script, etc.  A
+	basic script may look similar to the following:</p><pre class="programlisting">#!/bin/sh
+#
+# PROVIDE: utility
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=utility
+rcvar=utility_enable
+
+command="/usr/local/sbin/utility"
+
+load_rc_config $name
+
+#
+# DO NOT CHANGE THESE DEFAULT VALUES HERE
+# SET THEM IN THE /etc/rc.conf FILE
+#
+utility_enable=${utility_enable-"NO"}
+pidfile=${utility_pidfile-"/var/run/utility.pid"}
+
+run_rc_command "$1"</pre><p>This script will ensure that the provided
+	<span class="application">utility</span> will be started after the
+	<code class="literal">daemon</code> service.  It also provides a method
+	for setting and tracking the <acronym class="acronym">PID</acronym>, or process
+	<acronym class="acronym">ID</acronym> file.</p><p>This application could then have the following line placed
+	in <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">utility_enable="YES"</pre><p>This new method also allows for easier manipulation of the
+	command line arguments, inclusion of the default functions
+	provided in <code class="filename">/etc/rc.subr</code>, compatibility
+	with the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> utility and provides for easier
+	configuration via the <code class="filename">rc.conf</code> file.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84202192"></a>11.5.2. Using Services to Start Services</h3></div></div></div><p>Other services, such as <acronym class="acronym">POP</acronym>3 server
+	daemons, <acronym class="acronym">IMAP</acronym>, etc. could be started using
+	the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a>.  This involves installing the service
+	utility from the Ports Collection with a configuration line
+	appended to the <code class="filename">/etc/inetd.conf</code> file,
+	or uncommenting one of the current configuration lines.  Working
+	with <span class="application">inetd</span> and its configuration is
+	described in depth in the
+	<a class="link" href="network-inetd.html" title="25.2. The inetd "Super-Server"">inetd</a> section.</p><p>In some cases, it may be more plausible to use the
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a> daemon to start system services.  This approach
+	has a number of advantages because <code class="command">cron</code> runs
+	these processes as the <code class="filename">crontab</code>'s file
+	owner.  This allows regular users to start and maintain some
+	applications.</p><p>The <code class="command">cron</code> utility provides a unique
+	feature, <code class="literal">@reboot</code>, which may be used in place
+	of the time specification.  This will cause the job to be run
+	when <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a> is started, normally during system
+	initialization.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="configtuning-appconfig.html">Poprzedni</a> </td><td width="20%" align="center"><a accesskey="u" href="config-tuning.html">Początek rozdziału</a></td><td width="40%" align="right"> <a accesskey="n" href="configtuning-cron.html">Następny</a></td></tr><tr><td width="40%" align="left" valign="top">11.4. Application Configuration </td><td width="20%" align="center"><a accesskey="h" href="index.html">Spis treści</a></td><td width="40%" align="right" valign="top"> 11.6. Configuring the <code class="command">cron</code> Utility</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>12.4. 区分不同的操作系统， 以及 OS 的版本</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter 手册" /><link rel="up" href="porting-dads.html" title="第 12 章 该做什么和不该做什么" /><link rel="prev" href="porting-wrkdirprefix.html" title="12.3. WRKDIRPREFIX (用于联编的临时目录的父目录名)" /><link rel="next" href="freebsd-versions.html" title="12.5. __FreeBSD_version 值" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.4. 区分不同的操作系统， 以及 OS 的版本</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-wrkdirprefix.html">上一页</a> </td><th width="60%" align="center">第 12 章 该做什么和不该做什么</th><td width="20%" align="right"> <a accesskey="n" href="freebsd-versions.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="porting-versions"></a>12.4. 区分不同的操作系统， 以及 OS 的版本</h2></div></div></div><p>在不同版本的 Unix 下可能需要对代码进行一些修改或增加少许编译选项，
+	  才能够正确地编译和运行。 如果您需要根据一些条件来对代码进行修改，
+	  请尽可能让这些修改通用， 这样， 我们就能够将这些代码移植回更早的 FreeBSD
+	  系统， 并交叉移植到其它 BSD 系统， 例如来自 CSRG 的 4.4BSD，
+	  BSD/386， 386BSD， NetBSD 和 OpenBSD。</p><p>推荐的获得 4.3BSD/Reno (1990) 以及更新版本 BSD 代码版本号的方式， 是使用
+	  <a class="link" href="http://cvsweb.freebsd.org/src/sys/sys/param.h" target="_top">sys/param.h</a>
+	  中所定义的 <code class="literal">BSD</code> 宏的值。 一般来说这个文件已经被引用了；
+	  如果没有的话， 增加下述代码：</p><pre class="programlisting">#if (defined(__unix__) || defined(unix)) &amp;&amp; !defined(USG)
+#include &lt;sys/param.h&gt;
+#endif</pre><p>到 <code class="filename">.c</code> 文件中合适的地方。
+	  我们相信所有定义了这两个符号的系统中， 都提供了
+	  <code class="filename">sys/param.h</code>。 如果您发现有不这样做的系统，
+	  请通过致信 <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-ports" target="_top">FreeBSD ports 邮件列表</a> 让我们了解这一情况。</p><p>另一种方法是使用 GNU Autoconf 风格的方式：</p><pre class="programlisting">#ifdef HAVE_SYS_PARAM_H
+#include &lt;sys/param.h&gt;
+#endif</pre><p>采用这种方法时， 不要忘了把 <code class="literal">-DHAVE_SYS_PARAM_H</code> 加到
+	  <code class="filename">Makefile</code> 中的 <code class="varname">CFLAGS</code> 里。</p><p>一旦引用了 <code class="filename">sys/param.h</code>， 您就可以使用：</p><pre class="programlisting">#if (defined(BSD) &amp;&amp; (BSD &gt;= 199103))</pre><p>来检测代码是否正在 4.3 Net2 代码基础，
+	  或更新的系统上编译 (例如 FreeBSD 1.x， 4.3/Reno， NetBSD 0.9， 386BSD，
+	  BSD/386 1.1 以及更高版本)。</p><p>使用：</p><pre class="programlisting">#if (defined(BSD) &amp;&amp; (BSD &gt;= 199306))</pre><p>来检测代码是否正在 4.4 或更新的系统 (例如 FreeBSD 2.x， 4.4，
+	  NetBSD 1.0、 BSD/386 2.0 或更高版本)。</p><p>对于 4.4BSD-Lite2 代码系来说， <code class="literal">BSD</code> 宏的值应该是
+	  <code class="literal">199506</code>。 这里只是作为信息提供，
+	  您不应使用它来区分基于 4.4-Lite 的 FreeBSD 和基于 4.4-Lite2 的版本。
+	  这些情况下， 您应使用
+	  <code class="literal">__FreeBSD__</code> 宏。</p><p>保守地使用：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">__FreeBSD__</code> 在所有版本的
+	      FreeBSD 中皆有定义。 如果您正进行的修改
+	      <span class="emphasis"><em>只</em></span> 影响 FreeBSD， 则应使用这个宏。
+	      类似 <code class="literal">sys_errlist[]</code> 之于
+	      <code class="function">strerror()</code> 这样的移植问题是伯克利代码系公用的，
+	      而并非 FreeBSD 所专有。</p></li><li class="listitem"><p>在 FreeBSD 2.x 中， <code class="literal">__FreeBSD__</code>
+	      定义为 <code class="literal">2</code>。 更早版本中， 它曾经是
+	      <code class="literal">1</code>。 新的版本都会在主要的版本号变化时变更它。</p></li><li class="listitem"><p>如果您需要区分 FreeBSD 1.x 系统和 FreeBSD 2.x 及更高版本的区别，
+	      通常应使用前述的 <code class="literal">BSD</code> 宏来进行。
+	      如果事实上需要一个 FreeBSD 专有的修改 (例如，
+	      在使用 <code class="command">ld</code> 时需要特殊的共享库选项)，
+	      则可以用 <code class="literal">__FreeBSD__</code> 和 <code class="literal">#if
+		__FreeBSD__ &gt; 1</code> 来检测 FreeBSD 2.x 和新系统上的变化。
+	      如果需要更细粒度地检测 FreeBSD 2.0-RELEASE 之后版本的变化，
+	      则可以使用：</p><pre class="programlisting">#if __FreeBSD__ &gt;= 2
+#include &lt;osreldate.h&gt;
+#    if __FreeBSD_version &gt;= 199504
+	 /* 适用于 2.0.5+ 版本的代码 */
+#    endif
+#endif</pre></li></ul></div><p>在已有的数百个 port 中， 只有一两个应该使用 <code class="literal">__FreeBSD__</code>。
+	  早期的 port 在不适当的地方使用了它并引发问题，
+	  并不意味着您也必定如此。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-wrkdirprefix.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="porting-dads.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="freebsd-versions.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">12.3. <code class="varname">WRKDIRPREFIX</code> (用于联编的临时目录的父目录名) </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 12.5. __FreeBSD_version 值</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

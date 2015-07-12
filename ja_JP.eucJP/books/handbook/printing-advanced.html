@@ -1,0 +1,1740 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>10.4. プリンタ設定上級編</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="printing.html" title="第10章 プリンタの利用" /><link rel="prev" href="printing-intro-setup.html" title="10.3. 基本的な設定" /><link rel="next" href="printing-using.html" title="10.5. プリンタを使う" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.4. プリンタ設定上級編</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="printing-intro-setup.html">戻る</a>〓</td><th width="60%" align="center">第10章 プリンタの利用</th><td width="20%" align="right">〓<a accesskey="n" href="printing-using.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="printing-advanced"></a>10.4. プリンタ設定上級編</h2></div></div></div><p>この節では、特殊な形式のファイルを印字するためのフィルタ、
+      ヘッダページ、ネットワーク越しのプリンタへの印字、そして、
+      プリンタ使用の制限や課金について説明しています。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-filter-intro"></a>10.4.1. フィルタ</h3></div></div></div><a id="idp86304464" class="indexterm"></a><p><span class="application">LPD</span>
+	は、ネットワークプロトコル、キュー、アクセス制御などの
+	印刷にかかわるさまざまな点を扱いますが、
+	<span class="emphasis"><em>実際の</em></span>作業のほとんどは
+	<span class="emphasis"><em>フィルタ</em></span>によっておこなわれています。
+	フィルタは、プリンタと通信し、
+	プリンタのデバイス依存性や特殊な要求を扱うプログラムです。
+	簡単なプリンタ設定では、
+	プレインテキストのためのフィルタをインストールしました。
+	このプレインテキストフィルタは、
+	ほとんどのプリンタで機能する極めて単純なものでした
+	(「<a class="link" href="printing-intro-setup.html#printing-textfilter" title="10.3.1.5.6. テキストフィルタのインストール">
+	  テキストフィルタのインストール</a>」を参照)。</p><p>しかしながら、形式変換やプリンタ課金、特定のプリンタの癖、
+	など をうまく利用するためには、
+	フィルタがどのように機能するかという
+	ことを理解しておくべきです。これらの側面を扱うことは、
+	最終的には、フィルタの責任であるからです。
+	そして、これは悪い情報ですが、ほとんどの場合において、
+	<span class="emphasis"><em>あなた自身</em></span>が
+	フィルタを供給する必要があるということです。また都合のよいことには、
+	たくさんのフィルタが一般的に利用できるということです。
+	もしフィルタがなかったとしても、
+	普通はフィルタを作るのは簡単です。</p><p>FreeBSD にも、プレインテキストを印字させることができる
+	<code class="filename">/usr/libexec/lpr/lpf</code>
+	というフィルタが 1 つ付いています
+	(このフィルタはファイルに含まれるバックスペースやタブを扱います。
+	また、課金をすることもできますが、
+	できることはこれだけしかありません)。
+	いくつかのフィルタとフィルタの構成要素は
+        FreeBSD Ports Collection にもあります。</p><p>この節で述べることは次の通りです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>「<a class="link" href="printing-advanced.html#printing-advanced-filters" title="10.4.1.1. フィルタはどのように機能しているか">
+	      フィルタはどのように機能しているか</a>」では、
+	    印字の過程におけるフィルタの役割を概説します。
+	    この節を読むことで、<span class="application">LPD</span>
+	    がフィルタを使うときに、<span class="quote">「<span class="quote">見えないところで</span>」</span>
+	    何が起こっているかが理解できるでしょう。このことを知っておくと、
+	    プリンタそれぞれに様々なフィルタをインストールしたときに
+	    遭遇するかもしれない問題を予期したり、
+	    デバッグするときに役立つでしょう。</p></li><li class="listitem"><p><span class="application">LPD</span>
+	    は、すべてのプリンタがデフォルトでプレインテキストを印字できることを期待しています。
+	    これは、プレインテキストを直接印字できない <span class="trademark">PostScript</span>®
+	    (または他の言語対応の) プリンタで問題になります。「<a class="link" href="printing-advanced.html#printing-advanced-if-conversion" title="10.4.1.2. プレインテキストのジョブを PostScript® プリンタで印字する">
+	      プレインテキストのジョブを <span class="trademark">PostScript</span>®
+	      プリンタで印字する</a>」 で、
+	    この問題を克服する方法について述べます。
+            <span class="trademark">PostScript</span>® プリンタをお持ちの方は、
+            この節をお読みになることをおすすめします。</p></li><li class="listitem"><p><span class="trademark">PostScript</span>®
+	    は様々なプログラムのための有名な出力形式です。
+	    <span class="trademark">PostScript</span>® のコードを直接書いてしまう人すらいます。
+	    残念ながら、<span class="trademark">PostScript</span>® プリンタは高価です。「<a class="link" href="printing-advanced.html#printing-advanced-ps" title="10.4.1.3. 非 PostScript® プリンタによる PostScript® のシミュレート">非 <span class="trademark">PostScript</span>® プリンタによる
+	      <span class="trademark">PostScript</span>® のシミュレート</a>」節では、<span class="trademark">PostScript</span>®
+	    データを<span class="emphasis"><em>非 <span class="trademark">PostScript</span>®
+	    プリンタ</em></span>に受けつけさせ、印字させるために、
+	    どのようにしてプリンタ用のテキストフィルタをさらに変更すればよいのか、
+	    ということについて説明しています。<span class="trademark">PostScript</span>®
+	    プリンタを持っていない方は、
+	    この節をお読みになることをおすすめします。</p></li><li class="listitem"><p>「<a class="link" href="printing-advanced.html#printing-advanced-convfilters" title="10.4.1.4. 変換フィルタ">
+	      変換フィルタ</a>」では、
+	      図形や組版データといった特定のファイル形式を、
+	      プリンタが理解できる形式へ変換する作業を自動的におこなわせる方法について述べます。
+	      この節を読むと、troff のデータを印字するには <code class="command">lpr
+	      -t</code>, または、<span class="application">TeX</span> DVI を印字するには
+	    <code class="command">lpr -d</code>、
+	    ラスタイメージデータを印字するには <code class="command">lpr -v</code>、
+	    などといったようにユーザが入力することができるように
+	    プリンタの設定をおこなうことができます。
+	    この節もお読みになることをお薦めします。</p></li><li class="listitem"><p>「<a class="link" href="printing-advanced.html#printing-advanced-of" title="10.4.1.5. 出力フィルタ">出力フィルタ</a>」
+	    では、あまり使われない <span class="application">LPD</span>
+	    の機能のすべて、すなわち、
+	    出力フィルタに関することが記述されています。ヘッダページ
+	    (「<a class="link" href="printing-advanced.html#printing-advanced-header-pages" title="10.4.2. ヘッダページ">
+	      ヘッダページ</a>」参照) を印字させていない場合は、
+	    多分、この節は飛ばしても構わないでしょう。</p></li><li class="listitem"><p>「<a class="link" href="printing-advanced.html#printing-advanced-lpf" title="10.4.1.6. テキストフィルタ lpf">テキストフィルタ
+	      lpf</a>」では、<code class="command">lpf</code>
+	    についての説明が、ほぼ完全におこなわれています。これは
+	    FreeBSD に付属するラ インプリンタ (または、
+	    ラインプリンタのように動作するレーザプリンタ) のための、
+	    単純なテキストフィルタです。
+	    プレインテキストを印字したことに対して課金をおこなう方法が
+	    至急必要な場合、もしくは、バックスペース文字を印字しようと
+	    すると煙を発するプリンタを持っている場合は、絶対に
+	    <code class="command">lpf</code> を検討するべきです。</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">以下で述べられているさまざまなスクリプトは、<code class="filename">/usr/share/examples/printing</code>
+	  ディレクトリにあります。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-filters"></a>10.4.1.1. フィルタはどのように機能しているか</h4></div></div></div><p>既に言及したように、フィルタとは、プリンタにデータを送る際に、
+	  デバイスに依存した部分を取り扱うために <span class="application">LPD</span>
+	  によって起動される実行プログラムです。</p><p><span class="application">LPD</span>
+	  がジョブ中のファイルを印字しようとするとき、
+	  <span class="application">LPD</span>
+	  はフィルタプログラムを起動します。このとき、
+	  フィルタの標準入力を印字するファイルに、
+	  標準出力をプリンタに、そして、標準エラー出力を
+	  エラーログファイル (<code class="filename">/etc/printcap</code> 内の
+	  <code class="literal">lf</code> 項目で指定されたファイル、または、
+	  指定されていない場合は、デフォルトとして
+	  <code class="filename">/dev/console</code>)
+	  にセットします。</p><a id="idp86349904" class="indexterm"></a><p><span class="application">LPD</span>
+	  が起動するフィルタと、その引数が何であるかは、
+	  <code class="filename">/etc/printcap</code>
+	  ファイルの内容と、ジョブの起動時にユーザが指定した
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lpr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lpr</span>(1)</span></a> コマンドの引数に依存しています。
+	  たとえば、ユーザが <code class="command">lpr -t</code> と入力した場合は、
+	  <span class="application">LPD</span> は出力先のプリンタ用の
+	  <code class="literal">tf</code> 項目で指定されている troff
+	  用のフィルタを起動させるでしょう。
+	  ユーザがプレインテキストの印字を指示したときは、
+	  <code class="literal">if</code> で指定されたフィルタが起動されるでしょう
+	  (このことはほとんどの場合にあてはまります。
+	  詳細については、「<a class="link" href="printing-advanced.html#printing-advanced-of" title="10.4.1.5. 出力フィルタ">
+	    出力フィルタ</a>」をご覧ください)。</p><p><code class="filename">/etc/printcap</code>
+	  で指定可能なフィルタは次の3種類があります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>テキストフィルタ</em></span>
+	      (<span class="application">LPD</span> のドキュメントでは紛らわしいことに
+	      <span class="emphasis"><em>入力フィルタ</em></span>と呼んでいますが)
+	      は一般のテキストの印字を扱います。これはデフォルトのフィルタと
+	      考えてください。<span class="application">LPD</span>
+	      では、すべてのプリンタに対して、
+	      デフォルトでプレインテキストが印字できることを期待しています。
+	      さらに、バックスペースやタブを正しく扱い、また、
+	      他の特殊な文字が入力されてもプリンタに混乱を来さないように
+	      するのはテキストフィルタの仕事であると考えています。
+
+	      プリンタの使用に対して課金をしなくてはならない環境にあ
+	      るときは、テキストフィルタが印字したページ数を数える作
+	      業もしなくてはなりません。この作業は、通常、印字した行
+	      数を数え、これをプリンタが 1 ページ当たりに印字できる行
+	      数と比較することでおこなわれます。
+
+	      テキストフィルタは、次のような引数を付けて起動されます。</p><div class="cmdsynopsis"><p><code class="command">filter-name</code> [-c]  -w <em class="replaceable"><code>width</code></em>   -l <em class="replaceable"><code>length</code></em>   -i <em class="replaceable"><code>indent</code></em>   -n <em class="replaceable"><code>login</code></em>   -h <em class="replaceable"><code>host</code></em>   <em class="replaceable"><code>acct-file</code></em> </p></div><p>ここで、</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="option">-c</code></span></dt><dd><p><code class="command">lpr -l</code>
+		      によってジョブが入力されたときに与えられます。</p></dd><dt><span class="term"><em class="replaceable"><code>width</code></em></span></dt><dd><p><code class="filename">/etc/printcap</code>
+		      で指定された <code class="literal">pw</code> (page width)
+		      項目の値が与えられます。デフォルトは、
+		      132 です。</p></dd><dt><span class="term"><em class="replaceable"><code>length</code></em></span></dt><dd><p><code class="literal">pl</code> (page length)
+		      項目で指定された値が与えられます。
+		      デフォルトは 66 です。</p></dd><dt><span class="term"><em class="replaceable"><code>indent</code></em></span></dt><dd><p><code class="command">lpr -i</code>
+		      によって与えられた字下げの量で、
+		      デフォルトは 0 です。</p></dd><dt><span class="term"><em class="replaceable"><code>login</code></em></span></dt><dd><p>ファイルを印字したユーザのアカウント名が
+		      与えられます。</p></dd><dt><span class="term"><em class="replaceable"><code>host</code></em></span></dt><dd><p>ジョブが入力されたホスト名が
+		      与えられます。</p></dd><dt><span class="term"><em class="replaceable"><code>acct-file</code></em></span></dt><dd><p><code class="literal">af</code>
+		      項目で指定されている課金データファイル
+		      の名前が与えられます。</p></dd></dl></div></li><li class="listitem"><p><span class="emphasis"><em>変換フィルタ</em></span><a id="idp86406352" class="indexterm"></a>は、
+	      特定のファイル形式をプリンタ
+	      が紙に印字できるようなものに変換します。たとえば、
+	      プリンタで ditroff 組版データを直接印字することはできません。
+	      しかし、ditroff データをプリンタが消化し、
+	      印字することができる形式へ変換するために、ditroff
+	      ファイル用フィルタをインストールすることができます。
+	      「<a class="link" href="printing-advanced.html#printing-advanced-convfilters" title="10.4.1.4. 変換フィルタ">
+		変換フィルタ</a>」
+	      で、これらに関するすべてについて説明します。
+	      プリンタの課金をする必要がある場合は、
+	      変換フィルタでも印字ページを数える作業が必要となります。
+
+	      変換フィルタは次の引数をとって起動されます。</p><div class="cmdsynopsis"><p><code class="command">filter-name</code>  -x <em class="replaceable"><code>pixel-width</code></em>   -y <em class="replaceable"><code>pixel-height</code></em>   -n <em class="replaceable"><code>login</code></em>   -h <em class="replaceable"><code>host</code></em>   <em class="replaceable"><code>acct-file</code></em> </p></div><p>ここで、<em class="replaceable"><code>pixel-width</code></em> は、
+	      <code class="literal">px</code> 項目で指定された値
+	      (デフォルトは 0)、
+	      <em class="replaceable"><code>pixel-height</code></em> は、
+	      <code class="literal">py</code> 項目で指定された値
+	      (デフォルトは 0) です。</p></li><li class="listitem"><p><span class="emphasis"><em>出力フィルタ</em></span>は、
+	      テキストフィルタが指定されて
+	      おらず、かつ、
+	      ヘッダページの出力が許可されている場合にのみ使われます。
+	      「<a class="link" href="printing-advanced.html#printing-advanced-of" title="10.4.1.5. 出力フィルタ">
+		出力フィルタ</a>」で、これらのことについて説明します。
+	      出力フィルタに対する引数は次の 2 つだけです。</p><div class="cmdsynopsis"><p><code class="command">filter-name</code>  -w <em class="replaceable"><code>width</code></em>   -l <em class="replaceable"><code>length</code></em> </p></div><p>ここで、<code class="option">-w</code> と <code class="option">-l</code> は、
+	      テキストフィルタの場合と同じです。</p></li></ul></div><p>フィルタは、次に示す終了状態をもってプログラムを
+	  <span class="emphasis"><em>exit</em></span> するべきです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">exit 0</span></dt><dd><p>フィルタがファイルを正常に印字した場合。</p></dd><dt><span class="term">exit 1</span></dt><dd><p>フィルタはファイルの印字に失敗したが、
+		<span class="application">LPD</span>
+		に再度ファイルの印字を試みて欲しい場合。
+		この終了状態で終了した場合、<span class="application">LPD</span>
+		はフィルタを再スタートします。</p></dd><dt><span class="term">exit 2</span></dt><dd><p>フィルタはファイルの印字に失敗し、かつ、<span class="application">LPD</span>
+		に再出力を試みて欲しくない場合。この場合、<span class="application">LPD</span>
+		はそのファイルを放棄します。</p></dd></dl></div><p>FreeBSD に付属するテキストフィルタ
+	  <code class="filename">/usr/libexec/lpr/lpf</code> は、FORM FEED
+	  文字が送られたときやプリンタ使用に対する課金をどのようにするかを決定するために、
+	  ページ幅やページ長の引数を利用します。また、
+	  課金用のエントリを作成するため、ログイン名、ホスト名、
+	  課金ファイル名の引数を利用します。</p><p>もし、フィルタの購入を検討しているならば、<span class="application">LPD</span>
+	  と互換性があるかどうかを確認してください。もしそうならば、
+	  上述の引数リストをサポートしていなければなりません。
+	  一般向けの使用のためにフィルタを作成する計画をしている場合は、
+	  同じ引数リストと終了コードをサポートしてください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-if-conversion"></a>10.4.1.2. プレインテキストのジョブを <span class="trademark">PostScript</span>® プリンタで印字する</h4></div></div></div><a id="idp86441936" class="indexterm"></a><p>コンピュータと <span class="trademark">PostScript</span>® (または、他の言語に対応した)
+	  プリンタをあなたしか使用しない場合は、プリンタにプレ
+	  インテキストを絶対に送らない、そして、
+	  プリンタにプレインテキストを送りたがっている
+	  様々なプログラムの機能を決して使わないことにしてください。そうすれば、
+	  この節に書かれたことに心を煩わせる必要はまったくなくなります。</p><p>しかし、<span class="trademark">PostScript</span>®
+	  とプレインテキストの両方のジョブをプリンタへ送りたいと思っている場合は、
+	  プリンタ設定についての要求が増えるでしょう。
+	  両者をプリンタへ送信するためには、
+	  到着したジョブがプレインテキストであるか
+	  <span class="trademark">PostScript</span>® であるかを検出するテキストフィルタが必要です。
+	  <span class="trademark">PostScript</span>® のジョブはすべて <code class="literal">%!</code>
+	  で始まらなければならないことになっています
+	  (他のプリンタ言語に関しては、
+	  プリンタのドキュメントをご覧ください)。
+	  ジョブの最初の 2 文字がこれならば、<span class="trademark">PostScript</span>® であることが分かります。
+	  したがって、
+	  ジョブのそれ以降の部分をプリンタに直接送ることができます
+	  (訳注: <span class="trademark">PostScript</span>® では、<span class="emphasis"><em>%</em></span>
+	  以降はコメントとして扱われるので、最初の <span class="emphasis"><em>%!</em></span> の行を読み捨てても問題はない)。
+	  最初の2文字が <span class="emphasis"><em>%!</em></span> でない場合は、
+	  フィルタはテキストを <span class="trademark">PostScript</span>® に変換し、
+	  その結果を使って印字をおこないます。</p><p>この作業をどうやってやればよいのでしょうか。</p><a id="idp86457552" class="indexterm"></a><p>シリアルポートにプリンタを接続した場合は、
+	  <code class="command">lprps</code> をインストールすることをお勧めします。
+	  <code class="command">lprps</code> は <span class="trademark">PostScript</span>® 用のフィルタで、
+	  プリンタとの双方向通信をおこないます。
+	  このフィルタでは、プリンタからの冗長な情報を得ることで、
+	  プリンタの状況を示すファイルが更新されていきます。
+	  したがって、ユーザや管理者は
+	  (<span class="errorname">トナー残量少</span>や
+	  <span class="errorname">紙詰まり</span>といった)
+	  プリンタの状況を正確に知ることができます。しかし、
+	  もっと重要なことは、<code class="command">psif</code>
+	  と呼ばれるプログラムが含まれているということです。
+	  このプログラムは、
+	  入力されたジョブがプレインテキストかどうかを検出し、
+	  これを <span class="trademark">PostScript</span>® に変換するために、<code class="command">textps</code>
+	  (<code class="command">lprps</code> に付属する別のプログラム)
+	  を呼び出します。そして、このジョブをプリンタに送るために、
+	  <code class="command">lprps</code> が使われます。</p><p><code class="command">lprps</code> は FreeBSD Ports Collection
+	  に含まれています (<a class="link" href="ports.html" title="第5章 アプリケーションのインストール - packages と ports">Ports Collection</a>
+          を参照してください)。
+	  紙のサイズに合わせて
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/print/lprps-a4/pkg-descr">print/lprps-a4</a> または
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/print/lprps-letter/pkg-descr">print/lprps-letter</a> port
+	  をインストールしてください。<code class="command">lprps</code>
+	  をインストールした後は、<code class="command">lprps</code>
+	  の一部である <code class="command">psif</code>
+	  プログラムのパス名を指定するだけです。Ports Collection から
+	  <code class="command">lprps</code> をインストールしたときは、
+	  <code class="filename">/etc/printcap</code> の中のシリアル接続した
+	  <span class="trademark">PostScript</span>® プリンタのエントリに対して、次を使ってください。
+	</p><pre class="programlisting">:if=<code class="filename">/usr/local/libexec/psif</code>:</pre><p><span class="application">LPD</span>
+	  にプリンタをリード・ライトモードでオープンさせるために、
+	  <code class="literal">rw</code> 項目も指定すべきです。</p><p>パラレルポート接続の <span class="trademark">PostScript</span>® プリンタの場合 (すなわち、
+	  <code class="command">lprps</code> が
+	  必要としているプリンタとの双方向通信ができない)、
+	  テキストフィルタとして次のシェルスクリプトを使うことができます。</p><pre class="programlisting">#!/bin/sh
+#
+#  psif - Print PostScript or plain text on a PostScript printer
+#  Script version; NOT the version that comes with lprps
+#  Installed in /usr/local/libexec/psif
+#
+
+IFS="" read -r first_line
+first_two_chars=`expr "$first_line" : '\(..\)'`
+
+if [ "$first_two_chars" = "%!" ]; then
+   #
+   #  PostScript job, print it.
+   #
+   echo "$first_line" &amp;&amp; cat &amp;&amp; printf "\004" &amp;&amp; exit 0
+   exit 2
+else
+   #
+   #  Plain text, convert it, then print it.
+   #
+   ( echo "$first_line"; cat ) | /usr/local/bin/textps &amp;&amp; printf "\004" &amp;&amp; exit 0
+   exit 2
+fi</pre><p>上記のスクリプトにおいて、<code class="command">textps</code>
+	  はプレインテキストから <span class="trademark">PostScript</span>®
+	  へ変換するために別にインストールしたプログラムです。
+	  テキストから <span class="trademark">PostScript</span>® へ変換するのには、
+	  お好みのどんなプログラムでも使うことができます。FreeBSD
+	  Ports Collection (<a class="link" href="ports.html" title="第5章 アプリケーションのインストール - packages と ports">Ports Collection</a>
+	  を参照してください) には、<code class="literal">a2ps</code>
+	  と呼ばれるテキストから
+	  <span class="trademark">PostScript</span>® に変換するプログラムが入っています。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-ps"></a>10.4.1.3. 非 <span class="trademark">PostScript</span>® プリンタによる <span class="trademark">PostScript</span>®
+	  のシミュレート</h4></div></div></div><a id="idp86480848" class="indexterm"></a><a id="idp86482000" class="indexterm"></a><p><span class="trademark">PostScript</span>®
+	  は質の高い組版と印字をおこなうための
+	  <span class="emphasis"><em>事実上の</em></span>標準です。しかしながら、<span class="trademark">PostScript</span>®
+	  は、<span class="emphasis"><em>高価な</em></span>標準です。ありがたいことに、
+	  Aladdin Enterprises から
+	  <span class="application">Ghostscript</span> と呼ばれる、
+	  <span class="trademark">PostScript</span>® 互換の動作をするフリーのプログラムが出されていて、
+	  FreeBSD で動きます。
+	  <span class="application">Ghostscript</span> はほとんどの <span class="trademark">PostScript</span>® ファイルを読むことができ、
+	  これらの各ページを多くのブランドの非 <span class="trademark">PostScript</span>® プリンタを含む
+	  様々なデバイス用に変換することができます。
+	  <span class="application">Ghostscript</span> をインストールし、
+	  プリンタ用の特別なテキストフィルタを使うことによって、
+	  非 <span class="trademark">PostScript</span>® プリンタをあたかも本物の <span class="trademark">PostScript</span>®
+	  プリンタであるかのように動作させることができます。</p><p><span class="application">Ghostscript</span> は FreeBSD Ports Collection に入っています。
+	  複数のバージョンがありますが、最も良く使われているバージョンは <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/print/ghostscript-gpl/pkg-descr">print/ghostscript-gpl</a> です。</p><p><span class="trademark">PostScript</span>® プリンタをシミュレートさせる場合は、
+	  テキストフィルタに <span class="trademark">PostScript</span>®
+	  ファイルを印字しようとしているかどうかを検出させます。
+	  <span class="trademark">PostScript</span>® ファイルでない場合は、
+	  フィルタはそのファイルを直接プリンタに送ります
+	  (訳注: テキストファイルを直接印字できない場合は、もちろん、
+	  変換フィルタを通す必要があります)。<span class="trademark">PostScript</span>® の場合は、
+	  まず、<span class="application">Ghostscript</span> を使い、
+	  ファイルをそのプリンタが理解できる形式へ変換します。</p><p>次の例のスクリプトは、Hewlett Packard DeskJet 500
+	  プリンタ用 のテキストフィルタです。
+	  他のプリンタで用いるときは、<code class="option">-sDEVICE</code>
+	  引数を <code class="command">gs</code> (<span class="application">Ghostscript</span>)
+	  コマンドに変えてください (<code class="command">gs -h</code>
+	  と入力すると、現在インストールされている <span class="application">Ghostscript</span>
+	  でサポートされているデバイスのリストが得られます)。</p><pre class="programlisting">#!/bin/sh
+#
+#  ifhp - Print Ghostscript-simulated PostScript on a DeskJet 500
+#  Installed in /usr/local/libexec/ifhp
+
+#
+#  Treat LF as CR+LF (to avoid the "staircase effect" on HP/PCL
+#  printers):
+#
+printf "\033&amp;k2G" || exit 2
+
+#
+#  Read first two characters of the file
+#
+IFS="" read -r first_line
+first_two_chars=`expr "$first_line" : '\(..\)'`
+
+if [ "$first_two_chars" = "%!" ]; then
+    #
+    #  It is PostScript; use Ghostscript to scan-convert and print it.
+    #
+    /usr/local/bin/gs -dSAFER -dNOPAUSE -q -sDEVICE=djet500 \
+      -sOutputFile=- - &amp;&amp; exit 0
+
+else
+    #
+    #  Plain text or HP/PCL, so just print it directly; print a form feed
+    #  at the end to eject the last page.
+    #
+    echo "$first_line" &amp;&amp; cat &amp;&amp; printf "\033&amp;l0H" &amp;&amp;
+    exit 0
+fi
+
+exit 2</pre><p>最後に、<code class="literal">if</code> 項目を通して、<span class="application">LPD</span>
+	  にこのフィルタを教えてやる必要があります。</p><pre class="programlisting">:if=<code class="filename">/usr/local/libexec/ifhp</code>:</pre><p>これでおしまいです。<code class="command">lpr plain.text</code>
+	  とか <code class="command">lpr whatever.ps</code>
+	  と入力してみましょう。どちらも正常に印字されるはずです。</p><div xmlns="" class="note"><h3 class="admontitle">訳注: </h3><p xmlns="http://www.w3.org/1999/xhtml">
+	    日本語を印字する場合は、
+	    日本語対応の Ghostscript が必要です。日本語対応版の
+	    Ghostscript も Ports Collection に入っています。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-convfilters"></a>10.4.1.4. 変換フィルタ</h4></div></div></div><p>「<a class="link" href="printing-intro-setup.html#printing-simple" title="10.3.1. プリンタ設定導入編">プリンタ設定導入編</a>」
+	  に書かれた簡単な設定が完了したら、最初に、
+	  やってみたいと思うことは、多分 (プレイン ASCII テキストに加えて)
+	  好みのファイル形式のための変換フィルタをインストールすることでしょう。
+	  </p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86521680"></a>10.4.1.4.1. なぜ、変換フィルタをインストールするのか?</h5></div></div></div><a id="idp86522320" class="indexterm"></a><p>変換フィルタによって、
+	    様々な種類のファイルを印字することが簡単になります。たとえば、<span class="application">TeX</span>
+	    組版システムでたくさんの仕事をしたと仮定しましょう。
+	    そして、<span class="trademark">PostScript</span>® プリンタが接続 されているとします。
+	    すると、<span class="application">TeX</span> で DVI ファイルを作成する度に、DVI
+	    ファイルを印字するために、
+	    これを <span class="trademark">PostScript</span>® ファイルに変換する必要があります。
+	    このコマンドは次のようになるでしょう。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>dvips seaweed-analysis.dvi</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>lpr seaweed-analysis.ps</code></strong></pre><p>DVI ファイル用の変換フィルタがインストールしてあると、
+	    <span class="application">LPD</span> に変換を肩代わりさせることで毎回毎回
+	    おこなわなければならなかった面倒な変換作業を省くことができます。
+	    つまり、DVI を生成したら、
+	    次のようなコマンドを入力するだけで、これが印字されます。
+	  </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>lpr -d seaweed-analysis.dvi</code></strong></pre><p><span class="application">LPD</span> に DVI
+	    ファイルの変換をさせるためには、
+	    <code class="option">-d</code> オプション を指定します。
+	    変換オプションのリストは「<a class="link" href="printing-using.html#printing-lpr-options-format" title="10.5.4.1. 整形と変換に関するオプション">
+	      整形と変換に関するオプション</a>」
+	    に載せてあります。</p><p>変化のオプションのそれぞれをプリンタに
+	    サポートさせるためには、
+	    <span class="emphasis"><em>変換フィルタ</em></span>をインストールし、
+	    そのパス名を <code class="filename">/etc/printcap</code>
+	    の中で指定しなくてはなりません。変換フィルタは、
+	    プレインテキストを印字する代わりに、フィルタはファイルを
+	    プリンタが理解できる形式に変換するところを除けば、
+	    「プリンタの簡単な設定」で説明したテキストファイル
+	    (「<a class="link" href="printing-intro-setup.html#printing-textfilter" title="10.3.1.5.6. テキストフィルタのインストール">
+	      テキストフィルタのインストール</a>」 を見て下さい)
+	    に似ています。</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86532560"></a>10.4.1.4.2. どの変換フィルタをインストールすべきか?</h5></div></div></div><p>使いたいと思う変換フィルタをインストールすべきです。
+	    DVI のデータを頻繁に印字するならば、DVI 変換フィルタ
+	    をインストールするのが適切でしょう。印字しなくてはなら
+	    ない troff を大量に抱えている場合は、多分、
+	    troff フィルタが欲しくなるはずです。</p><p>次の表は、<span class="application">LPD</span> で動作するフィルタと、
+	    <code class="filename">/etc/printcap</code>
+	    ファイルでのエントリする項目、そして、
+	    <code class="command">lpr</code>
+	    コマンドで呼び出す方法をまとめたものです。</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /><col /></colgroup><thead><tr><th>ファイル形式</th><th><code class="filename">/etc/printcap</code>項目</th><th><code class="command">lpr</code> オプション</th></tr></thead><tbody><tr><td>cifplot</td><td><code class="literal">cf</code></td><td><code class="option">-c</code></td></tr><tr><td>DVI</td><td><code class="literal">df</code></td><td><code class="option">-d</code></td></tr><tr><td>plot</td><td><code class="literal">gf</code></td><td><code class="option">-g</code></td></tr><tr><td>ditroff</td><td><code class="literal">nf</code></td><td><code class="option">-n</code></td></tr><tr><td>FORTRAN text</td><td><code class="literal">rf</code></td><td><code class="option">-f</code></td></tr><tr><td>troff</td><td><code class="literal">tf</code></td><td><code class="option">-f</code></td></tr><tr><td>raster</td><td><code class="literal">vf</code></td><td><code class="option">-v</code></td></tr><tr><td>プレインテキスト</td><td><code class="literal">if</code></td><td>なし、<code class="option">-p</code>、または
+		    <code class="option">-l</code></td></tr></tbody></table></div><p>先の例のように、<code class="command">lpr -d</code>
+	    を使うためには、出力先のプリンタの
+	    <code class="filename">/etc/printcap</code> 内のエントリで、
+	    <code class="literal">df</code>
+	    項目が必要であることが分かります。</p><a id="idp86572496" class="indexterm"></a><p>反論はあるかも知れませんが、FORTRAN テキストや plot
+	    のような形式は、多分、廃れてていくでしょう。
+	    あなたのサイトで、自前のフィルタをインストールするだけで、
+	    プリントオプションのいくつか、あるいは、
+	    全部に新しい意味を与えることができます。たとえば、
+	    Printerleaf ファイル (Interleaf
+	    デスクトップパブリッシングプログラムによるファイル)
+	    を直接印字したいとします。
+	    そして、Printerleaf 用の変換フィルタを
+	    <code class="literal">gf</code> 項目で
+	    指定したパスにインストールすれば、<code class="command">lpr
+	      -g</code> の意味は <span class="quote">「<span class="quote">Printerleaf
+	    ファイルを印字する</span>」</span> 意味だとユーザに教えることができます。
+	    </p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86574672"></a>10.4.1.4.3. 変換フィルタのインストール</h5></div></div></div><p>変換フィルタは FreeBSD
+	    の基本システムのインストールとは別にインストールするプログラムなので、
+	    変換フィルタは、
+	    <code class="filename">/usr/local</code>
+	    ディレクトリの下に置くべきでしょう。
+	    フィルタは <span class="application">LPD</span> だけが実行する特別なプログラム、
+	    すなわち、一般ユーザが実行する必要すらないプログラムなので、
+	    <code class="filename">/usr/local/libexec</code>
+	    ディレクトリに置くのが普通です。</p><p>変換フィルタを使用可能にするためには、
+	    <code class="filename">/etc/printcap</code>
+	    の目的のプリンタの適切な項目に
+	    フィルタがあるパス名を指定します。</p><p>DVI 変換フィルタをプリンタ <code class="literal">bamboo</code>
+	    のエントリに加えてみましょう。プリンタ
+	    <code class="literal">bamboo</code> の <code class="literal">df</code>
+	    項目を新たに加えた <code class="filename">/etc/printcap</code>
+	    ファイルの例を以下に再掲します。</p><pre class="programlisting">#
+#  /etc/printcap for host rose - added df filter for bamboo
+#
+rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:sd=<code class="filename">/var/spool/lpd/rattan</code>:\
+        :lp=<code class="filename">/dev/lpt0</code>:\
+        :if=<code class="filename">/usr/local/libexec/if-simple</code>:
+
+bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :sh:sd=<code class="filename">/var/spool/lpd/bamboo</code>:\
+        :lp=<code class="filename">/dev/ttyu5</code>:ms#-parenb cs8 clocal crtscts:rw:\
+        :if=<code class="filename">/usr/local/libexec/psif</code>:\
+        :df=<code class="filename">/usr/local/libexec/psdf</code>:</pre><p>DVI フィルタは
+	    <code class="filename">/usr/local/libexec/psdf</code> という
+	    名前のシェルスクリプトです。
+	    このスクリプトは次のようになっています。</p><pre class="programlisting">#!/bin/sh
+#
+#  psdf - DVI to PostScript printer filter
+#  Installed in /usr/local/libexec/psdf
+#
+#  Invoked by lpd when user runs lpr -d
+#
+exec /usr/local/bin/dvips -f | /usr/local/libexec/lprps "$@"</pre><p>このスクリプトでは、<code class="command">dvips</code>
+	    をフィルタモード (引数 <code class="option">-f</code>) で、
+	    標準入力上で起動しています。標準入力は印字するジョブです。
+	    それから、<span class="trademark">PostScript</span>® プリンタ用フィルタ
+	    <code class="command">lprps</code> (これについては「<a class="link" href="printing-advanced.html#printing-advanced-if-conversion" title="10.4.1.2. プレインテキストのジョブを PostScript® プリンタで印字する">
+	      プレインテキストのジョブを <span class="trademark">PostScript</span>®
+	      プリンタで印字する</a>」 を参照してください) を
+	    <span class="application">LPD</span> に与えられた引数を付けて起動します。
+	    <code class="command">lprps</code>
+	    はこれらの引数を印字されたページ分の課金をおこなうために使われます。
+	    </p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86588240"></a>10.4.1.4.4. 変換フィルタのその他の例</h5></div></div></div><p>変換フィルタのインストールには決まったステップがないので、
+	    この節では、例をもっと挙げることにします。
+	     これを自分でフィルタを作る際のガイドにしてください。
+	    適当な例があったら、それをそのまま使ってください。</p><p>次のスクリプト例は、Hewlett Packard LaserJet III-Si
+	    のための、raster (ええと・・実は、GIF ファイル)
+	    用の変換フィルタです。</p><pre class="programlisting">#!/bin/sh
+#
+#  hpvf - Convert GIF files into HP/PCL, then print
+#  Installed in /usr/local/libexec/hpvf
+
+PATH=/usr/X11R6/bin:$PATH; export PATH
+
+giftopnm | ppmtopgm | pgmtopbm | pbmtolj -resolution 300 \
+    &amp;&amp; exit 0 \
+    || exit 2</pre><p>ここでは、GIF ファイルから PNM (portable anymap)
+	    形式に変換し、次に PGM (portable graymap) 形式に変換してから、
+	    LaserJet/PCL-互換データに変換しています。</p><p>上記のフィルタを使うプリンタのためのエントリを付け加えた
+	    <code class="filename">/etc/printcap</code>
+	    ファイルは次のようになります。</p><pre class="programlisting">#
+#  /etc/printcap for host orchid
+#
+teak|hp|laserjet|Hewlett Packard LaserJet 3Si:\
+        :lp=<code class="filename">/dev/lpt0</code>:sh:sd=<code class="filename">/var/spool/lpd/teak</code>:mx#0:\
+        :if=<code class="filename">/usr/local/libexec/hpif</code>:\
+        :vf=<code class="filename">/usr/local/libexec/hpvf</code>:</pre><p>次のスクリプトは、<span class="trademark">PostScript</span>® プリンタ
+	    <code class="literal">bamboo</code> のための groff 組版システムの
+	    troff データのための変換フィルタです。</p><pre class="programlisting">#!/bin/sh
+#
+#  pstf - Convert groff's troff data into PS, then print.
+#  Installed in /usr/local/libexec/pstf
+#
+exec grops | /usr/local/libexec/lprps "$@"</pre><p>上記のスクリプトではプリンタとの通信をおこなうため、
+	    <code class="command">lprps</code> をまた利用しています。
+	    プリンタがパラレルポートに接続されている場合は、代わりに、
+	    次のスクリプトを使うかもしれません。</p><pre class="programlisting">#!/bin/sh
+#
+#  pstf - Convert groff's troff data into PS, then print.
+#  Installed in /usr/local/libexec/pstf
+#
+exec grops</pre><p>これで完成しました。次に、フィルタを使用可能にするため
+	    に <code class="filename">/etc/printcap</code>
+	    に加える必要があるエントリを示します。</p><pre class="programlisting">:tf=<code class="filename">/usr/local/libexec/pstf</code>:</pre><p>次の例をみたら、FORTRAN のベテランは赤面するかもしれません。
+	    この FORTRAN テキストフィルタは、
+	    プレインテキストを直接印字できるすべてのプリンタで利用できます。
+	    このフィルタをプリンタ <code class="literal">teak</code>
+	    にインストールすることにしましょう。</p><pre class="programlisting">#!/bin/sh
+#
+# hprf - FORTRAN text filter for LaserJet 3si:
+# Installed in /usr/local/libexec/hprf
+#
+
+printf "\033&amp;k2G" &amp;&amp; fpr &amp;&amp; printf "\033&amp;l0H" &amp;&amp; exit 0
+exit 2</pre><p>そして、このフィルタを使用可能にするため、以下の行を
+	    <code class="filename">/etc/printcap</code> のプリンタ
+	    <code class="literal">teak</code> のエントリに加えます。</p><pre class="programlisting">:rf=<code class="filename">/usr/local/libexec/hprf</code>:</pre><p>これが最後の、そして、若干複雑な例です。前に紹介した
+	    LaserJet プリンタ <code class="literal">teak</code> に、DVI
+	    フィルタを加える ことにしましょう。最初に、
+	    簡単な部分をおこないます。すなわち、DVI フィルタの位置を
+	    <code class="filename">/etc/printcap</code> に書き加えます。
+	  </p><pre class="programlisting">:df=<code class="filename">/usr/local/libexec/hpdf</code>:</pre><p>さて、難しい部分であるフィルタの作成をおこないます。
+	    このために、DVI から LaserJet/PCL
+	    への変換プログラムが必要です。FreeBSD の Ports Collection
+            (<a class="link" href="ports.html" title="第5章 アプリケーションのインストール - packages と ports">Ports Collection</a>
+	    を参照してください) には、それがあります。
+	    <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/dvi2xx/pkg-descr">dvi2xx</a> というのがその port の名前です。
+	    これをインストールすると、必要なプログラム
+	    <code class="command">dvilj2p</code> が使えます。このプログラムは
+	    DVI を LaserJet IIp、LaserJet III、そして LaserJet 2000
+	    の互換コードへ変換してくれます。</p><p><code class="command">dvilj2p</code> はフィルタ
+	    <code class="command">hpdf</code> を極めて複雑にしています。
+	    なぜなら、<code class="command">dvilj2p</code>
+	    は標準入力からデータを読み込むことができないからです。
+	    このプログラムを働かせるためには、ファイル名が必要です。
+	    もっと悪いことに、ファイル名は <code class="filename">.dvi</code>
+	    で終わっている必要があり、標準入力の代わりに、
+	    <code class="filename">/dev/fd/0</code> を使うのは問題があります。
+	    この問題は、(<code class="filename">.dvi</code> で終わる)
+	    一時的なファイル名から<code class="filename">/dev/fd/0</code> に
+	    (シンボリックな) リンクを張る
+	    ことで回避することができます。これで、
+	    <code class="command">dvilj2p</code>
+	    に強制的に標準入力からデータを読み込ませることができます。</p><p>もう1つの問題は、一時的なリンクを張るために
+	    <code class="filename">/tmp</code>
+	    ディレクトリを使うことができないという事実です。
+	    シンボリックリンクはユーザ、グループが <code class="systemitem">bin</code>
+	    であるユーザに所有されています。フィルタはユーザ
+	    <code class="systemitem">daemon</code> として起動します。そして、
+	    <code class="filename">/tmp</code>
+	    ディレクトリはスティッキービットが立っています。
+	    フィルタはリンクを作ることができます。しかし、
+	    リンクは別のユーザに所有されているため、
+	    作業が終了したとき、このリンクを削除することができません。</p><p>その代わりに、シンボリックリンクは現在の作業ディレクトリ、
+	    すなわち、スプーリングディレクトリ
+	    (<code class="filename">/etc/printcap</code> の
+	    <code class="literal">sd</code> 項目で指定する) に作ることにします。
+	    フィルタが作業するにはここの場所は完璧な場所で、なぜなら、
+	    特に、スプーリングディレクトリのディ スクの空き容量は
+	    (ときどき) <code class="filename">/tmp</code>
+	    ディレクトリよりもたくさんあるからです。</p><p>以下に示すのが最後のフィルタです。</p><pre class="programlisting">#!/bin/sh
+#
+#  hpdf - Print DVI data on HP/PCL printer
+#  Installed in /usr/local/libexec/hpdf
+
+PATH=/usr/local/bin:$PATH; export PATH
+
+#
+#  Define a function to clean up our temporary files.  These exist
+#  in the current directory, which will be the spooling directory
+#  for the printer.
+#
+cleanup() {
+   rm -f hpdf$$.dvi
+}
+
+#
+#  Define a function to handle fatal errors: print the given message
+#  and exit 2.  Exiting with 2 tells LPD to do not try to reprint the
+#  job.
+#
+fatal() {
+    echo "$@" 1&gt;&amp;2
+    cleanup
+    exit 2
+}
+
+#
+#  If user removes the job, LPD will send SIGINT, so trap SIGINT
+#  (and a few other signals) to clean up after ourselves.
+#
+trap cleanup 1 2 15
+
+#
+#  Make sure we are not colliding with any existing files.
+#
+cleanup
+
+#
+#  Link the DVI input file to standard input (the file to print).
+#
+ln -s /dev/fd/0 hpdf$$.dvi || fatal "Cannot symlink /dev/fd/0"
+
+#
+#  Make LF = CR+LF
+#
+printf "\033&amp;k2G" || fatal "Cannot initialize printer"
+
+#
+#  Convert and print.  Return value from dvilj2p does not seem to be
+#  reliable, so we ignore it.
+
+#
+dvilj2p -M1 -q -e- dfhp$$.dvi
+
+#
+#  Clean up and exit
+#
+cleanup
+exit 0</pre></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-autoconv"></a>10.4.1.4.5. 自動変換: その他の変換フィルタ</h5></div></div></div><p>ここまでに述べてきたフィルタによって、
+	    印字環境の能率が上がったことと思います。しかし、
+	    これはどのフィルタを使うかを (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lpr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lpr</span>(1)</span></a> のコマンドライン上で)
+	    ユーザが指定しなくてはならないという代価を支払って実現されています。
+	    コンピュータの事情にあまり詳しくないユーザにとって、
+	    フィルタのオプションを指定させられるということは
+	    いらいらさせられるものになるでしょう。更に悪いことに、
+	    間違ったフィルタオプションを指定されると、
+	    間違った形式のファイルがそのフィルタに適用されることになり、
+	    その結果、何百枚もの紙を吐き出すことになるかもしれません。</p><p>そのような結果になるならば、
+	    変換フィルタをインストールするよりもむしろ、
+	    テキストフィルタ (これがデフォルトフィルタなので)
+	    に印字するよう要求されたファイルの形式を検出させ、自動的に、
+	    適切な変換フィルタを起動するようにしたいと思うかもしれません。
+	    ここでは <code class="command">file</code>
+	    コマンドのようなツールを役立たせることができます。
+	    もちろん、<span class="emphasis"><em>いくつかの</em></span>
+	    ファイル形式の違いを見分けることは難しいことでしょう。
+	    そして、もちろん、それらのファイルに対しては、
+	    変換フィルタを提供するだけで済ますこともできるのです。</p><a id="idp86624208" class="indexterm"></a><a id="idp86624720" class="indexterm"></a><p>FreeBSD Ports Collection には、<code class="command">apsfilter</code>
+	    (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/print/apsfilter/pkg-descr">print/apsfilter</a>)
+	    と呼ばれる自動変換をおこなうテキストフィルタがあります。
+	    このフィルタは プレインテキスト、<span class="trademark">PostScript</span>®, DVI
+	    など、ほとんどすべてのファイル形式を検出し、適当な変換をおこなった後、
+	    データを印字することができます。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-of"></a>10.4.1.5. 出力フィルタ</h4></div></div></div><p><span class="application">LPD</span> スプーリングシステムでは、
+	  ここまでにまだ取り上げていないフィルタ形式、
+	  出力フィルタをサポートしています。出力フィルタは、
+	  テキストフィルタのように、
+	  プレインテキストのみを印字するために意図されたものですが、
+	  非常に簡単化されています。テキストフィルタを用いずに、
+	  出力フィルタを使っている場合は、次のようになります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="application">LPD</span>
+	      はジョブ中の各ファイルに一度ではなく、
+	      ジョブ全体に対して一度だけ出力フィルタを起動します。</p></li><li class="listitem"><p><span class="application">LPD</span> は出力フィルタに対し、
+	      ジョブ中のファイルの先頭や末尾を特定するための対策を
+	      一切おこなっていません。</p></li><li class="listitem"><p><span class="application">LPD</span>
+	      はユーザのログイン名やホスト名をフィルタに渡しません。
+	      したがって、課金の処理をおこなうことは考えていません。
+	      実際、出力フィルタには、以下2つの引数しか与えられません。</p><div class="cmdsynopsis"><p><code class="command">filter-name</code>  -w<em class="replaceable"><code>width</code></em>   -l<em class="replaceable"><code>length</code></em> </p></div><p>ここで、<em class="replaceable"><code>width</code></em>
+	      は対象となるプリンタの <code class="literal">pw</code> 項目、
+	      <em class="replaceable"><code>length</code></em> は
+	      <code class="literal">pl</code> 項目に指定された数です。</p></li></ul></div><p>出力フィルタの簡便さに誘惑されてはいけません。もし、
+	  ジョブ中のそれぞれのファイルに別のページ番号を付加しようとしても、
+	  出力フィルタは<span class="emphasis"><em>うまく動作しないでしょう</em></span>。
+	  そのような動作を期待しているならば、
+	  (入力フィルタとしても知られている) テキストフィルタを使ってください。
+	  詳しくは、「<a class="link" href="printing-intro-setup.html#printing-textfilter" title="10.3.1.5.6. テキストフィルタのインストール">
+	    テキストフィルタのインストール</a>」をご覧ください。
+	  さらに、出力フィルタは、実のところ、
+	  <span class="emphasis"><em>もっと複雑</em></span>になっています。まず、
+	  特殊なフラグ文字を検出するために、
+	  フィルタに送られてくるバイトストリームを検査する必要があります。
+	  また、<span class="application">LPD</span> に代わって、
+	  自分自身にシグナルを送らなければなりません。</p><p>しかしながら、ヘッダページの印字をおこないたくて、
+	  エスケープシーケンスやヘッダページを印字できるようにするその他の初期化文字列を送信する必要がある場合は、
+	  出力ファイルが<span class="emphasis"><em>必要</em></span>です。
+	  (しかし、
+	  ヘッダページを要求したユーザに対して課金しようとするのもまた無駄なことです。
+	  <span class="application">LPD</span>
+	  は出力フィルタにユーザやホストの情報を渡しません)。</p><p>1 台のプリンタに対し、<span class="application">LPD</span>
+	  では出力フィルタとテキストやその他のフィルタを両方使うことができます。
+	  このような場合、<span class="application">LPD</span> はヘッダページ (「<a class="link" href="printing-advanced.html#printing-advanced-header-pages" title="10.4.2. ヘッダページ">
+	    ヘッダページ</a>」 を参照してください)
+	  だけを印字させるために、出力フィルタを起動させます。
+	  それから <span class="application">LPD</span> では、出力フィルタに 2 バイトの文字
+	  (ASCII 031 の次に ASCII 001) を送ることで、
+	  出力フィルタが<span class="emphasis"><em>自分自身を停止する</em></span>ことを期待しています。
+	  2 バイト (031, 001) が出力フィルタに送られたとき、
+	  出力フィルタは自分自身にシグナル <code class="literal">SIGSTOP</code>
+	  を送ることによって停止するはずです。
+	  <span class="application">LPD</span> がその他のフィルタを動かし終わると、
+	  出力フィルタにシグナル <code class="literal">SIGCONT</code>
+	  を送って、出力フィルタを再起動します。</p><p>出力フィルタがあり、
+	  テキストフィルタが<span class="emphasis"><em>ない</em></span>場合、
+	  <span class="application">LPD</span>
+	  はプレインテキストジョブを扱う場合に、
+	  出力フィルタを使います。前述したように、出力フィルタでは、
+	  ジョブ中の各ファイルの間に
+	  FORM FEED 文字や紙を送る他の文字を入れることはしません。
+	  この動作は多分、
+	  あなたが求めているものとは<span class="emphasis"><em>異なっている</em></span>でしょう。
+	  ほとんどの場合において、テキストフィルタが必要なはずです。</p><p>プログラム <code class="command">lpf</code> は、
+	  テキストフィルタの項で既に紹介しましたが、
+	  出力フィルタとしても動作させることができます。もし、
+	  簡便で極悪な出力フィルタが必要で、かつ、
+	  バイトストリームを検査したりシグナルを送るコードを書きたくないときには、
+	  <code class="command">lpf</code> をお試しください。
+	  あるいは、プリントが要求する初期化コードを送るために、
+	  <code class="command">lpf</code>
+	  をシェルスクリプトに包んで使うこともできます。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-lpf"></a>10.4.1.6. テキストフィルタ <code class="command">lpf</code></h4></div></div></div><p>プログラム <code class="filename">/usr/libexec/lpr/lpf</code> は、
+	  FreeBSD の バイナリ配布に付属しているテキストフィルタ
+	  (入力フィルタ) で、出力を字下げしたり (<code class="command">lpr
+	    -i</code> でジョブが入力さ れたとき)、
+	  文字を未処理のままプリンタに送ったり (<code class="command">lpr
+	    -l</code> でジョブが入力されたとき)、
+	  ジョブ中のバックスペースやタブの印字位置を調節したり、
+	  印字したページに対して課金したりすることができます。また、
+	  このフィルタは出力フィルタとしても動作させることができます。</p><p><code class="command">lpf</code>
+	  フィルタは多くの印字環境において使用することに適しています。
+	  このフィルタには、プリンタに初期化文字列を送る機能はありませんが、
+	  必要とされる初期化をおこない、それから
+	  <code class="command">lpf</code>
+	  を実行させるためのシェルスクリプトを作成するのはたやすいことです。
+	  </p><a id="idp86717136" class="indexterm"></a><a id="idp86717648" class="indexterm"></a><p><code class="command">lpf</code> に対して、
+	  印字ページへの課金を正確におこなわせるためには、
+	  <code class="filename">/etc/printcap</code> ファイルの中の
+	  <code class="literal">pw</code> と <code class="literal">pl</code>
+	  の項目に正確な値を入れておく必要があります。これらの値は、
+	  どのくらいの量のテキストがページにフィットするか、また、
+	  ユーザのジョブが何ページあるのかを調べるために使われます。
+	  プリンタの課金についての詳しい情報については、「<a class="link" href="printing-advanced.html#printing-advanced-acct" title="10.4.5. プリンタの利用に対する課金">
+	    プリンタの利用に対する課金</a>」をご覧ください。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-header-pages"></a>10.4.2. ヘッダページ</h3></div></div></div><p>あなたが管理するシステムのユーザが
+	<span class="emphasis"><em>たくさん</em></span>おり、
+	ユーザ全員が様々なプリンタを使用する場合、多分、
+	必要悪である<span class="emphasis"><em>ヘッダページ</em></span>を
+	印字させることを検討したいと思うかもしれません。</p><a id="idp86723280" class="indexterm"></a><a id="idp86724432" class="indexterm"></a><p>ヘッダページは、<span class="emphasis"><em>バナー</em></span> とか
+	<span class="emphasis"><em>バーストページ</em></span> としても知られていますが、
+	出力されたジョブが誰によるものなのかを特定させる働きがあります。
+	印字結果の山の中において、
+	ユーザのジョブによって印字された本物のドキュメント部分よりも際立たせるために、
+	ヘッダページは、通常、多分、縁が装飾されている大きな太文字で印字されます。
+	ヘッダページにより、
+	ユーザは自分が出したジョブがどこにあるのかをすばやく見つけることができます。
+	ヘッダページの欠点は、明らかに、すべてのジョブに対して、
+	紙が 1 枚余分に印字されるということです。
+	この紙の有効期間は短く、2 〜 3 分も続きません。最終的に、
+	これらの紙は再利用紙入れの中かくずの山に入れられることでしょう
+	(ヘッダページはジョブ中の各ファイル毎に印字されるのではなく、
+	ジョブ毎に印字されるということに注意してください。したがって、
+	紙の消費はそれほどひどくはないかもしれません)。</p><p><span class="emphasis"><em>もし</em></span>、
+	プリンタがプレインテキストを直接印字できるならば、<span class="application">LPD</span>
+	システムは印字物に対して自動的にヘッダページを付けることができます。
+	<span class="trademark">PostScript</span>® プリンタを使っている場合は、
+	ヘッダページを生成する外部プログラムが必要になります。これについては、
+	「<a class="link" href="printing-advanced.html#printing-advanced-header-pages-ps" title="10.4.2.4. PostScript® プリンタでのヘッダページ"><span class="trademark">PostScript</span>®
+	  プリンタでのヘッダページ</a>」をご覧ください。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-header-pages-enabling"></a>10.4.2.1. ヘッダページの印字を許可する</h4></div></div></div><p>「<a class="link" href="printing-intro-setup.html#printing-simple" title="10.3.1. プリンタ設定導入編">プリンタ設定導入編
+	  </a>」節では、<code class="filename">/etc/printcap</code>
+	  ファイルの <code class="literal">sh</code> (``suppress header'' :
+	  <span class="quote">「<span class="quote">ヘッダを供給しない</span>」</span> という意味) を指定して、
+	  ヘッダページの印字を止めていました。
+	  プリンタでのヘッダページの印字を許可するには、
+	  <code class="literal">sh</code> 項目を取り除くだけでよいのです。</p><p>とても簡単そうに見えるけど、本当かな?</p><p>それは本当です。
+	  プリンタに初期化文字列を送るための
+	  出力フィルタを用意しなくてはならないかもしれません。次に、Hewlett
+	  Packard PCL 互換プリンタの例を挙げます。</p><pre class="programlisting">#!/bin/sh
+#
+#  hpof - Output filter for Hewlett Packard PCL-compatible printers
+#  Installed in /usr/local/libexec/hpof
+
+
+printf "\033&amp;k2G" || exit 2
+exec /usr/libexec/lpr/lpf</pre><p><code class="literal">of</code>
+	  項目に出力フィルタのパス名を指定してください。
+	  詳細については、「<a class="link" href="printing-advanced.html#printing-advanced-of" title="10.4.1.5. 出力フィルタ">出力フィルタ</a>」節
+	  をご覧ください。</p><p>次に、以前紹介したプリンタ <code class="literal">teak</code>
+	  のための <code class="filename">/etc/printcap</code>
+	  ファイルの例を示します。ここでは、
+	  ヘッダページの印字を許可し、上記の出力フィルタを追加しました。
+	</p><pre class="programlisting">#
+#  /etc/printcap for host orchid
+#
+teak|hp|laserjet|Hewlett Packard LaserJet 3Si:\
+        :lp=<code class="filename">/dev/lpt0</code>:sd=<code class="filename">/var/spool/lpd/teak</code>:mx#0:\
+        :if=<code class="filename">/usr/local/libexec/hpif</code>:\
+        :vf=<code class="filename">/usr/local/libexec/hpvf</code>:\
+        :of=<code class="filename">/usr/local/libexec/hpof</code>:</pre><p>さて、ユーザが <code class="literal">teak</code>
+	  からジョブを印字させたとき、
+	  それぞれのジョブ毎にヘッダページが印字されます。
+	  もし、ユーザが印字物を探すのに時間を費やしたいと思うなら、
+	  <code class="command">lpr -h</code> によってジョブを入力することで、
+	  ヘッダページの印字を止めることができます。
+	  これ以外の
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lpr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lpr</span>(1)</span></a> のオプションについては、
+	  「<a class="link" href="printing-using.html#printing-lpr-options-misc" title="10.5.4.3. ヘッダページ用オプション">
+	    ヘッダページ用オプション</a>」節をご覧ください。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="application">LPD</span> では、ヘッダページの最後に、
+	    FORM FEED 文字が印字されます。
+	    プリンタに紙排出をさせるために、別な文字、
+	    もしくは、別な文字列が利用されている場合は、
+	    <code class="filename">/etc/printcap</code> 中の
+	    <code class="literal">ff</code> 項目で指定することができます。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-header-pages-controlling"></a>10.4.2.2. ヘッダページを制御する</h4></div></div></div><p>ヘッダページの印字が許可されていると、<span class="application">LPD</span> は
+	  <span class="emphasis"><em>長いヘッダ</em></span>を作ります。これには、
+	  紙全面に大きな文字でユーザ名、ホスト名、
+	  ジョブ名が書かれています。次に、このヘッダページの例を示
+	  します (<code class="systemitem">kelly</code> がジョブ名
+	  <span class="quote">「<span class="quote">outline</span>」</span> を <code class="systemitem">rose</code>
+	  というホストから印字 された場合)。</p><pre class="screen">      k                   ll       ll
+      k                    l        l
+      k                    l        l
+      k   k     eeee       l        l     y    y
+      k  k     e    e      l        l     y    y
+      k k      eeeeee      l        l     y    y
+      kk k     e           l        l     y    y
+      k   k    e    e      l        l     y   yy
+      k    k    eeee      lll      lll     yyy y
+                                               y
+                                          y    y
+                                           yyyy
+
+
+                                   ll
+                          t         l        i
+                          t         l
+       oooo    u    u   ttttt       l       ii     n nnn     eeee
+      o    o   u    u     t         l        i     nn   n   e    e
+      o    o   u    u     t         l        i     n    n   eeeeee
+      o    o   u    u     t         l        i     n    n   e
+      o    o   u   uu     t  t      l        i     n    n   e    e
+       oooo     uuu u      tt      lll      iii    n    n    eeee
+
+
+
+
+
+
+
+
+
+      r rrr     oooo     ssss     eeee
+      rr   r   o    o   s    s   e    e
+      r        o    o    ss      eeeeee
+      r        o    o      ss    e
+      r        o    o   s    s   e    e
+      r         oooo     ssss     eeee
+
+
+
+
+
+
+
+                                              Job:  outline
+                                              Date: Sun Sep 17 11:04:58 1995</pre><p><span class="application">LPD</span> はこのテキストの終わりに
+	  FORM FEED 文字を加えます
+	  ので、ジョブは新しいページから開始されます (ただし、
+	  <code class="filename">/etc/printcap</code>
+	  で出力先のプリンタのエントリに <code class="literal">sf</code>
+	  (suppress form feeds) が指定されているときはこ
+	  の限りではありません)。</p><p>お望みならば、<span class="application">LPD</span>
+	  に<span class="emphasis"><em>短いヘッダページ</em></span>を出力させることもできます。
+	  この場合は、
+	  <code class="filename">/etc/printcap</code> ファイルの中で
+	  <code class="literal">sb</code> (short banner) を指定してください。
+	  ヘッダページは次のようになります。</p><pre class="screen">rose:kelly  Job: outline  Date: Sun Sep 17 11:07:51 1995</pre><p>デフォルトでは、<span class="application">LPD</span>
+	  はヘッダページを最初に印字し、次にジョブの印字をおこないます。
+	  この順番を逆にするときは、
+	  <code class="filename">/etc/printcap</code> で <code class="literal">hl</code>
+	  (header last) を指定してください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-header-pages-accounting"></a>10.4.2.3. ヘッダページに対する課金</h4></div></div></div><p><span class="application">LPD</span>
+	  に備わっているヘッダページ出力機能を使うと、
+	  入力されたジョブに対して課金をおこなうことができても、
+	  ヘッダページは<span class="emphasis"><em>無料</em></span>で提供しなくてはならない、
+	  という特有のやり方を強要されます。</p><p>なぜでしょうか。</p><p>出力フィルタは単なる外部プログラムなので、
+	  課金をするための制御をおこなうとすれば、
+	  それはヘッダページを印字するときですが、出力フィルタには、
+	  <span class="emphasis"><em>ユーザ名とホスト名</em></span>
+	  の情報や課金情報を格納するファイルがどれな
+	  のかということが知らされません。それゆえ、出力ファイルには、
+	  誰にプリンタ利用の課金をおこなえばよいのかが分からないのです。
+	  テキストフィルタやその他の変換フィルタ
+	  (これらのフィルタはユーザやホストの情報が知らされます)
+	  が出力ページの枚数に <span class="quote">「<span class="quote">1 ページ分水増しする</span>」</span> だけでは十分ではありません。
+          なぜなら、ユーザは
+	  <code class="command">lpr -h</code> に
+	  よってヘッダページの出力を止めることができるからです。
+	  やみくもに 1 ページを水増しすると、
+	  印字されてもいないヘッダページに対する
+	  料金をとることになります。基本的に、<code class="command">lpr
+	   -h</code> は環境に優しい心を持つユーザに好まれるオプションですが、
+	  これを使うように奨励することもできません。</p><p>各々のフィルタに独自のヘッダページを生成させる
+	  (その結果、ヘッダページに課金することができる)
+	  という方法<span class="emphasis"><em>でも十分であるとはいえません</em></span>。
+	  この場合、<span class="application">LPD</span> はフィルタに
+	  <code class="option">-h</code> の情報を送りませんので、<code class="command">lpr
+	    -h</code>
+	  によってヘッダページを印字しないオプションを選択したとしても、
+	  依然としてヘッダページは印字され、
+	  その分の課金がおこなわれてしまいます。</p><p>では、どのような選択肢があるのでしょうか。</p><p>ヘッダページへの課金に関しては、
+	  次のことができます。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="application">LPD</span> のやり方を受け入れ、
+	      ヘッダページは無料とする。</p></li><li class="listitem"><p><span class="application">LPRng</span> などの
+	      <span class="application">LPD</span> の代替品をインストールする。
+	      <span class="application">LPD</span>
+	      と入れ替えが可能な他のスプーリングソフトウェアに関しては、
+              <a class="link" href="printing-lpd-alternatives.html" title="10.6. 標準スプーラの代替品">標準スプーラの代替品</a>
+              をご覧ください。</p></li><li class="listitem"><p><span class="emphasis"><em>スマートな</em></span>
+	      出力フィルタを作成する。通常、
+	      出力フィルタはプリンタを初期化するか、
+	      単純な文字列変換をする程度の働きしかしません。
+	      (テキスト (入力) フィルタがない場合)
+	      出力フィルタはヘッダページとプレインテキストの印字をおこなうのに適しています。
+
+	      プレインテキストを印字するためのテキストフィルタがない場合、
+	      <span class="application">LPD</span>
+	      はヘッダページを印字するためだけの目的で出力フィルタを起動します。
+	      そして、<span class="application">LPD</span>
+	      が生成するヘッダページのテキストを解析することにより、
+	      出力フィルタはヘッダページに課金するために必要なユーザ名と
+	      ホスト名を取得することができます。この方式の唯一の問題点は、
+	      出力フィルタは課金情報を格納するデータファイルの名前を知ることが
+	      できないということです
+	      (<code class="literal">af</code> 項目で指定されたファイル名は
+	      出力ファイルに渡されません)。しかし、既知の
+	      名前の課金データファイルを使うのならば、
+	      その名前を出力フィルタのプログラム中に埋め込むことができます。
+
+	      解析の手順を簡単にするためには、
+	      <code class="filename">/etc/printcap</code>
+	      で <code class="literal">sh</code> 項目
+	      (短いヘッダを指定) を使うとよいでしょう。
+
+	      そしてまた、
+	      ここまでの方法は少なからぬトラブルを生じさせるかもしれません。
+	      そうなれば、もちろんユーザはヘッダページを無料で
+	      提供してくれる気前のよいシステム管理者に感謝することでしょう。
+	    </p></li></ul></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-header-pages-ps"></a>10.4.2.4. <span class="trademark">PostScript</span>® プリンタでのヘッダページ</h4></div></div></div><p>これまでに述べたように、<span class="application">LPD</span>
+	  ではプレインテキストのヘッダページをたくさんのプリンタに合うように生成することができます。
+	  残念ながら、<span class="trademark">PostScript</span>® プリンタは、
+	  プレインテキストを直接印字することができません。ですから、
+	  <span class="application">LPD</span> のヘッダページ機能はまったく、
+	  あるいはほとんどの場合、役に立ちません。</p><p>ヘッダページを出力するための自明な方法の1つに、
+	  すべての変換フィルタとテキストフィルタにヘッダページを生成させる方法があります。
+	  フィルタは、
+	  適切なヘッダページを生成するために、
+	  ユーザ名とホスト名の引数を使うべきです。この方法の欠点は、いつでも、
+	  <code class="command">lpr -h</code>
+	  によってジョブが入力された場合でさえも、
+	  ヘッダページが印字されるということです。</p><p>この方法で試してみましょう。次のスクリプトは、3 つの引数
+	  (ユーザ のログイン名、ホスト名、ジョブ名) をとり、簡単な
+	  <span class="trademark">PostScript</span>® 用 のヘッダページを生成します。</p><pre class="programlisting">#!/bin/sh
+#
+#  make-ps-header - make a PostScript header page on stdout
+#  Installed in /usr/local/libexec/make-ps-header
+#
+
+#
+#  These are PostScript units (72 to the inch).  Modify for A4 or
+#  whatever size paper you are using:
+#
+page_width=612
+page_height=792
+border=72
+
+#
+#  Check arguments
+#
+if [ $# -ne 3 ]; then
+    echo "Usage: `basename $0` &lt;user&gt; &lt;host&gt; &lt;job&gt;" 1&gt;&amp;2
+    exit 1
+fi
+
+#
+#  Save these, mostly for readability in the PostScript, below.
+#
+user=$1
+host=$2
+job=$3
+date=`date`
+
+#
+#  Send the PostScript code to stdout.
+#
+exec cat &lt;&lt;EOF
+%!PS
+
+%
+%  Make sure we do not interfere with user's job that will follow
+%
+save
+
+%
+%  Make a thick, unpleasant border around the edge of the paper.
+%
+$border $border moveto
+$page_width $border 2 mul sub 0 rlineto
+0 $page_height $border 2 mul sub rlineto
+currentscreen 3 -1 roll pop 100 3 1 roll setscreen
+$border 2 mul $page_width sub 0 rlineto closepath
+0.8 setgray 10 setlinewidth stroke 0 setgray
+
+%
+%  Display user's login name, nice and large and prominent
+%
+/Helvetica-Bold findfont 64 scalefont setfont
+$page_width ($user) stringwidth pop sub 2 div $page_height 200 sub moveto
+($user) show
+
+%
+%  Now show the boring particulars
+%
+/Helvetica findfont 14 scalefont setfont
+/y 200 def
+[ (Job:) (Host:) (Date:) ] {
+200 y moveto show /y y 18 sub def
+} forall
+
+/Helvetica-Bold findfont 14 scalefont setfont
+/y 200 def
+[ ($job) ($host) ($date) ] {
+        270 y moveto show /y y 18 sub def
+} forall
+
+%
+%  That is it
+%
+restore
+showpage
+EOF</pre><p>そして、変換フィルタやテキストフィルタがそれぞれ、
+	  最初にこのスクリプトを起動することで、
+	  ヘッダページが出力され、それから、
+	  ユーザのジョブの印字をおこないます。次に、
+	  このドキュメントの始めのほうで紹介した DVI 変換フィルタを、
+	  ヘッダページを印字するように変更したものを示します。</p><pre class="programlisting">#!/bin/sh
+#
+#  psdf - DVI to PostScript printer filter
+#  Installed in /usr/local/libexec/psdf
+#
+#  Invoked by lpd when user runs lpr -d
+#
+
+orig_args="$@"
+
+fail() {
+    echo "$@" 1&gt;&amp;2
+    exit 2
+}
+
+while getopts "x:y:n:h:" option; do
+    case $option in
+        x|y)  ;; # Ignore
+        n)    login=$OPTARG ;;
+        h)    host=$OPTARG ;;
+        *)    echo "LPD started `basename $0` wrong." 1&gt;&amp;2
+              exit 2
+              ;;
+    esac
+done
+
+[ "$login" ] || fail "No login name"
+[ "$host" ] || fail "No host name"
+
+( /usr/local/libexec/make-ps-header $login $host "DVI File"
+  /usr/local/bin/dvips -f ) | eval /usr/local/libexec/lprps $orig_args</pre><p>このフィルタがユーザ名やホスト名を決定するために
+	  引数リストをどのように解析しなくてはならないかという点に注意してください。
+	  この解析方法は他の変換フィルタに対しても同様です。
+	  しかしながら、テキストフィルタについては、
+	  引数の設定が少し異なっています (これについては、「<a class="link" href="printing-advanced.html#printing-advanced-filters" title="10.4.1.1. フィルタはどのように機能しているか">
+	    フィルタはどのように機能しているか</a>」
+	  をご覧ください)。</p><p>前述の通り、上記の手法は、極めて単純なのにも関らず、
+	  <code class="literal">lpr</code>
+	  で <span class="quote">「<span class="quote">ヘッダページを印字しない</span>」</span> オプション
+	  (<code class="option">-h</code> オプション) が使えなくなっています。
+	  ユーザが森林資源を (あるいは、
+	  ヘッダページが課金されているならば、その僅かな金額を)、
+	  節約したいと望んでいる場合でも、
+	  すべてのフィルタがすべてのジョブ毎にヘッダページを印字
+	  することになっているので、節約することはできません。</p><p>ジョブ毎に印字されるヘッダページを
+	  ユーザが抑制できるようにするためには、「<a class="link" href="printing-advanced.html#printing-advanced-header-pages-accounting" title="10.4.2.3. ヘッダページに対する課金">
+	    ヘッダページに対する課金</a>」で紹介したトリックを
+	  使う必要があります。すなわち、LPD
+	  が生成するヘッダページの解析をおこない、<span class="trademark">PostScript</span>®
+	  版のヘッダページを出力させる出力フィルタを作るのです。
+	  この場合、ユーザが <code class="command">lpr -h</code> でジョブを入力すると、
+	  <span class="application">LPD</span> はヘッダページを生成しなくなり、また、
+	  出力フィルタも起動されません。そうでないならば、
+	  作成した出力フィルタが <span class="application">LPD</span>
+	  からのテキストを読み込み、ヘッダページを印字する適当な
+	  <span class="trademark">PostScript</span>® のコードがプリンタに送られるでしょう。</p><p><span class="trademark">PostScript</span>® プリンタがシリアルポートに接続されている場合、
+	  出力フィルタとして <code class="command">lprps</code> を、
+	  上記の動作をおこなうものとして <code class="command">psof</code>
+	  を使うことができます。ただし、<code class="command">psof</code>
+	  はヘッダページに対して課金をおこないませんので注意してください。
+	</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-network-printers"></a>10.4.3. リモートプリンタからの出力</h3></div></div></div><a id="idp86850256" class="indexterm"></a><a id="idp86851408" class="indexterm"></a><p>FreeBSD では、ネットワーク越しの印字、すなわち、
+	ジョブをリモートプリンタに送ることをサポートしています。
+	リモートプリンタからの出力をするには、一般に、
+	次の 2 つを参照してください。
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>リモートホストに接続されたプリンタにアクセスする方法。
+	    プリンタがあるホストのシリアル、
+	    または、パラレルインタフェースに接続されている場合、
+	    ネットワーク上の他のホストからこのプリンタにアクセスできるように
+	    <span class="application">LPD</span> を設定します。「<a class="link" href="printing-advanced.html#printing-advanced-network-rm" title="10.4.3.1. リモートホストに接続されたプリンタ">リモートホストに
+	      接続されたプリンタ</a>」
+	    でどのようにするかを説明します。</p></li><li class="listitem"><p>ネットワークに直接接続されているプリンタにアクセスする方法。
+	    プリンタに、旧来のシリアル、または、
+	    パラレルインタフェースに加えて (もしくは、これらに代わって)
+	    ネットワーク用のインタフェースがある場合。
+	    そのようなプリンタは次のように動作するでしょう。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>そのプリンタが <span class="application">LPD</span>
+		のプロトコルを理解でき、リモートホストからのジョブを
+		キューに入れることさえできる場合。この場合、
+		プリンタは、<span class="application">LPD</span>
+		が起動している一般のホストのように振る舞います。
+		そのようなプリンタを設定するために、
+		「<a class="link" href="printing-advanced.html#printing-advanced-network-rm" title="10.4.3.1. リモートホストに接続されたプリンタ">
+		  リモートホストに接続されたプリンタ</a>」
+		と同様の手順をおこなってください。</p></li><li class="listitem"><p>そのプリンタが、
+	        データストリームによるネットワーク接続をサポートしている場合。
+		この場合、ネットワーク上の1つのホストとしてプリンタを
+		<span class="quote">「<span class="quote">接続</span>」</span> します。
+		このホストは、ジョブをスプーリングする責任を負い、
+		スプーリングされたジョブはプリンタに送られます。
+		そのようなプリンタをインストールするためのいくつかの提案が
+		「<a class="link" href="printing-advanced.html#printing-advanced-network-net-if" title="10.4.3.2. ネットワークにおけるデータストリームの インタフェースを持つプリンタ">
+		  ネットワークにおけるデータストリームの
+		  インタフェースを持つプリンタ</a>」にあります。</p></li></ul></div></li></ul></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-network-rm"></a>10.4.3.1. リモートホストに接続されたプリンタ</h4></div></div></div><p><span class="application">LPD</span> スプーリングシステムでは
+	  <span class="application">LPD</span>
+	  (または <span class="application">LPD</span> 互換のシステム)
+	  が起動している他のホストへジョブを送る機能が
+	  始めからサポートされています。この機能により、
+	  あるホストに接続されたプリンタへ、
+	  他のホストからアクセスできるようになります。また、
+	  <span class="application">LPD</span>
+	  プロトコルを理解するネットワークインタフェースを持ったプリンタに対しても、
+	  この機能は働きます。</p><p>リモートプリンタへの出力を許可するためには、最初に、
+	  あるホスト (これを、
+	  <span class="emphasis"><em>プリンタホスト</em></span>と呼びます)
+	  にプリンタを接続します。そして、「<a class="link" href="printing-intro-setup.html#printing-simple" title="10.3.1. プリンタ設定導入編"> プリンタ設定導入編</a>」
+	  に書かれた簡単なプリンタの設定をおこなってください。
+	  必要ならば、「<a class="link" href="printing-advanced.html" title="10.4. プリンタ設定上級編">プリンタ設定上級編</a>」
+	  にある、更に進んだ設定をおこなってください。そして、
+	  そのプリンタをテストしてうまく動作することを確認し、<span class="application">LPD</span>
+	  に許可した機能がうまく働くかどうかを見てください。さらに
+	  <span class="emphasis"><em>ローカルホスト</em></span>が
+	  <span class="emphasis"><em>プリンタホスト</em></span>の <span class="application">LPD</span>
+	  サービスの使用を許可されているか確認して下さい (「<a class="link" href="printing-advanced.html#printing-advanced-restricting-remote" title="10.4.4.4. リモートホストからの利用を制限する">
+	    リモートホストからの利用を制限する
+	  </a>」参照)。</p><a id="idp86874448" class="indexterm"></a><a id="idp86875600" class="indexterm"></a><p><span class="application">LPD</span>
+	  互換のネットワークインタフェースを持つプリンタを使用している場合は、
+	  そのプリンタ自身が以下で説明する
+	  <span class="emphasis"><em>プリンタホスト</em></span>になります。そして、
+	  <span class="emphasis"><em>プリンタ名</em></span>とは、
+	  そのプリンタに設定した名前のことを指します。
+	  これについては、プリンタ、および (または)、
+	  プリンタのネットワークインタフェースに付属するドキュメントを参照してください。</p><div xmlns="" class="tip"><h3 class="admontitle">ヒント: </h3><p xmlns="http://www.w3.org/1999/xhtml">
+            ヒューレット・パッカード社の Laserjet シリーズを使用している場合には、
+            プリンタ名を <code class="literal">text</code> とすると、
+            自動的に LF から CRLF への変換が行なわれます。
+            そのため、<code class="filename">hpif</code> スクリプトは必要ありません。
+          </p></div><p>次に、
+	  そのプリンタにアクセスしたいと思っている他ホストにおいて、
+	  そのホストの <code class="filename">/etc/printcap</code>
+	  ファイルに次にあげるエントリを作ります。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>名前のエントリ。どんな名前でもよいのですが、簡単のため、多分、
+	      プリンタホストで設定されたプリンタ名や別名と同じものを使いたいと思うでしょう。</p></li><li class="listitem"><p><code class="literal">lp</code>
+	      項目で指定されるデバイスは明示的に空にします
+	      (<code class="literal">:lp=:</code> とします)。</p></li><li class="listitem"><p>スプーリングディレクトリを作成し、
+	      <code class="literal">sd</code> 項目でその位置を指定します。
+	      <span class="application">LPD</span>
+	      では、プリンタホストにジョブを送信するまでの間、
+	      このディレクトリにジョブを格納します。</p></li><li class="listitem"><p><code class="literal">rm</code>
+	      項目でプリンタホストの名前を指定します。</p></li><li class="listitem"><p><code class="literal">rp</code> 項目で
+	      <span class="emphasis"><em>プリンタホスト</em></span>に接続したプリンタ名を指定します。</p></li></ol></div><p>これで終わりです。
+	  変換フィルタやページの大きさやその他の事項を
+	  <code class="filename">/etc/printcap</code>
+	  に加える必要はありません。</p><p>次に、
+	  リモートホストに接続されたプリンタで印字するための設定例を示します。
+	  ホスト <code class="systemitem">rose</code> には 2 台のプリンタ
+	  <code class="literal">bamboo</code> と <code class="literal">rattan</code>
+	  が接続されています。これらのプリンタをホスト <code class="systemitem">orchid</code>
+	  のユーザが使えるようにしましょう。最初に
+	  <code class="systemitem">orchid</code> の
+	  <code class="filename">/etc/printcap</code> を示します
+	  (このファイルは、「<a class="link" href="printing-advanced.html#printing-advanced-header-pages-enabling" title="10.4.2.1. ヘッダページの印字を許可する">
+	    ヘッダページの出力を許可する</a>」
+	  で参照することができます)。このファイルには、既に、プリンタ
+	  <code class="literal">teak</code> 用のエントリがありました。以下では、
+	  これに、ホスト <code class="systemitem">rose</code>
+	  にある2台のプリンタ用のエントリが加えられています。</p><pre class="programlisting">#
+#  /etc/printcap for host orchid - added (remote) printers on rose
+#
+
+#
+#  teak is local; it is connected directly to orchid:
+#
+teak|hp|laserjet|Hewlett Packard LaserJet 3Si:\
+        :lp=<code class="filename">/dev/lpt0</code>:sd=<code class="filename">/var/spool/lpd/teak</code>:mx#0:\
+        :if=<code class="filename">/usr/local/libexec/ifhp</code>:\
+        :vf=<code class="filename">/usr/local/libexec/vfhp</code>:\
+        :of=<code class="filename">/usr/local/libexec/ofhp</code>:
+
+#
+#  rattan is connected to rose; send jobs for rattan to rose:
+#
+rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :lp=:rm=rose:rp=rattan:sd=<code class="filename">/var/spool/lpd/rattan</code>:
+
+#
+#  bamboo is connected to rose as well:
+#
+bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :lp=:rm=rose:rp=bamboo:sd=<code class="filename">/var/spool/lpd/bamboo</code>:</pre><p><code class="systemitem">orchid</code>
+	  で必要となる作業はスプーリングディレクトリを作ることだけです。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir -p /var/spool/lpd/rattan /var/spool/lpd/bamboo</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 770 /var/spool/lpd/rattan /var/spool/lpd/bamboo</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chown daemon:daemon /var/spool/lpd/rattan /var/spool/lpd/bamboo</code></strong></pre><p>これで、<code class="systemitem">orchid</code> のユーザが
+	  <code class="literal">rattan</code> と <code class="literal">bamboo</code>
+	  で印字することができるようになりました。
+	  たとえば、<code class="systemitem">orchid</code> のユーザが次のように入力したとします。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>lpr -P bamboo -d sushi-review.dvi</code></strong></pre><p>すると、<code class="systemitem">orchid</code> の
+	  <span class="application">LPD</span> システムは、
+	  ジョブをスプーリングディレクトリ
+	  <code class="filename">/var/spool/lpd/bamboo</code>
+	  にコピーし、これが
+	  DVI ファイルを印字するジョブであることを記録します。
+	  ホスト <code class="systemitem">rose</code> の <code class="literal">bamboo</code>
+	  スプーリングディレクトリに十分な容量が確保でき次第、
+	  両者の <span class="application">LPD</span> は、ジョブのファイルを
+	  <code class="systemitem">rose</code> に転送します。
+	  このファイルは、そのすべてが印字されるまで、<code class="systemitem">rose</code>
+	  のキューに留まります。
+	  (<code class="literal">bamboo</code> は <span class="trademark">PostScript</span>® プリンタなので)
+	  DVI から <span class="trademark">PostScript</span>® への変換は
+	  <code class="systemitem">rose</code> でおこなわれます。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-network-net-if"></a>10.4.3.2. ネットワークにおけるデータストリームの
+	  インタフェースを持つプリンタ</h4></div></div></div><p>プリンタのネットワークインタフェースカードは、
+	  2 種類に分類することができます。
+	  1 つはスプーラをエミュレートするもの (高価) で、もう 1
+	  つはシリアルやパラレルポートを使うように
+	  プリンタにデータを送ることができるだけのもの (安価) です。この節では、
+	  後者の使い方を説明します。前者のプリンタは、前節「<a class="link" href="printing-advanced.html#printing-advanced-network-rm" title="10.4.3.1. リモートホストに接続されたプリンタ">
+	    リモートホストに接続されたプリンタ</a>」
+	  の方法が適用できます。</p><p><code class="filename">/etc/printcap</code> ファイルでは、
+	  シリアルかパラレルのインタフェースのどちらを使うのか、
+	  そして、(シリアルインタフェースを使う場合)
+	  そのボーレートはいくらであるか、フロー制御は使うのか、
+	  タブのための遅延を加えるのか、
+	  改行文字を変換するかなどの指定をおこなうことができます。
+	  しかし、TCP/IP や他のネットワークポートからデータを受け取るプリンタを
+	  接続するための指定をおこなうことはでき ません。</p><p>ネットワーク接続されたプリンタにデータを送るためには、
+	  テキストフィルタと変換フィルタから呼び出すことができる
+	  通信プログラムを開発する必要があります。以下に、
+	  そのようなプログラムの例を示します。スクリプト
+	  <code class="command">netprint</code> では、
+	  標準入力から印字データをすべて受け取り、
+	  ネットワーク接続されたプリンタにこれを送ります。
+	  <code class="command">netprint</code>
+	  の最初の引数でプリンタのホスト名を、
+	  2 番目の引数で接続するポート番号を指定します。
+	  このプログラムでは単方向通信 (FreeBSD からプリンタ)
+	  のみをサポートしていることに注意してください。
+	  ネットワークプリンタの多くは双方向通信をサポートしていますので、
+	  その恩恵 (プリンタの状態を得たり、
+	  課金をおこなうなど) にあずかりたいと思われるかもしれません。
+	</p><pre class="programlisting">#!/usr/bin/perl
+#
+#  netprint - Text filter for printer attached to network
+#  Installed in /usr/local/libexec/netprint
+#
+
+$#ARGV eq 1 || die "Usage: $0 &lt;printer-hostname&gt; &lt;port-number&gt;";
+
+$printer_host = $ARGV[0];
+$printer_port = $ARGV[1];
+
+require 'sys/socket.ph';
+
+($ignore, $ignore, $protocol) = getprotobyname('tcp');
+($ignore, $ignore, $ignore, $ignore, $address)
+    = gethostbyname($printer_host);
+
+$sockaddr = pack('S n a4 x8', &amp;AF_INET, $printer_port, $address);
+
+socket(PRINTER, &amp;PF_INET, &amp;SOCK_STREAM, $protocol)
+    || die "Can't create TCP/IP stream socket: $!";
+connect(PRINTER, $sockaddr) || die "Can't contact $printer_host: $!";
+while (&lt;STDIN&gt;) { print PRINTER; }
+exit 0;</pre><p>このスクリプトは、
+	  様々なフィルタが利用することができます。仮に、Diablo 750-N
+	  ラインプリンタを持っており、
+	  これがネットワークに接続されているとしましょう。
+	  プリンタはポート番号 5100 にて印字するデータを受け取ります。
+	  プリンタのホスト名は <code class="systemitem">scrivener</code> とします。このとき、
+	  このプリンタのテキストフィルタは次のようになります。</p><pre class="programlisting">#!/bin/sh
+#
+#  diablo-if-net - Text filter for Diablo printer `scrivener' listening
+#  on port 5100.  Installed in /usr/local/libexec/diablo-if-net
+#
+
+exec /usr/libexec/lpr/lpf "$@" | /usr/local/libexec/netprint scrivener 5100</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-restricting"></a>10.4.4. プリンタの利用に制約を与える</h3></div></div></div><a id="idp86932944" class="indexterm"></a><p>本節では、プリンタの利用に制約を与えるための情報を記しています。
+	<span class="application">LPD</span> システムでは、プリンタ (ローカル、
+	リモートのいずれに接続されていても)
+	にアクセスできる人を制限する機能、
+	複数部のコピーの印字の可否を制御する機能、
+	ジョブのサイズの最大値やプリンタキューに入る
+	ジョブの最大個数を制御する機能を提供しています。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-restricting-copies"></a>10.4.4.1. 複数部のコピーの印字を制限する</h4></div></div></div><p><span class="application">LPD</span>
+	  システムではユーザが複数部のコピーの印字を簡単におこなう
+	  機能を提供しています。ユーザが、(たとえば) <code class="command">lpr
+	    -#5</code> コマンドを使ってジョブを印字すると、
+	  ジョブのそれぞれのファイルのコピーを 5 部得ることができます。
+	  これがよい機能であると思うかどうかは人それぞれでしょう。</p><p>複数部のコピーの印字によってプリンタが
+	  必要以上に消耗してしまうと感じるならば、
+	  <code class="filename">/etc/printcap</code>
+	  ファイルに <code class="literal">sc</code>
+	  項目を加えてください。これにより、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lpr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lpr</span>(1)</span></a> の <code class="option">-#</code>
+	  オプションの使用が禁止されます。
+	  このオプションが指定されているにも関らず、
+	  <code class="option">-#</code> オプションを使うと、
+	  次のようなメッセージが表示され、
+	  このオプションの利用できない旨を伝えます。</p><pre class="screen">lpr: multiple copies are not allowed</pre><p>リモートホストからプリンタをアクセスできる
+	  設定にしている場合 (この 設定については、「<a class="link" href="printing-advanced.html#printing-advanced-network-rm" title="10.4.3.1. リモートホストに接続されたプリンタ">
+	    リモートホストに接続されたプリンタ</a>」
+	  をご覧ください)、そのリモートホストの
+	  <code class="filename">/etc/printcap</code> にも同じように
+	  <code class="literal">sc</code>
+	  項目を追加する必要があることに注意してください。
+	  そうしないと、ユーザは別なホストから複数部のコピーの
+	  印字をすることができてしまいます。</p><p>例を使って説明しましょう。次に示す
+	  <code class="filename">/etc/printcap</code> ファイルは、ホスト
+	  <code class="systemitem">rose</code> のものです。プリンタ
+	  <code class="literal">rattan</code> は極めて頑丈なので、
+	  複数部のコピーの印字は許可されています。しかし、
+	  レーザプリンタの <code class="literal">bamboo</code>
+	  はもう少しデリケートで、
+	  このプリンタから複数部のコピーを印字することを <code class="literal">sc</code>
+	  項目を追加することで禁止しています。</p><pre class="programlisting">#
+#  /etc/printcap for host rose - restrict multiple copies on bamboo
+#
+rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:sd=<code class="filename">/var/spool/lpd/rattan</code>:\
+        :lp=<code class="filename">/dev/lpt0</code>:\
+        :if=<code class="filename">/usr/local/libexec/if-simple</code>:
+
+bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :sh:sd=<code class="filename">/var/spool/lpd/bamboo</code>:sc:\
+        :lp=<code class="filename">/dev/ttyu5</code>:ms#-parenb cs8 clocal crtscts:rw:\
+        :if=<code class="filename">/usr/local/libexec/psif</code>:\
+        :df=<code class="filename">/usr/local/libexec/psdf</code>:</pre><p>さらに、orchid の <code class="filename">/etc/printcap</code>
+	  にも </p><div class="literallayout"><p>sc</p></div><p>
+	  項目を追加する必要があります (<code class="systemitem">orchid</code>
+	  でこの編集をおこなっているときに、ついでに、プリンタ
+	  <code class="literal">teak</code>
+	  でも複数部のコピーの印字を禁止することにしましょう)。</p><pre class="programlisting">#
+#  /etc/printcap for host orchid - no multiple copies for local
+#  printer teak or remote printer bamboo
+
+teak|hp|laserjet|Hewlett Packard LaserJet 3Si:\
+        :lp=<code class="filename">/dev/lpt0</code>:sd=<code class="filename">/var/spool/lpd/teak</code>:mx#0:sc:\
+        :if=<code class="filename">/usr/local/libexec/ifhp</code>:\
+        :vf=<code class="filename">/usr/local/libexec/vfhp</code>:\
+        :of=<code class="filename">/usr/local/libexec/ofhp</code>:
+
+rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :lp=:rm=rose:rp=rattan:sd=<code class="filename">/var/spool/lpd/rattan</code>:
+
+bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :lp=:rm=rose:rp=bamboo:sd=<code class="filename">/var/spool/lpd/bamboo</code>:sc:</pre><p><code class="literal">sc</code> 項目を指定することにより、
+	  <code class="command">lpr -#</code>
+	  の使用を防ぐことができます。しかし、この状態では
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lpr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lpr</span>(1)</span></a> を複数回起動したり、
+	  1 回のジョブで次のように同じファイルを複数個指定することを防ぐまでには至っていません。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>lpr forsale.sign forsale.sign forsale.sign forsale.sign forsale.sign</code></strong></pre><p>このような悪用を防ぐ方法は
+	  (その指示を無視することも含めて) たくさんあります。
+	  各自で調べてみてください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-restricting-access"></a>10.4.4.2. プリンタを使用できる人を限定する</h4></div></div></div><p>それぞれのプリンタを使用できる人を限定するには、<span class="trademark">UNIX</span>® の
+	  グループ権限のメカニズムを利用し、さらに、
+	  <code class="filename">/etc/printcap</code> で <code class="literal">rg</code>
+	  項目を指定することでおこないます。
+	  あるプリンタにアクセスさせてもよいと思うユーザすべてを
+	  グループのどれかに入れてください。そして、
+	  そのグループ名を <code class="literal">rg</code> で指定します。</p><p>このとき、そのグループに含まれないユーザ
+	  (<code class="systemitem">root</code> も含みます)
+	  がプリントしようとすると、次のようなメッセージが表示されます。</p><pre class="screen">lpr: Not a member of the restricted group</pre><p><code class="literal">sc</code> (suppress multiple copies :
+	  複数部のコピーの印字を禁止する)
+	  を指定するときと同様に、<code class="literal">rg</code>
+	  が指定されたプリンタがリモートホストからもアクセスでき
+	  (この設定については、
+	  「<a class="link" href="printing-advanced.html#printing-advanced-network-rm" title="10.4.3.1. リモートホストに接続されたプリンタ">
+	    リモートホストに接続されたプリンタ</a>」
+	  をご覧ください)、かつ、
+	  そのホストでもプリンタを使用できる人を限定するのが
+	  妥当であると思う場合は、
+	  そのホストの <code class="filename">/etc/printcap</code> にも
+	  <span class="emphasis"><em>rg</em></span>
+	  指定をおこなう必要があります。</p><p>たとえば、プリンタ <code class="literal">rattan</code>
+	  は誰でも利用できるが、<code class="literal">bamboo</code> はグループ
+	  <code class="systemitem">artists</code>
+	  に属している人のみが利用できるようにしてみましょう。
+	  以下に、もうお馴染みとなったホスト
+	  <code class="systemitem">rose</code> の <code class="filename">/etc/printcap</code>
+	  を示します。</p><pre class="programlisting">#
+#  /etc/printcap for host rose - restricted group for bamboo
+#
+rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:sd=<code class="filename">/var/spool/lpd/rattan</code>:\
+        :lp=<code class="filename">/dev/lpt0</code>:\
+        :if=<code class="filename">/usr/local/libexec/if-simple</code>:
+
+bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :sh:sd=<code class="filename">/var/spool/lpd/bamboo</code>:sc:rg=artists:\
+        :lp=<code class="filename">/dev/ttyu5</code>:ms#-parenb cs8 clocal crtscts:rw:\
+        :if=<code class="filename">/usr/local/libexec/psif</code>:\
+        :df=<code class="filename">/usr/local/libexec/psdf</code>:</pre><p>これ以外の <code class="filename">/etc/printcap</code> ファイル
+	  (ホスト <code class="systemitem">orchid</code> のもの)
+	  はそのままにしておくことにします。もちろん、
+	  <code class="systemitem">orchid</code> のユーザは全員
+	  <code class="literal">bamboo</code> を利用することができます。これは、
+	  <code class="systemitem">orchid</code>
+	  には特定のユーザのみにしかアクセスさせておらず、
+	  そのユーザにはプリンタを利用させたいと思っているからなのかもしれませんし、
+	  そうでないかもしれません。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">1台のプリンタを複数グループのユーザに利用させることはできません。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-restricting-sizes"></a>10.4.4.3. 入力可能なジョブのサイズを制限する</h4></div></div></div><a id="idp86988752" class="indexterm"></a><p>たくさんのユーザからプリンタが利用される場合には、多分、
+	  ユーザが印字要求を出すことができるファイルのサイズに
+	  上限値を置く必要が生じるでしょう。結局のところ、
+	  スプーリングディレクトリ
+	  が置かれているファイルシステムの空き容量がその
+	  上限値になる訳ですが、
+	  あるユーザがこれを独占的に使用すること避けるために、
+	  他ユーザからのジョブ用の空き容量を確保する必要もあります。</p><a id="idp86989648" class="indexterm"></a><p><span class="application">LPD</span> では、<code class="literal">mx</code>
+	  項目を指定することにより、
+	  ジョブ中の個々のファイルのサイズの上限値を制限する機能を提供しています。
+	  指定される ファイルサイズの単位は BUFSIZ ブロックで、1
+	  <code class="literal">BUFSIZ</code> ブロックは 1024バイトを表わします。この
+	  <code class="literal">mx</code> 項目の値として 0 が指定されると、
+	  ファイルサイズの制限はなくなります。
+	  <code class="literal">mx</code> が指定されない場合は、
+	  デフォルトの制限として 1000 ブロックが使われます。
+	</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">この制限はジョブ中の各
+	    <span class="emphasis"><em>ファイル</em></span>に対して適用されるものであり、
+	    ジョブ全体のサイズ
+	    を制限するものでは<span class="emphasis"><em>ありません</em></span>。</p></div><p>ところで、
+	  プリンタに設定された上限値を超えるファイルサイズの
+	  ファイルが入力された場合でも、<span class="application">LPD</span>
+	  はこれを拒否しません。その代わりに、このファイルは、
+	  その先頭から上限値のファイルサイズまでしかキューに入れられません。
+	  そして、その部分までが印字され、
+	  残りの部分は捨てられます。
+	  これが正しい動作といえるのかどうかは議論の余地があるところです。</p><p>それでは、設定例に登場しているプリンタ
+	  <code class="literal">rattan</code> と  <code class="literal">bamboo</code>
+	  の印字可能なファイルサイズに制限を加えてみましょう。
+	  <code class="systemitem">artists</code>
+	  グループの人達が作る <span class="trademark">PostScript</span>® ファイルのサイズは
+	  巨大になる傾向があるので、上限値を 5M バイトとします。
+	  それから、
+	  プレインテキスト用のラインプリンタは無制限とします。</p><pre class="programlisting">#
+#  /etc/printcap for host rose
+#
+
+#
+#  No limit on job size:
+#
+rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:mx#0:sd=<code class="filename">/var/spool/lpd/rattan</code>:\
+        :lp=<code class="filename">/dev/lpt0</code>:\
+        :if=<code class="filename">/usr/local/libexec/if-simple</code>:
+
+#
+#  Limit of five megabytes:
+#
+bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :sh:sd=<code class="filename">/var/spool/lpd/bamboo</code>:sc:rg=artists:mx#5000:\
+        :lp=<code class="filename">/dev/ttyu5</code>:ms#-parenb cs8 clocal crtscts:rw:\
+        :if=<code class="filename">/usr/local/libexec/psif</code>:\
+        :df=<code class="filename">/usr/local/libexec/psdf</code>:</pre><p>この場合もそうですが、この制限はローカル (ホスト rose)
+	  のユーザのみに適用されます。
+	  リモートホストからプリンタを利用できるように設定している場合は、
+	  そのリモートホストのユーザはこの制限を受けません。
+	  これらのユーザにも制限を加える場合は、リモートホストの
+	  <code class="filename">/etc/printcap</code> の <code class="literal">mx</code>
+	  を指定する必要があります。
+	  リモートホストから印字するための詳しい情報については、
+	  「<a class="link" href="printing-advanced.html#printing-advanced-network-rm" title="10.4.3.1. リモートホストに接続されたプリンタ">
+	    リモートホストに接続されたプリンタ</a>」
+	  を参照してください。</p><p>リモートホストに接続されたプリンタへのジョブの
+	  サイズを制限する特別な方法は他にもあります。これについては、
+	  「<a class="link" href="printing-advanced.html#printing-advanced-restricting-remote" title="10.4.4.4. リモートホストからの利用を制限する">
+	    リモートホストからの利用を制限する</a>」
+	  を参照してください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-restricting-remote"></a>10.4.4.4. リモートホストからの利用を制限する</h4></div></div></div><p><span class="application">LPD</span> スプーリングシステムでは、
+	  リモートホストから要求されたジョブの印字を制限するための方法がいくつか提供されています。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">ホストの制限</span></dt><dd><p>ローカルの <span class="application">LPD</span>
+		が印字要求を受け付けるリモートホストは、ファイル
+		<code class="filename">/etc/hosts.equiv</code> と
+		<code class="filename">/etc/hosts.lpd</code>
+		によって制御することができます。<span class="application">LPD</span>
+		では、あるホストから印字の要求がきたとき、
+		このホストの名前がこれら 2 つのファイルのどちらかに含まれている
+		かどうかを調べます。これが含まれていない場合は、<span class="application">LPD</span>
+		はこの要求を拒否します。</p><p>これらのファイルの形式は単純です。
+		各行にホストの名前を
+		1つずつ書いていきます。ファイル
+		<code class="filename">/etc/hosts.equiv</code> の方は
+		<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ruserok&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">ruserok</span>(3)</span></a> プロトコルでも利用され、
+		<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rsh</span>(1)</span></a> や <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcp&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rcp</span>(1)</span></a>
+		といったプログラムの動作に影響するので注意が必要です。
+		<code class="filename">/etc/hosts.equiv</code>
+		の記述は慎重におこないましょう。</p><p>例として、以下にホスト <code class="systemitem">rose</code> の
+		<code class="filename">/etc/hosts.lpd</code> を示します。
+	      </p><pre class="programlisting">orchid
+violet
+madrigal.fishbaum.de</pre><p>この例では、<code class="systemitem">rose</code> はホスト
+		<code class="systemitem">orchid</code>, <code class="systemitem">violet</code>
+		そして <code class="systemitem">madrigal.fishbaum.de</code>
+		からの要求を受け付けることになります。
+		その他のホストが <code class="systemitem">rose</code> の
+		<span class="application">LPD</span> にアクセスしようとしても、
+		<span class="application">LPD</span> はそのジョブを拒否します
+		(訳注: 拒否されるのは、そのホストが
+		<code class="filename">/etc/hosts.equiv</code>
+		にも含まれていない場合です)。</p></dd><dt><span class="term">サイズの制限</span></dt><dd><p>スプーリングディレクトリがある
+		ファイルシステムに残しておく必要がある
+		空き容量の大きさを制御することができます。
+		ローカルプリンタ用のスプーリングディレクトリに
+		<code class="filename">minfree</code>
+		という名前のファイルを作成します。そして、
+		そのファイルの中にリモートホストからのジョブの
+		要求を受け付けるために必要な空き容量のディスクブロックサイズ
+		(1 ディスクブロック = 512 バイト) を記します。</p><p>これで、
+		リモートホストのユーザにファイルシステムを満杯にされないことが保証されます。
+		この機能を使うと、
+		ローカルホストのユーザに対してある種の優先権を与えることもできます。
+		ローカルホストのユーザは、
+		<code class="filename">minfree</code>
+		ファイルで指定された値よりもディスクの空き容量が下回った後でもずっと、
+		ジョブをキューに入れることができるのです。</p><p>たとえば、プリンタ <code class="literal">bamboo</code> 用の
+		<code class="filename">minfree</code> を作ってみましょう。
+		このプリンタのスプーリングディレクトリを調べるために、
+		<code class="filename">/etc/printcap</code> を調べてみましょう。
+		以下に、<code class="literal">bamboo</code>
+		のエントリ部分を示します。</p><pre class="programlisting">bamboo|ps|PS|S|panasonic|Panasonic KX-P4455 PostScript v51.4:\
+        :sh:sd=<code class="filename">/var/spool/lpd/bamboo</code>:sc:rg=artists:mx#5000:\
+        :lp=<code class="filename">/dev/ttyu5</code>:ms#-parenb cs8 clocal crtscts:rw:mx#5000:\
+        :if=<code class="filename">/usr/local/libexec/psif</code>:\
+        :df=<code class="filename">/usr/local/libexec/psdf</code>:</pre><p>スプーリングディレクトリは <code class="literal">sd</code>
+		項目で指定されます。<span class="application">LPD</span>
+		がリモートホストからのジョブを受け付けるために必要な
+		ファイルシステムの空き容量を 3M バイト
+		(= 6144 ディスクブロック) にすることにしましょう。
+	      </p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 6144 &gt; /var/spool/lpd/bamboo/minfree
+              </code></strong></pre></dd><dt><span class="term">利用ユーザの制限</span></dt><dd><p><code class="filename">/etc/printcap</code> の
+		<code class="literal">rs</code> 項目を指定することで、
+		ローカルプリンタを利用できるリモートホストのユーザを制限することができます。
+		ローカルホストに接続されたプリンタ用のエントリに
+		<code class="literal">rs</code> 項目が指定されている場合、
+		<span class="application">LPD</span>
+		は、印字を要求したユーザのアカウントと同じログイン名が
+		ローカルホストに登録されている<span class="emphasis"><em>場合に限り</em></span>、
+		そのジョブを受け付けます。それ以外のジョブを
+		<span class="application">LPD</span> は拒否します。</p><p>この機能は、(たとえば)
+		複数の部署がネットワークを共有しており、
+		この内のあるユーザが部署の境界を越えて活動している場合には特に有用です。
+		そのようなユーザに対して、システムのアカウントを与えるだけで、
+		これらのユーザは自分が所属する部署のシステムから
+		そのシステムに接続されているプリンタを使用することができます。
+		これらのユーザにはむしろ、
+		プリンタの使用<span class="emphasis"><em>だけ</em></span>を認め、
+		その他のコンピュータ資源を利用させたくないときは、
+		それらのユーザにはホームディレクトリを与えず、
+		ログインシェルはシェルとしては何の役にも立たない
+		<code class="filename">/usr/bin/false</code> などを指定して、
+		これらのユーザのアカウントはプリンタ用の <span class="quote">「<span class="quote">形式的な</span>」</span> ものとします。</p></dd></dl></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="printing-advanced-acct"></a>10.4.5. プリンタの利用に対する課金</h3></div></div></div><a id="idp87114576" class="indexterm"></a><p>という訳で、印字するためには料金をとることが必要です。
+	取らない理由などありましょうか。紙やインクにはお金がかかります。
+	そして、プリンタの維持費もかかります。
+	プリンタには可動部分が搭載されており、
+	これらの部分は壊れやすいという傾向があります。
+	プリンタや、その利用形態、維持費について調査をし、1 ページ
+	(1 フィート、1 メートルなど) 当たりにかかるコストを調べておいてください。
+	これに基づき、プリンタの利用に対する課金を、実際に、
+	どのように始めればよいのでしょうか。</p><p>さて、残念ながら、この部分に関しては <span class="application">LPD</span>
+	スプーリングシステムはほとんど役に立ちません。
+	課金は使用しているプリンタの種類、印字するもののファイルの形式、
+	プリンタの利用に対する課金での
+	<span class="emphasis"><em>あなた自身の</em></span>要求に大きく左右されます。</p><p>課金システムを実現するためには、プリンタのテキストフィルタ
+	(プレインテキストのジョブに対して課金するため) と変換フィルタ
+	(その他のファイル形式に対して課金するため) を変更して、
+	印字したページを数えたり、
+	プリンタに印字したページ数を取得するための要求を送る必要があります。
+	ただし、出力フィルタのみを利用している場合は、
+	課金をおこなうことができません。フィルタに関しては、
+	「<a class="link" href="printing-advanced.html#printing-advanced-filter-intro" title="10.4.1. フィルタ">
+	  フィルタ</a>」をご覧ください。</p><p>一般に、課金方式には次の 2 つがあります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>定期的に課金する方法</em></span>
+	    はよく利用される方法です。この理由は、
+	    恐らく比較的簡単に実現できるからです。
+	    誰かがジョブを印字する度に、フィルタはそのユーザ名、
+	    ホスト名、印字したページ数を課金データファイルに記録します。
+	    毎月、毎学期、毎年、その他お好みの時期に、
+	    各プリンタの課金用ファイルを集め、
+	    それぞれのユーザが印字したページ数を合計して
+	    その分の課金をおこないます。
+	    次回の課金期間をデータを 0 にして課金を再開するために、
+	    すべてのログファイルを削除します。</p></li><li class="listitem"><p><span class="emphasis"><em>利用毎に課金する方法</em></span>
+	    はあまり利用されていません。これは、
+	    実現するのが比較的難しいからです。この方式では、
+	    プリンタを使用したらすぐに、
+	    フィルタがユーザにその利用に対する課金をおこないます。
+	    ディスククォータのように、課金作業は瞬時におこなわれます。
+	    この方式では、ユーザのアカウントが赤字になる場合に、
+	    ユーザが印字をおこなうことを拒否することができます。
+	    また、ユーザに <span class="quote">「<span class="quote">プリンタ版 quota</span>」</span> を調べたり、
+	    調整したりする方法を提供したいと思うかもしれ ません。
+	    これを実現するためには、ユーザとその quota を追跡するために、
+	    あるデータベース用のコードが必要となります。</p></li></ul></div><p><span class="application">LPD</span> スプーリングシステムでは、
+	どちらの方式にも簡単に対応できます。(ほとんどの場合は)
+	フィルタを用意しなければならないので、
+	課金作業のためのコードも用意しなければなりません。
+	しかし、明るい面もあります。
+	それは、課金方式に関して、非常に大きな柔軟性が与えられたということです。
+	たとえば、「定期的に課金する方法」か、
+	「利用毎に課金する方法」のどちらかを選びまず、そして、
+	どんな情報 (ユーザ名、ホスト名、ジョブのタイプ、印字された頁数、
+	使用した紙の大きさ、印字をするために要した時間など)
+	をログに記録するかを決めます。
+	以上のことをおこなうには、上記の情報を保持するために、
+	フィルタを変更しなくてはなりません。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87122128"></a>10.4.5.1. 手軽なプリンタ課金方法</h4></div></div></div><p>FreeBSD には、「定期的に課金する方法」による課金を
+	  すぐに設定できるように、2 個のプログラムを添付しています。
+	  その内の1つはテキストフィルタ <code class="command">lpf</code> で、
+	  これについては、「<a class="link" href="printing-advanced.html#printing-advanced-lpf" title="10.4.1.6. テキストフィルタ lpf">
+	    テキストフィルタ lpf</a>」をご覧ください。もう1つは、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> で、
+	  これはプリンタの課金データファイルからのエントリを集め、
+	  これを合計するプログラムです。</p><p>「<a class="link" href="printing-advanced.html#printing-advanced-filters" title="10.4.1.1. フィルタはどのように機能しているか">
+	    フィルタはどのように機能しているか</a>」で述べたように、
+	  <span class="application">LPD</span>
+	  ではテキストフィルタや変換フィルタを起動しますが、
+	  そのコマンドラインで使用している課金データファイルの名前が指定されます。
+	  両フィルタはこの引数を使って、
+	  どの課金データファイルのエントリに書き込めばよいのかを知ることができます。
+	  このファイルの名前は <code class="filename">/etc/printcap</code> 中の
+	  <code class="literal">af</code> 項目によって指定されます。
+	  このファイルが絶対パ スで指定されない場合は、
+	  スプーリングディレクトリからの相対パスとして扱われます。</p><p><span class="application">LPD</span> は、紙のページの幅と行数
+	  (<code class="literal">pw</code> と <code class="literal">pl</code> 項目で 指定される)
+	  を引数として <code class="command">lpf</code>
+	  を起動します。<code class="command">lpf</code> フィルタでは、
+	  何ページ印字したかを決定するためにこれらの引数を使用します。
+	  ファイルをプリンタに送った後、
+	  課金情報を課金データファイルに書き込みます。
+	  このファイルは次のようになります。</p><pre class="programlisting">2.00 rose:andy
+3.00 rose:kelly
+3.00 orchid:mary
+5.00 orchid:mary
+2.00 orchid:zhang</pre><p>課金データファイルはプリンタ毎に分けて作るべきです。
+	  これは、<code class="command">lpf</code>
+	  にはファイルをロックする機構が組み込まれていないためです。
+	  したがって、<code class="command">lpf</code>
+	  が 2 つ起動されたとき、
+	  同じファイルに同時に書き込みをおこなった場合、
+	  お互いのエントリを破壊してしまうかもしれません。
+	  課金用ファイルを各プリンタ毎に確実に分けるには、
+	  <code class="filename">/etc/printcap</code> 中の
+	  <code class="literal">af=acct</code> 項目を使います。
+	  そうすれば、それぞれの課金用ファイルがプリンタのスプーリングディレクトリに、
+	  <code class="filename">acct</code> という名称で作成されます。</p><p>プリンタの利用に対してユーザに課金する準備ができたら、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> プログラムを実行してください
+	  (課金したいプリンタのスプーリングディレクトリに移動した後、
+	  <code class="command">pac</code> と入力してください)。
+	  次のような、ドル中心主義の課金リストが表示されます
+	  (訳注: ドル中心主義という表現は、
+	  表示がドルで出ることへの著者の皮肉でしょう。
+	  セントがあるので小数点以下が表示されますが、
+	  この機能も日本では邪魔ですね)。</p><pre class="screen">  Login               pages/feet   runs    price
+orchid:kelly                5.00    1   $  0.10
+orchid:mary                31.00    3   $  0.62
+orchid:zhang                9.00    1   $  0.18
+rose:andy                   2.00    1   $  0.04
+rose:kelly                177.00  104   $  3.54
+rose:mary                  87.00   32   $  1.74
+rose:root                  26.00   12   $  0.52
+
+total                     337.00  154   $  6.74</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> が受け付ける引数には次のようなものがあります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="option">-P<em class="replaceable"><code>printer</code></em></code></span></dt><dd><p> プリンタ <em class="replaceable"><code>printer</code></em>
+		の利用に対する課金リストを作成します。
+		このオプションは、<code class="filename">/etc/printcap</code>
+		の <code class="literal">af</code>
+		が絶対パスで指定されていた場合に限り、動作します。</p></dd><dt><span class="term"><code class="option">-c</code></span></dt><dd><p>ユーザ名のアルファベット順ではなく、
+		課金額の低い順にリストを並べます。</p></dd><dt><span class="term"><code class="option">-m</code></span></dt><dd><p>課金データファイルにあるホスト名を無視します。
+		このオプションを使用すると、ホスト
+		<code class="systemitem">alpha</code> のユーザ
+		<code class="systemitem">smith</code> とホスト
+		<code class="systemitem">gamma</code> のユーザ
+		<code class="systemitem">smith</code> は同一人物として扱われます。
+		このオプションが指定されない場合は、
+		両者は別なユーザとして扱います。</p></dd><dt><span class="term"><code class="option">-p<em class="replaceable"><code>price</code></em></code></span></dt><dd><p><code class="filename">/etc/printcap</code> の
+		<code class="literal">pc</code> 項目で指定された値、または、
+		デフォルトの値 (2 セント) に代わり、紙1ページ、または、
+		1フィート当たりの価格を指定します。
+		<em class="replaceable"><code>price</code></em> として、
+		浮動小数点数を指定することができます。</p></dd><dt><span class="term"><code class="option">-r</code></span></dt><dd><p>リストの並べる順番を逆順にします。</p></dd><dt><span class="term"><code class="option">-s</code></span></dt><dd><p>課金リストを作成し、
+		課金データファイルを削除します。</p></dd><dt><span class="term"><em class="replaceable"><code>name</code></em> <em class="replaceable"><code>…</code></em></span></dt><dd><p>ユーザ <em class="replaceable"><code>names</code></em>
+		に対する課金情報のみを表示します。</p></dd></dl></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> が生成するデフォルトのリストには、
+	  各ホストのユーザ別に印字ページ数が表示されます。
+	  (ユーザがサイト内のすべてのホストを使用できるため)
+	  ホスト名の情報が意味を持たない場合、
+	  <code class="command">pac -m</code>
+	  を実行してください。次のようなリストが得られます。</p><pre class="screen">  Login               pages/feet   runs    price
+andy                        2.00    1   $  0.04
+kelly                     182.00  105   $  3.64
+mary                      118.00   35   $  2.36
+root                       26.00   12   $  0.52
+zhang                       9.00    1   $  0.18
+
+total                     337.00  154   $  6.74</pre><p>課金額を決めるために、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> は <code class="filename">/etc/printcap</code>
+	  ファイルの <code class="literal">pc</code>
+	  項目で指定された値 (デフォルト値は 200、すなわち 1
+	  ページ当たり 2 セント)
+	  を使います。この項目で、印字物に課金したい
+	  ファと思う 1 ページ当たり、
+	  または、1 フィート当たりの価格を 100 分の 1 セント単位で指定します。
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> を <code class="option">-p</code> オプション付きで起動すると、
+	  この値を置き換えることができます。
+	  この <code class="option">-p</code> オプションで指定する額の単位は、
+	  100 分の 1 セント単位ではなく、ドル単位です。たとえば、次の指定では、
+	  1 ページ当たりの単価が 1 ドル 50 セントになります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pac -p1.50</code></strong></pre><p>このオプションを使うと、
+	  実際の課金額を集計することができます。</p><p>最後に、<code class="command">pac -s</code>
+	  を起動すると、課金情報は課金データ累計ファイルに保存されます。
+	  このファイルの名前は、プリンタの課金データファイルの後ろに
+	  <code class="literal">_sum</code> を付けたものとなります。そして、
+	  課金データファイルは削除されます。次に
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pac</span>(8)</span></a> が起動されると、
+	  その時点までの累計金額を得るために、
+	  課金データ累計ファイルが読み込まれ、
+	  通常の課金データファイルからの情報に加算されます。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87197392"></a>10.4.5.2. 印字されたページ数をどのように数えるか?</h4></div></div></div><p>課金を、リモートホストからの印字でさえも、
+	  正確におこなうためには、
+	  ジョブで使用された紙が何ページであるかを特定できる必要があります。
+	  このことは、プリンタ利用に対する課金をおこなう上の根本的な問題です。</p><p>プレインテキストのジョブの場合、
+	  問題を解決するのはさほど難しくはありません。
+	  ジョブが何行であったかを数え、プリンタがサポートしている紙
+	  1 ページに印字できる最大の行数と比較すればよいのです。
+	  重ね打ちするために利用されるファイル中のバックスペース文字や、
+	  物理的に複数の行に渡る長い論理行に対する取り扱いを忘れずにおこなってください。</p><p>(「<a class="link" href="printing-advanced.html#printing-advanced-lpf" title="10.4.1.6. テキストフィルタ lpf">テキストフィルタ
+	    lpf</a>」で紹介した) テキストフィルタ
+	  <code class="command">lpf</code> では、課金をおこなうときに、
+	  これらの取り扱いをおこなってくれます。
+	  課金をおこなうために必要なテキストフィルタを作成している方は、
+	  <code class="command">lpf</code>
+	  のソースコードが参考になるでしょう。</p><p>これに対して、他のファイル形式の処理はどのようにすれば
+	  よいのでしょうか。</p><p>まず、DVI から LaserJet, または、DVI から <span class="trademark">PostScript</span>®
+	  への変換の場合、フィルタが <code class="command">dvilj</code> や
+	  <code class="command">dvips</code> の 出力メッセージを解析することで、
+	  何ページ分の変換がおこなわれたかを知ることができます。
+	  他のファイル形式とその変換プログラムに関しても、
+	  同様のことができるかもしれません。</p><p>しかし、この方式には問題点があります。それは、
+	  変換されたページがすべて印字されるとは限らないということです。
+	  たとえば、プリンタが紙詰まりを起こしたり、トナー切れになったり、
+	  はたまた、爆発したりするかもしれません。
+	  そのような状況により印字が途中で中止されたとしても、この方式では、
+	  ユーザは全ページ分の料金を課されてしまうのです。</p><p>それでは、どのような対策をたてることができるのでしょうか。</p><p><span class="emphasis"><em>正確な</em></span>
+	  課金をおこなうための唯一の<span class="emphasis"><em>確実な</em></span>方法は、
+	  何ページ印字したのかを知らせることができるプリンタを入手し、
+	  これをシリアルポートかネットワークに接続することです。
+	  ほとんどすべての <span class="trademark">PostScript</span>®
+	  プリンタではこの概念がサポートされています。
+	  他のプリンタも同様です (Imagen
+	  レーザプリンタをネットワーク接続するなど)。
+	  それぞれのプリンタのフィルタを、
+	  ジョブを印字した後で印字ページ数を得るように変更してください。
+	  そして、課金情報はここで得られた値<span class="emphasis"><em>のみに</em></span>
+	  基づいて記録してください。行数を数えたり、
+	  エラーが生じやすいファイルの調査は必要とされません。</p><p>もちろん、
+	  気前よく印字料金をすべて無料にすることもできます。</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="printing-intro-setup.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="printing.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="printing-using.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">10.3. 基本的な設定〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓10.5. プリンタを使う</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

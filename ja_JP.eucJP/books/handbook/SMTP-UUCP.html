@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>21.7. UUCP とともに SMTP を使う</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="mail.html" title="第21章 電子メール" /><link rel="prev" href="mail-advanced.html" title="21.6. 先進的なトピックス" /><link rel="next" href="SMTP-dialup.html" title="21.8. ダイアルアップ接続でメールを使う" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.7. UUCP とともに SMTP を使う</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mail-advanced.html">戻る</a>〓</td><th width="60%" align="center">第21章 電子メール</th><td width="20%" align="right">〓<a accesskey="n" href="SMTP-dialup.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-UUCP"></a>21.7. UUCP とともに SMTP を使う</h2></div></div></div><p>FreeBSD とともに出荷されている
+      <span class="application">sendmail</span> の設定は、
+      サイトがインターネットに直接接続しているものとして設計されています。
+      UUCP 経由でメールを交換したいサイトは、他にも
+      設定ファイルをインストールしなければいけません。</p><p><code class="filename">/etc/mail/sendmail.cf</code>
+      を手動で調整することは先進的なトピックです。
+      <span class="application">sendmail</span> のバージョン 8 は設定ファイルを
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a> プリプロセッサから生成します。
+      これにより、高度に抽象化された設定を行うことができます。
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a> による設定ファイルは
+      <code class="filename">/usr/src/usr.sbin/sendmail/cf</code>
+      以下にあります。</p><p>もしシステムをすべてのソースとともにインストールしていなければ、
+      sendmail の設定材料は分割された個別のソース tarball を取得してください。
+      FreeBSD のソースコードが入った CDROM をマウントしているのなら、</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /cdrom/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat scontrib.?? | tar xzf - -C /usr/src/contrib/sendmail</code></strong></pre><p>と展開してください (展開してもたった数百 KB 程度です)。
+      <code class="filename">cf</code> ディレクトリの
+      <code class="filename">README</code> ファイルは
+      m4 による設定の基本的な手引として役に立つでしょう。</p><p>UUCP 配送に対応するための一番よい方法は
+      <code class="literal">mailertable</code> 機能を使用することです。
+      これは経路を決定するために
+      <span class="application">sendmail</span>
+      が使用できるデータベースを作成します。</p><p>まずはじめに <code class="filename">.mc</code>
+      ファイルを作成しなければいけません。
+      <code class="filename">/usr/src/usr.sbin/sendmail/cf/cf</code>
+      にいくつか例があります。<code class="filename">foo.mc</code>
+      という名前のファイルをあなたが作成したとすると、
+      有効な <code class="filename">sendmail.cf</code>
+      ファイルへ変換するには次のようにするだけです。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/usr.sbin/sendmail/cf/cf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make foo.cf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp foo.cf /etc/mail/sendmail.cf</code></strong></pre><p>典型的な <code class="filename">.mc</code> ファイルは次のようになるでしょう。</p><pre class="programlisting">VERSIONID(`<em class="replaceable"><code>Your version number</code></em>') OSTYPE(bsd4.4)
+
+FEATURE(accept_unresolvable_domains)
+FEATURE(nocanonify)
+FEATURE(mailertable, `hash -o /etc/mail/mailertable')
+
+define(`UUCP_RELAY', <em class="replaceable"><code>your.uucp.relay</code></em>)
+define(`UUCP_MAX_SIZE', 200000)
+define(`confDONT_PROBE_INTERFACES')
+
+MAILER(local)
+MAILER(smtp)
+MAILER(uucp)
+
+Cw    <em class="replaceable"><code>your.alias.host.name</code></em>
+Cw    <em class="replaceable"><code>youruucpnodename.UUCP</code></em></pre><p>
+      <code class="literal">accept_unresolvable_domains</code>,
+      <code class="literal">nocanonify</code> および
+      <code class="literal">confDONT_PROBE_INTERFACES</code> 機能を含んでいる行は、
+      メール配送時にまったく DNS を使用しません。
+      <code class="literal">UUCP_RELAY</code> の記述は UUCP 配送に対応するのに必要です。
+      そこにインターネットホスト名を単に書くだけで
+      .UUCP pseudo ドメインアドレスを扱うことができるようになります。
+      大抵の場合、あなたの ISP のメールリレーをそこに入力するでしょう。</p><p>次に、
+      <code class="filename">/etc/mail/mailertable</code> が必要になります。
+      メールを配送するリンクが外界との間に一つだけの場合は、
+      次のようにファイルを記述するだけで十分でしょう。</p><pre class="programlisting">#
+# makemap hash /etc/mail/mailertable.db &lt; /etc/mail/mailertable
+.                             uucp-dom:<em class="replaceable"><code>your.uucp.relay</code></em></pre><p>次はさらに複雑な例です。</p><pre class="programlisting">#
+# makemap hash /etc/mail/mailertable.db &lt; /etc/mail/mailertable
+#
+horus.interface-business.de   uucp-dom:horus
+.interface-business.de        uucp-dom:if-bus
+interface-business.de         uucp-dom:if-bus
+.heep.sax.de                  smtp8:%1
+horus.UUCP                    uucp-dom:horus
+if-bus.UUCP                   uucp-dom:if-bus
+.                             uucp-dom:</pre><p>はじめの三行はドメインで宛先を指定されたメールが、
+      配送路を <span class="quote">「<span class="quote">近道</span>」</span> するために、
+      デフォルトルートではなく代わりにいくつかの UUCP 隣接ホストへ送られる特別な場合を扱います。
+      次の行はメールを SMTP で配送可能なローカルイーサネットドメインへ送ります。
+      最後に
+      <code class="literal">uucp-neighbor
+	!recipient</code>
+      がデフォルトルートを上書きすることを許可するための UUCP 隣接ホストは
+      .UUCP 仮想ドメイン記法で言及されます。
+      最後の行は常に他のすべてが当てはまるシングルドットです。
+      これは UUCP 隣接ホストへの UUCP 配送をすることで、
+      世界に向けたあなたの普遍的メールゲートウェイとして役に立ちます。
+      <code class="literal">uucp-dom:</code> キーワードの後ろにあるノード名はすべて、
+      <code class="literal">uuname</code> コマンドを使用することで確かめられる正しい
+      UUCP 隣接ホストである必要があります。</p><p>このファイルは、実際に使用する前に DBM
+      データベース形式に変換する必要があることに注意してください。
+      これを実行するコマンドラインは mailertable
+      ファイルの先頭にコメントとして書かれています。
+      mailertable を変更するたびにいつもこのコマンドを実行する必要があります。</p><p>最後のアドバイス: もし、
+      いくつかのメールルーティングがうまく動いているかどうか分からないときは
+      <span class="application">sendmail</span> に
+      <code class="option">-bt</code> オプションをつけることを覚えておいてください。
+      これは <span class="application">sendmail</span> を
+      <span class="emphasis"><em>アドレステストモード</em></span> で起動します。
+      あなたがテストしたいメールルーティングのアドレスを後につけて、
+      単純に <code class="literal">3,0</code> と入力してください。
+      最後の行は、内部で使われたメールエージェント、
+      このエージェントが呼び出された目的地ホスト、および
+      (もしかしたら変換された) アドレスを表示します。
+      このモードを終了するには
+      <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>D</strong></span>
+      を入力します。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>sendmail -bt</code></strong>
+ADDRESS TEST MODE (ruleset 3 NOT automatically invoked)
+Enter &lt;ruleset&gt; &lt;address&gt;
+<code class="prompt">&gt;</code> <strong class="userinput"><code>3,0 foo@example.com</code></strong>
+canonify           input: foo @ example . com
+...
+parse            returns: $# uucp-dom $@ <em class="replaceable"><code>your.uucp.relay</code></em> $: foo &lt; @ example . com . &gt;
+<code class="prompt">&gt;</code> <strong class="userinput"><code>^D</code></strong></pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mail-advanced.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="mail.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="SMTP-dialup.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">21.6. 先進的なトピックス〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓21.8. ダイアルアップ接続でメールを使う</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

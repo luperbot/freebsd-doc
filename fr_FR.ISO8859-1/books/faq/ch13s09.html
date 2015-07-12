@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>13.9. Comment sont détectées les cartes plugs and play ISA?</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Questions Fréquemment Posées sur FreeBSD 2.X, 3.X et 4.X" /><link rel="up" href="hackers.html" title="Chapitre 13. Pour les passionnés. **Mise à jour en cours**" /><link rel="prev" href="ch13s08.html" title="13.8. J'ai écrit une extension pour le noyau, comment l'incorporer?" /><link rel="next" href="ch13s10.html" title="13.10. Est-ce que FreeBSD va supporter d'autres architectures matérielles?" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">13.9. Comment sont détectées les cartes plugs and play ISA?</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch13s08.html">Précédent</a> </td><th width="60%" align="center">Chapitre 13. Pour les passionnés. **Mise à jour en cours**</th><td width="20%" align="right"> <a accesskey="n" href="ch13s10.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp68666320"></a>13.9. Comment sont détectées les cartes plugs and play ISA?</h2></div></div></div><p>Contribution de <a class="link" href="mailto:uhclem@nemesis.lonestar.org" target="_top">Frank Durda IV</a></p><p>Il y a un certains nombres de ports d'entrées/sorties sur
+lesquels la plupart des cartes PnP répondent lorsqu'une machine
+interroge le bus ISA. Donc, lorsque la routine de détection PnP
+s'execute, elle interroge les cartes PnP sur ces ports pour savoir
+lesquelles sont présentes. Dans ce cas toutes les cartes répondent en
+indiquant leur modèle et la routine de détection reçoit alors une
+valeur qui est soit <span class="quote">« <span class="quote">oui</span> »</span> soit rien. Au minimum un bit
+est mis à 1 lors de la réponse. Alors le code de détection peut
+essayer de dialoguer avec les cartes, graçe aux numéros de modèle de
+cartes (définis par Microsoft/Intel), inférieurs à X pour leur dire de
+s'arréter. Il vérifie alors qu'aucune autre carte ne répond à la
+question précedente. Si la réponse est <span class="emphasis"><em>0</em></span> alors il
+considère  qu'aucune carte n'a d'ID au dessus de X. Ensuite il
+interroge le bus pour obtenir la liste des cartes sous
+<span class="quote">« <span class="quote">X</span> »</span>. S'il en trouve alors il interroge le bus pour avoir
+la liste des celles ayant un ID supérieur à X-(limit/4). Et répète
+ainsi de suite l'algorithme, qui consiste à diviser l'intervalle de
+recherche par deux. Avec cet algorithme, les cartes seront découvertes
+avec un maximum d'itération de 2^64.</p><p>Les Identifiants de cartes sont codés sur 32 bits + 8 bit
+de checksum. Les 32 premiers bits représentent le code de la carte
+pour le constructeur de cette carte. Il arrive de trouver plusieurs
+cartes du meme constructeur ayant différents code de carte. L'idée de
+coder sur 32 bits le nom du constructeur serait un peu
+excessif.</p><p>Les 32 bits de poids faibles sont le numéro de série de la
+carte; l'adresse ethernet , ou quelque chose rendant la carte unique
+par ce numéro. Le constructeur ne doit jamais produire une deuxième
+carte ayant ce meme numéro tout en ayant le meme nombre représenté sur
+les 32 premiers bits. Vous pouvez dons avoir plusieurs cartes du meme
+type dans votre ordinateur , et l'ensemble des 64 bits permet de
+rendre chacune unique.</p><p>Les groupes de 32 bits ne peuvent en aucun cas etre tous
+à zéro. Cela permet d'effectuer le <span class="quote">« <span class="quote">OU</span> »</span> pour afficher les
+bits non nuls lors de la première recherche dicotomique.</p><p>Lorsque le système à détecter toutes les cartes présentes,
+ils les réactivent une à une, et recherche les ressources dont elles
+ont besoin, quels sont les choix possibles pour les interruptions,
+etc. Un <span class="quote">« <span class="quote">scan</span> »</span> de toutes les cartes est effectué pour
+collecter toutes ces informations.</p><p>Cette information est combinée avec l'information
+recueillie des fichiers ECU se trouvant sur le disque dur ou dans le
+BIOS. Le support ECU et BIOS du plug-and-play pour le matériel est
+très simple, et les périphérique n'ont pas besoin d'etre vraiment
+PnP. Mais en examinant les informations du BIOS et des fichiers ECU,
+les routines d'interrogations peuvent permettre aux périphériques
+PnP <span class="quote">« <span class="quote">to avoid those devices the probe code cannot
+relocate. </span> »</span></p><p>Alors les périphériques PnP sont encore interrogés, et
+renvoient leur IRQ, adresse mémoire, ports d'entrée/sorties et
+DMA. Les périphériques sont alors activés, en prenant en compte ces
+valeurs, et le reste jusqu'au prochaine redémarrage du système. Bien
+sur rien de vous empeche de les retirer, si le matériel le permet
+:-).</p><p>Ceci n'explique pas toute la complexité de détection, mais
+c'est une explication simple du processus de détection.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch13s08.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="hackers.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch13s10.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">13.8. J'ai écrit une extension pour le noyau, comment l'incorporer? </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 13.10. Est-ce que FreeBSD va supporter d'autres architectures matérielles?</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

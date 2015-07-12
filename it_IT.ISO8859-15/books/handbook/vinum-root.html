@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.9. Usare Vinum nel Filesystem Root</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="vinum-vinum.html" title="Capitolo 20. Il Gestore di Volumi Vinum" /><link rel="prev" href="vinum-config.html" title="20.8. Configurare Vinum" /><link rel="next" href="virtualization.html" title="Capitolo 21. Virtualizzazione" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.9. Usare Vinum nel Filesystem Root</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-config.html">Indietro</a> </td><th width="60%" align="center">Capitolo 20. Il Gestore di Volumi Vinum</th><td width="20%" align="right"> <a accesskey="n" href="virtualization.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-root"></a>20.9. Usare Vinum nel Filesystem Root</h2></div></div></div><p>Per una macchina con filesystem completamente in mirroring con Vinum
+      è desiderabile mettere in mirroring anche il filesystem di root;
+      fare questo è meno semplice che non per un filesystem arbitrario,
+      dato che:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Il filesystem root deve essere disponibile nella parte iniziale
+          del processo di boot, quindi l'infrastruttura di Vinum deve essere
+          già disponibile in quel momento.</p></li><li class="listitem"><p>Il volume contenente il filesystem root contiene anche il sistema
+          di avvio e il kernel, che devono essere letti usando le funzioni
+          native del sistema (ovvero il BIOS, sui PC) che spesso non conoscono i
+          dettagli di Vinum.</p></li></ul></div><p>Nelle sezioni seguenti, il termine <span class="quote">«<span class="quote">volume root</span>»</span>
+      è usato generalmente per descrivere il volume Vinum che contiene il
+      filesystem root.  È probabilmente una buona idea usare il nome
+      <code class="literal">"root"</code> per questo volume, ma non è necessario.
+      Tutti gli esempi nelle prossime sezioni usano questo nome.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85325136"></a>20.9.1. Lanciare Vinum abbastanza presto per il Filesystem Root</h3></div></div></div><p>Ci sono varie misure da prendere per fare in modo che questo
+        accada:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Vinum deve essere disponibile nel kernel già all'avvio,
+            quindi il metodo per lanciare Vinum automaticamente descritto
+            in <a class="xref" href="vinum-config.html#vinum-rc-startup" title="20.8.1.1. Avvio Automatico">Sezione 20.8.1.1, «Avvio Automatico»</a> non può essere
+            utilizzato e il parametro <code class="literal">start_vinum</code> in
+            realtà <span class="emphasis"><em>non</em></span> va impostato in questo tipo
+            di configurazione.  La prima possibilità è di
+            compilare Vinum staticamente dentro al kernel, in modo che sia
+            sempre disponibile, ma questo non è normalmente desiderabile.
+            Un'altra opportunità à di fare in modo che
+            <code class="filename">/boot/loader</code> (<a class="xref" href="boot-blocks.html#boot-loader" title="12.3.3. Stadio Tre, /boot/loader">Sezione 12.3.3, «Stadio Tre, <code class="filename">/boot/loader</code>»</a>) carichi il modulo kernel di Vinum prima di
+            lanciare il kernel.  Questo può essere fatto utilizzando la
+            riga:</p><pre class="programlisting">vinum_load="YES"</pre><p>nel file <code class="filename">/boot/loader.conf</code>.</p></li><li class="listitem"><p>Vinum deve essere inizializzato subito in modo da poter fornire
+            il volume per il filesystem root.  Per default la porzione kernel di
+            Vinum non cerca dischi che contengano informazioni sui volumi Vinum
+            fino a quando un amministratore (o uno degli script di partenza) non
+            esegue un comando di <code class="command">vinum start</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">I seguenti paragrafi spiegano i passi necessari per
+              FreeBSD 5.X e superiori.  L'impostazione richiesta da
+              FreeBSD 4.X è diversa ed è descritta dopo, in
+              <a class="xref" href="vinum-root.html#vinum-root-4x" title="20.9.5. Differenze per FreeBSD 4.X">Sezione 20.9.5, «Differenze per FreeBSD 4.X»</a>.</p></div><p>Inserendo la linea:</p><pre class="programlisting">vinum.autostart="YES"</pre><p>dentro a <code class="filename">/boot/loader.conf</code>, Vinum viene
+            istruito, alla partenza del kernel, di controllare automaticamente
+            tutti i dischi alla ricerca di informazioni sui volumi Vinum.</p><p>Da notare il fatto che non è necessario istruire il
+            kernel sulla locazione del filesystem root.
+            <code class="filename">/boot/loader</code> cerca il nome del device di root
+            in <code class="filename">/etc/fstab</code> e passa l'informazione al kernel.
+            Quando è necessario montare il filesystem root, il kernel,
+            tramite il nome di device fornitogli, capisce a quale driver deve
+            chiedere la conversione di tale nome in ID interno di device (numero
+            maggiore/minore).</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85356112"></a>20.9.2. Rendere un volume di root basato su Vinum accessibile
+        dall'avvio</h3></div></div></div><p>Dato che il codice di avvio di FreeBSD è attualmente di soli
+        7.5 KB ed è già appesantito dalla lettura di file (come
+        <code class="filename">/boot/loader</code>) da un filesystem UFS, è
+        semplicemente impossibile insegnargli anche a leggere le strutture
+        interne di Vinum in modo da fargli leggere i dati della configurazione
+        di Vinum per ricavarne gli elementi del volume di boot stesso.
+        Sono quindi necessari alcuni trucchi per dare al codice di avvio
+        l'illusione di una partizione <code class="literal">"a"</code> standard contenente
+        il filesystem di root.</p><p>Perché questo sia anche solo possibile, il volume di root
+        deve rispondere ai seguenti requisiti:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Il volume di root non deve essere in striping o in RAID-5.</p></li><li class="listitem"><p>Il volume di root non deve contenere la concatenazione di più di
+            un sottodisco per ogni plex.</p></li></ul></div><p>Da notare che è desiderabile e possibile avere plex multipli,
+        contenente ognuno una replica del filesystem root.  Il processo di
+        avvio, però, usa solo una di queste repliche per trovare i file
+        necessario all'avvio, fino a quando il kernel monta il filesystem di
+        root stesso.  Ogni singolo sottodisco in questi plex avrà quindi
+        bisogno di una propria partizione <code class="literal">"a"</code> illusoria,
+        affinché la periferica relativa possa essere avviabile.  Non
+        è strettamente necessario che ognuna di queste finte partizioni
+        <code class="literal">"a"</code> sia locato con lo stesso spiazzamento all'interno
+        della propria periferica, rispetto alle periferiche contenenti gli altri
+        plex del volume.  È comunque probabilmente una buona idea creare
+        i volumi Vinum in modo che le periferiche in mirror siano simmetriche,
+        per evitare confusione.</p><p>Per poter configurare queste partizioni <code class="literal">"a"</code>,
+        in ogni periferica contenente parte del volume di root, bisogna fare le
+        seguenti cose:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>La locazione (spiazzamento dall'inizio della periferica) e la
+            dimensione del sottodisco che è parte del volume di root deve
+            essere esaminato, usando il comando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vinum l -rv root</code></strong></pre><p>Da notare che gli spiazzamenti e le dimensioni in Vinum sono
+            misurati in byte.  Devono essere divisi per 512 per ottenere il
+            numero di blocchi necessari nel comando
+            <code class="command">disklabel</code>.</p></li><li class="step"><p>Esegui il comando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>disklabel -e devname</code></strong></pre><p>per ogni periferica che partecipa al volume di root.
+            <em class="replaceable"><code>devname</code></em> deve essere o il nome della slice
+            (ad esempio <code class="filename">ad0s1</code>) o il nome del disco (ad
+            esempio <code class="filename">da0</code>) per dischi senza tabella delle
+            slice (ovvero i nomi che si usano anche con fdisk).</p><p>Se c'è già una partizione <code class="literal">"a"</code>
+            sulla periferica (presumibilmente contenente un filesystem root
+            precedente all'uso di Vinum), dovrebbe essere rinominata in altro
+            modo, in modo da restare accessibile (non si sa mai), ma non essere
+            usata più per default per avviare il sistema.  Da notare che
+            le partizioni attive (ad esempio un filesystem root attualmente
+            montato) non possono essere rinominati, quindi questo deve essere
+            eseguito o avviando da un disco <span class="quote">«<span class="quote">Fixit</span>»</span> o (in caso di
+            mirror) in un processo a due passi dove il disco non di avvio viene
+            modificato per primo.</p><p>Infine, lo spiazzamento della partizione Vinum sulla periferica
+            va aggiunto allo spiazzamento del rispettivo sottodisco di root
+            rispetto alla periferica stessa. Il risultato sarà il valore
+            di <code class="literal">"offset"</code> (spiazzamento) per la nuova
+            partizione <code class="literal">"a"</code>.  Il valore
+            <code class="literal">"size"</code> (dimensione) per questa partizione
+            può essere copiato pari pari dal calcolo fatto sopra.
+            Il valore <code class="literal">"fstype"</code> deve essere
+            <code class="literal">4.2BSD</code>.  I valori <code class="literal">"fsize"</code>,
+            <code class="literal">"bsize"</code> e <code class="literal">"cpg"</code> devono
+            preferibilmente essere scelti per corrispondere al vero e proprio
+            filesystem, anche se in questo contesto non sono molto
+            importanti.</p><p>In questo modo una nuova partizione <code class="literal">"a"</code>
+            sarà creata ricoprendo le partizioni Vinum su questa
+            periferica.  Da notare che <code class="command">disklabel</code>
+            permetterà questa ricopertura solo se la partizione Vinum
+            è stata appropriatamente marcata usando un
+            <code class="literal">"fstype"</code> pari a <code class="literal">"vinum"</code>
+            fstype.</p></li><li class="step"><p>È tutto!  Ora una falsa partizione <code class="literal">"a"</code>
+            esiste su ogni periferica che abbia una replica del volume di root.
+            È altamente raccomandabile verificare nuovamente i risultati,
+            usando un comando come:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -n /dev/devnamea</code></strong></pre></li></ol></div><p>Bisogna ricordarsi che tutte le informazioni contenute nei file di
+        controllo devono essere relative al filesystem di root nel volume Vinum
+        che, quando si imposta un nuovo volume di root Vinum, potrebbe non
+        coincidere con quello del filesystem root attualmente attivo.
+        In particolare bisogna stare attenti ai file
+        <code class="filename">/etc/fstab</code> e
+        <code class="filename">/boot/loader.conf</code>.</p><p>Al seguente riavvio il sistema dovrebbe ricavare le informazioni di
+        controllo appropriate dal filesystem di root Vinum e agire di
+        consequenza.  Alla fine del processo di inizializzazione del kernel,
+        dopo che tutte le periferiche sono state annunciate, l'avvertimento
+        principale che conferma il successo dell'avvio è un messaggio
+        simile a questo:</p><pre class="screen">Mounting root from ufs:/dev/vinum/root</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85387344"></a>20.9.3. Esempi di configurazioni con root basata su Vinum</h3></div></div></div><p>Dopo aver creato il volume di root Vinum,
+        <code class="command">vinum l -rv root</code> dovrebbe produrre qualcosa di simile
+        a:</p><pre class="screen">
+...
+Subdisk root.p0.s0:
+                Size:        125829120 bytes (120 MB)
+                State: up
+                Plex root.p0 at offset 0 (0  B)
+                Drive disk0 (/dev/da0h) at offset 135680 (132 kB)
+
+Subdisk root.p1.s0:
+                Size:        125829120 bytes (120 MB)
+                State: up
+                Plex root.p1 at offset 0 (0  B)
+                Drive disk1 (/dev/da1h) at offset 135680 (132 kB)
+      </pre><p>I valori su cui fare caso sono il <code class="literal">135680</code> dello
+        spiazzamento (relativo alla partizione
+        <code class="filename">/dev/da0h</code>). Questo si traduce in 265 blocchi da
+        512 byte nei termini di <code class="command">disklabel</code>.
+        <code class="filename">/dev/da1h</code>, contenente la seconda replica del
+        volume di root, ha una configurazione simmetrica.</p><p>La <code class="command">disklabel</code> per queste periferiche dovrebbe
+        essere simile a questa:</p><pre class="screen">
+...
+8 partitions:
+#        size   offset    fstype   [fsize bsize bps/cpg]
+  a:   245760      281    4.2BSD     2048 16384     0   # (Cyl.    0*- 15*)
+  c: 71771688        0    unused        0     0         # (Cyl.    0 - 4467*)
+  h: 71771672       16     vinum                        # (Cyl.    0*- 4467*)
+      </pre><p>Si può notare che il parametro <code class="literal">"size"</code> per
+        la finta partizione <code class="literal">"a"</code> corrisponde al valore di cui
+        abbiamo parlato prima, mentre il parametro <code class="literal">"offset"</code>
+        è la somma dello spiazzamento all'interno della partizione Vinum
+        <code class="literal">"h"</code> e lo spiazzamento all'interno della periferica (o
+        slice).  Questa è una tipica configurazione necessaria per
+        evitare il problema descritto in <a class="xref" href="vinum-root.html#vinum-root-panic" title="20.9.4.3. Non si Carica Niente, l'Avvio va in Panico">Sezione 20.9.4.3, «Non si Carica Niente, l'Avvio va in Panico»</a>.
+        Si può anche notare che l'intera partizione
+        <code class="literal">"a"</code> è completamente contenuta dalla partizione
+        <code class="literal">"h"</code>, che contiene tutti i dati Vinum per questa
+        periferica.</p><p>Notate che in questo esempio l'intera periferica è dedicata a
+        Vinum e non c'è spazio per partizioni pre-Vinum, dato che questo
+        disco è stato configurato da nuovo per il solo scopo di far parte
+        di una configurazione Vinum.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85396048"></a>20.9.4. Risoluzione Problemi</h3></div></div></div><p>Se qualcosa va storto, serve un modo per tornare in una situazione
+        di normalità.  Segue una lista di alcuni tipici problemi,
+        completi di soluzione.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85397072"></a>20.9.4.1. Il Codice di Avvio si Carica, ma il Sistema non si Avvia</h4></div></div></div><p>Se per qualsiasi ragione in sistema non prosegue nell'avvio, si
+          può interrompere il processo di avvio premendo il tasto
+          <span class="keycap"><strong>spazio</strong></span> all'avviso dei 10 secondi.  Le variabili di
+          avvio potranno quindi essere esaminate usando il comando
+          <code class="command">show</code> e manipolate con <code class="command">set</code> e
+          <code class="command">unset</code>.</p><p>Se l'unico problema è che il modulo kernel di Vinum non
+          è ancora presente nella lista dei moduli da caricare
+          automaticamente, un semplice <code class="command">load vinum</code>
+          aiuterà.</p><p>Quando pronti, il processo di avvio può continuare con un
+          <code class="command">boot -as</code>.  Le opzioni <code class="option">-as</code>
+          comunicano al kernel di montare il filesystem di root
+          (<code class="option">-a</code>) e di interrompere il processo di avvio in
+          modalità singolo utente (<code class="option">-s</code>),
+          quando il filesystem di root è montato a sola lettura.  In
+          questo modo benché uno solo dei plex do un volume multi-plex
+          sia stato montato, non si rischia inconsistenza dei dati tra i vari
+          plex.</p><p>Alla richiesta di un filesystem di root da montare, ogni
+          periferica che contenga un filesystem di root valido può essere
+          usata. Se <code class="filename">/etc/fstab</code> è stato impostato
+          correttamente, il default dovrebbe essere
+          <code class="literal">ufs:/dev/vinum/root</code> o simile.  Una tipica
+          alternativa potrebbe essere <code class="literal">ufs:da0d</code>, una
+          ipotetica partizione contenente un filesystem root pre-Vinum.
+          Bisogna fare attenzione quando si sceglie una delle partizioni
+          <code class="literal">"a"</code> alias di un sottodisco della periferica root di
+          Vinum, perché in una configurazione in mirror questo monterebbe
+          solo un pezzo della root in mirror.  Se questo filesystem deve poi
+          essere montato in lettura/scrittura è necessario rimuovere gli
+          altri plex del volume root di Vinum dato che conterrebbero comunque
+          dati non consistenti.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85404624"></a>20.9.4.2. Si Carica Solo l'Avvio Primario</h4></div></div></div><p>Se <code class="filename">/boot/loader</code> non si carica, ma l'avvio
+          primario si carica comunque (si capisce dal singolo trattino nella
+          colonna di sinistra dello schermo subito dopo l'inizio dell'avvio), si
+          può tentare di fermare l'avvio primario in questo punto,
+          premendo il tasto <span class="keycap"><strong>spazio</strong></span>.  Questo fermerà
+          l'avvio nella seconda fase, vedi <a class="xref" href="boot-blocks.html#boot-boot1" title="12.3.2. Stadio Uno, /boot/boot1, e Stadio Due, /boot/boot2">Sezione 12.3.2, «Stadio Uno, <code class="filename">/boot/boot1</code>, e Stadio Due,
+        <code class="filename">/boot/boot2</code>»</a>.  Qua si
+          può fare un tentativo di caricare una differente partizione, ad
+          esempio la partizione contenente il precedente filesystem di root
+          <code class="literal">"a"</code>, prima di sostituirlo come sopra
+          indicato.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vinum-root-panic"></a>20.9.4.3. Non si Carica Niente, l'Avvio va in Panico</h4></div></div></div><p>Questa situazione accade quando l'installazione di Vinum ha
+          distrutto il codice di avvio.  Sfortunatamente Vinum lascia solo 4 KB
+          liberi all'inizio della sua partizione prima di scrivere il proprio
+          header.  Purtroppo le due fasi dell'avvio e la disklabel compresa tra
+          le due attualmente occupa 8 KB, quindi se la partizione Vinum è
+          creata con spiazzamento 0 in una slice o disco che dovrebbe essere
+          avviabile, la configurazione di Vinum distruggerà il codice di
+          avvio.</p><p>Similmente, se la situazione sopra descritta è stata
+          risolta avviando da un disco di <span class="quote">«<span class="quote">Fixit</span>»</span>, e il codice di
+          avvio re-installato usando <code class="command">disklabel -B</code> come
+          descritto in <a class="xref" href="boot-blocks.html#boot-boot1" title="12.3.2. Stadio Uno, /boot/boot1, e Stadio Due, /boot/boot2">Sezione 12.3.2, «Stadio Uno, <code class="filename">/boot/boot1</code>, e Stadio Due,
+        <code class="filename">/boot/boot2</code>»</a>, il codice di avvio
+          distruggerà l'header di Vinum, che non saprà più
+          trovare i propri dischi.  Benché nessun dato, di configurazione
+          o contenuto, sia distrutto da questo processo, che risulta quindi
+          recuperabile reinserendo la stessa configurazione di Vinum, la
+          situazione è in realtà di difficile risoluzione: sarebbe
+          necessario spostare l'intera partizione Vinum di almeno 4 KB, in modo
+          da lasciare abbastanza spazio sia per il codice di avvio che per
+          l'header Vinum.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vinum-root-4x"></a>20.9.5. Differenze per FreeBSD 4.X</h3></div></div></div><p>In FreeBSD 4.X alcune funzioni interne necessarie a Vinum per poter
+        trovare automaticamente tutti i dischi non sono presenti e il codice che
+        ricava l'ID interno della periferica di root non è abbastanza
+        intelligente da gestire automaticamente nomi come
+        <code class="filename">/dev/vinum/root</code>, quindi le cose vengono fatte
+        in modo un po' diverso.</p><p>Bisogna dire esplicitamente a Vinum quali dischi controllare, usando
+        una riga di <code class="filename">/boot/loader.conf</code> come la
+        seguente:</p><pre class="programlisting">vinum.drives="/dev/<em class="replaceable"><code>da0</code></em> /dev/<em class="replaceable"><code>da1</code></em>"</pre><p>È importante indicare tutti i drive che possono contenere
+        dati Vinum.  Non è un problema indicare drive <span class="emphasis"><em>di
+        troppo</em></span>, non è neanche necessario aggiungere
+        esplicitamente ogni slice e/o partizione, dato che Vinum
+        cercherà header Vinum in tutte le slice e partizioni dei drive
+        nominati.</p><p>Dato che le procedure utilizzate per interpretare il nome del
+        filesystem di root e derivarne l'ID di periferica (numeri
+        maggiore e minore) sono adatte per gestire solo nomi
+        <span class="quote">«<span class="quote">classici</span>»</span> di periferica come
+        <code class="filename">/dev/ad0s1a</code>, non riescono a capire nomi di
+        volumi root come <code class="filename">/dev/vinum/root</code>.  Per questo
+        motivo Vinum ha bisogno di pre-impostare durante la propria
+        inzializzazione il parametro kernel interno che contiene l'ID della
+        periferica di root.  Questo viene fatto indicando il nome del
+        volume di root nella variabile di avvio <code class="literal">vinum.root</code>.
+        La riga di <code class="filename">/boot/loader.conf</code> adatta per fare questo
+        è simile alla seguente:</p><pre class="programlisting">vinum.root="root"</pre><p>Quando l'inizializzazione del kernel cerca di trovare la periferica
+        root da montare controlla se qualche modulo del kernel ha già
+        pre-inizializzato il parametro kernel apposito; se questo è il
+        caso <span class="emphasis"><em>e</em></span> la periferica che dice di essere la
+        periferica di root ha il numero maggiore e minore corrispondenti al
+        driver come trovato dal nome della periferica di root passata (ovvero
+        <code class="literal">"vinum"</code>, nel nostro caso), userà l'ID di
+        periferica pre-allocato, anziché cercar di trovarne uno da solo.
+        In tal modo durante l'usuale avvio automatico può continuare a
+        montare il volume di root Vinum per il filesystem di root.</p><p>Bisogna comunque notare che anche quando <code class="command">boot -a</code>
+        richiede di inserire manualmente il nome della periferica di root tale
+        nome non può essere intepretato nel caso sia un nome riferito a
+        un volume Vinum.  Se è inserito un nome di periferica non
+        riferito a una periferica Vinum, la non corrispondenza col numero
+        maggiore pre-allocato del parametro di root e del driver ricavato dal
+        nome farà sì che la procedura utilizzi il normale
+        interprete, quindi una stringa come <code class="literal">ufs:da0d</code>
+        funzionerà come previsto.  Da notare che se questo fallisce non
+        si può più provare una stringa come
+        <code class="literal">ufs:vinum/root</code>, dato che non verrebbe
+        interpretata; l'unica via di uscita è riavviare e ripartire da
+        zero.  (Alla richiesta di <span class="quote">«<span class="quote">askroot</span>»</span>, la parte iniziale
+        <code class="filename">/dev/</code> può sempre essere omessa.)</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-config.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="virtualization.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">20.8. Configurare Vinum </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> Capitolo 21. Virtualizzazione</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

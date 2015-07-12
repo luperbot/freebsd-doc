@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>12.5. 中断</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="scsi.html" title="第 12 章 通用访问方法SCSI控制器" /><link rel="prev" href="scsi-async.html" title="12.4. 异步事件" /><link rel="next" href="scsi-errors.html" title="12.6. 错误总览" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.5. 中断</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="scsi-async.html">上一页</a> </td><th width="60%" align="center">第 12 章 通用访问方法SCSI控制器</th><td width="20%" align="right"> <a accesskey="n" href="scsi-errors.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="scsi-interrupts"></a>12.5. 中断</h2></div></div></div><a id="idp72528208" class="indexterm"></a><p>中断例程的确切类型依赖于SCSI控制器所连接到的外围总线的类型（PCI，
+      ISA等等）。</p><p>SIM驱动程序的中断例程运行在中断级别splcam上。因此应当在驱动
+      程序中使用<code class="function">splcam()</code>来同步中断例程与驱动程序
+      剩余部分的活动（对于能察觉多处理器的驱动程序，事情更要有趣，但
+      此处我们忽略这种情况）。本文档中的伪代码简单地忽略了同步问题。
+      实际代码一定不能忽略它们。一个较笨的办法就是在进入其他例程的
+      入口点处设<code class="function">splcam()</code>，并在返回时将它复位，从而
+      用一个大的临界区保护它们。为了确保中断级别总是会被恢复，可以定义
+      一个包装函数，如：</p><pre class="programlisting">    static void
+    xxx_action(struct cam_sim *sim, union ccb *ccb)
+    {
+        int s;
+        s = splcam();
+        xxx_action1(sim, ccb);
+        splx(s);
+    }
+
+    static void
+    xxx_action1(struct cam_sim *sim, union ccb *ccb)
+    {
+        ... process the request ...
+    }</pre><p>这种方法简单而且健壮，但它存在的问题是中断可能会被阻塞相对
+      很长的事件，这会对系统性能产生负面影响。另一方面，
+      <code class="function">spl()</code>函数族有相当高的额外开销，因此大量
+      很小的临界区可能也不好。</p><p>中断例程处理的情况和其中细节严重依赖于硬件。我们考虑
+      <span class="quote">“<span class="quote">典型(typical)</span>”</span>情况。</p><p>首先，我们检查总线上是否遇到了SCSI复位（可能由同一SCSI总线上
+      的另一SCSI控制器引起）。如果这样我们丢弃所有入队的和断开连接的
+      请求，报告事件并重新初始化我们的SCSI控制器。初始化期间控制器
+      不会发出另一个复位，这对我们十分重要，否则同一SCSI总线上的两个控制器
+      可能会一直来回地复位下去。控制器致命错误/挂起的情况可以在同一
+      地方进行处理，但这可能需要发送RESET信号到SCSI总线来复位与SCSI
+      设备的连接状态。</p><pre class="programlisting">    int fatal=0;
+    struct ccb_trans_settings neg;
+    struct cam_path *path;
+
+    if( detected_scsi_reset(softc)
+    || (fatal = detected_fatal_controller_error(softc)) ) {
+        int targ, lun;
+        struct xxx_hcb *h, *hh;
+
+        /* 丢弃所有入队的CCB */
+        for(h = softc-&gt;first_queued_hcb; h != NULL; h = hh) {
+            hh = h-&gt;next;
+            free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_SCSI_BUS_RESET);
+        }
+
+        /* 要报告的协商的干净值 */
+        neg.bus_width = 8;
+        neg.sync_period = neg.sync_offset = 0;
+        neg.valid = (CCB_TRANS_BUS_WIDTH_VALID
+            | CCB_TRANS_SYNC_RATE_VALID | CCB_TRANS_SYNC_OFFSET_VALID);
+
+        /* 丢弃所有断开连接的CCB和干净协商 */
+        for(targ=0; targ &lt;= OUR_MAX_SUPPORTED_TARGET; targ++) {
+            clean_negotiations(softc, targ);
+
+            /* report the event if possible */
+            if(xpt_create_path(&amp;path, /*periph*/NULL,
+                    cam_sim_path(sim), targ,
+                    CAM_LUN_WILDCARD) == CAM_REQ_CMP) {
+                xpt_async(AC_TRANSFER_NEG, path, &amp;neg);
+                xpt_free_path(path);
+            }
+
+            for(lun=0; lun &lt;= OUR_MAX_SUPPORTED_LUN; lun++)
+                for(h = softc-&gt;first_discon_hcb[targ][lun]; h != NULL; h = hh) {
+                    hh=h-&gt;next;
+                    if(fatal)
+                        free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_UNREC_HBA_ERROR);
+                    else
+                        free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_SCSI_BUS_RESET);
+                }
+        }
+
+        /* 报告事件 */
+        xpt_async(AC_BUS_RESET, softc-&gt;wpath, NULL);
+
+        /* 重新初始化可能花很多时间，这种情况下应当由另一中断发信号
+         * 指示初始化否完成，或在超时时检查 - 但为了简单我们假设
+         * 初始化真的很快
+         */
+        if(!fatal) {
+            reinitialize_controller_without_scsi_reset(softc);
+        } else {
+            reinitialize_controller_with_scsi_reset(softc);
+        }
+        schedule_next_hcb(softc);
+        return;
+    }</pre><p>如果中断不是由控制器范围的条件引起的，则很可能当前硬件控制块
+      出现了问题。依赖于硬件，可能有非HCB相关的事件，此处我们指示不考虑
+      它们。然后我们分析这个HCB发生了什么：</p><pre class="programlisting">    struct xxx_hcb *hcb, *h, *hh;
+    int hcb_status, scsi_status;
+    int ccb_status;
+    int targ;
+    int lun_to_freeze;
+
+    hcb = get_current_hcb(softc);
+    if(hcb == NULL) {
+        /* 或者丢失(stray)的中断，或者某些东西严重错误，
+         * 或者这是硬件相关的某些东西
+         */
+        进行必要的处理;
+        return;
+    }
+
+    targ = hcb-&gt;target;
+    hcb_status = get_status_of_current_hcb(softc);</pre><p>首先我们检查HCB是否完成，如果完成我们就检查返回的SCSI状态。
+      </p><pre class="programlisting">    if(hcb_status == COMPLETED) {
+        scsi_status = get_completion_status(hcb);</pre><p>然后看这个状态是否与REQUEST SENSE命令有关，如果有关则简单
+      地处理一下它。</p><pre class="programlisting">        if(hcb-&gt;flags &amp; DOING_AUTOSENSE) {
+            if(scsi_status == GOOD) { /* autosense成功 */
+                hcb-&gt;ccb-&gt;ccb_h.status |= CAM_AUTOSNS_VALID;
+                free_hcb_and_ccb_done(hcb, hcb-&gt;ccb, CAM_SCSI_STATUS_ERROR);
+            } else {
+        autosense_failed:
+                free_hcb_and_ccb_done(hcb, hcb-&gt;ccb, CAM_AUTOSENSE_FAIL);
+            }
+            schedule_next_hcb(softc);
+            return;
+        }</pre><p>否则命令自身已经完成，把更多注意力放在细节上。如果这个CCB
+      没有禁用auto-sense并且命令连同sense数据失败，则运行REQUEST SENSE
+      命令接收那些数据。</p><pre class="programlisting">        hcb-&gt;ccb-&gt;csio.scsi_status = scsi_status;
+        calculate_residue(hcb);
+
+        if( (hcb-&gt;ccb-&gt;ccb_h.flags &amp; CAM_DIS_AUTOSENSE)==0
+        &amp;&amp; ( scsi_status == CHECK_CONDITION
+                || scsi_status == COMMAND_TERMINATED) ) {
+            /* 启动auto-SENSE */
+            hcb-&gt;flags |= DOING_AUTOSENSE;
+            setup_autosense_command_in_hcb(hcb);
+            restart_current_hcb(softc);
+            return;
+        }
+        if(scsi_status == GOOD)
+            free_hcb_and_ccb_done(hcb, hcb-&gt;ccb, CAM_REQ_CMP);
+        else
+            free_hcb_and_ccb_done(hcb, hcb-&gt;ccb, CAM_SCSI_STATUS_ERROR);
+        schedule_next_hcb(softc);
+        return;
+    }</pre><p>属于协商事件的一个典型事情：从SCSI目标（回答我们的协商企图或
+      由目标发起的）接收到的协商消息，或目标无法协商（拒绝我们的协商消息
+      或不回答它们）。</p><pre class="programlisting">    switch(hcb_status) {
+    case TARGET_REJECTED_WIDE_NEG:
+        /* 恢复到8-bit总线 */
+        softc-&gt;current_bus_width[targ] = softc-&gt;goal_bus_width[targ] = 8;
+        /* 报告事件 */
+        neg.bus_width = 8;
+        neg.valid = CCB_TRANS_BUS_WIDTH_VALID;
+        xpt_async(AC_TRANSFER_NEG, hcb-&gt;ccb.ccb_h.path_id, &amp;neg);
+        continue_current_hcb(softc);
+        return;
+    case TARGET_ANSWERED_WIDE_NEG:
+        {
+            int wd;
+
+            wd = get_target_bus_width_request(softc);
+            if(wd &lt;= softc-&gt;goal_bus_width[targ]) {
+                /* 可接受的回答 */
+                softc-&gt;current_bus_width[targ] =
+                softc-&gt;goal_bus_width[targ] = neg.bus_width = wd;
+
+                /* 报告事件 */
+                neg.valid = CCB_TRANS_BUS_WIDTH_VALID;
+                xpt_async(AC_TRANSFER_NEG, hcb-&gt;ccb.ccb_h.path_id, &amp;neg);
+            } else {
+                prepare_reject_message(hcb);
+            }
+        }
+        continue_current_hcb(softc);
+        return;
+    case TARGET_REQUESTED_WIDE_NEG:
+        {
+            int wd;
+
+            wd = get_target_bus_width_request(softc);
+            wd = min (wd, OUR_BUS_WIDTH);
+            wd = min (wd, softc-&gt;user_bus_width[targ]);
+
+            if(wd != softc-&gt;current_bus_width[targ]) {
+                /* 总线宽度改变了 */
+                softc-&gt;current_bus_width[targ] =
+                softc-&gt;goal_bus_width[targ] = neg.bus_width = wd;
+
+                /* 报告事件 */
+                neg.valid = CCB_TRANS_BUS_WIDTH_VALID;
+                xpt_async(AC_TRANSFER_NEG, hcb-&gt;ccb.ccb_h.path_id, &amp;neg);
+            }
+            prepare_width_nego_rsponse(hcb, wd);
+        }
+        continue_current_hcb(softc);
+        return;
+    }</pre><p>然后我们用与前面相同的笨办法处理auto-sense期间可能出现的任何
+      错误。否则，我们再一次进入细节。</p><pre class="programlisting">    if(hcb-&gt;flags &amp; DOING_AUTOSENSE)
+        goto autosense_failed;
+
+    switch(hcb_status) {</pre><p>我们考虑的下一事件是未预期的连接断开，这个事件在ABORT或
+      BUS DEVICE RESET消息之后被看作是正常的，其他情况下是非正常的。
+      </p><pre class="programlisting">    case UNEXPECTED_DISCONNECT:
+        if(requested_abort(hcb)) {
+            /* 中止影响目标和LUN上的所有命令，因此将那个目标和LUN上的
+             * 所有断开连接的HCB也标记为中止
+             */
+            for(h = softc-&gt;first_discon_hcb[hcb-&gt;target][hcb-&gt;lun];
+                    h != NULL; h = hh) {
+                hh=h-&gt;next;
+                free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_REQ_ABORTED);
+            }
+            ccb_status = CAM_REQ_ABORTED;
+        } else if(requested_bus_device_reset(hcb)) {
+            int lun;
+
+            /* 复位影响那个目标上的所有命令，因此将那个目标和LUN上的
+             * 所有断开连接的HCB标记为复位
+             */
+
+            for(lun=0; lun &lt;= OUR_MAX_SUPPORTED_LUN; lun++)
+                for(h = softc-&gt;first_discon_hcb[hcb-&gt;target][lun];
+                        h != NULL; h = hh) {
+                    hh=h-&gt;next;
+                    free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_SCSI_BUS_RESET);
+                }
+
+            /* 发送事件 */
+            xpt_async(AC_SENT_BDR, hcb-&gt;ccb-&gt;ccb_h.path_id, NULL);
+
+            /* 这是CAM_RESET_DEV请求本身，它完成了 */
+            ccb_status = CAM_REQ_CMP;
+        } else {
+            calculate_residue(hcb);
+            ccb_status = CAM_UNEXP_BUSFREE;
+            /* request the further code to freeze the queue */
+            hcb-&gt;ccb-&gt;ccb_h.status |= CAM_DEV_QFRZN;
+            lun_to_freeze = hcb-&gt;lun;
+        }
+        break;</pre><p>如果目标拒绝接受标签，我们就通知CAM，并返回此LUN的所有命令：
+      </p><pre class="programlisting">    case TAGS_REJECTED:
+        /* 报告事件 */
+        neg.flags = 0 &amp; ~CCB_TRANS_TAG_ENB;
+        neg.valid = CCB_TRANS_TQ_VALID;
+        xpt_async(AC_TRANSFER_NEG, hcb-&gt;ccb.ccb_h.path_id, &amp;neg);
+
+        ccb_status = CAM_MSG_REJECT_REC;
+        /* 请求后面的代码冻结队列 */
+        hcb-&gt;ccb-&gt;ccb_h.status |= CAM_DEV_QFRZN;
+        lun_to_freeze = hcb-&gt;lun;
+        break;</pre><p>然后我们检查一些其他情况，处理(processing)基本上仅限于设置CCB状态：
+      </p><pre class="programlisting">    case SELECTION_TIMEOUT:
+        ccb_status = CAM_SEL_TIMEOUT;
+        /* request the further code to freeze the queue */
+        hcb-&gt;ccb-&gt;ccb_h.status |= CAM_DEV_QFRZN;
+        lun_to_freeze = CAM_LUN_WILDCARD;
+        break;
+    case PARITY_ERROR:
+        ccb_status = CAM_UNCOR_PARITY;
+        break;
+    case DATA_OVERRUN:
+    case ODD_WIDE_TRANSFER:
+        ccb_status = CAM_DATA_RUN_ERR;
+        break;
+    default:
+        /*以通用方法处理所有其他错误 */
+        ccb_status = CAM_REQ_CMP_ERR;
+        /* 请求后面的代码冻结队列 */
+        hcb-&gt;ccb-&gt;ccb_h.status |= CAM_DEV_QFRZN;
+        lun_to_freeze = CAM_LUN_WILDCARD;
+        break;
+    }</pre><p>然后我们检查是否错误严重到需要冻结输入队列，直到它得到处理方可
+      解冻，如果是这样那么就这样来处理：</p><pre class="programlisting">    if(hcb-&gt;ccb-&gt;ccb_h.status &amp; CAM_DEV_QFRZN) {
+        /* 冻结队列 */
+        xpt_freeze_devq(ccb-&gt;ccb_h.path, /*count*/1);
+
+*        /* 重新入队这个目标/LUN的所有命令，将它们返回CAM */
+
+        for(h = softc-&gt;first_queued_hcb; h != NULL; h = hh) {
+            hh = h-&gt;next;
+
+            if(targ == h-&gt;targ
+            &amp;&amp; (lun_to_freeze == CAM_LUN_WILDCARD || lun_to_freeze == h-&gt;lun) )
+                free_hcb_and_ccb_done(h, h-&gt;ccb, CAM_REQUEUE_REQ);
+        }
+    }
+    free_hcb_and_ccb_done(hcb, hcb-&gt;ccb, ccb_status);
+    schedule_next_hcb(softc);
+    return;</pre><p>这包括通用中断处理，尽管特定处理器可能需要某些附加处理。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="scsi-async.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="scsi.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="scsi-errors.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">12.4. 异步事件 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 12.6. 错误总览</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

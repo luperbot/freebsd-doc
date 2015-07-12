@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>3.5. Die Umgebung ihrer Programme einschränken</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="secure.html" title="Kapitel 3. Sicheres Programmieren" /><link rel="prev" href="secure-setuid.html" title="3.4. SetUID-Themen" /><link rel="next" href="secure-trust.html" title="3.6. Vertrauen" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">3.5. Die Umgebung ihrer Programme einschränken</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="secure-setuid.html">Zurück</a> </td><th width="60%" align="center">Kapitel 3. Sicheres Programmieren</th><td width="20%" align="right"> <a accesskey="n" href="secure-trust.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="secure-chroot"></a>3.5. Die Umgebung ihrer Programme einschränken</h2></div></div></div><a id="idp67764048" class="indexterm"></a><p>Die herkömmliche Methode, um einen Prozess
+      einzuschränken, besteht in dem Systemaufruf
+      <code class="function">chroot()</code>. Dieser Aufruf
+      ändert das Wurzelverzeichnis, auf das sich alle
+      Pfadangaben des Prozesses und jegliche Kind-Prozesse beziehen.
+      Damit dieser Systemaufruf gelingt, muss der Prozess
+      Ausführungsrechte (Durchsuchungsrechte) für das
+      Verzeichnis haben, auf das er sich bezieht. Die neue Umgebung
+      wird erst wirksam, wenn Sie mittels
+      <code class="function">chdir()</code> in Ihre neue Umgebung wechseln.
+      Es sollte erwähnt werden, dass ein Prozess recht einfach
+      aus der chroot-Umgebung ausbrechen kann, wenn er root-Rechte
+      besitzt. Das kann man erreichen, indem man Gerätedateien
+      anlegt, um Kernel-Speicher zu lesen, oder indem man einen
+      Debugger mit einem Prozess außerhalb seiner
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>-Umgebung verbindet, oder auf viele andere
+      kreative Wege.</p><p>Das Verhalten des Systemaufrufs
+      <code class="function">chroot()</code> kann durch die
+      kern.chroot.allow_open_directories
+      <code class="command">sysctl</code>-Variable beeinflusst werden. Wenn
+      diese auf 0 gesetzt ist, wird <code class="function">chroot()</code>
+      mit EPERM fehlschlagen, wenn irgendwelche Verzeichnisse
+      geöffnet sind. Wenn die Variable auf den Standardwert 1
+      gesetzt ist, wird <code class="function">chroot()</code> mit EPERM
+      fehlschlagen, wenn irgendwelche Verzeichnisse geöffnet
+      sind und sich der Prozess bereits in einer
+      <code class="function">chroot()</code>-Umgebung befindet. Bei jedem
+      anderen Wert wird die Überprüfung auf
+      geöffnete Verzeichnisse komplett umgangen.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67768912"></a>3.5.1. Die Jail-Funktionalität in FreeBSD</h3></div></div></div><a id="idp67769552" class="indexterm"></a><p>Das Konzept einer Jail (Gefängnis) erweitert
+	<code class="function">chroot()</code>, indem es die Macht des
+	Superusers einschränkt, um einen echten 'virtuellen
+	Server' zu erzeugen. Wenn ein solches Gefängnis einmal
+	eingerichtet ist, muss die gesamte Netzwerkkommunikation
+	über eine bestimmte IP-Adresse erfolgen und die
+	"root-Privilegien" innerhalb der Jail sind sehr stark
+	eingeschränkt.</p><p>Solange Sie sich in einer Jail befinden, werden alle
+	Tests auf Superuser-Rechte durch den Aufruf von
+	<code class="function">suser()</code> fehlschlagen. Allerdings wurden
+	einige Aufrufe von <code class="function">suser()</code>
+	abgeändert, um die neue
+	<code class="function">suser_xxx()</code>-Schnittstelle zu
+	implementieren. Diese Funktion ist dafür verantwortlich,
+	festzustellen, ob bestimmte Superuser-Rechte einem
+	eingesperrten Prozess zur Verfügung stehen.</p><p>Ein Superuser-Prozess innerhalb einer Jail darf
+	folgendes:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">Berechtigungen verändern mittels:
+	    <code class="function">setuid</code>,
+	    <code class="function">seteuid</code>,
+	    <code class="function">setgid</code>,
+	    <code class="function">setegid</code>,
+	    <code class="function">setgroups</code>,
+	    <code class="function">setreuid</code>,
+	    <code class="function">setregid</code>,
+	    <code class="function">setlogin</code></li><li class="listitem">Ressourcenbegrenzungen setzen mittels
+	    <code class="function">setrlimit</code></li><li class="listitem">Einige sysctl-Variablen (kern.hostname)
+	    verändern</li><li class="listitem"><code class="function">chroot()</code></li><li class="listitem">Ein Flag einer vnode setzen:
+	    <code class="function">chflags</code>,
+	    <code class="function">fchflags</code></li><li class="listitem">Attribute einer vnode setzen wie Dateiberechtigungen,
+	    Eigentümer, Gruppe, Größe, Zugriffszeit
+	    und Modifikationszeit</li><li class="listitem">Binden eines Prozesses an einen öffentlichen
+	    privilegierten Port (ports &lt; 1024)</li></ul></div><p><code class="function">Jail</code>s sind ein mächtiges
+	Werkzeug, um Anwendungen in einer sicheren Umgebung
+	auszuführen, aber sie haben auch ihre Nachteile.
+	Derzeit wurden die IPC-Mechanismen noch nicht an
+	<code class="function">suser_xxx</code> angepasst, so dass Anwendungen
+	wie MySQL nicht innerhalb einer Jail ausgeführt werden
+	können. Der Superuser-Zugriff hat in einer Jail nur eine
+	sehr eingeschränkte Bedeutung, aber es gibt keine
+	Möglichkeit zu definieren was
+	"sehr eingeschränkt" heißt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67787984"></a>3.5.2. <span class="trademark">POSIX</span>®.1e Prozess Capabilities</h3></div></div></div><a id="idp67789008" class="indexterm"></a><a id="idp67789520" class="indexterm"></a><p><span class="trademark">POSIX</span>® hat einen funktionalen Entwurf (Working Draft)
+	herausgegeben, der Ereignisüberprüfung,
+	Zugriffskontrolllisten, feiner einstellbare Privilegien,
+	Informationsmarkierung und verbindliche Zugriffskontrolle
+	enthält.</p><p>Dies ist im Moment in Arbeit und das Hauptziel des <a class="link" href="http://www.trustedbsd.org/" target="_top">TrustedBSD</a>-Projekts.
+	Ein Teil der bisherigen Arbeit wurde in FreeBSD-CURRENT
+	übernommen (cap_set_proc(3)).</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="secure-setuid.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="secure.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="secure-trust.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">3.4. SetUID-Themen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 3.6. Vertrauen</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

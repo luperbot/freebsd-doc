@@ -1,0 +1,1001 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>32.6. IPFW</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="firewalls.html" title="Kapitel 32. Firewalls" /><link rel="prev" href="firewalls-ipf.html" title="32.5. Die IPFILTER-Firewall (IPF)" /><link rel="next" href="advanced-networking.html" title="Kapitel 33. Weiterführende Netzwerkthemen" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">32.6. IPFW</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="firewalls-ipf.html">Zurück</a> </td><th width="60%" align="center">Kapitel 32. Firewalls</th><td width="20%" align="right"> <a accesskey="n" href="advanced-networking.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls-ipfw"></a>32.6. IPFW</h2></div></div></div><a id="idp91631056" class="indexterm"></a><p>Die <span class="emphasis"><em>IPFIREWALL</em></span>
+      (<acronym class="acronym">IPFW</acronym>) ist eine vom FreeBSD Project
+      gesponserte Software-Firewall.  Sie wurde und wird
+      freiwillig von Mitgliedern des FreeBSD Projects geschrieben und
+      gewartet.  Mit zustandslosen Regeln und einer Grammatik für
+      Regeln implementiert sie eine sogenannte <span class="quote">&#8222;<span class="quote">Einfache
+      Zustandsgesteuerte Logik</span>&#8220;</span>.</p><p>Die Standardinstallation von IPFW  enthält
+      einen beispielhaften Regelsatz
+      (<code class="filename">/etc/rc.firewall</code> und
+      <code class="filename">/etc/rc.firewall6</code>).  Dieser ist eher
+      einfach gehalten; es ist nicht zu erwarten, dass dieser
+      ohne Modifikationen angewandt werden kann.  Dieses Beispiel
+      nutzt keine zustandsorientierte Filterung, von der allerdings
+      die meisten Installationen profitieren sollten.  Deshalb wird sich
+      dieser Abschnitt auch nicht auf diese Beispiele stützen.</p><p>Die zustandslose IPFW Regel-Syntax ist durch ihre technisch
+      ausgefeilten Selektions-Fähigkeiten, die über das
+      Niveau der gebrächlichen Firewall-Installationsprogramme
+      weit hinausgehen, sehr mächtig.  IPFW richtet sich an
+      professionelle oder technisch versierte Nutzer mit
+      weitergehenden Anforderungen an die Paket-Auswahl.  Um die
+      Ausdrucksstärke der IPFW zu nutzen, ist sehr detailliertes
+      Wissen über die Art und Weise, wie verschiedene Protokolle ihre
+      jeweilige Paket-Header-Information erzeugen und nutzen,
+      erforderlich.  Im Rahmen dieses Abschnitts ist es nicht möglich,
+      auf alle diese Punkte detailliert einzugehen.</p><p>IPFW besteht aus sieben Komponenten:  Hauptbestandteil ist der
+      Kernel Firewall Filter, ein Regel-Prozessor mit integrierter
+      Paket-Buchführung.  Außerdem enthalten
+      ist eine Komponente zur Protokollierung der Aktivitäten der
+      Firewall (also ein Logfunktion).  Weiters besteht die IPFW aus einer
+      Regel zum Umleiten des Datenverkehrs (<code class="literal">divert</code>), die
+      auch Network Address Translation (<acronym class="acronym">NAT</acronym>)
+      unterstützt.  Die restlichen Bestandteile dienen verschiedenen
+      fortgeschrittenen Zwecken.  Der
+      <span class="foreignphrase"><em class="foreignphrase">Traffic Shaper</em></span> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dummynet&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">dummynet</span>(4)</span></a>
+      gestattet es beispielsweise,  den Datenverkehr zu lenken, während
+      die <code class="literal">fwd</code>-Regel zum Weiterleiten von Datenpaketen
+      dient.  Komplettiert wird IPFW durch Funktionen zum
+      Überbrücken von Netzwerkgrenzen
+      (<span class="foreignphrase"><em class="foreignphrase">Bridge</em></span>-Funktion) sowie
+      <span class="foreignphrase"><em class="foreignphrase">ipstealth</em></span>, das es gestattet,
+      bridging-Funktionen durchzuführen, ohne dabei das TTL-Feld im
+      IP-Paket zu erhöhen.  IPFW unterstützt IPv4 und IPv6.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-enable"></a>32.6.1. IPFW aktivieren</h3></div></div></div><a id="idp91643728" class="indexterm"></a><p>IPFW ist in der FreeBSD-Installation standardmäßig
+	als ein zur Laufzeit ladbares Kernelmodul enthalten, das
+	vom System automatisch geladen wird, wenn in der Datei
+	<code class="filename">rc.conf</code> die Option
+	<code class="varname">firewall_enable="YES"</code> gesetzt wird.  Es ist
+	daher nicht notwendig, IPFW statisch in den Kernel zu
+	kompilieren.</p><p>Während des Systemstart wird bei gesetzter Option
+	<code class="varname">firewall_enable="YES"</code> (in der Datei
+	<code class="filename">rc.conf</code>) folgende Nachricht ausgegeben:</p><pre class="screen">ipfw2 initialized, divert disabled, rule-based forwarding disabled, default to deny, logging disabled</pre><p>Das Kernelmodul hat eine Protokollierungsfunktion.  Um
+	diese zu aktivieren und einen Schwellwert für die
+	Protokollierung zu definieren, ist es erforderlich, folgende
+	Ausdrücke der <code class="filename">/etc/sysctl.conf</code>
+	hinzuzufügen:</p><pre class="programlisting">net.inet.ip.fw.verbose=1
+net.inet.ip.fw.verbose_limit=5</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-kernel"></a>32.6.2. Kerneloptionen</h3></div></div></div><a id="idp91653840" class="indexterm"></a><a id="idp91654992" class="indexterm"></a><a id="idp91656144" class="indexterm"></a><a id="idp91657296" class="indexterm"></a><p>Es ist für die Aktivierung von IPFW nicht zwingend
+	erforderlich, die folgenden Optionen in den Kernel zu
+	kompilieren.  Es wird hier lediglich als
+	Hintergrundinformation aufgeführt.</p><pre class="programlisting">options IPFIREWALL</pre><p>Diese Option aktiviert IPFW als Bestandteil des
+	Kernels.</p><pre class="programlisting">options IPFIREWALL_VERBOSE</pre><p>Diese Option aktiviert die Funktion, alle Pakete, die durch
+	IPFW verarbeitet werden und bei denen das Schlüsselwort
+	<code class="literal">log</code> gesetzt ist, zu protokollieren.</p><pre class="programlisting">options IPFIREWALL_VERBOSE_LIMIT=5</pre><p>Diese Option limitiert die Anzahl der durch <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	protokollierten Pakete auf das angegebene Maximum.  Sie wird
+	in feindlichen Umgebungen verwandt, in denen die
+	Protokollierung der Firewall-Aktivität erwünscht
+	ist.  Dadurch wird ein möglicher Denial-of-Service-Angriff
+	durch Überflutung von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> verhindert.</p><a id="idp91691856" class="indexterm"></a><pre class="programlisting">options IPFIREWALL_DEFAULT_TO_ACCEPT</pre><p>Diese Option erlaubt allen Paketen, die Firewall zu passieren.
+	Diese Einstellung kann beispielsweise bei der ersten Konfiguration
+	der Firewall hilfreich sein.</p><a id="idp91693776" class="indexterm"></a><pre class="programlisting">options IPDIVERT</pre><p>Dies aktiviert die Nutzung der
+	<acronym class="acronym">NAT</acronym>-Funktionalität.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Firewall wird alle eingehenden oder ausgehenden
+	  Pakete blockieren, wenn entweder die Kernel-Option
+	  <code class="literal">IPFIREWALL_DEFAULT_TO_ACCEPT</code> fehlt oder
+	  aber keine Regel, die die betreffenden Verbindungen explizit
+	  gestattet, existiert.  Dies enstpricht im Wesentlichen der
+	  Einstellung <span class="quote">&#8222;<span class="quote">default to deny</span>&#8220;</span></p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rc"></a>32.6.3. Optionen in <code class="filename">/etc/rc.conf</code></h3></div></div></div><p>Der Eintrag</p><pre class="programlisting">firewall_enable="YES"</pre><p>aktiviert die Firewall während des Systemstarts.</p><p>Die Auswahl einer für FreeBSD verfügbaren Firewall
+	erfolgt durch einen entsprechenden Eintrag in der Datei
+	<code class="filename">/etc/rc.firewall</code>, durch den der Firewalltyp
+	festgelegt wird.</p><pre class="programlisting">firewall_type="open"</pre><p>Konkret sind folgende Einträge erlaubt:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">open</code> &#8212; gestattet jeglichen
+	    Datenverkehr</p></li><li class="listitem"><p><code class="literal">client</code> &#8212; schützt nur die
+	    jeweilige Maschine (Client/Mandant)</p></li><li class="listitem"><p><code class="literal">simple</code> &#8212; schützt das
+	    gesamte Netzwerk</p></li><li class="listitem"><p><code class="literal">closed</code> &#8212; unterbindet
+	    jeglichen IP-Datenverkehr mit Ausnahme des Verkehrs
+	    über die Loopback-Schnittstelle.</p></li><li class="listitem"><p><code class="literal">UNKNOWN</code> &#8212; deaktiviert das
+	    Laden von Firewallregeln</p></li><li class="listitem"><p><code class="filename">filename</code>
+	    &#8212; absoluter Pfad zu einer Datei, in der die
+	    Firewallregeln definiert sind</p></li></ul></div><p>Angepasste Regeln für <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> können auf zwei
+	verschiedene Arten geladen werden.  Einerseits kann man durch die
+	Variable <code class="varname">firewall_type</code> den absoluten Pfad
+	der Datei angeben, welche die <span class="emphasis"><em>Firewallregeln</em></span>
+	(ohne weitere Optionen) für <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> enthält.  Ein
+	einfaches Beispiel für einen Regelsatz, der jeglichen
+	eingehenden und ausgehenden Datenverkehr blockiert, könnte
+	beispielsweise so aussehen:</p><pre class="programlisting">add deny in add deny out</pre><p>Andererseits ist es möglich, den Wert der
+	<code class="varname">firewall_type</code>-Variable mit dem absoluten
+	Pfad einer Datei zu belegen, die (als ausführbares Skript)
+	die <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>-Kommandos enthält, die beim Booten
+	ausgeführt werden sollen.   Ein gültiges Skript (das die
+	gleiche Funktion hat wie die Zeile im letzten Beispiel) könnte
+	beispielsweise so aussehen:</p><pre class="programlisting">#!/bin/sh
+
+ipfw -q flush
+
+ipfw add deny in
+ipfw add deny out</pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Wenn die Variable <code class="varname">firewall_type</code>
+	  entweder auf <code class="literal">client</code> oder
+	  <code class="literal">simple</code> gesetzt ist, sollten die
+	  Standardregeln in der Datei
+	  <code class="filename">/etc/rc.firewall</code> geprüft und an die
+	  Konfiguration der gegebenen Maschine angepasst werden.  Beachten
+	  Sie dabei bitte, dass die Beispiele dieses Kapitels davon
+	  ausgehen, dass das <code class="varname">firewall_script</code> auf
+	  <code class="filename">/etc/ipfw.rules</code> gesetzt ist.</p></div><p>Das Logging wird durch folgenden Eintrag aktiviert:</p><pre class="programlisting">firewall_logging="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Variable <code class="varname">firewall_logging</code> definiert
+	  lediglich die sysctl-Variable als
+	  <code class="varname">net.inet.ip.fw.verbose = 1</code> (lesen Sie dazu
+	  bitte auch den Abschnitt <a class="xref" href="firewalls-ipfw.html#firewalls-ipfw-enable" title="32.6.1. IPFW aktivieren">Abschnitt 32.6.1, &#8222;IPFW aktivieren&#8220;</a>
+	  des Handbuchs).  Es gibt keine
+	  <code class="filename">rc.conf</code>-Variable, mit der man
+	  Protokollierungsschwellen setzen könnte.  Dies kann
+	  lediglich über <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> geschehen, wobei Sie in
+	  der Datei <code class="filename">/etc/sysctl.conf</code> nur
+	  Werte &gt; 1 angeben sollten:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">net.inet.ip.fw.verbose_limit=5</pre></div><p>Sollte Ihre Maschinen als Gateway fungieren (also mittels
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> <span class="foreignphrase"><em class="foreignphrase">Network Address
+	Translation</em></span> (<acronym class="acronym">NAT</acronym>)
+      durchführen), finden Sie weitere Optionen in
+      <code class="filename">/etc/rc.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-cmd"></a>32.6.4. Der Befehl IPFW</h3></div></div></div><a id="idp91740880" class="indexterm"></a><p>Mit <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> ist es möglich, im laufenden Betrieb
+	einzelne Regeln hinzuzufügen oder zu entfernen.  Problematisch
+	ist allerdings, dass diese Änderungen verloren gehen, wenn
+	das System neu gestartet wird.  Daher ist es empfehlenswert,
+	eigene Regeln in einer Datei zu definieren und diese zu laden, um
+	die Regeln der Firewall im laufenden Betrieb anzupassen.</p><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> ist jedoch hilfreich, um die Regeln der laufenden
+	Firewall in der Konsole auszugeben.  IPFW erzeugt dynamisch einen
+	Zähler, der jedes Paket, auf das eine Regel zutrifft,
+	zählt.  Dadurch wird es möglich, die Funktion einer
+	Regel zu überprüfen.</p><p>Eine sequentielle Liste aller Regeln erhalten Sie mit:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw list</code></strong></pre><p>Eine Liste aller Regeln inklusive des letzten Treffers
+	erhalten Sie durch den folgenden Befehl:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -t list</code></strong></pre><p>Um eine Liste aller Regeln inklusive der Anzahl der Pakete, die
+	von einer Regel gefiltert wurden, zu erhalten, geben Sie
+	den folgenden Befehl ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -a list</code></strong></pre><p>Eine Liste, die zusätzlich allen dynamischen Regeln
+	enthält, erhalten Sie mit:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d list</code></strong></pre><p>Um diese Liste um alle <span class="quote">&#8222;<span class="quote">abgelaufenen</span>&#8220;</span> Regeln zu
+	erweitern, ädern Sie diesen Befehl wie folgt ab:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d -e list</code></strong></pre><p>Alle Zähler auf Null zurücksetzen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero</code></strong></pre><p>Es ist auch möglich, einen spezifischen Zähler
+	auszuwählen und zurückzusetzen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero NUM</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules"></a>32.6.5. IPFW-Regeln</h3></div></div></div><p>Ein Regelwerk ist eine Menge von IPFW-Regeln, die in
+	Abhängigkeit von bestimmten Paketeigenschaften Pakete
+	entweder passieren lassen oder abweisen.  Der
+	zustandshafte bidirektionale Transfer von Paketen zwischen
+	Rechnern wird als Sitzung bezeichnet.  Das Regelwerk der Firewall
+	verarbeitet sowohl ankommende Pakete (aus dem öffentlichen
+	Internet) als auch Pakete, deren Ursprung in einer Antwort des
+	Systems auf empfangene Pakete liegt.  Jeder
+	<acronym class="acronym">TCP/IP</acronym>-Dienst (wie telnet, www, mail) ist
+	durch sein Protokoll und durch den priveligierten
+	(eingehenden) Port definiert.  An einen spezifischen Dienst
+	adressierte Pakete kommen von einer Quelladresse und einem
+	unprivilegierten (high order) Port. Sie adressieren den
+	spezifischen Port des Dienstes an der Zieladresse.  Alle weiter
+	oben aufgeführten Parameter (also Ports und Adressen)
+	können als Selektionskriterium zur Erzeugung von Regeln
+	genutzt werden, die ein Passieren der Firewall für oder
+	ein Blockieren von Diensten bewirken.</p><a id="idp91771472" class="indexterm"></a><p>Wenn ein Paket die Firewall <span class="quote">&#8222;<span class="quote">betritt</span>&#8220;</span>, also
+	von der Firewall geprüft und verarbeitet wird, wird die
+	erste Regel des Regelwerkes auf das Paket angewandt.  Auf
+	diese Weise wird in aufsteigender Reihenfolge der Regelnummer
+	mit allen weiteren Regeln verfahren.  Falls die
+	Selektionsparameter einer Regel auf ein Paket zutreffen, wird
+	das Aktionsfeld der Regel ausgeführt und die Prüfung
+	des Pakets beendet, nachfolgende Regeln werden also nicht
+	mehr geprüft.  Diese Suchmethode wird als <span class="quote">&#8222;<span class="quote">erster
+	Treffer gewinnt</span>&#8220;</span> bezeichnet.  Falls keine Regel auf
+	das betreffende Paket zutrifft, wird die obligatorische
+	IPFW-Rückfallregel (also Regel 65535) angewendet und das
+	Paket wird ohne Rückantwort verworfen.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Prüfung der Regeln wird nach Treffern von mit
+	  <code class="literal">count</code>, <code class="literal">skipto</code> und
+	  <code class="literal">tee</code> parametrisierten Regeln ungeachtet
+	  des <span class="quote">&#8222;<span class="quote">erster Treffer gewinnt</span>&#8220;</span>-Prinzips weiter
+	  fortgeführt.</p></div><p>Die Anweisungen basieren auf der Nutzung von Regeln
+	mit den zustandsgesteuerten Optionen <code class="literal">keep</code>,
+	<code class="literal">state</code>, <code class="literal">limit</code>,
+	<code class="literal">in</code> und <code class="literal">out</code>.  Diese
+	bilden die Basis für die Spezifikation von
+	Firewallregeln.</p><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Bei der Arbeit mit Firewallregeln ist Vorsicht geboten.
+	  Es ist sehr einfach, sich selbst auszuschließen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-syntax"></a>32.6.5.1. Syntax der Firewallregeln</h4></div></div></div><a id="idp91784400" class="indexterm"></a><p>Mit der in diesem Abschnitt dargestellten Syntax der
+	  Regeln kann ein Standardregelsatz für eine
+	  <span class="quote">&#8222;<span class="quote">einschließende</span>&#8220;</span> Firewall erstellt
+	  werden.  Für eine vollständige Beschreibung der
+	  Regelsyntax lesen Sie bitte die Manualpage <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a></p><p>Regelausdrücke werden <span class="quote">&#8222;<span class="quote">von links nach
+	  rechts</span>&#8220;</span> ausgewertet.  Schlüsselwörter
+	  werden in fetter Schrift dargestellt.  Manche
+	  Schlüsselworte beinhalten Unteroptionen, die wiederum
+	  selbst aus Schlüsselworten samt Optionen bestehen
+	  können.</p><p>Kommentare sind mit einen führenden Doppelkreuz
+	  (<code class="literal">#</code>) ausgezeichnet.  Sie können am
+	  Ende einer Regel oder in einzelnen, separaten Zeilen stehen.
+	  Leerzeilen werden ignoriert.</p><p><em class="replaceable"><code>CMD RULE_NUMBER ACTION LOGGING SELECTION
+	  STATEFUL</code></em></p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91789008"></a>32.6.5.1.1. CMD</h5></div></div></div><p>Jede neue Regel benötigt das Präfix
+	    <code class="literal">add</code>, um die Regel der internen
+	    Tabelle hinzuzfügen.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91790544"></a>32.6.5.1.2. RULE_NUMBER</h5></div></div></div><p>Zu jeder Regel gehört eine Regelnummer zwischen 1
+	    und 65535.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91791696"></a>32.6.5.1.3. ACTION</h5></div></div></div><p>Eine Regel kann mit einer der vier folgenden Aktionen
+	    verbunden sein, die ausgeführt werden, wenn ein Paket
+	    den Selektionskriterien der Regel entspricht.</p><p><em class="parameter"><code>allow | accept | pass | permit</code></em></p><p>Alle diese Aktionen bewirken das Gleiche:  Pakete, die
+	    den Selektionskriterien der Regel entsprechen, verlassen den
+	    Regelprüfungsabschnitt der Firewall und die
+	    Regelprüfung wird beendet.</p><p><em class="parameter"><code>check-state</code></em></p><p>Diese Aktion prüft das Paket gegen die Regeln aus
+	    den dynamischen Regeltabellen.  Trifft ein
+	    Selektionskriterium zu, wird die zur dynamischen Regel
+	    gehörende Aktion ausgeführt.  Anderenfalls wird
+	    gegen die nächste Regel geprüft.  Die
+	    <code class="literal">check-state</code>-Regel selbst hat kein
+	    Selektionskriterium.  Sollte eine
+	    <code class="literal">check-state</code>-Regel im Regelwerk fehlen,
+	    wird gegen die erste <code class="literal">keep-state</code>- oder
+	    <code class="literal">limit</code>-Regel in den dynamischen Regeln
+	    geprüft.</p><p><em class="parameter"><code>deny | drop</code></em></p><p>Beide Schlüsselworte bewirken dieselbe Aktion:
+	    Ein Paket, dass die Selektionskriterien der Regel
+	    erfüllt, wird verworfen und die Regelprüfung
+	    wird beendet.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91797200"></a>32.6.5.1.4. Protokollierung</h5></div></div></div><p><em class="parameter"><code>log</code></em> oder
+	    <em class="parameter"><code>logamount</code></em></p><p>Erfüllt ein Paket die Selektionskriterien mit dem
+	    Schlüsselwort <code class="literal">log</code>, wird dies von
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> mit der Annotation SECURITY protokolliert.
+	    Dies erfolgt allerdings nur, wenn die Anzahl der
+	    protokollierten Pakete der betreffenden Regel die im
+	    <code class="literal">logamount</code>-Parameter definierte
+	    Schwelle nicht übersteigt.  Ist der Parameter
+	    <code class="literal">logamount</code> nicht definiert, wird diese
+	    Grenze aus der <code class="command">sysctl</code>-Variable
+	    <code class="varname">net.inet.ip.fw.verbose_limit</code> ermittelt.
+	    Ist einer dieser beiden Werte auf <span class="quote">&#8222;<span class="quote">Null</span>&#8220;</span>
+	    gesetzt, wird unbegrenzt protokolliert.  Wurde hingegen
+	    ein definierter Schwellenwert erreicht, wird die
+	    Protokollierung deaktiviert.  Um sie zu reaktivieren,
+	    können Sie entweder den Protokoll- oder den
+	    Paketzähler rücksetzen (und zwar über den
+	    Befehl <code class="command">ipfw reset log</code>).</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Protokollierung findet statt, nachdem alle
+	      Paketselektionskriterien geprüft und bevor die
+	      daraus folgende, endgültige Aktion
+	      (<code class="literal">accept</code> oder <code class="literal">deny</code>)
+	      auf das Paket ausgeführt wird.  Die Entscheidung,
+	      welche Regel protokolliert werden soll, bleibt Ihnen
+	      überlassen.</p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91804368"></a>32.6.5.1.5. Selektion</h5></div></div></div><p>Die in diesem Abschnitt beschriebenen
+	    Schlüsselwörter beschreiben die Attribute eines
+	    Pakets, durch die bestimmt wird, ob eine Regel auf ein
+	    Paket zutrifft.  Die folgenden Attribute dienen der
+	    Bestimmung des Protokolls und müssen in der angegebenen
+	    Reihenfolge verwendet werden.</p><p><em class="parameter"><code>udp | tcp | icmp</code></em></p><p>Weitere in <code class="filename">/etc/protocols</code>
+	    angegebene Protokolle werden ebenfalls erkannt und
+	    können daher verwendet werden, um das Protokoll zu
+	    definieren, gegen das Pakete geprüft werden. Die
+	    Angabe des Protokolls ist verpflichtend.</p><p><em class="parameter"><code>from src to dst</code></em></p><p>Die Schlüsselwörter <code class="literal">from</code>
+	    und <code class="literal">to</code> beziehen sich auf IP-Adressen und
+	    definieren sowohl Ursprungs- als auch Zieladresse einer
+	    Datenverbindung.  Firewallregeln müssen Parameter
+	    für den Ursprung <span class="emphasis"><em>und</em></span> das Ziel
+	    enthalten.  Das Schlüsselwort <code class="literal">any</code>
+	    steht für beliebige IP-Adressen.  Bei
+	    <code class="literal">me</code> handelt es sich um ein spezielles
+	    Schlüsselwort, das alle IP-Adressen beschreibt, die
+	    einer bestimmten Netzwerkschnittstelle Ihres Systems
+	    (auf dem die Firewall läuft) zugeordnet sind.
+	    Beispiele hierfür sind
+	    <code class="literal">from me to any</code>,
+	    <code class="literal">from any to me</code>,
+	    <code class="literal">from 0.0.0.0/0 to any </code>,
+	    <code class="literal">from any to 0.0.0.0/0</code>,
+	    <code class="literal">from 0.0.0.0 to any</code>,
+	    <code class="literal">from any to 0.0.0.0</code> oder
+	    <code class="literal">from me to 0.0.0.0</code>.  IP-Adressen werden
+	    entweder in <acronym class="acronym">CIDR</acronym>-Notation
+	    oder durch Punkte getrennt mit Suffixen
+	    (<code class="systemitem">192.168.2.101/24</code>) für
+	    die Netzmaske oder als einzelne numerische, durch Punkte
+	    getrennte Adressen
+	    (<code class="systemitem">192.168.2.101</code>) angegeben.
+	    Die dafür notwendigen Berechnungen erleichtert der
+	    Port <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/ipcalc/pkg-descr">net-mgmt/ipcalc</a>.
+	    Weiterführende Informationen finden sich auf
+	    <code class="uri"><a class="uri" href="http://jodies.de/ipcalc" target="_top">http://jodies.de/ipcalc</a></code>.</p><p><em class="parameter"><code>port number</code></em></p><p>Bei der Verarbeitung von Protokollen wie
+	    <acronym class="acronym">TCP</acronym> oder <acronym class="acronym">UDP</acronym>, die
+	    Portnummern verwenden, muss die Portnummer des
+	    betreffenden Dienstes angegeben werden.  Anstelle der
+	    Portnummer kann auch der in der Datei
+	    <code class="filename">/etc/services</code> definierte Name des
+	    Dienstes angegeben werden.</p><p><em class="parameter"><code>in | out</code></em></p><p>Diese Schlüsselwörter beziehen sich auf die
+	    Richtung des Datenverkehrs.  Jede Regel
+	    <span class="emphasis"><em>muss</em></span> eines dieser beiden
+	    Schlüsselwörter enthalten.</p><p><em class="parameter"><code>via IF</code></em></p><p>Eine Regel mit dem Schlüsselwort
+	    <code class="literal">via IF</code> betrifft nur Pakete, die über
+	    die angegebene Schnittstellte geroutet werden (ersetzen Sie
+	    <code class="literal">IF</code> durch den Namen Ihrer
+	    Netzwerkschnittstelle).  Die Angabe des
+	    Schlüsselwortes <code class="literal">via</code> bewirkt, dass
+	    die Netzwerkschnittstelle in die Regelprüfung
+	    aufgenommen wird.</p><p><em class="parameter"><code>setup</code></em></p><p>Dieses obligatorische Schlüsselwort bezeichnet
+	    die Anforderung des Sitzungsstarts für
+	    <acronym class="acronym">TCP</acronym>-Pakete.</p><p><em class="parameter"><code>keep-state</code></em></p><p>Dieses obligatorische Schlüsselwort bewirkt,
+	    dass die Firewall eine dynamische Regel erzeugt, die
+	    bidirektionalen Datenverkehr zwischen Ursprungs- und
+	    Zieladresse sowie Ursprungs- und Zielport prüft,
+	    der das gleiche Protokoll verwendet.</p><p><em class="parameter"><code>limit {src-addr | src-port | dst-addr |
+	      dst-port}</code></em></p><p>Wird das Schlüsselwort <code class="literal">limit</code>
+	    verwendet, sind nur <code class="literal">N</code> durch diese
+	    Regel definierte Verbindungen erlaubt.  Es können
+	    dabei ein oder mehrere Ursprungs- und Zieladressen sowie
+	    ein oder mehrere Ports angegeben werden.  Die
+	    Schlüsselwörter <code class="literal">limit</code>
+	    und <code class="literal">keep-state</code> können nicht in
+	    derselben Regel verwendet werden.  Die Option
+	    <code class="literal">limit</code> bewirkt dieselbe Zustandsteuerung
+	    wie die Option <code class="literal">keep-state</code>, erweitert
+	    diese jedoch um eigene Regeln.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91834192"></a>32.6.5.2. Optionen für zustandsgesteuerte Regeln</h4></div></div></div><a id="idp91834832" class="indexterm"></a><p>Eine zustandsgesteuerte Filterung behandelt Datenverkehr
+	  als einen bidirektionalen Austausch von Datenpaketen (die eine
+	  sogenannte Konversation innerhalb einer Sitzung darstellen).
+	  Sie ist in der Lage, zu bestimmen, ob die Konversation von
+	  originärem Sender und Empfänger gültigen
+	  Prozeduren des bidirektionalen Pakettausches entspricht.
+	  Pakete, die dem Muster von Konversationen in Sitzungen nicht
+	  folgen, werden automatisch als <span class="quote">&#8222;<span class="quote">Betrüger</span>&#8220;</span>
+	  abgelehnt.</p><p>Die <code class="literal">check-state</code>-Option wird verwendet,
+	  wo genau innerhalb des IPFW-Regelwerks die Prüfung
+	  dynamischer Regeln stattfinden soll.  Erfüllt ein
+	  Datenpaket die Selektionskriterien der Regel, verlässt
+	  das Paket die Firewall.  Gleichzeitig wird eine neue
+	  dynamische Regel erzeugt, die für das nächste Paket
+	  der bidirektionalen Konversation in der Sitzung vorgesehen
+	  ist.  Falls ein Paket die (dyanmische) Regel nicht erfüllt,
+	  wird es gegen die nächste Regel im Regelwerk
+	  geprüft.</p><p>Dynamische Regeln sind für einem sogenannten
+	  <span class="foreignphrase"><em class="foreignphrase">SYN-flood</em></span>-Angriff anfällig,
+	  bei dem eine riesige Anzahl <span class="quote">&#8222;<span class="quote">schwebender</span>&#8220;</span>
+	  dynamischer Regelprüfungungsinstanzen erzeugt wird.  Um
+	  einem solchen Angriff zu begegnen, wurde in FreeBSD die neue
+	  Option <code class="literal">limit</code> geschaffen.  Diese Option
+	  begrenzt die Anzahl der gleichzeitig möglichen
+	  Sitzungen und/oder Konversationen.  Es handelt sich dabei um
+	  einen Zähler, der die Anzahl von Instanzen dynamischer
+	  Regelprüfungen in Abhängigkeit von einer eindeutigen
+	  Urspungs- und Quelladresskombination zählt.
+	  Übersteigt der Zähler den durch
+	  <code class="literal">limit</code> definierten Schwellenwert, wird
+	  das Paket verworfen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91839824"></a>32.6.5.3. Protokollierung von Firewall-Nachrichten</h4></div></div></div><a id="idp91840464" class="indexterm"></a><p>Die Vorteile einer Protokollierung sind offensichtlich.
+	  Sie ermöglicht nach Aktivierung von Regeln zu
+	  untersuchen, welche Pakete verworfen wurden, von wo diese
+	  stammen und für welche Systeme sie bestimmt waren.  Diese
+	  Informationen sind sehr nützlich bei der Erkennung
+	  eventueller Angriffe sowie bei deren Abwehr.</p><p>IPFW protokolliert nur jene Regeln, für die ein
+	  Administrator dies explizit aktiviert.  Ein Aktivieren
+	  der Protolllfunktion führt also nicht dazu, dass
+	  automatisch alle Regeln protokolliert werden.  Vielmehr
+	  entscheidet der Administrator der Firewall, welche Regeln
+	  protokolliert werden sollen.  Dazu wird die Option
+	  <code class="literal">log</code> für diese Regeln aktiviert.  Im
+	  Regelfall werden nur <code class="literal">deny</code>-Regeln
+	  protokolliert, beispielsweise  die <code class="literal">deny</code>-Regel
+	  für eintreffende <acronym class="acronym">ICMP</acronym>-Nachrichten.
+	  Üblicherweise wird die <span class="quote">&#8222;<span class="quote">ipfw default deny
+	  everything</span>&#8220;</span>-Regel doppelt angelegt.  Einmal mit und
+	  einmal ohne aktivierte Option <code class="literal">log</code>.  Dadurch
+	  erhält man eine Auflistung aller Pakete, auf die keine
+	  Regel zutraf.</p><p>Protokollierung ist allerdings ein zweischneidiges
+	  Schwert, bei mangelnder Vorsicht wird man mit einer enormen
+	  Flut von Protokollierungsdaten förmlich
+	  <span class="emphasis"><em>überschwemmt</em></span> und belastet
+	  zusätzlich die Festplatte des Systems durch rasch
+	  wachsende Protokolldateien.  DoS-Angriffe, die auf diese
+	  Art und Weise Festplatten an die Kapazitätsgrenze treiben,
+	  gehören zu den ältesten Angriffen überhaupt.
+	  Außerdem werden Protokollnachrichten nicht nur an
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> geschickt, sondern auch auf einem
+	  root-Terminal angezeigt.</p><p>Die Kerneloption
+	  <code class="varname">IPFIREWALL_VERBOSE_LIMIT=5</code> begrenzt die
+	  Anzahl gleicher Nachrichten an <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> für
+	  eine gegebene Regel auf fünf Nachrichten.  Ist diese
+	  Option im Kernel aktiviert, wird nach Erreichen der
+	  festgelegten Anzahl die Protokollierung einer (sich
+	  unmittelbar hintereinander wiederholenden) Nachricht auf den
+	  angegebenen Schwellenwert begrenzt, da beispielsweise die
+	  Speicherung von 200 gleichen Protokollnachrichten durch
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> sinnlos ist.  Daher werden durch diesen
+	  nur füf derartige Nachrichten protokolliert.  Alle
+	  weiteren derartigen Nachrichten werden nur gezählt und
+	  deren Gesamtzahl wird schließlich von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	  durch folgenden Ausdruck ausgegeben:</p><pre class="programlisting">last message repeated 45 times</pre><p>Alle protokollierten Nachrichten für Datenpakete
+	  werden in der Voreinstellung in die Datei
+	  <code class="filename">/var/log/security</code> (die in der Datei
+	  <code class="filename">/etc/syslog.conf</code> definiert wird),
+	  geschrieben.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="Firewalls-ipfw-rules-script"></a>32.6.5.4. Skripte zur Regeldefinition erstellen</h4></div></div></div><p>Die meisten fortgeschrittenen IPFW-Nutzer erzeugen eine
+	  Datei, die die Regeln für die Firewall enthält,
+	  um diese als Skript ausführen zu können.
+	  Der Hauptvorteil einer derartigen Konfiguration ist es, dass
+	  dadurch mehrere Regeln gleichzeitig geändert und
+	  (re-)aktiviert werden können, ohne dass dazu das System
+	  neu gestartet werden muss.  Dies ist auch beim Testen von
+	  Regeländerungen sehr hilfreich.  Weil es sich bei der
+	  Datei, in der die Regeln gespeichert sind, um ein Skript
+	  handelt, ist es auch möglich, häufig verwendete
+	  Werte/Befehle durch Aliase zu ersetzen und diese so in mehreren
+	  Regeln zu nutzen.  Diese Funktion wird im folgenden Beispiel
+	  näher vorgestellt.</p><p>Die Syntax des folgenden Skripts entspricht der Syntax von
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> sowie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcsh</span>(1)</span></a>.  Felder, die
+	  symbolisch substituiert werden, haben das Präfix
+	  $ (das Dollarzeichen).  Symbolische Felder haben dieses
+	  $-Praefix nicht.  Der Wert, mit dem das symbolische
+	  Feld belegt wird, muss in
+	  <span class="quote">&#8222;<span class="quote">doppelten Anführungszeichen</span>&#8220;</span>
+	  eingeschlossen sein.</p><p>Beginnen Sie Ihre Regeldatei wie folgt:</p><pre class="programlisting">############### start of example ipfw rules script #############
+#
+ipfw -q -f flush       # Delete all rules
+# Set defaults
+oif="tun0"             # out interface
+odns="192.0.2.11"      # ISP's DNS server IP address
+cmd="ipfw -q add "     # build rule prefix
+ks="keep-state"        # just too lazy to key this each time
+$cmd 00500 check-state
+$cmd 00502 deny all from any to any frag
+$cmd 00501 deny tcp from any to any established
+$cmd 00600 allow tcp from any to any 80 out via $oif setup $ks
+$cmd 00610 allow tcp from any to $odns 53 out via $oif setup $ks
+$cmd 00611 allow udp from any to $odns 53 out via $oif $ks
+################### End of example ipfw rules script ############</pre><p>Die Regeln in diesem Beispiel sind nicht wichtig.  Wichtig
+	  ist es, zu zeigen, wie die symbolische Substitution innerhalb
+	  der Regeln verwendet wird.</p><p>Wurde dieses Beispiel in der Datei
+	  <code class="filename">/etc/ipfw.rules</code> gespeichert, so können
+	  alle Regeln durch die Ausführung des folgenden Befehls
+	  neu geladen werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /etc/ipfw.rules</code></strong></pre><p>Statt <code class="filename">/etc/ipfw.rules</code> können Sie
+	  auch einen beliebigen anderen Namen und/oder Speicherort
+	  verwenden.</p><p>Alternativ könnten Sie die einzelnen Befehle dieses
+	  Skripts auch manuell starten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -q -f flush</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add check-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add deny all from any to any frag</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add deny tcp from any to any established</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add allow tcp from any to any 80 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add allow tcp from any to 192.0.2.11 53 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00611 allow udp from any to 192.0.2.11 53 out via tun0 keep-state</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91873488"></a>32.6.5.5. Zustandsgesteuertes Regelwerk</h4></div></div></div><p>Das folgende Regelwerk (ohne
+	  <acronym class="acronym">NAT</acronym>-Funktionalität) ist ein Beispiel
+	  dafür, wie man eine sehr sichere
+	  <span class="quote">&#8222;<span class="quote">einschließende</span>&#8220;</span> Firewall aufsetzen kann.
+	  Eine einschließende Firewall erlaubt es nur Diensten,
+	  für die explizite Regeln existieren, die Firewall zu
+	  passieren.  Alle anderen Dienste und Pakete werden hingegen
+	  blockiert.  Firewalls, die ganze Netzwerksegmente schützen
+	  sollen, benötigen mindestens zwei Netzwerkschnittstellen,
+	  für die jeweils eigene Regeln definiert werden müssen,
+	  damit die Firewall ordnungsgemäß funktioniert.</p><p>Alle unixoiden Betriebssysteme (aber auch solche, die
+	  Konzepte aus <span class="trademark">UNIX</span>® implementieren), darunter auch FreeBSD,
+	  verwenden die Schnittstelle <code class="filename">lo0</code> mit
+	  der IP-Adresse <code class="systemitem">127.0.0.1</code> zur
+	  internen Kommunikation mit dem Betriebssystem.  Die Firewall
+	  muss so eingestellt sein, dass sie den Datenverkehr dieser
+	  speziellen (und nur intern genutzten) Pakete ungehindert
+	  durchlässt.</p><p>Die Regeln, die den Zugriff auf eingehene und ausgehende
+	  Verbindungen regeln, autorisieren und kontrollieren,
+	  müssen mit der für die Verbindung zum
+	  öffentlichen Internet verantwortlichen Schnittstelle
+	  assoziiert werden.  Bei dieser Schnittstelle kann es sich
+	  beispielsweise um
+	  <acronym class="acronym">PPP</acronym>/<code class="filename">tun0</code> oder
+	  die Netzwerkkarte handelt, über, die mit Ihrem
+	  <acronym class="acronym">DSL</acronym>- oder Kabelmodem verbunden
+	  ist.</p><p>Falls mehr als eine Netzwerkkarte mit einem privaten
+	  Netzwerk (hinter der Firewall) verbunden sind, müssen
+	  die Firewallregeln für alle diese Schnittstellen
+	  entstammenden Datenpakete freien und ungehinderten
+	  Datenverkehr erlauben.</p><p>Es ist sinnvoll, die Regeln in drei Abschnitte
+	  aufzuteilen.  Der erste Abschnitt enthält die freien,
+	  von der Firewall nicht zu überwachenden
+	  Netzwerkschnittstellen.  Danach folgen die öffentlichen,
+	  für den ausgehenden Verkehr verantwortlichen
+	  Schnittstellen.  Zuletzt kommen dann die Schnittstellen,
+	  die für den eingehenden Datenverkehr verantwortlich
+	  sind.</p><p>Innerhalb der einzelnen Abschnitte ist es sinnvoll, die
+	  am häufigsten verwendeten Regeln vor den seltener
+	  verwendeten Regel zu platzieren.  Jeder Abschnitt sollte
+	  mit einer letzten Regel (die alle Pakete, auf die keine
+	  Regel zutraf, verwirft) abgeschlossen werden.</p><p>Der Abschnitt für den ausgehenden Datenverkehr des
+	  folgenden Beispiels enthät nur
+	  <code class="literal">allow</code>)-Regeln, in denen der Dienst, dem
+	  der Zugriff auf das öffentliche Internet gewährt
+	  wird, eindeutig definiert ist.  Alle Regeln verwenden die
+	  Optionen <code class="literal">proto</code>, <code class="literal">port</code>,
+	  <code class="literal">in/out</code>, <code class="literal">via</code> sowie
+	  <code class="literal">keep state</code> kodiert.  Die
+	  Regeln mit <code class="literal">proto tcp</code> verwenden
+	  zusätzlich die Option <code class="literal">setup</code>, damit
+	  die initiale, eine Sitzung beginnende Anfrage identifiziert
+	  werden kann, damit die die Zustandsttabelle gefüllt
+	  werden kann.</p><p>Der Abschnitt für den eingehenden Datenverkehr
+	  beginnt mit allen Regeln, die zur Blockierung
+	  unerwünschten Datenverkehrs benötigt werden.
+	  Für diese Vorgehensweise gibt es zwei Gründe:
+	  Zum einen könnten bösartige Pakete legtitimen
+	  Datenverker so sehr ähneln, dass sie die
+	  Bedingungen von <code class="literal">allow</code>-Regeln erfüllen
+	  und daher die Firewall passieren dürfen.  Daher sollten
+	  derartige Pakete direkt verworden werden.  Zum anderen
+	  sollten unerwünschte Pakete mit bekannten (und somit
+	  uninteressanten Mustern) sofort ohne Rückmeldung blockiert
+	  werden, anstatt erst von der letzten, generischen Regel
+	  blockiert (und, was noch wichtiger ist, auch noch
+	  protokolliert).  Die letzte Regel jedes Abschnittes blockiert
+	  und protokolliert; sie kann daher dazu verwendet werden,
+	  vor Gericht haltbare Beweise zu erhalten, damit sie gegen
+	  Personen vorgehen können, die versuchen, Ihre Systeme
+	  anzugreifen.</p><p>Achten Sie darauf, dass Sie keine Netwerkantworten für
+	  geblockte Pakete senden.  Diese müssen ohne
+	  Rückmeldung verworfen werden, damit ein Angreifer keine
+	  Informationen darüber erhält, ob seine Datenpakete
+	  Ihr System erreicht hat.  Je weniger Information ein Angreifer
+	  über Ihr System erhält, desto sicherer ist Ihr
+	  System.  Datenpakete an Ports, die nicht bekannten Diensten
+	  zugeordnet werden können, können über die Datei
+	  <code class="filename">/etc/services</code> identifiziert werden.
+	  Alternativ kann eine Anfrage an <code class="uri"><a class="uri" href="http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers" target="_top">http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers</a></code>
+	  Klarheit über die Aufgabe/Funktion einer bestimmten Portnummer
+	  bringen.  Auf der Seite <code class="uri"><a class="uri" href="http://www.sans.org/security-resources/idfaq/oddports.php" target="_top">http://www.sans.org/security-resources/idfaq/oddports.php</a></code>
+	  kann man Information über bekannte Trojaner und von
+	  diesen verwendete Portnummern erhalten.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91890384"></a>32.6.5.6. Ein Beispiel für einschließende
+	  Regeln</h4></div></div></div><p>Das folgende Regelwerk (ohne
+	  <acronym class="acronym">NAT</acronym>-Funktionalität) beschreibt ein
+	  vollständiges, einschließendes Regelwerk.  Dieses
+	  Regelwerk kann direkt auf Ihren eigenen Systemen eingesetzt
+	  werden, wenn alle <code class="literal">pass</code>-Regeln
+	  für von Ihnen nicht benötigten Dienste
+	  auskommentiert werden.  Falls Sie keine Protokollierung
+	  benötigen, können Sie diese im Abschnitt für
+	  den eingehenden Datenverkehr durch eine
+	  <code class="literal">deny</code> deaktivieren.  Die im Beispiel
+	  verwendete Netzwerkschnittstelle <code class="filename">dc0</code>
+	  müssen Sie durch die auf Ihrem System für
+	  ausgehenden Datenverkehr vorgesehenen Netzwerkschnittstelle
+	  ersetzen.  Im Falle von benutzergesteuertem
+	  <acronym class="acronym">PPP</acronym>s wäre dies
+	  beispielsweise <code class="filename">tun0</code>.</p><p>Alle Regeln folgen einem bestimmten Muster.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Alle Ausdrücke, die eine Anfrage zum Beginn
+	      einer zustandsgesteuerten darstellen, beinhalten den
+	      Ausdruck <code class="literal">keep-state</code>.</p></li><li class="listitem"><p>Alle Dienste aus dem öffentlichen Internet
+	      beinhalten die Option <code class="literal">limit</code>, um
+	      gegebenenfalls
+	      <span class="foreignphrase"><em class="foreignphrase">flooding</em></span> zu
+	      unterbinden.</p></li><li class="listitem"><p>Alle Regeln bezeichnen die Richtung durch der
+	      Ausdrücke <code class="literal">in</code> oder
+	      <code class="literal">out</code>.</p></li><li class="listitem"><p>Alle Regeln legen die verwendete
+	      Netzwerkschnittstelle die Ausdrücke
+	      <code class="literal">via</code> und
+	      <em class="replaceable"><code>interface-name</code></em> fest.</p></li></ul></div><p>Die folgenden Regeln werden in der Datei
+	  <code class="filename">/etc/ipfw.rules</code> definiert.</p><pre class="programlisting">################ Start of IPFW rules file ###############################
+# Flush out the list before we begin.
+ipfw -q -f flush
+
+# Set rules command prefix
+cmd="ipfw -q add"
+pif="dc0"     # public interface name of NIC
+              # facing the public Internet
+
+#################################################################
+# No restrictions on Inside LAN Interface for private network
+# Not needed unless you have LAN.
+# Change xl0 to your LAN NIC interface name
+#################################################################
+#$cmd 00005 allow all from any to any via xl0
+
+#################################################################
+# No restrictions on Loopback Interface
+#################################################################
+$cmd 00010 allow all from any to any via lo0
+
+#################################################################
+# Allow the packet through if it has previous been added to the
+# the "dynamic" rules table by a allow keep-state statement.
+#################################################################
+$cmd 00015 check-state
+
+#################################################################
+# Interface facing Public Internet (Outbound Section)
+# Interrogate session start requests originating from behind the
+# firewall on the private network or from this gateway server
+# destined for the public Internet.
+#################################################################
+
+# Allow out access to my ISP's Domain name server.
+# x.x.x.x must be the IP address of your ISP.s DNS
+# Dup these lines if your ISP has more than one DNS server
+# Get the IP addresses from /etc/resolv.conf file
+$cmd 00110 allow tcp from any to x.x.x.x 53 out via $pif setup keep-state
+$cmd 00111 allow udp from any to x.x.x.x 53 out via $pif keep-state
+
+# Allow out access to my ISP's DHCP server for cable/DSL configurations.
+# This rule is not needed for .user ppp. connection to the public Internet.
+# so you can delete this whole group.
+# Use the following rule and check log for IP address.
+# Then put IP address in commented out rule &amp; delete first rule
+$cmd 00120 allow log udp from any to any 67 out via $pif keep-state
+#$cmd 00120 allow udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Allow out non-secure standard www function
+$cmd 00200 allow tcp from any to any 80 out via $pif setup keep-state
+
+# Allow out secure www function https over TLS SSL
+$cmd 00220 allow tcp from any to any 443 out via $pif setup keep-state
+
+# Allow out send &amp; get email function
+$cmd 00230 allow tcp from any to any 25 out via $pif setup keep-state
+$cmd 00231 allow tcp from any to any 110 out via $pif setup keep-state
+
+# Allow out FBSD (make install &amp; CVSUP) functions
+# Basically give user root "GOD" privileges.
+$cmd 00240 allow tcp from me to any out via $pif setup keep-state uid root
+
+# Allow out ping
+$cmd 00250 allow icmp from any to any out via $pif keep-state
+
+# Allow out Time
+$cmd 00260 allow tcp from any to any 37 out via $pif setup keep-state
+
+# Allow out nntp news (i.e. news groups)
+$cmd 00270 allow tcp from any to any 119 out via $pif setup keep-state
+
+# Allow out secure FTP, Telnet, and SCP
+# This function is using SSH (secure shell)
+$cmd 00280 allow tcp from any to any 22 out via $pif setup keep-state
+
+# Allow out whois
+$cmd 00290 allow tcp from any to any 43 out via $pif setup keep-state
+
+# deny and log everything else that.s trying to get out.
+# This rule enforces the block all by default logic.
+$cmd 00299 deny log all from any to any out via $pif
+
+#################################################################
+# Interface facing Public Internet (Inbound Section)
+# Check packets originating from the public Internet
+# destined for this gateway server or the private network.
+#################################################################
+
+# Deny all inbound traffic from non-routable reserved address spaces
+$cmd 00300 deny all from 192.168.0.0/16 to any in via $pif  #RFC 1918 private IP
+$cmd 00301 deny all from 172.16.0.0/12 to any in via $pif     #RFC 1918 private IP
+$cmd 00302 deny all from 10.0.0.0/8 to any in via $pif          #RFC 1918 private IP
+$cmd 00303 deny all from 127.0.0.0/8 to any in via $pif        #loopback
+$cmd 00304 deny all from 0.0.0.0/8 to any in via $pif            #loopback
+$cmd 00305 deny all from 169.254.0.0/16 to any in via $pif   #DHCP auto-config
+$cmd 00306 deny all from 192.0.2.0/24 to any in via $pif       #reserved for docs
+$cmd 00307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster interconnect
+$cmd 00308 deny all from 224.0.0.0/3 to any in via $pif         #Class D &amp; E multicast
+
+# Deny public pings
+$cmd 00310 deny icmp from any to any in via $pif
+
+# Deny ident
+$cmd 00315 deny tcp from any to any 113 in via $pif
+
+# Deny all Netbios service. 137=name, 138=datagram, 139=session
+# Netbios is MS/Windows sharing services.
+# Block MS/Windows hosts2 name server requests 81
+$cmd 00320 deny tcp from any to any 137 in via $pif
+$cmd 00321 deny tcp from any to any 138 in via $pif
+$cmd 00322 deny tcp from any to any 139 in via $pif
+$cmd 00323 deny tcp from any to any 81 in via $pif
+
+# Deny any late arriving packets
+$cmd 00330 deny all from any to any frag in via $pif
+
+# Deny ACK packets that did not match the dynamic rule table
+$cmd 00332 deny tcp from any to any established in via $pif
+
+# Allow traffic in from ISP's DHCP server. This rule must contain
+# the IP address of your ISP.s DHCP server as it.s the only
+# authorized source to send this packet type.
+# Only necessary for cable or DSL configurations.
+# This rule is not needed for .user ppp. type connection to
+# the public Internet. This is the same IP address you captured
+# and used in the outbound section.
+#$cmd 00360 allow udp from any to x.x.x.x 67 in via $pif keep-state
+
+# Allow in standard www function because I have apache server
+$cmd 00400 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Allow in secure FTP, Telnet, and SCP from public Internet
+$cmd 00410 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Allow in non-secure Telnet session from public Internet
+# labeled non-secure because ID &amp; PW are passed over public
+# Internet as clear text.
+# Delete this sample group if you do not have telnet server enabled.
+$cmd 00420 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Reject &amp; Log all incoming connections from the outside
+$cmd 00499 deny log all from any to any in via $pif
+
+# Everything else is denied by default
+# deny and log all packets that fell through to see what they are
+$cmd 00999 deny log all from any to any
+################ End of IPFW rules file ###############################</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91901648"></a>32.6.5.7. Ein Beispiel für zustandshafte
+	  <acronym class="acronym">NAT</acronym>-Regeln</h4></div></div></div><a id="idp91919184" class="indexterm"></a><p>Es müssen einige zusätzliche
+	  Konfigurationseinstellungen vorgenommen werden, um die
+	  die <acronym class="acronym">NAT</acronym>-Funktion von IPFW zu nutzen.  Die
+	  Kernelquellen müssen mit der Option
+	  <code class="literal">IPDIVERT</code> (im IPFIREWALL-Abschnitt der
+	  Kernelkonfigurationsdatei) neu gebaut werden, um den
+	  benötigten angepassten Kernel zu erzeugen.</p><p>Zusätzlich werden folgende Optionen in der
+	  <code class="filename">/etc/rc.conf</code> benötigt:</p><pre class="programlisting">natd_enable="YES"                   # Enable <acronym class="acronym">NAT</acronym>D function
+natd_interface="rl0"                # interface name of public Internet NIC
+natd_flags="-dynamic -m"            # -m = preserve port numbers if possible</pre><p>Zustandshafte Regeln bei aktiviertem
+	  <code class="literal">divert natd</code> (<span class="foreignphrase"><em class="foreignphrase">Network
+	  Address Translation</em></span>) verkomplizieren die
+	  Formulierung des Regelwerkes beträchtlich.  Damit Ihre
+	  Firewall funktioniert, kommt es insbesondere auf die Position
+	  der Ausdrücke <code class="literal">check-state</code> sowie
+	  <code class="literal">divert natd</code> an.  Sie können nicht
+	  länger einen einfachen, kaskadierenden Ablauf verwenden
+	  (also einen Regelsatz, bei dem einfach auf eine Regel nach der
+	  anderen geprüft wird.  Vielmehr wird der neue
+	  Aktionstyp <code class="literal">skipto</code> benötigt.  Dies
+	  erfordert, dass jede Regel über eine eindeutige Nummer
+	  verfügt, um so eindeutige Sprungziele zu erhalten.</p><p>Im Folgenden wird anhand eines umkommentierten Beispiels
+	  der Paketfluss durch das Regelwerk verdeutlicht.</p><p>Die Verarbeitung beginnt mit der ersten Regel (also am
+	  Anfang der Regeldatei.  Sie setzt sich Regel für Regel
+	  weiter fort, bis das Ende der Datei erreicht ist oder eine
+	  Regel für das Paket einen Treffer erzielt und das Paket
+	  so die Firewall verlassen kann.  Achten Sie besonders auf die
+	  Position der Regeln mit den Nummern
+	  <code class="literal">100, 101, 450, 500</code> sowie
+	  <code class="literal">510</code>.  Diese Regeln steuern die
+	  Adressumsetzung ausgehender und eingehender Pakete, so dass
+	  deren entsprechende Einträge in der Zustandstabelle immer
+	  die private LAN-Adressen abbilden.  Zusätzlich werden in
+	  allen Regeln die Richtung des Pakets (eingehend oder
+	  ausgehend) so die vom Paket zu verwendende Netzwerkschnittstelle
+	  definiert.  Ausgehende Anfragen, die eine Sitzung starten, rufen
+	  immer <code class="literal">skipto rule 500</code>, damit
+	  <acronym class="acronym">NAT</acronym> verwendet werden kann.</p><p>Nehmen wir nun an, dass ein Nutzer einen Webbrowser
+	  verwendet, um eine Internetseite aufzurufen.  Derartige
+	  Anfragen werden in der Regel über Port 80 geleitet.  Die
+	  zugehörigen Pakete werden durch die Firewall verarbeitet.
+	  Regel 100 trifft nicht zu, denn das Paket geht nach außen,
+	  nicht nach innen.  Regel 101 trifft ebenfalls nicht zu, denn es
+	  handelt sich um das erste Paket.  Folglich wird die Sitzung
+	  erst initiiert und kann somit noch nicht in der
+	  Zustandstabelle enthalten sein kann.  Die erste Regel, die
+	  zutrifft, ist Regel 125.  Das Paket will das lokale Netzwerk
+	  über die Schnittstelle zum öffentlichen Internet (das
+	  heißt nach außen) verlassen, es hat aber noch die
+	  Quelladresse des privaten lokalen Netzwerks.  Da Regel 125
+	  zutrifft, werden zwei Aktionen ausgeführt:  Die Option
+	  <code class="literal">keep-state</code> bewirkt, dass das Paket in der
+	  internen Tabelle für zustandshafte, dynamische Regeln
+	  registriert wird.  Danach wird der Aktionsteil der Regel
+	  ausgeführt.  Dieser ist Bestandteil der Informationen, die
+	  in die in der Tabelle für dynamische Regeln aufgenommen
+	  wird und lautet <code class="literal">skipto rule  500</code>.  Die
+	  Regel 500 führt <acronym class="acronym">NAT</acronym>s auf die
+	  IP-Adresse des Paketes durch.  Danach verlässt das Paket
+	  das LAN nach außen in Richtung des öffentlichen
+	  Internets.  Dieser letzte Teil ist für funktionierendes
+	  NAT von entscheidender Bedeutung.  Nachdem dieses Paket
+	  am Bestimmungsort angekommen ist, wird dort eine Antwort
+	  generiert und zurückgeschickt.  Dieses Paket wird auf die
+	  gleiche Art und Weise durch das gegebene Regelwerk
+	  verarbeitet.  Dieses Mal trifft Regel 100 auf das Paket zu,
+	  damit wird die Bestimmungsadresse auf die zugehörige
+	  (lokale) LAN-Adresse (rück-)abgebildet.  Danach wird es
+	  von der <code class="literal">check-state</code>-Regel verarbeitet,
+	  die Zustandstabelle erkennt, dass eine zugehörige
+	  aktive Sitzung vorliegt und das Paket wird freigegeben
+	  und in das LAN geleitet.  Es wird innerhalb des LANs von dem PC,
+	  der die zugehörige Sitzung hält, empfangen, der
+	  ein neues Paket absendet und ein weiteres Datensegment vom
+	  entfernten Server anfordert.  Dieses Mal wird bei der
+	  Prüfung der <code class="literal">check-state</code>-Regel ein
+	  nach außen gehender zugehöriger Eintrag in der
+	  Zustandstabelle gefunden und die entsprechende Aktion (also
+	  <code class="literal">skipto 500</code>) wird ausgeführt.  Das
+	  Paket springt zu Regel 500 und wird durch diese Regel für
+	  das öffentliche Internet freigegeben.</p><p>Innerhalb des durch die Firewall geschützten
+	  Netzwerks werden alle eingehenden Pakete, die zu einer
+	  existierenden Sitzung gehören, durch die Regel
+	  <code class="literal">check-state</code> sowie entsprechend platzierte
+	  <code class="literal">divert natd</code>-Regeln verarbeitet.  Die
+	  notwendige Arbeit beschränkt sich darauf, alle
+	  <span class="quote">&#8222;<span class="quote">schlechten</span>&#8220;</span> Pakete zu blockieren und nur
+	  authorisierten Diensten zugehörige Pakete
+	  durchzulassen.  In Umkehrung des bisherigen Beispiels nehmen
+	  wir nun, dass auf dem Rechner, auf dem die Firewall läuft,
+	  auch ein Apache Webserver läuft, auf den von außen,
+	  also aus dem öffentlichen Internet, zugegriffen werden
+	  kann.  Das erste von außen eintreffende Paket (das auch
+	  eine neue Sitzung startet) erfüllt Regel 100.  Die
+	  Zieladresse des Paketes wird daher auf die LAN-Adresse des
+	  Firewallrechners abgebildet.  Das Paket wird dann weiter auf
+	  alle in der Firewall definierten Regeln geprüft und trifft
+	  schließlich auf Regel 425.  Durch diese Regel werden
+	  zwei Aktionen ausgelösst:  Erstens wird aus dem Paket
+	  eine dynamische Regel generiert und in die Zustandstabelle
+	  geschrieben.  Zusätzlich wird jedoch die Anzahl neuer
+	  Sitzungsanfragen (von der gleichen Quell-IP-Adresse) auf
+	  <code class="literal">2</code> begrenzt, um so DoS-Angriffe auf Dienste,
+	  die auf diesem Port laufen, zu verhindern.  Die Aktion dieser
+	  Regel ist <code class="literal">allow</code>, daher wird das Paket
+	  freigegeben und in das LAN weitergeleitet.  Das als Antwort
+	  generierte Paket wird durch die
+	  <code class="literal">check-state</code>-Regel als zu einer Sitzung
+	  gehörend erkannt.  Damit wird es der Regel 500
+	  zugeführt, <acronym class="acronym">NAT</acronym> wird durchgeführt
+	  und über die Schnittstelle zum öffentlichen Internet
+	  nach außen geroutet.</p><p>Beispiel 1 für einen Regelsatz:</p><pre class="programlisting">#!/bin/sh
+cmd="ipfw -q add"
+skip="skipto 500"
+pif=rl0
+ks="keep-state"
+good_tcpo="22,25,37,43,53,80,443,110,119"
+
+ipfw -q -f flush
+
+$cmd 002 allow all from any to any via xl0  # exclude LAN traffic
+$cmd 003 allow all from any to any via lo0  # exclude loopback traffic
+
+$cmd 100 divert natd ip from any to any in via $pif
+$cmd 101 check-state
+
+# Authorized outbound packets
+$cmd 120 $skip udp from any to xx.168.240.2 53 out via $pif $ks
+$cmd 121 $skip udp from any to xx.168.240.5 53 out via $pif $ks
+$cmd 125 $skip tcp from any to any $good_tcpo out via $pif setup $ks
+$cmd 130 $skip icmp from any to any out via $pif $ks
+$cmd 135 $skip udp from any to any 123 out via $pif $ks
+
+
+# Deny all inbound traffic from non-routable reserved address spaces
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 private IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 private IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 private IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #reserved for docs
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Class D &amp; E multicast
+
+# Authorized inbound packets
+$cmd 400 allow udp from xx.70.207.54 to any 68 in $ks
+$cmd 420 allow tcp from any to me 80 in via $pif setup limit src-addr 1
+
+
+$cmd 450 deny log ip from any to any
+
+# This is skipto location for outbound stateful rules
+$cmd 500 divert natd ip from any to any out via $pif
+$cmd 510 allow ip from any to any
+
+######################## end of rules  ##################</pre><p>Das folgende Beispiel ist praktisch identisch mit dem ersten
+	  Regelsatz.  Allerdings wurden die Regel umfassend kommentiert und
+	  umgeschrieben, damit sie für weniger erfahrene Benutzer
+	  leichter verständlich werden.</p><p>Beispiel 2 für einen Regelsatz:</p><pre class="programlisting">#!/bin/sh
+################ Start of IPFW rules file ###############################
+# Flush out the list before we begin.
+ipfw -q -f flush
+
+# Set rules command prefix
+cmd="ipfw -q add"
+skip="skipto 800"
+pif="rl0"     # public interface name of NIC
+              # facing the public Internet
+
+#################################################################
+# No restrictions on Inside LAN Interface for private network
+# Change xl0 to your LAN NIC interface name
+#################################################################
+$cmd 005 allow all from any to any via xl0
+
+#################################################################
+# No restrictions on Loopback Interface
+#################################################################
+$cmd 010 allow all from any to any via lo0
+
+#################################################################
+# check if packet is inbound and nat address if it is
+#################################################################
+$cmd 014 divert natd ip from any to any in via $pif
+
+#################################################################
+# Allow the packet through if it has previous been added to the
+# the "dynamic" rules table by a allow keep-state statement.
+#################################################################
+$cmd 015 check-state
+
+#################################################################
+# Interface facing Public Internet (Outbound Section)
+# Check session start requests originating from behind the
+# firewall on the private network or from this gateway server
+# destined for the public Internet.
+#################################################################
+
+# Allow out access to my ISP's Domain name server.
+# x.x.x.x must be the IP address of your ISP's DNS
+# Dup these lines if your ISP has more than one DNS server
+# Get the IP addresses from /etc/resolv.conf file
+$cmd 020 $skip tcp from any to x.x.x.x 53 out via $pif setup keep-state
+
+
+# Allow out access to my ISP's DHCP server for cable/DSL configurations.
+$cmd 030 $skip udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Allow out non-secure standard www function
+$cmd 040 $skip tcp from any to any 80 out via $pif setup keep-state
+
+# Allow out secure www function https over TLS SSL
+$cmd 050 $skip tcp from any to any 443 out via $pif setup keep-state
+
+# Allow out send &amp; get email function
+$cmd 060 $skip tcp from any to any 25 out via $pif setup keep-state
+$cmd 061 $skip tcp from any to any 110 out via $pif setup keep-state
+
+# Allow out FreeBSD (make install &amp; CVSUP) functions
+# Basically give user root "GOD" privileges.
+$cmd 070 $skip tcp from me to any out via $pif setup keep-state uid root
+
+# Allow out ping
+$cmd 080 $skip icmp from any to any out via $pif keep-state
+
+# Allow out Time
+$cmd 090 $skip tcp from any to any 37 out via $pif setup keep-state
+
+# Allow out nntp news (i.e. news groups)
+$cmd 100 $skip tcp from any to any 119 out via $pif setup keep-state
+
+# Allow out secure FTP, Telnet, and SCP
+# This function is using SSH (secure shell)
+$cmd 110 $skip tcp from any to any 22 out via $pif setup keep-state
+
+# Allow out whois
+$cmd 120 $skip tcp from any to any 43 out via $pif setup keep-state
+
+# Allow ntp time server
+$cmd 130 $skip udp from any to any 123 out via $pif keep-state
+
+#################################################################
+# Interface facing Public Internet (Inbound Section)
+# Check packets originating from the public Internet
+# destined for this gateway server or the private network.
+#################################################################
+
+# Deny all inbound traffic from non-routable reserved address spaces
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 private IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 private IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 private IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #reserved for docs
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Class D &amp; E multicast
+
+# Deny ident
+$cmd 315 deny tcp from any to any 113 in via $pif
+
+# Deny all Netbios service. 137=name, 138=datagram, 139=session
+# Netbios is MS/Windows sharing services.
+# Block MS/Windows hosts2 name server requests 81
+$cmd 320 deny tcp from any to any 137 in via $pif
+$cmd 321 deny tcp from any to any 138 in via $pif
+$cmd 322 deny tcp from any to any 139 in via $pif
+$cmd 323 deny tcp from any to any 81  in via $pif
+
+# Deny any late arriving packets
+$cmd 330 deny all from any to any frag in via $pif
+
+# Deny ACK packets that did not match the dynamic rule table
+$cmd 332 deny tcp from any to any established in via $pif
+
+# Allow traffic in from ISP's DHCP server. This rule must contain
+# the IP address of your ISP's DHCP server as it's the only
+# authorized source to send this packet type.
+# Only necessary for cable or DSL configurations.
+# This rule is not needed for 'user ppp' type connection to
+# the public Internet. This is the same IP address you captured
+# and used in the outbound section.
+$cmd 360 allow udp from x.x.x.x to any 68 in via $pif keep-state
+
+# Allow in standard www function because I have Apache server
+$cmd 370 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Allow in secure FTP, Telnet, and SCP from public Internet
+$cmd 380 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Allow in non-secure Telnet session from public Internet
+# labeled non-secure because ID &amp; PW are passed over public
+# Internet as clear text.
+# Delete this sample group if you do not have telnet server enabled.
+$cmd 390 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Reject &amp; Log all unauthorized incoming connections from the public Internet
+$cmd 400 deny log all from any to any in via $pif
+
+# Reject &amp; Log all unauthorized out going connections to the public Internet
+$cmd 450 deny log all from any to any out via $pif
+
+# This is skipto location for outbound stateful rules
+$cmd 800 divert natd ip from any to any out via $pif
+$cmd 801 allow ip from any to any
+
+# Everything else is denied by default
+# deny and log all packets that fell through to see what they are
+$cmd 999 deny log all from any to any
+################ End of IPFW rules file ###############################</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="firewalls-ipf.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="firewalls.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="advanced-networking.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">32.5. Die IPFILTER-Firewall (IPF) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Kapitel 33. Weiterführende Netzwerkthemen</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

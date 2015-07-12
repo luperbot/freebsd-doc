@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Filtering Bridges</title>
+    
+
+    <authorgroup xmlns:xlink="http://www.w3.org/1999/xlink">
+      <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Alex</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Dupre</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+          <address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">ale@FreeBSD.org</email></address>
+        </affiliation></author>
+    </authorgroup>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">3Com and HomeConnect are registered
+  trademarks of 3Com Corporation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Intel, Celeron, Centrino, Core, EtherExpress, i386,
+  i486, Itanium, Pentium, and Xeon are trademarks or registered
+  trademarks of Intel Corporation or its subsidiaries in the United
+  States and other countries.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <quote xmlns:xlink="http://www.w3.org/1999/xlink">&#8482;</quote> or the
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">®</quote> symbol.</para>
+    </legalnotice>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Often it is useful to divide one physical network (like an
+	Ethernet) into two separate segments without having to create subnets,
+	and use a router to link them together. The device that connects the
+	two networks in this way is called a bridge.  A FreeBSD system with
+	two network interfaces is enough in order to act as a bridge.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">A bridge works by scanning the addresses of <acronym xmlns:xlink="http://www.w3.org/1999/xlink">MAC</acronym>
+	level (Ethernet addresses) of the devices connected to each of its
+	network interfaces and then forwarding the traffic between the two
+	networks only if the source and the destination are on different
+	segments. Under many points of view a bridge is similar to an Ethernet
+	switch with only two ports.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-why">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Why use a filtering bridge?</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">More and more frequently, thanks to the lowering costs of broad band
+      Internet connections (xDSL) and also because of the reduction of
+      available IPv4 addresses, many companies are connected to the Internet
+      24 hours on 24 and with few (sometimes not even a power of 2) IP
+      addresses. In these situations it is often desirable to have a firewall
+      that filters incoming and outgoing traffic from and towards Internet,
+      but a packet filtering solution based on router may not be applicable,
+      either due to subnetting issues, the router is owned by the connectivity
+      supplier (<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISP</acronym>), or because it does not support such
+      functionalities. In these scenarios the use of a filtering bridge is
+      highly advised.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">A bridge-based firewall can be configured and inserted between the
+      xDSL router and your Ethernet hub/switch without any IP numbering
+      issues.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-how">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">How to Install</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Adding bridge functionalities to a FreeBSD system is not difficult.
+      Since 4.5 release it is possible to load such functionalities as modules
+      instead of having to rebuild the kernel, simplifying the procedure a
+      great deal. In the following subsections I will explain both
+      installation ways.</para>
+
+    <important xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Do not</emphasis> follow both instructions: a procedure
+	<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">excludes</emphasis> the other one.  Select the best choice
+	according to your needs and abilities.</para>
+    </important>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Before going on, be sure to have at least two Ethernet cards that
+      support the promiscuous mode for both reception and transmission, since
+      they must be able to send Ethernet packets with any address, not just
+      their own. Moreover, to have a good throughput, the cards should be PCI
+      bus mastering cards. The best choices are still the Intel <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">EtherExpress</trademark>
+      Pro, followed by the <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">3Com</trademark> 3c9xx series. To simplify the firewall
+      configuration it may be useful to have two cards of different
+      manufacturers (using different drivers) in order to distinguish clearly
+      which interface is connected to the router and which to the inner
+      network.</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-kernel">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Kernel Configuration</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">So you have decided to use the older but well tested installation
+	method. To begin, you have to add the following rows to your kernel
+	configuration file:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options BRIDGE
+options IPFIREWALL
+options IPFIREWALL_VERBOSE</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The first line is to compile the bridge support, the second one is
+	the firewall and the third one is the logging functions of the
+	firewall.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Now it is necessary to build and install the new kernel.  You may
+	find detailed instructions in the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-building.html">Building
+	and Installing a Custom Kernel</link> section of the FreeBSD
+	Handbook.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-modules">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Modules Loading</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">If you have chosen to use the new and simpler installation
+	method, the only thing to do now is add the following row to
+        <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">bridge_load="YES"</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">In this way, during the system startup, the
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">bridge.ko</filename> module will be loaded together with the
+	kernel. It is not required to add a similar row for the
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ipfw.ko</filename> module, since it will be loaded
+	automatically after the execution of the steps in the following
+	section.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-finalprep">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Final Preparation</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Before rebooting in order to load the new kernel or the required
+      modules (according to the previously chosen installation method), you
+      have to make some changes to the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>
+      configuration file. The default rule of the firewall is to reject all IP
+      packets.  Initially we will set up an <option xmlns:xlink="http://www.w3.org/1999/xlink">open</option> firewall, in order to verify
+      its operation without any issue related to packet filtering (in case you
+      are going to execute this procedure remotely, such configuration will
+      avoid you to remain isolated from the network). Put these lines in
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">firewall_enable="YES"
+firewall_type="open"
+firewall_quiet="YES"
+firewall_logging="YES"</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The first row will enable the firewall (and will load the module
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">ipfw.ko</filename> if it is not compiled in the kernel), the
+      second one to set up it in <option xmlns:xlink="http://www.w3.org/1999/xlink">open</option> mode (as explained in
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.firewall</filename>), the third one to not show rules
+      loading and the fourth one to enable logging support.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">About the configuration of the network interfaces, the most used way
+      is to assign an IP to only one of the network cards, but the bridge will
+      work equally even if both interfaces or none has a configured IP. In the
+      last case (IP-less) the bridge machine will be still more hidden, as
+      inaccessible from the network: to configure it, you have to login from
+      console or through a third network interface separated from the bridge.
+      Sometimes, during the system startup, some programs require network
+      access, say for domain resolution: in this case it is necessary to
+      assign an IP to the external interface (the one connected to Internet,
+      where <acronym xmlns:xlink="http://www.w3.org/1999/xlink">DNS</acronym> server resides), since the bridge will be
+      activated at the end of the startup procedure. It means that the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">fxp0</filename> interface (in our case) must be mentioned
+      in the ifconfig section of the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename> file,
+      while the <filename xmlns:xlink="http://www.w3.org/1999/xlink">xl0</filename> is not. Assigning an IP to both
+      the network cards does not make much sense, unless, during the start
+      procedure, applications should access to services on both Ethernet
+      segments.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There is another important thing to know. When running IP over
+      Ethernet, there are actually two Ethernet protocols in use: one is IP,
+      the other is <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ARP</acronym>.  <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ARP</acronym> does the
+      conversion of the IP address of a host into its Ethernet address
+      (<acronym xmlns:xlink="http://www.w3.org/1999/xlink">MAC</acronym> layer).  In order to allow the communication
+      between two hosts separated by the bridge, it is necessary that the
+      bridge will forward <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ARP</acronym> packets. Such protocol is not
+      included in the IP layer, since it exists only with IP over Ethernet.
+      The FreeBSD firewall filters exclusively on the IP layer and therefore
+      all non-IP packets (<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ARP</acronym> included) will be forwarded
+      without being filtered, even if the firewall is configured to not permit
+      anything.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now it is time to reboot the system and use it as before: there will
+      be some new messages about the bridge and the firewall, but the bridge
+      will not be activated and the firewall, being in <option xmlns:xlink="http://www.w3.org/1999/xlink">open</option> mode, will not
+      avoid any operations.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">If there are any problems, you should sort them out now
+      before proceeding.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-enabling">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Enabling the Bridge</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">At this point, to enable the bridge, you have to execute the
+      following commands (having the shrewdness to replace the names of the
+      two network interfaces <filename xmlns:xlink="http://www.w3.org/1999/xlink">fxp0</filename> and
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">xl0</filename> with your own ones):</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sysctl net.link.ether.bridge.config=fxp0:0,xl0:0</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sysctl net.link.ether.bridge.ipfw=1</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sysctl net.link.ether.bridge.enable=1</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The first row specifies which interfaces should be activated by the
+      bridge, the second one will enable the firewall on the bridge and
+      finally the third one will enable the bridge.</para>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">If you have FreeBSD 5.1-RELEASE or previous the sysctl variables
+	are spelled differently.  See <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bridge</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry> for details.</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">At this point you should be able to insert the machine between two
+      sets of hosts without compromising any communication abilities between
+      them. If so, the next step is to add the
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">net.link.ether.bridge.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">[blah]</replaceable>=<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">[blah]</replaceable></literal>
+      portions of these rows to the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/sysctl.conf</filename>
+      file, in order to have them execute at startup.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-ipfirewall">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Configuring The Firewall</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now it is time to create your own file with custom firewall rules,
+      in order to secure the inside network. There will be some complication
+      in doing this because not all of the firewall functionalities are
+      available on bridged packets. Furthermore, there is a difference between
+      the packets that are in the process of being forwarded and packets that
+      are being received by the local machine. In general, incoming packets
+      are run through the firewall only once, not twice as is normally the
+      case; in fact they are filtered only upon receipt, so rules that use
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">out</option> or <option xmlns:xlink="http://www.w3.org/1999/xlink">xmit</option> will never match. Personally, I use <option xmlns:xlink="http://www.w3.org/1999/xlink">in via</option> which is an
+      older syntax, but one that has a sense when you read it. Another
+      limitation is that you are restricted to use only <option xmlns:xlink="http://www.w3.org/1999/xlink">pass</option> or <option xmlns:xlink="http://www.w3.org/1999/xlink">drop</option>
+      commands for packets filtered by a bridge.  Sophisticated things like
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">divert</option>, <option xmlns:xlink="http://www.w3.org/1999/xlink">forward</option> or <option xmlns:xlink="http://www.w3.org/1999/xlink">reject</option> are not available. Such options can
+      still be used, but only on traffic to or from the bridge machine itself
+      (if it has an IP address).</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">New in FreeBSD 4.0, is the concept of stateful filtering.  This is a
+      big improvement for <acronym xmlns:xlink="http://www.w3.org/1999/xlink">UDP</acronym> traffic, which typically is a
+      request going out, followed shortly thereafter by a response with the
+      exact same set of IP addresses and port numbers (but with source and
+      destination reversed, of course). For firewalls that have no
+      statekeeping, there is almost no way to deal with this sort of traffic
+      as a single session. But with a firewall that can <quote xmlns:xlink="http://www.w3.org/1999/xlink">remember</quote> an outgoing
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">UDP</acronym> packet and, for the next few minutes, allow a
+      response, handling <acronym xmlns:xlink="http://www.w3.org/1999/xlink">UDP</acronym> services is trivial. The
+      following example shows how to do it. It is possible to do the same thing
+      with <acronym xmlns:xlink="http://www.w3.org/1999/xlink">TCP</acronym> packets. This allows you to avoid some
+      denial of service attacks and other nasty tricks, but it also typically
+      makes your state table grow quickly in size.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Let's look at an example setup. Note first that at the top of
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.firewall</filename> there are already standard rules
+      for the loopback interface <filename xmlns:xlink="http://www.w3.org/1999/xlink">lo0</filename>, so we should not
+      have to care for them anymore. Custom rules should be put in a separate
+      file (say <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.firewall.local</filename>) and loaded at
+      system startup, by modifying the row of
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename> where we defined the <option xmlns:xlink="http://www.w3.org/1999/xlink">open</option>
+      firewall:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">firewall_type="/etc/rc.firewall.local"</programlisting>
+
+    <important xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">You have to specify the <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">full</emphasis> path, otherwise
+	it will not be loaded with the risk to remain isolated from the
+	network.</para>
+    </important>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">For our example imagine to have the <filename xmlns:xlink="http://www.w3.org/1999/xlink">fxp0</filename>
+      interface connected towards the outside (Internet) and the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">xl0</filename> towards the inside
+      (<acronym xmlns:xlink="http://www.w3.org/1999/xlink">LAN</acronym>).  The bridge machine has the IP <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="ipaddress">1.2.3.4</systemitem> (it is not possible that your
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISP</acronym> can give you an address quite like this, but for
+      our example it is good).</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink"># Things that we have kept state on before get to go through in a hurry
+add check-state
+
+# Throw away RFC 1918 networks
+add drop all from 10.0.0.0/8 to any in via fxp0
+add drop all from 172.16.0.0/12 to any in via fxp0
+add drop all from 192.168.0.0/16 to any in via fxp0
+
+# Allow the bridge machine to say anything it wants
+# (if the machine is IP-less do not include these rows)
+add pass tcp from 1.2.3.4 to any setup keep-state
+add pass udp from 1.2.3.4 to any keep-state
+add pass ip from 1.2.3.4 to any
+
+# Allow the inside hosts to say anything they want
+add pass tcp from any to any in via xl0 setup keep-state
+add pass udp from any to any in via xl0 keep-state
+add pass ip from any to any in via xl0
+
+# TCP section
+# Allow SSH
+add pass tcp from any to any 22 in via fxp0 setup keep-state
+# Allow SMTP only towards the mail server
+add pass tcp from any to relay 25 in via fxp0 setup keep-state
+# Allow zone transfers only by the slave name server [dns2.nic.it]
+add pass tcp from 193.205.245.8 to ns 53 in via fxp0 setup keep-state
+# Pass ident probes.  It is better than waiting for them to timeout
+add pass tcp from any to any 113 in via fxp0 setup keep-state
+# Pass the "quarantine" range
+add pass tcp from any to any 49152-65535 in via fxp0 setup keep-state
+
+# UDP section
+# Allow DNS only towards the name server
+add pass udp from any to ns 53 in via fxp0 keep-state
+# Pass the "quarantine" range
+add pass udp from any to any 49152-65535 in via fxp0 keep-state
+
+# ICMP section
+# Pass 'ping'
+add pass icmp from any to any icmptypes 8 keep-state
+# Pass error messages generated by 'traceroute'
+add pass icmp from any to any icmptypes 3
+add pass icmp from any to any icmptypes 11
+
+# Everything else is suspect
+add drop log all from any to any</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Those of you who have set up firewalls before may notice some things
+      missing. In particular, there are no anti-spoofing rules, in fact we did
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">not</emphasis> add:</para>
+
+    <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">add deny all from 1.2.3.4/8 to any in via fxp0</programlisting>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">That is, drop packets that are coming in from the outside claiming
+      to be from our network. This is something that you would commonly do to
+      be sure that someone does not try to evade the packet filter, by
+      generating nefarious packets that look like they are from the inside.
+      The problem with that is that there is <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">at least</emphasis> one
+      host on the outside interface that you do not want to ignore: the
+      router. But usually, the <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISP</acronym> anti-spoofs at their
+      router, so we do not need to bother that much.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The last rule seems to be an exact duplicate of the default rule,
+      that is, do not let anything pass that is not specifically allowed. But
+      there is a difference: all suspected traffic will be logged.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There are two rules for passing <acronym xmlns:xlink="http://www.w3.org/1999/xlink">SMTP</acronym> and
+      <acronym xmlns:xlink="http://www.w3.org/1999/xlink">DNS</acronym> traffic towards the mail server and the name
+      server, if you have them. Obviously the whole rule set should be
+      flavored to personal taste, this is only a specific example (rule format
+      is described accurately in the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ipfw</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> man page). Note that in
+      order for <quote xmlns:xlink="http://www.w3.org/1999/xlink">relay</quote> and <quote xmlns:xlink="http://www.w3.org/1999/xlink">ns</quote> to work, name service lookups must work
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">before</emphasis> the bridge is enabled. This is an example of
+      making sure that you set the IP on the correct network card.
+      Alternatively it is possible to specify the IP address instead of the
+      host name (required if the machine is IP-less).</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">People that are used to setting up firewalls are probably also used
+      to either having a <option xmlns:xlink="http://www.w3.org/1999/xlink">reset</option> or a <option xmlns:xlink="http://www.w3.org/1999/xlink">forward</option> rule for ident packets
+      (<acronym xmlns:xlink="http://www.w3.org/1999/xlink">TCP</acronym> port 113). Unfortunately, this is not an
+      applicable option with the bridge, so the best thing is to simply pass
+      them to their destination. As long as that destination machine is not
+      running an ident daemon, this is relatively harmless. The alternative is
+      dropping connections on port 113, which creates some problems with
+      services like <acronym xmlns:xlink="http://www.w3.org/1999/xlink">IRC</acronym> (the ident probe must
+      timeout).</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The only other thing that is a little weird that you may have
+      noticed is that there is a rule to let the bridge machine speak, and
+      another for internal hosts. Remember that this is because the two sets
+      of traffic will take different paths through the kernel and into the
+      packet filter. The inside net will go through the bridge, while the
+      local machine will use the normal IP stack to speak. Thus the two rules
+      to handle the different cases. The <literal xmlns:xlink="http://www.w3.org/1999/xlink">in via
+      fxp0</literal> rules work for both paths. In general, if
+      you use <option xmlns:xlink="http://www.w3.org/1999/xlink">in via</option> rules throughout the filter, you will need to make an
+      exception for locally generated packets, because they did not come in
+      via any of our interfaces.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="filtering-bridges-contributors">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Contributors</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Many parts of this article have been taken, updated and adapted from
+      an old text about bridging, edited by Nick Sayer. A pair of inspirations
+      are due to an introduction on bridging by Steve Peterson.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">A big thanks to Luigi Rizzo for the implementation of the bridge
+      code in FreeBSD and for the time he has dedicated to me answering all of
+      my related questions.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">A thanks goes out also to Tom Rhodes who looked over my job of
+      translation from Italian (the original language of this article) into
+      English.</para>
+  </sect1>
+</article>

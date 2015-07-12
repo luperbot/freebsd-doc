@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.5. 资源</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver-config.html" title="10.4. 配置文件与自动配置期间识别和探测的顺序" /><link rel="next" href="isa-driver-busmem.html" title="10.6. 总线内存映射" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.5. 资源</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-config.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-busmem.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-resources"></a>10.5. 资源</h2></div></div></div><a id="idp71716688" class="indexterm"></a><a id="idp71717200" class="indexterm"></a><p>用户写入到内核配置文件中的信息被作为配置资源处理，并传递到内核。
+        总线配置代码解析这部分信息并将其转换为结构device_t的值和与之
+        关联的总线资源。对于复杂情况下的配置，驱动程序可以直接使用
+        <code class="function">resource_*</code> 函数访问配置资源。 然而，
+        通常既不需要也不推荐这样做，
+        因此这儿不再进一步讨论这个问题。</p><p>总线资源与每个设备相关联。通过类型和类型中的数字标识它们。
+        对于ISA总线，定义了下面的类型：</p><a id="idp71719248" class="indexterm"></a><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>SYS_RES_IRQ</em></span> - 中断号</p></li><li class="listitem"><p><span class="emphasis"><em>SYS_RES_DRQ</em></span> - ISA DMA通道号</p></li><li class="listitem"><p><span class="emphasis"><em>SYS_RES_MEMORY</em></span> - 映射到系统内存空间
+            的设备内存的范围
+          </p></li><li class="listitem"><p><span class="emphasis"><em>SYS_RES_IOPORT</em></span> - 设备I/O寄存器的范围
+            </p></li></ul></div><p>类型内的枚举从0开始，因此如果设备有两个内存区域，它的
+        <code class="literal">SYS_RES_MEMORY</code> 类型的资源编号为0和1。
+        资源类型与C语言的类型无关，
+        所有资源值具有C语言 <code class="literal">unsigned long</code>
+        类型，并且必要时必须进行类型强制转换 (cast)。资源号不必连续，
+        尽管对于ISA它们一般是连续的。ISA设备允许的资源编号为：</p><pre class="programlisting">          IRQ: 0-1
+          DRQ: 0-1
+          MEMORY: 0-3
+          IOPORT: 0-7</pre><p>所有资源被表示为带有起始值和计数的范围。对于IRQ和DRQ资源，
+        计数一般等于1。内存的值引用物理地址。</p><p>对资源能够执行三种类型的动作：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>set/get</p></li><li class="listitem"><p>allocate/release</p></li><li class="listitem"><p>activate/deactivate</p></li></ul></div><p>Set设置资源使用的范围。Allocation保留出请求的范围，使得
+        其它设备不能再占用（并检查此范围没有被其它设备占用）。
+        Activation执行必要的动作使得驱动程序可以访问资源（例如，对于
+        内存，它将被映射到内核的虚拟地址空间）。</p><p>操作资源的函数有：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">int bus_set_resource(device_t dev, int type,
+            int rid, u_long start, u_long count)</code></p><p>为资源设置范围。成功则返回0，否则返回错误码。
+            一般此函数只有在<code class="literal">type</code>，
+            <code class="literal">rid</code>，<code class="literal">start</code>或
+            <code class="literal">count</code>之一的值超出了允许的范围才会
+            返回错误。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p> dev - 驱动程序的设备</p></li><li class="listitem"><p> type - 资源类型，SYS_RES_* </p></li><li class="listitem"><p> rid - 类型内部的资源号（ID）</p></li><li class="listitem"><p> start, count - 资源范围 </p></li></ul></div></li><li class="listitem"><p><code class="function">int bus_get_resource(device_t dev, int type,
+          int rid, u_long *startp, u_long *countp)</code></p><p>取得资源范围。成功则返回0，如果资源尚未定义则返回错误码。
+          </p></li><li class="listitem"><p><code class="function">u_long bus_get_resource_start(device_t dev,
+            int type, int rid) u_long bus_get_resource_count (device_t
+            dev, int type, int rid)</code></p><p>便捷函数，只用来获取start或count。出错的情况下返回0，
+            因此如果0是资源的start合法值之一，将无法区分返回
+            的0是否指示错误。幸运的是，对于附加驱动程序，没有ISA资源的
+            start值从0开始。</p></li><li class="listitem"><p><code class="function">void bus_delete_resource(device_t dev, int
+            type, int rid)</code></p><p>删除资源，令其未定义。</p></li><li class="listitem"><p><code class="function">struct resource *
+            bus_alloc_resource(device_t dev, int type, int *rid,
+            u_long start, u_long end, u_long count, u_int
+            flags)</code></p><p>在start和end之间没有被其它设备占用的地方按count值
+            的范围分配一个资源。不过，不支持对齐。如果资源尚未被设置，
+            则自动创建它。start为0，end为~0（全1）的这对特殊值
+            意味着必须使用以前通过
+            <code class="function">bus_set_resource()</code>设置的固定值：
+            start和count就是它们自己，end=(start+count)，这种情况下，
+            如果以前资源没有定义，则返回错误。尽管rid通过引用传递，
+            但它并不被ISA总线的资源分配代码设置（其它总线可能使用不同的
+            方法并可能修改它）。</p></li></ul></div><p>旗标是一个位映射，调用者感兴趣的有：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>RF_ACTIVE</em></span> - 使得资源分配后
+            被自动激活。</p></li><li class="listitem"><p><span class="emphasis"><em>RF_SHAREABLE</em></span> - 资源可以同时
+            被多个驱动程序共享。</p></li><li class="listitem"><p><span class="emphasis"><em>RF_TIMESHARE</em></span> - 资源可以被多个驱动
+            程序分时共享，也就是说，被多个驱动程序同时分配，但任何
+            给定时间只能被其中一个激活。</p></li><li class="listitem"><p>出错返回0。被分配的值可以使用
+            <code class="function">rhand_*()</code>从返回的句柄获得。</p></li><li class="listitem"><p><code class="function">int bus_release_resource(device_t dev, int
+            type, int rid, struct resource *r)</code></p></li><li class="listitem"><p>释放资源，r为<code class="function">bus_alloc_resource()</code>
+            返回的句柄。成功则返回0，否则返回错误码。</p></li><li class="listitem"><p><code class="function">int bus_activate_resource(device_t dev, int
+            type, int rid, struct resource *r)</code>
+            <code class="function">int bus_deactivate_resource(device_t dev, int
+            type, int rid, struct resource *r)</code></p></li><li class="listitem"><p>激活或禁用资源。成功则返回0，否则返回错误码。如果
+            资源被分时共享且当前被另一驱动程序激活，则返回 <code class="literal">EBUSY</code>。
+          </p></li><li class="listitem"><p><code class="function">int bus_setup_intr(device_t dev, struct
+            resource *r, int flags, driver_intr_t *handler, void *arg,
+            void **cookiep)</code> <code class="function">int
+            bus_teardown_intr(device_t dev, struct resource *r, void
+            *cookie)</code></p></li><li class="listitem"><p>关联/分离中断处理程序与设备。成功则返回0，否则
+            返回错误码。</p></li><li class="listitem"><p>r - 被激活的描述IRQ的资源句柄。</p><p>flags - 中断优先级，如下之一：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><code class="function">INTR_TYPE_TTY</code> - 终端和其它
+                类似的字符类型设备。使用
+                <code class="function">spltty()</code>屏蔽它们。</p></li><li class="listitem"><p><code class="function">(INTR_TYPE_TTY |
+                INTR_TYPE_FAST)</code> - 输入缓冲较小的终端类型
+                设备，而且输入上的数据丢失很关键（例如老式串口）。
+                使用<code class="function">spltty()</code>屏蔽它们。</p></li><li class="listitem"><p><code class="function">INTR_TYPE_BIO</code> - 块类型设备，
+                不包括CAM控制器上的。使用
+                <code class="function">splbio()</code>屏蔽它们。</p></li><li class="listitem"><p><code class="function">INTR_TYPE_CAM</code> - CAM （通用访问
+                方法Common Access Method）总线控制器。使用
+                <code class="function">splcam()</code>屏蔽它们。</p></li><li class="listitem"><p><code class="function">INTR_TYPE_NET</code> - 网络接口
+                 控制器。使用
+                <code class="function">splimp()</code>屏蔽它们。</p></li><li class="listitem"><p><code class="function">INTR_TYPE_MISC</code> -
+                各种其它设备。除了通过
+                <code class="function">splhigh()</code>没有其它方法屏蔽它们。
+                <code class="function">splhigh()</code>屏蔽所有中断。
+                </p></li></ul></div></li></ul></div><p>当中断处理程序执行时，匹配其优先级的所有其它中断都被屏蔽，
+        唯一的例外是MISC级别，它不会屏蔽其它中断，也不会被其它中断
+        屏蔽。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>handler</em></span> - 指向处理程序的指针，
+            类型driver_intr_t被定义为<code class="function">void
+            driver_intr_t(void *)</code></p></li><li class="listitem"><p><span class="emphasis"><em>arg</em></span> - 传递给处理程序的参量，标识
+            特定设备。由处理程序将它从void*转换为任何实际类型。ISA
+            中断处理程序的旧约定是使用单元号作为参量，新约定（推荐）
+            使用指向设备softc结构的指针。</p></li><li class="listitem"><p><span class="emphasis"><em>cookie[p]</em></span> - 从
+            <code class="function">setup()</code>接收的值，当传递给
+            <code class="function">teardown()</code>
+            时用于标识处理程序。</p></li></ul></div><p>定义了若干方法来操作资源句柄(struct resource *)。设备驱动
+        程序编写者感兴趣的有：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">u_long rman_get_start(r) u_long
+            rman_get_end(r)</code> 取得被分配的资源范围的起始和结束。
+          </p></li><li class="listitem"><p><code class="function">void *rman_get_virtual(r)</code> 取得
+            被激活的内存资源的虚地址。</p></li></ul></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-config.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-busmem.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.4. 配置文件与自动配置期间识别和探测的顺序 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.6. 总线内存映射</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

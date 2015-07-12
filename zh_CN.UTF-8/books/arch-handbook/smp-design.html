@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>8.3. 架构与设计概览</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="smp.html" title="第 8 章 SMPng 设计文档" /><link rel="prev" href="smp-lock-fundamentals.html" title="8.2. 基本工具与上锁的基础知识" /><link rel="next" href="smp-lock-strategies.html" title="8.4. 特定数据的锁策略" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8.3. 架构与设计概览</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="smp-lock-fundamentals.html">上一页</a> </td><th width="60%" align="center">第 8 章 SMPng 设计文档</th><td width="20%" align="right"> <a accesskey="n" href="smp-lock-strategies.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="smp-design"></a>8.3. 架构与设计概览</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70984528"></a>8.3.1. 对中断的处理</h3></div></div></div><a id="idp70985168" class="indexterm"></a><p>与许多其它多线程 <span class="trademark">UNIX</span>® 内核所采取的模式类似， FreeBSD
+	会赋予中断处理程序独立的线程上下文，
+	这样做能够让中断线程在遇到锁时阻塞。 但为了避免不必要的延迟，
+	中断线程在内核中， 是以实时线程的优先级运行的。 因此，
+	中断处理程序不应执行过久， 以免饿死其它内核线程。 此外，
+	由于多个处理程序可以分享同一中断线程， 中断处理程序不应休眠，
+	或使用可能导致休眠的锁， 以避免将其它中断处理程序饿死。</p><a id="idp70986576" class="indexterm"></a><p>目前在 FreeBSD 中的中断线程是指重量级中断线程。
+	这样称呼它们的原因在于， 转到中断线程需要执行一次完整的上下文切换操作。
+	在最初的实现中， 内核不允许抢占， 因此中断在打断内核线程之前，
+	必须等待内核线程阻塞或返回用户态之后才能执行。</p><a id="idp70987472" class="indexterm"></a><a id="idp70987984" class="indexterm"></a><p>为了解决响应时间问题， FreeBSD 内核现在采用了抢占式调度策略。
+	目前， 只有释放休眠 mutex 或发生中断时才能抢断内核线程，
+	但最终目标是在 FreeBSD 上实现下面所描述的全抢占式调度策略。</p><p>并非所有的中断处理程序都在独立的线程上下文中执行。
+	相反， 某些处理程序会直接在主中断上下文中执行。 这些中断处理程序，
+	现在被错误地命名为
+	<span class="quote">“<span class="quote">快速</span>”</span> 中断处理程序， 因为早期版本的内核中使用了
+	<code class="constant">INTR_FAST</code> 标志来标记这些处理程序。
+	目前只有时钟中断和串口 I/O 设备中断采用这一类型。
+	由于这些处理程序没有独立的上下文， 因而它们都不能获得阻塞性锁，
+	因此也就只能使用自旋 mutex。</p><a id="idp70994256" class="indexterm"></a><p>最后， 还有一种称为轻量级上下文切换的优化，
+	可以在 MD 代码中使用。 因为中断线程都是在内核上下文中执行的，
+	所以它可以借用任意进程的 vmspace (虚拟内存地址空间)。 因此，
+	在轻量级上下文切换中， 切换到中断线程并不切换对应的 vmspace，
+	而是借用被中断线程的 vmspace。 为确保被中断线程的 vmspace
+	不在中断处理过程中消失， 被中断线程在中断线程不再借用其 vmspace
+	之前是不允许执行的。 刚才提到的情况可能在中断线程阻塞或完成时发生。
+	如果中断线程发生阻塞， 则它再次进入可运行状态时将使用自己的上下文，
+	这样一来， 就可以释放被中断的线程了。</p><p>这种优化的坏处在于它们和硬件紧密相关， 而且实现比较复杂，
+	因此只有在这样做能带来大幅性能改善时才应采用。
+	目前这样说可能还为时过早， 而且事实上可能会反而导致性能下降，
+	因为几乎所有的中断处理程序都会立即被全局锁 (Giant) 阻塞，
+	而这种阻塞将进而需要线程修正。 另外， Mike Smith
+	提议采用另一种方式来处理中断线程：</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>每个中断处理程序分为两部分， 一个在主中断上下文中运行的主体
+	    (predicate) 和一个在自己的线程上下文中执行的处理程序 (handler)。</p></li><li class="listitem"><p>如果中断处理程序拥有主体， 则当触发中断时， 执行该主体。
+	    如果主体返回真， 则认为该中断被处理完毕， 内核从中断返回。
+	    如果主体返回假， 或者中断没有主体， 则调度运行线程式处理程序。</p></li></ol></div><p>在这一模式中适当地采用轻量级上下文切换可能是非常复杂的。
+	因为我们可能会希望在未来改变这一模式， 因此现在最好的方案，
+	应该是暂时推迟在轻量级上下文切换之上的工作，
+	以便进一步完善中断处理架构， 随后再考察轻量级上下文切换是否适用。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70997968"></a>8.3.2. 内核抢占与临界区</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70998608"></a>8.3.2.1. 内核抢占简介</h4></div></div></div><p>内核抢占的概念很简单， 其基本思想是 CPU 总应执行优先级最高的工作。
+	  当然， 至少在理想情况下是这样。 有些时候，
+	  达成这一理想的代价会十分高昂， 以至于在这些情况下抢占会得不偿失。</p><p>实现完全的内核抢占十分简单： 在调度将要执行的线程并放入运行队列时，
+	  检查它的优先级是否高于目前正在执行的线程。 如果是这样的话，
+	  执行一次上下文切换并立即开始执行该线程。</p><p>尽管锁能够在抢占时保护多数数据， 但内核并不是可以安全地处处抢占的。
+	  例如， 如果持有自旋 mutex 的线程被抢占， 而新线程也尝试获得同一自旋
+	  mutex， 新线程就可能一直自旋下去，
+	  因为被中断的线程可能永远没有机会运行了。 此外， 某些代码， 例如在 Alpha 上的
+	  <code class="function">exec</code> 对进程地址空间编号进行赋值的代码也不能被抢断，
+	  因为它被用来支持实际的上下文切换操作。 在这些代码段中，
+	  会通过使用临界区来临时禁用抢占。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71001040"></a>8.3.2.2. 临界区</h4></div></div></div><a id="idp71001680" class="indexterm"></a><p>临界区 API 的责任是避免在临界区内发生上下文切换。
+	  对于完全抢占式内核而言， 除了当前线程之外的其它线程的每个
+	  <code class="function">setrunqueue</code> 都是抢断点。
+	  <code class="function">critical_enter</code> 的一种实现方式是设置一线程私有标记，
+	  并由其对应方清除。 如果调用
+	  <code class="function">setrunqueue</code> 时设置了这个标志，
+	  则无论新线程和当前线程相比其优先级高低， 都不会发生抢占。
+	  然而， 由于临界区会在自旋 mutex 中用于避免上下文切换，
+	  而且能够同时获得多个自旋 mutex， 因此临界区 API 必须支持嵌套。
+	  由于这个原因， 目前的实现中采用了嵌套计数，
+	  而不仅仅是单个的线程标志。</p><p>为了尽可能缩短响应时间， 在临界区中的抢占被推迟，
+	  而不是直接丢弃。 如果线程应被抢断， 并被置为可运行，
+	  而当前线程处于临界区， 则会设置一线程私有标志，
+	  表示有一个尚未进行的抢断操作。 当最外层临界区退出时，
+	  会检查这一标志， 如果它被置位， 则当前线程会被抢断，
+	  以允许更高优先级的线程开始运行。</p><a id="idp71004112" class="indexterm"></a><a id="idp71004624" class="indexterm"></a><p>中断会引发一个和自旋 mutex 有关的问题。
+	  如果低级中断处理程序需要锁， 它就不能中断任何需要该锁的代码，
+	  以避免可能发生的损坏数据结构的情况。 目前，这一机制是透过临界区 API
+	  以 <code class="function">cpu_critical_enter</code> 和
+	  <code class="function">cpu_critical_exit</code> 函数的形式实现的。
+	  目前这一 API 会在所有 FreeBSD
+	  所支持的平台上禁用和重新启用中断。 这种方法并不是最优的，
+	  但它更易理解， 也更容易正确地实现。 理论上， 这一辅助 API
+	  只需要配合在主中断上下文中的自旋 mutex 使用。 然而，
+	  为了让代码更为简单， 它被用在了全部自旋 mutex，
+	  甚至包括所有临界区上。 将其从 MI API 中剥离出来放入 MD API，
+	  并只在需要使用它的 MI API 的自旋 mutex 实现中使用可能会有更好的效果。
+	  如果我们最终采用了这种实现方式， 则 MD API
+	  可能需要改名， 以彰显其为一单独 API 这一事实。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71006672"></a>8.3.2.3. 设计折衷</h4></div></div></div><p>如前面提到的， 当完全抢占并非总能提供最佳性能时，
+	  采取了一些折衷的措施。</p><p>第一处折衷是， 抢占代码并不考虑其它 CPU 的存在。
+	  假设我们有两个 CPU， A
+	  和 B， 其中 A 上线程的优先级为 4，
+	  而 B 上线程的优先级是 2。 如果 CPU B 令一优先级为 1
+	  的线程进入可运行状态， 则理论上， 我们希望 CPU A 切换至这一新线程，
+	  这样就有两个优先级最高的线程在运行了。 然而， 确定哪个
+	  CPU 在抢占时更合适， 并通过 IPI 向那个 CPU 发出信号，
+	  并完成相关的同步工作的代价十分高昂。 因此， 目前的代码会强制 CPU B
+	  切换至更高优先级的线程。 请注意这样做仍会让系统进入更好的状态，
+	  因为 CPU B 会去执行优先级为 1 而不是 2 的那个线程。</p><p>第二处折衷是限制对于实时优先级的内核线程的立即抢占。
+	  在前面所定义的抢占操作的简单情形中， 低优先级总会被立即抢断
+	  (或在其退出临界区后被抢断)。 然而， 许多在内核中执行的线程，
+	  有很多只会执行很短的时间就会阻塞或返回用户态。 因此，
+	  如果内核抢断这些线程并执行其它非实时的内核线程，
+	  则内核可能会在这些线程马上要休眠或执行完毕之前切换出去。
+	  这样一来， CPU 就必须调整快取缓存以配合新线程的执行。
+	  当内核返回到被抢断的线程时， 它又需要重新填充之前丢失的快取缓存信息。
+	  此外， 如果内核能够将对将阻塞或返回用户态的那个线程的抢断延迟到这之后的话，
+	  还能够免去两次额外的上下文切换。 因此， 默认情况下，
+	  只有在优先级较高的线程是实时线程时， 抢占代码才会立即执行抢断操作。</p><p>启用针对所有内核线程的完全抢占对于调试非常有帮助，
+	  因为它会暴露出更多的竞态条件 (race conditions)。
+	  在难以模拟这些竞态条件的单处理器系统中， 这显得尤其有用。
+	  因此， 我们提供了内核选项 <code class="literal">FULL_PREEMPTION</code>
+	  来启用针对所有内核线程的抢占， 这一选项主要用于调试目的。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71079248"></a>8.3.3. 线程迁移</h3></div></div></div><a id="idp71079888" class="indexterm"></a><p>简单地说， 线程从一个 CPU 移动到另一个上的过程称作迁移。
+	在非抢占式内核中， 这只会在明确定义的点， 例如调用
+	<code class="function">msleep</code> 或返回至用户态时才会发生。
+	但是， 在抢占式内核中， 中断可能会在任何时候强制抢断，
+	并导致迁移。 对于 CPU 私有的数据而言这可能会带来一些负面影响， 因为除
+	<code class="varname">curthread</code> 和 <code class="varname">curpcb</code>
+	以外的数据都可能在迁移过程中发生变化。 由于存在潜在的线程迁移，
+	使得未受保护的 CPU 私有数据访问变得无用。 这就需要在某些代码段禁止迁移，
+	以获得稳定的 CPU 私有数据。</p><a id="idp71081936" class="indexterm"></a><p>目前我们采用临界区来避免迁移， 因为它们能够阻止上下文切换。
+	但是， 这有时可能是一种过于严厉的限制，
+	因为临界区实际上会阻止当前处理器上的中断线程。 因而，
+	提供了另一个 API， 用以指示当前进程在被抢断时，
+	不应迁移到另一 CPU。</p><p>这组 API 也叫线程牵制， 它由调度器提供。 这组 API 包括两个函数：
+	<code class="function">sched_pin</code> 和
+	<code class="function">sched_unpin</code>。 这两个函数用于管理线程私有的计数
+	<code class="varname">td_pinned</code>。 如果嵌套计数大于零， 则线程将被锁住，
+	而线程开始运行时其嵌套计数为零， 表示处于未牵制状态。 所有的调度器实现中，
+	都要求保证牵制线程只在它们首次调用 <code class="function">sched_pin</code>
+	时所在的 CPU 上运行。 由于只有线程自己会写嵌套计数，
+	而只有其它线程在受牵制线程没有执行， 且持有
+	<code class="varname">sched_lock</code> 锁时才会读嵌套计数， 因此访问
+	<code class="varname">td_pinned</code> 不必上锁。
+	<code class="function">sched_pin</code> 函数会使嵌套计数递增，
+	而 <code class="function">sched_unpin</code> 则使其递减。
+	注意， 这些函数只操作当前线程， 并将其绑定到其执行它时所处的 CPU 上。
+	要将任意线程绑定到指定的 CPU 上， 则应使用 <code class="function">sched_bind</code> 和
+	<code class="function">sched_unbind</code>。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71115984"></a>8.3.4. 调出 (Callout)</h3></div></div></div><p>内核机制 <code class="function">timeout</code> 允许内核服务注册函数，
+	以作为 <code class="function">softclock</code> 软件中断的一部分来执行。
+	事件将基于所希望的时钟嘀嗒的数目进行， 并在大约指定的时间回调用户提供的函数。</p><p>未决 timeout (超时) 事件的全局表是由一全局 mutex，
+	<code class="varname">callout_lock</code> 保护的； 所有对 timeout 表的访问，
+	都必须首先拿到这个 mutex。 当 <code class="function">softclock</code>
+	唤醒时， 它会扫描未决超时表， 并找出应启动的那些。 为避免锁逆序，
+	<code class="function">softclock</code> 线程会在调用所提供的
+	<code class="function">timeout</code> 回调函数时首先释放
+	<code class="varname">callout_lock</code> mutex。
+	如果在注册时没有设置 <code class="constant">CALLOUT_MPSAFE</code> 标志，
+	则在调用调出函数之前， 还会抓取全局锁， 并在之后释放。 其后，
+	<code class="varname">callout_lock</code> mutex 会在继续处理前再次获得。
+	<code class="function">softclock</code> 代码在释放这个 mutex
+	时会非常小心地保持表的一致状态。 如果启用了 <code class="constant">DIAGNOSTIC</code>，
+	则每个函数的执行时间会被记录， 如果超过了某一阈值， 则会产生警告。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="smp-lock-fundamentals.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="smp.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="smp-lock-strategies.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">8.2. 基本工具与上锁的基础知识 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 8.4. 特定数据的锁策略</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

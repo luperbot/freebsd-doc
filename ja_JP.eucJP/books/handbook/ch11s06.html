@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>11.6. 高度なトピックス</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="linuxemu.html" title="第11章 Linux バイナリ互換機能" /><link rel="prev" href="sapr3.html" title="11.5. SAP R/3 (4.6B - IDES) のインストール" /><link rel="next" href="system-administration.html" title="パート〓III.〓システム管理" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.6. 高度なトピックス</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="sapr3.html">戻る</a>〓</td><th width="60%" align="center">第11章 Linux バイナリ互換機能</th><td width="20%" align="right">〓<a accesskey="n" href="system-administration.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp88389968"></a>11.6. 高度なトピックス</h2></div></div></div><p>Linux バイナリ互換機能がどのような仕組みなのか興味がある人はこのセクションを読んでください。
+      以下の文章で説明されていることのほとんどは <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-chat" target="_top">FreeBSD chat メーリングリスト</a> に投稿された
+      Terry Lambert (<code class="email">&lt;<a xmlns="" class="email" href="mailto:tlambert@primenet.com">tlambert@primenet.com</a>&gt;</code>) 氏のメール
+      (Message ID: <code class="literal">&lt;199906020108.SAA07001@usr09.primenet.com&gt;</code>)
+      をもとにしています。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88396496"></a>11.6.1. どのように動くのでしょう?</h3></div></div></div><a id="idp88397136" class="indexterm"></a><p>FreeBSD は、“実行クラスローダ (execution class loader) ”
+      と呼ばれる抽象的な機構を持っています。これは <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=execve&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">execve</span>(2)</span></a>
+      システムコールへの楔という形で実装されています。
+    </p><p>FreeBSD は、シェルインタプリタやシェルスクリプトを実行するための
+      <code class="literal">#!</code> ローダを持った単一のプログラムローダではなく、
+      ローダのリストを持っているのです。
+    </p><p>歴史的には、Unix プラットフォーム上の唯一のローダーがマジックナンバー
+      (一般的にはファイルの先頭の 4 ないし 8 バイトの部分)
+      の検査を行ないシステムで実行できるバイナリかどうかを検査し、
+      もしそうならバイナリローダーを呼び出すというようになっていました。</p><p>もし、そのシステム用のバイナリでない場合には、
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=execve&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">execve</span>(2)</span></a> システムコールの呼び出しは失敗の戻り値を返し、
+      シェルがシェルコマンドとして実行しようと試みていたわけです。
+    </p><p>この仮定は<span class="quote">「<span class="quote">現在利用しているシェルがどのようなものであっても</span>」</span>変わりません。</p><p>後に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> に変更が加えられ、先頭の 2 バイトを検査した結果
+      <code class="literal">:\n</code> であれば代わりに <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> を呼び出す、
+      というようになりました (この変更は SCO が最初に行なったと思われます)。</p><p>現在の FreeBSD は、プログラムローダリストを走査します。
+      その際、空白文字までの文字列をインタプリタとして認識する、
+      通常の <code class="literal">#!</code> ローダを用いるため、
+      該当するものが存在しなければ最終的に /bin/sh がロードされます。</p><a id="idp88409168" class="indexterm"></a><p>Linux ABI をサポートするため、FreeBSD は
+      ELF バイナリを示すマジックナンバを確認します。
+      (ただし、この段階では FreeBSD、Solaris、Linux、そしてその他の
+      ELF イメージ形式を使っている OS を区別することはできません)。</p><a id="idp88410064" class="indexterm"></a><p>ELF ローダは、特殊な<span class="emphasis"><em>マーク (brand)</em></span> があるかどうか探します。
+      このマークとは、ELF イメージのコメントセクションのことです。
+      SVR4/Solaris の ELF バイナリには、このセクションは存在しません。</p><p>Linux バイナリを実行するためには、
+      ELF バイナリに <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=brandelf&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">brandelf</span>(1)</span></a> で説明されている
+      <code class="literal">Linux</code> のマークが<span class="emphasis"><em>付けられて</em></span>いなければなりません。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>brandelf -t Linux file</code></strong></pre><p>上のようにすることで、指定されたファイルは
+	<code class="literal">Linux</code> のマークが付けられ、
+	ELF ローダが認識できるようになります。</p><a id="idp88414928" class="indexterm"></a><p>ELF ローダが <code class="literal">Linux</code> マークを確認すると、
+      ローダは <code class="literal">proc</code> 構造体内の
+      ある一つのポインタを置き換えます。システムコールは全て、
+      このポインタ (伝統的な Unix システムではこれは構造体の配列 <code class="literal">sysent[]</code>
+      で、システムコールが含まれています) を通してインデックスされます。
+      さらに、そのプロセスには Linux カーネルモジュールに必要な
+      シグナルトランポリンコード (訳注:
+      シグナルの伝播を実現するコード) 用の特殊なトラップベクタの設定や、
+      他の (細かな) 調整のための設定が行なわれます。</p><p>Linux システムコールベクタは、
+      さまざまなデータに加えて <code class="literal">sysent[]</code>
+      エントリーのリストを含んでおり、それらのアドレスはカーネルモジュール内にあります。</p><p>Linux バイナリがシステムコールを発行する際、トラップコードは
+      <code class="literal">proc</code> 構造体を用いてシステムコール関数ポインタを
+      解釈します。そして FreeBSD ではなく
+      Linux 用のシステムコールエントリポイントを得るわけです。</p><p>さらに、Linux モードは状況に応じて<span class="emphasis"><em>ファイルシステム本来のルートマウントポイントを置き換えて</em></span>ファイルの参照を行ないます。
+      これは、<code class="literal">union</code> オプションを指定してマウントされたファイルシステム
+      (unionfs では<span class="emphasis"><em>ありません!</em></span>)が行なっていることと同じです。
+      ファイルを検索する際にはまず
+      <code class="filename">/compat/linux/original-path</code>
+      ディレクトリを、<span class="emphasis"><em>それから</em></span>見つけられなかったときにのみ、
+      <code class="filename">/original-path</code>
+      を調べます。
+      こうすることで、他のバイナリを要求するバイナリの実行を可能にしています
+      (したがって、Linux 用プログラムツールは Linux ABI サポート環境下で完全に動作するわけです)。
+      またこれは、もし対応する Linux バイナリが存在しない場合に
+      Linux バイナリが FreeBSD バイナリをロードしたり、実行したりすることが可能であること、
+      その Linux バイナリに自分自身が Linux 上で実行されていないことを
+      気付かせないようにする目的で、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=uname&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">uname</span>(1)</span></a> コマンドを
+      <code class="filename">/compat/linux</code> ディレクトリに置くことができる、
+      ということを意味します。
+    </p><p>要するに、Linux カーネルが FreeBSD カーネルの内部に存在しているわけです。
+      カーネルによって提供されるサービス全ての実装の基礎となるさまざまな関数は
+      FreeBSD システムコールテーブルエントリと
+      Linux システムコールテーブルエントリの両方で共通に利用されています。
+      これらにはファイルシステム処理、仮想メモリ処理、シグナル伝送、System V IPC
+      などが含まれますが、
+      FreeBSD バイナリは FreeBSD <span class="emphasis"><em>グルー</em></span> (訳注: glue;
+      二者の間を仲介するという意味) 関数群、
+      そして Linux バイナリは Linux <span class="emphasis"><em>グルー</em></span>関数群を用いる、
+      という点だけが異なります (過去に存在したほとんどの OS は、
+      自分自身のための<span class="emphasis"><em>グルー</em></span>関数群しか備えていません。
+      前述したように、システムコールを発行する際、
+      各々のプロセスの <code class="literal">proc</code> 構造体内にある、
+      ローダによって動的に初期化されるポインタを参照してアドレスを得る代わりに、
+      静的でグローバルな <code class="literal">sysent[]</code> 構造体の配列に
+      システムコール関数のアドレスが直接格納されているのです)。</p><p>さて、どちらを本来の FreeBSD ABI (訳注: Applications Binary Interface;
+      同じ CPU を利用したコンピュータ間でバイナリを共有するための規約のこと)
+      と呼ぶべきなのでしょうか?
+      実は、どちらが本来のものであるかということを論ずることに意味はありません。
+      基本的に、FreeBSD <span class="emphasis"><em>グルー</em></span>関数群はカーネルの中に静的にリンクされていて、
+      Linux <span class="emphasis"><em>グルー</em></span>関数群は静的にリンクすることも、
+      カーネルモジュールを介して利用することもできるようになっている、
+      という違いがあるだけ (ただしこれは現時点においての話であり、
+      将来のリリースで変更される可能性がありますし、
+      おそらく実際に変更されるでしょう) です。</p><p>あ、「でもこれは本当にエミュレーションと呼べるのか」って?
+      答えは「いいえ」です。これは ABI の実装であり、
+      エミュレーションとは異なります。エミュレータが呼び出されているわけではありません
+      (シミュレータでもないことをあらかじめ断っておきましょう)。</p><p>では、これがよく <span class="quote">「<span class="quote">Linux エミュレーション</span>」</span>と呼ばれるのは何故でしょうか?
+     それはもちろん FreeBSD の売りにするためでもあるのですが、
+     実際には、次のような理由によります。
+     この機能が初めて実装された頃、
+     動作原理を説明する以外にこの機能を表現する言葉はありませんでした。
+     しかし、コードをコンパイルしたりモジュールをロードしない場合、
+     「FreeBSD 上で Linux バイナリを実行する」という表現は、
+     厳密に考えると適切ではありません。
+     そこで、その際にロードされているもの自身を表現する言葉 ― すなわち
+     <span class="quote">「<span class="quote">Linux エミュレータ</span>」</span>が必要だったのです。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="sapr3.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="linuxemu.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="system-administration.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">11.5. SAP R/3 (4.6B - IDES) のインストール〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓パート〓III.〓システム管理</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

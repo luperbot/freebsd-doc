@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.3. Colli di Bottiglia nell'Accesso</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="vinum-vinum.html" title="Capitolo 20. Il Gestore di Volumi Vinum" /><link rel="prev" href="vinum-intro.html" title="20.2. Dischi Troppo Piccoli" /><link rel="next" href="vinum-data-integrity.html" title="20.4. Integrità dei Dati" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.3. Colli di Bottiglia nell'Accesso</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-intro.html">Indietro</a> </td><th width="60%" align="center">Capitolo 20. Il Gestore di Volumi Vinum</th><td width="20%" align="right"> <a accesskey="n" href="vinum-data-integrity.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-access-bottlenecks"></a>20.3. Colli di Bottiglia nell'Accesso</h2></div></div></div><p>I moderni sistemi hanno frequentemente la necessità di
+      accedere ai dati in modo concorrente.  Ad esempio, un grande server FTP o
+      HTTP può avere migliaia di sessioni concorrenti e molteplici
+      connessioni da 100 Mbit/s verso il mondo esterno, ben oltre il
+      transfer rate (velocità di trasferimento) che la maggior parte dei
+      dischi può sostenere.</p><p>I dischi odierni possono trasferire sequenzialmente dati fino a
+      70 MB/s, ma questo valore ha poca importanza in un ambiente dove
+      molti processi indipendenti accedono al disco, in quanto raggiungerebbero
+      solo una frazione di quella velocità.  In questi casi è
+      più interessante vedere il problema dal punto di vista del
+      sottosistema dischi: il parametro importante è il carico che il
+      trasferimento pone sul sottosistema, in altre parole il tempo per cui il
+      trasferimento occupa i dischi necessari per lo stesso.</p><p>In ogni trasferimento da disco il drive deve prima posizionare le
+      testine, poi aspettare che il primo settore passi sotto la testina di
+      lettura e solo dopo può effettuare il trasferimento.  Queste azioni
+      possono essere considerate atomiche: non ha alcun senso
+      interromperle.</p><p><a id="vinum-latency"></a>Considera un tipico trasferimento di circa
+      10 kB: l'attuale generazione di dischi ad alte prestazioni può
+      posizionare le testine in circa 3,5 ms.  I dischi più veloci
+      ruotano a 15.000 rpm, quindi la latenza media rotazionale (mezzo
+      giro) è di 2 ms.  A 70 MB/s, il trasferimento in
+      sé occupa circa 150 ?s, quasi nulla in confronto al tempo
+      di posizionamento. In questo caso il transfer rate effettivo può
+      scendere fino a poco oltre 1 MB/s e questo è chiaramente molto
+      dipendente dalla dimensione del trasferimento.</p><p>La tradizionale e ovvia soluzione a questo collo di bottiglia è
+      <span class="quote">«<span class="quote">più assi</span>»</span>: invece di usare un grande disco si usano
+      molti piccoli dischi con la stessa dimensione totale.  Ogni disco è
+      capace di posizionarsi e trasferire dati indipendentemente quindi la
+      velocità effettiva aumenta di un fattore vicino al numero di dischi
+      usati.</p><p>L'esatto fattore di miglioramento è, ovviamente, più
+      piccolo del numero di dischi: benché ogni disco sia capace di
+      trasferire in parallelo non c'è modo di assicurare che le richieste
+      siano distribuite uniformemente tra tutti i dischi.  Inevitabilmente il
+      carico su uno dei dischi è più alto che sugli altri.</p><a id="idp85030352" class="indexterm"></a><a id="idp85030864" class="indexterm"></a><p>L'uniformità della distribuzione del carico sui dischi è
+      fortemente dipendente dal modo in cui i dati sono condivisi tra i dischi
+      stessi.  Nella seguente discussione è conveniente pensare allo
+      spazio di immagazzinamento come se fosse diviso in un gran numero di
+      settori identificati da un indirizzo numerico, come pagine in un libro.
+      Il metodo più ovvio è di dividere il disco virtuale in
+      gruppi di settori consecutivi della dimensione dei dischi fisici e
+      immagazzinarli in questa maniera, come strappare un grosso libro in
+      piccole sezioni.  Questo metodo è chiamato
+      <span class="emphasis"><em>concatenazione</em></span> e ha il vantaggio di non avere
+      particolari richieste sulla dimensione degli specifici dischi.
+      Funziona bene quando l'accesso al
+      disco virtuale è ben ripartito tra tutto il suo spazio di
+      indirizzamento.  Quando l'accesso è concentrato in una piccola area
+      il miglioramento è meno marcato.  La <a class="xref" href="vinum-access-bottlenecks.html#vinum-concat" title="Figura 20.1. Organizzazione Concatenata">Figura 20.1, «Organizzazione Concatenata»</a>
+      illustra la sequenza in cui le unità di immagazzinamento sono
+      allocate nell'organizzazione concatenata.</p><p>
+      </p><div class="figure"><a id="vinum-concat"></a><div class="figure-title">Figura 20.1. Organizzazione Concatenata</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-concat.png" alt="Organizzazione Concatenata" /></div></div></div><p><br class="figure-break" />
+    </p><a id="idp85035088" class="indexterm"></a><a id="idp85035600" class="indexterm"></a><a id="idp85036752" class="indexterm"></a><a id="idp85037648" class="indexterm"></a><a id="idp85038800" class="indexterm"></a><p>Un metodo alternativo è dividere lo spazio di indirizzamento in più
+      piccole componenti di egual dimensione e immagazzinarle sequenzialmente su
+      differenti dispositivi.  Per esempio i primi 256 settori potrebbero essere
+      immagazzinati sul primo disco, i seguenti 256 settori sul disco seguente e
+      così via.  Dopo aver immagazzinato i dati sull'ultimo disco il
+      processo si ripete finché i dischi non sono pieni.  Questo
+      mappamento è chiamato <span class="emphasis"><em>striping</em></span> (letteralmente
+      "a bande") o <acronym class="acronym">RAID-0</acronym>
+      <a href="#ftn.idp85040336" class="footnote" id="idp85040336"><sup class="footnote">[9]</sup></a>.
+      Lo striping richiede qualche sforzo aggiuntivo per localizzare i dati e
+      può causare carico di I/O aggiuntivo quando il trasferimento
+      è distribuito tra vari dischi, ma aiuta il carico a essere ben
+      distribuito tra i vari dischi.  La <a class="xref" href="vinum-access-bottlenecks.html#vinum-striped" title="Figura 20.2. Organizzazione in Striping">Figura 20.2, «Organizzazione in Striping»</a> illustra
+      la sequenza in cui i blocchi di dati sono allocati nell'organizzazione in
+      striping.</p><p>
+      </p><div class="figure"><a id="vinum-striped"></a><div class="figure-title">Figura 20.2. Organizzazione in Striping</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-striped.png" alt="Organizzazione in Striping" /></div></div></div><p><br class="figure-break" />
+    </p><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp85040336" class="footnote"><p><a href="#idp85040336" class="para"><sup class="para">[9] </sup></a><acronym class="acronym">RAID</acronym> significa <span class="emphasis"><em>Redundant Array of
+          Inexpensive Disks</em></span> (insieme ridondante di dischi non
+          costosi) e offre varie forme di tolleranza ai problemi.  Nel caso del
+          <acronym class="acronym">RAID-0</acronym> il termine è leggermente fuorviante:
+          in effetti non dà alcuna ridondanza.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-intro.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-data-integrity.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">20.2. Dischi Troppo Piccoli </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 20.4. Integrità dei Dati</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

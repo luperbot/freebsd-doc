@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>10.4. Online-Kernel-Fehlersuche mit DDB</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="kerneldebug.html" title="Kapitel 10. Kernel-Fehlersuche" /><link rel="prev" href="kerneldebug-ddd.html" title="10.3. Fehlersuche in einem Speicherauszug nach einem Absturz mit DDD" /><link rel="next" href="kerneldebug-online-gdb.html" title="10.5. Online-Kernel-Fehlersuche mit GDB auf einem entfernten System" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.4. Online-Kernel-Fehlersuche mit DDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="kerneldebug-ddd.html">Zurück</a> </td><th width="60%" align="center">Kapitel 10. Kernel-Fehlersuche</th><td width="20%" align="right"> <a accesskey="n" href="kerneldebug-online-gdb.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kerneldebug-online-ddb"></a>10.4. Online-Kernel-Fehlersuche mit DDB</h2></div></div></div><p>Während <code class="command">kgdb</code> als Offline-Debugger
+      eine Benutzerschnittstelle auf höchster Ebene bietet, gibt
+      es einige Dinge, die es nicht kann. Die wichtigsten sind das
+      Setzen von Breakpoints und das Abarbeiten des Kernel-Codes in
+      Einzelschritten (Single-Stepping).</p><p>Falls Sie eine systemnahe Fehlersuche an Ihrem Kernel
+      vorhaben, steht Ihnen ein Online-Debugger mit dem Namen DDB zur
+      Verfügung. Er erlaubt Ihnen das Setzen von Breakpoints, die
+      Abarbeitung von Kernel-Funktionen in Einzelschritten, das
+      Untersuchen und Verändern von Kernel-Variablen usw. Jedoch
+      hat er keinen Zugriff auf Kernel-Quelldateien, sondern kann nur,
+      im Gegensatz zu <code class="command">gdb</code>, welches auf die ganzen
+      Informationen zur Fehlersuche zurückgreifen kann, auf
+      globale und statische Symbole zugreifen.</p><p>Um DDB in Ihren Kernel einzubinden, fügen Sie die
+      Optionen
+
+      </p><pre class="programlisting">options KDB</pre><p>
+      </p><pre class="programlisting">options DDB</pre><p>
+
+      Ihrer Konfigurationsdatei hinzu und bauen Sie den Kernel neu.
+      (Details zur Konfiguration des FreeBSD-Kernels finden Sie im
+      <a class="link" href="../../../../doc/de_DE.ISO8859-1/books/handbook/index.html" target="_top">FreeBSD-Handbuch</a>).</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Falls Sie eine ältere Version des Boot-Blocks haben,
+	könnte es sein, dass Ihre Symbole zur Fehlersuche noch
+	nicht einmal geladen werden. Aktualisieren Sie den Boot-Block;
+	aktuelle Versionen laden die DDB-Symbole automatisch.</p></div><p>Sobald Ihr Kernel mit DDB startet, gibt es mehrere Wege, um
+      in DDB zu gelangen. Der erste und früheste Weg ist, das
+      Boot-Flag <code class="option">-d</code> gleich an der
+      Boot-Eingabeaufforderung einzugeben. Der Kernel startet dann in
+      den Debug-Modus und betritt DDB noch vor jedweder
+      Gerätesuche. Somit können Sie Funktionen zur
+      Gerätesuche/-bereitstellung auf Fehler untersuchen.
+      FreeBSD-CURRENT-Benutzer müssen die sechste Option im
+      Boot-Menü auswählen, um an eine Eingabeaufforderung zu
+      gelangen.</p><p>Das zweite Szenario ist der Gang in den Debugger, sobald das
+      System schon gestartet ist. Es gibt zwei einfache Wege dies zu
+      erreichen. Falls Sie von der Eingabeaufforderung aus in den
+      Debugger gelangen möchten, geben Sie einfach folgenden
+      Befehl ab:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl debug.kdb.enter=1</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Um eine schnelle Panic zu erzwingen, geben Sie das folgende
+        Kommando ein:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl debug.kdb.panic=1</code></strong></pre></div><p>Anderenfalls können Sie ein Tastenkürzel auf der
+      Tastatur benutzen, wenn Sie an der Systemkonsole sind. Die
+      Voreinstellung für die break-to-debugger-Sequenz ist
+      <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>Alt</strong></span>+<span class="keycap"><strong>ESC</strong></span>.
+      In syscons kann diese Sequenz auf eine andere Tastenkombination
+      gelegt werden (remap) und manche der verfügbaren
+      Tastaturlayouts tun dies, stellen Sie also sicher, dass Sie die
+      richtige Sequenz kennen, die benutzt werden soll. Für
+      serielle Konsolen ist eine Option vorhanden, die die Benutzung
+      einer Unterbrechung der seriellen Verbindung (BREAK) auf der
+      Kommandozeile erlaubt, um in DDB zu gelangen (<code class="literal">options
+      BREAK_TO_DEBUGGER</code> in der Kernel-Konfigurationsdatei).
+      Dies ist jedoch nicht der Standard, da viele serielle Adapter in
+      Verwendung sind, die grundlos eine BREAK-Bedingung erzeugen, zum
+      Beispiel bei Ziehen des Kabels.</p><p>Die dritte Möglichkeit ist, dass jede Panic-Bedingung
+      in DDB springt, falls der Kernel hierfür konfiguriert ist.
+      Aus diesem Grund ist es nicht sinnvoll einen Kernel mit DDB
+      für ein unbeaufsichtigtes System zu konfigurieren.</p><p>Um die unbeaufsichtigte Funktionsweise zu erreichen
+      fügen Sie:</p><pre class="programlisting">options	KDB_UNATTENDED</pre><p>der Kernel-Konfigurationsdatei hinzu und bauen/installieren
+      Sie den Kernel neu.</p><p>Die DDB-Befehle ähneln grob einigen
+      <code class="command">gdb</code>-Befehlen. Das Erste, das Sie vermutlich
+      tun müssen, ist einen Breakpoint zu setzen:</p><pre class="screen"><strong class="userinput"><code>break function-name address</code></strong></pre><p>Zahlen werden standardmäßig hexadezimal
+      angegeben, aber um sie von Symbolnamen zu unterscheiden, muss
+      Zahlen, die mit den Buchstaben <code class="literal">a-f</code> beginnen,
+      <code class="literal">0x</code> vorangehen (dies ist für andere
+      Zahlen beliebig). Einfache Ausdrücke sind erlaubt, zum
+      Beispiel: <code class="literal">function-name + 0x103</code>.</p><p>Um den Debugger zu verlassen und mit der Abarbeitung
+      fortzufahren, geben Sie ein:</p><pre class="screen"><strong class="userinput"><code>continue</code></strong></pre><p>Um eine Stack-Ablaufverfolgung zu erhalten, benutzen
+      Sie:</p><pre class="screen"><strong class="userinput"><code>trace</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Beachten Sie, dass wenn Sie DDB mittels einer
+	Schnelltaste betreten, der Kernel zurzeit einen Interrupt
+	bereitstellt, sodass die Stack-Ablaufverfolgung Ihnen nicht
+	viel nützen könnte.</p></div><p>Falls Sie einen Breakpoint entfernen möchten, benutzen
+      Sie</p><pre class="screen"><strong class="userinput"><code>del</code></strong>
+<strong class="userinput"><code>del address-expression</code></strong></pre><p>Die erste Form wird direkt, nachdem ein Breakpoint anschlug,
+      angenommen und entfernt den aktuellen Breakpoint. Die zweite
+      kann jeden Breakpoint löschen, aber Sie müssen die
+      genaue Adresse angeben; diese kann bezogen werden durch:</p><pre class="screen"><strong class="userinput"><code>show b</code></strong></pre><p>oder:</p><pre class="screen"><strong class="userinput"><code>show break</code></strong></pre><p>Um den Kernel in Einzelschritten auszuführen, probieren
+      Sie:</p><pre class="screen"><strong class="userinput"><code>s</code></strong></pre><p>Dies springt in Funktionen, aber Sie können DDB
+      veranlassen, diese schrittweise zu verfolgen, bis die passende
+      Rückkehranweisung (Return-Statement) erreicht ist. Nutzen
+      Sie hierzu:</p><pre class="screen"><strong class="userinput"><code>n</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Dies ist nicht das gleiche wie die
+	<code class="command">next</code>-Anweisung von <code class="command">gdb</code>;
+	es ist wie <code class="command">gdb</code>s <code class="command">finish</code>.
+	Mehrmaliges Drücken von <span class="keycap"><strong>n</strong></span> führt zu
+	einer Fortsetzung.</p></div><p>Um Daten aus dem Speicher zu untersuchen, benutzen Sie (zum
+      Beispiel):
+
+      </p><pre class="screen"><strong class="userinput"><code>x/wx 0xf0133fe0,40</code></strong>
+<strong class="userinput"><code>x/hd db_symtab_space</code></strong>
+<strong class="userinput"><code>x/bc termbuf,10</code></strong>
+<strong class="userinput"><code>x/s stringbuf</code></strong></pre><p>
+
+      für Word/Halfword/Byte-Zugriff und
+      Hexadezimal/Dezimal/Character/String-Ausgabe. Die Zahl nach dem
+      Komma ist der Objektzähler. Um die nächsten 0x10
+      Objekte anzuzeigen benutzen Sie einfach:</p><pre class="screen"><strong class="userinput"><code>x ,10</code></strong></pre><p>Gleichermaßen benutzen Sie
+
+      </p><pre class="screen"><strong class="userinput"><code>x/ia foofunc,10</code></strong></pre><p>
+
+      um die ersten 0x10 Anweisungen aus <code class="function">foofunc</code>
+      zu zerlegen (disassemble) und Sie zusammen mit ihrem
+      Adressabstand (Offset) vom Anfang von
+      <code class="function">foofunc</code> auszugeben.</p><p>Um Speicher zu verändern benutzen Sie den
+      Schreibbefehl:</p><pre class="screen"><strong class="userinput"><code>w/b termbuf 0xa 0xb 0</code></strong>
+<strong class="userinput"><code>w/w 0xf0010030 0 0</code></strong></pre><p>Die Befehlsoption
+      (<code class="literal">b</code>/<code class="literal">h</code>/<code class="literal">w</code>)
+      legt die Größe der Daten fest, die geschrieben werden
+      sollen, der erste Ausdruck danach ist die Adresse, wohin
+      geschrieben werden soll, und der Rest wird als Daten
+      verarbeitet, die in aufeinander folgende Speicherstellen
+      geschrieben werden.</p><p>Falls Sie die aktuellen Register wissen möchten,
+      benutzen Sie:</p><pre class="screen"><strong class="userinput"><code>show reg</code></strong></pre><p>Alternativ können Sie den Inhalt eines einzelnen
+      Registers ausgeben mit z.B.
+
+      </p><pre class="screen"><strong class="userinput"><code>p $eax</code></strong></pre><p>
+
+      und ihn bearbeiten mit:</p><pre class="screen"><strong class="userinput"><code>set $eax new-value</code></strong></pre><p>Sollten Sie irgendeine Kernel-Funktion aus DDB heraus
+      aufrufen wollen, geben Sie einfach ein:</p><pre class="screen"><strong class="userinput"><code>call func(arg1, arg2, ...)</code></strong></pre><p>Der Rückgabewert wird ausgegeben.</p><p>Für eine Zusammenfassung aller laufenden Prozesse im
+      Stil von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ps&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ps</span>(1)</span></a> benutzen Sie:</p><pre class="screen"><strong class="userinput"><code>ps</code></strong></pre><p>Nun haben Sie herausgefunden, warum Ihr Kernel
+      fehlschlägt, und möchten neu starten. Denken Sie
+      daran, dass, abhängig von der Schwere vorhergehender
+      Störungen, nicht alle Teile des Kernels wie gewohnt
+      funktionieren könnten. Führen Sie eine der folgenden
+      Aktionen durch, um Ihr System herunterzufahren und neu zu
+      starten:</p><pre class="screen"><strong class="userinput"><code>panic</code></strong></pre><p>Dies wird Ihren Kernel dazu veranlassen abzustürzen,
+      einen Speicherauszug abzulegen und neu zu starten, sodass Sie
+      den Kernspeicherauszug später auf höherer Ebene mit
+      <code class="command">gdb</code> auswerten können. Diesem Befehl muss
+      normalerweise eine weitere <code class="command">continue</code>-Anweisung
+      folgen.</p><pre class="screen"><strong class="userinput"><code>call boot(0)</code></strong></pre><p>Dürfte ein guter Weg sein, um das laufende System
+      sauber herunterzufahren, alle Festplatten mittels
+      <code class="function">sync()</code> zu schreiben und schließlich,
+      in manchen Fällen, neu zu starten. Solange die Festplatten-
+      und Dateisystemschnittstellen des Kernels nicht beschädigt
+      sind, könnte dies ein guter Weg für ein beinahe
+      sauberes Abschalten sein.</p><pre class="screen"><strong class="userinput"><code>call cpu_reset()</code></strong></pre><p>Dies ist der letzte Ausweg aus der Katastrophe und kommt
+      beinahe dem Drücken des Ausschaltknopfes gleich.</p><p>Falls Sie eine kurze Zusammenfassung aller Befehle
+      benötigen, geben Sie einfach ein:</p><pre class="screen"><strong class="userinput"><code>help</code></strong></pre><p>Es ist strengstens empfohlen, eine ausgedruckte Version der
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ddb&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ddb</span>(4)</span></a>-Manualpage während der Fehlersuche neben sich
+      liegen zu haben. Denken Sie daran, dass es schwer ist, die
+      Online-Hilfe zu lesen, während der Ausführung des
+      Kernels in Einzelschritten.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="kerneldebug-ddd.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="kerneldebug.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="kerneldebug-online-gdb.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">10.3. Fehlersuche in einem Speicherauszug nach einem Absturz mit
+      DDD </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 10.5. Online-Kernel-Fehlersuche mit GDB auf einem entfernten
+      System</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,926 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Подключаемые Модули Аутентификации (PAM)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="В этой статье описываются принципы и механизмы, лежащие в основе библиотеки Подключаемых Модулей Аутентификации (PAM - Pluggable Authentication Modules), и рассказывается, как настроить PAM, как интегрировать PAM в приложения и как создавать модули PAM." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="ru" class="article" lang="ru"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70059088"></a>Подключаемые Модули Аутентификации (PAM)</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Dag-Erling</span> <span class="surname">Smorgrav</span></h3><span class="contrib">Текст предоставил</span> </div></div></div><div>Издание: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Авторские права © 2001-2003 Networks Associates Technology, Inc.</p></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="pam-legalnotice"></a><p>Эта статья была написана для Проекта FreeBSD компаниями
+        ThinkSec AS и Network Associates Laboratories, Security
+        Research Division of Network Associates, Inc. в рамках работ по
+        контракту N66001-01-C-8035 с DARPA/SPAWAR (<span class="quote"><<<span class="quote">CBOSS</span>>></span>),
+        как часть исследовательской программы DARPA CHATS.</p></div></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD это зарегистрированная торговая
+  марка FreeBSD Foundation.</p><p>Linux это зарегистрированная торговая марка
+  Linus Torvalds.</p><p>Motif, OSF/1 и UNIX это
+  зарегистрированные торговые марки, а IT DialTone и The Open Group это
+  торговые марки Open Group в Соединенных Штатах и других
+  странах.</p><p>Sun, Sun Microsystems, Java, Java Virtual Machine,
+  JDK, JRE, JSP, JVM, Netra, Solaris, StarOffice,
+  SunOS это торговые марки или
+  зарегистрированные торговые марки Sun Microsystems, Inc. в Соединенных
+  Штатах и других странах.</p><p>Многие из обозначений, используемые
+  производителями и продавцами для обозначения своих продуктов, заявляются
+  в качестве торговых марок.  Когда такие обозначения появляются в этом
+  документе, и Проекту FreeBSD известно о торговой марке, к обозначению
+  добавляется знак <span class="quote"><<<span class="quote">TM</span>>></span> или
+  <span class="quote"><<<span class="quote">(R)</span>>></span>.</p></div></div><div>    .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Аннотация</div><p>В этой статье описываются принципы и механизмы, лежащие в основе
+        библиотеки Подключаемых Модулей Аутентификации (PAM - Pluggable
+        Authentication Modules), и рассказывается, как настроить PAM, как
+        интегрировать PAM в приложения и как создавать модули PAM.</p></div></div></div><hr /></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="section"><a href="#pam-intro">1. Введение</a></span></dt><dt><span class="section"><a href="#pam-terms">2. Термины и соглашения</a></span></dt><dt><span class="section"><a href="#pam-essentials">3. Основы PAM</a></span></dt><dt><span class="section"><a href="#pam-config">4. Настройка PAM</a></span></dt><dt><span class="section"><a href="#pam-freebsd-modules">5. Модули PAM во FreeBSD</a></span></dt><dt><span class="section"><a href="#pam-appl-prog">6. Программирование приложений с PAM</a></span></dt><dt><span class="section"><a href="#pam-module-prog">7. Программирование модуля PAM</a></span></dt><dt><span class="appendix"><a href="#pam-sample-appl">A. Пример PAM-приложения</a></span></dt><dt><span class="appendix"><a href="#pam-sample-module">B. Пример PAM-модуля</a></span></dt><dt><span class="appendix"><a href="#pam-sample-conv">C. Пример функции взаимодействия
+      PAM</a></span></dt><dt><span class="bibliography"><a href="#pam-further">Дополнительная литература</a></span></dt></dl></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-intro"></a>1. Введение</h2></div></div></div><p>Библиотека Pluggable Authentication Modules (PAM) является обобщённым
+      API для служб, связанных с аутентификацией, которые позволяют системному
+      администратору добавлять новые методы аутентификации простой установкой
+      новых модулей PAM, и изменять политику аутентификации посредством
+      редактирования конфигурационных файлов.</p><p>PAM описали и разработали Vipin Samar и Charlie Lai из Sun
+      Microsystems в 1995 году, с тех он сильно не менялся.  В 1997 году Open
+      Group опубликовала предварительные спецификации на X/Open Single Sign-on
+      (XSSO), что стандартизовало API для PAM и добавило расширения для
+      одноразовой (или достаточно интегрированной) подписи.  На момент
+      написания этого документа эта спецификация ещё не была принята за
+      стандарт.</p><p>Хотя эта статья посвящена в основном FreeBSD 5.x, в которой
+      используется OpenPAM, она подойдёт для FreeBSD 4.x, использующей
+      Linux-PAM, и других операционных систем, таких, как Linux и
+      <span class="trademark">Solaris</span>TM.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-terms"></a>2. Термины и соглашения</h2></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-definitions"></a>2.1. Определения</h3></div></div></div><p>Терминология, используемая в PAM, достаточно запутана.  Ни
+        оригинальная работа Samar и Lai, ни спецификация XSSO не делают никаких
+        попыток формально определить термины для различных объектов и
+        участвующих в PAM сторон, а термины, которые они используют (но не
+        определяют) иногда неверны и неоднозначны.  Первой попыткой создать
+        недвусмысленную и согласованную терминологию была работа, которую
+        написал Andrew G. Morgan (автор Linux-PAM) в 1999 году.  Хотя выбор
+        терминологии, которую сделал Морган, был гигантским скачком вперед,
+        это, по мнению автора данной статьи, не означает ее правильность.
+        Далее делается попытка, в значительной степени на основе работы
+        Моргана, дать точные и недвусмысленные определения терминов для всех
+        участников и объектов PAM.</p><div class="glosslist"><dl><dt><span class="glossterm">учётная запись (account)</span></dt><dd class="glossdef"><p>Набор полномочий, которые аппликант запрашивает от
+              арбитратора.</p></dd><dt><span class="glossterm">аппликант (applicant)</span></dt><dd class="glossdef"><p>Пользователь или объект, запрашивающие аутентификацию.</p></dd><dt><span class="glossterm">арбитратор (arbitrator)</span></dt><dd class="glossdef"><p>Пользователь или объект, имеющий привилегии, достаточные
+              для проверки полномочий аппликанта и права подтвердить или
+              отклонить запрос.</p></dd><dt><span class="glossterm">цепочка (chain)</span></dt><dd class="glossdef"><p>Последовательность модулей, которые будут вызваны в ответ на
+              запрос PAM.  В цепочку включена информация о последовательности
+              вызовов модулей, аргументах, которые нужно им передать, и о том,
+              как интерпретировать результаты.</p></dd><dt><span class="glossterm">клиент (client)</span></dt><dd class="glossdef"><p>Приложение, отвечающее за инициирование запроса на
+              аутентификацию от имени аппликанта и получающее от него
+              необходимую для аутентификации информацию.</p></dd><dt><span class="glossterm">подсистема (facility)</span></dt><dd class="glossdef"><p>Одна из четырех основных групп функциональности, которые дает
+              PAM: аутентификация, управление учетными записями, управление
+              сеансом и обновление ключом аутентификации.</p></dd><dt><span class="glossterm">модуль (module)</span></dt><dd class="glossdef"><p>Набор из одной или большего количества связанных функций,
+              реализующих определенную подсистему аутентификации, собранный в
+              один (обычно динамически загружаемый) двоичный файл,
+              идентифицируемый по имени.</p></dd><dt><span class="glossterm">политика (policy)</span></dt><dd class="glossdef"><p>Полный набор конфигурационных деклараций, описывающих, как
+              обрабатывать запросы PAM к определенной услуге.  Политика обычно
+              состоит из четырех цепочек, по одной для каждой подсистемы, хотя
+              некоторые службы используют не все четыре подсистемы.</p></dd><dt><span class="glossterm">сервер (server)</span></dt><dd class="glossdef"><p>Приложение, выступающее от имени арбитратора для общения с
+              клиентом, запрашивания аутентификационной информации, проверки
+              полномочий аппликанта и подтверждающее или отклоняющее
+              запрос.</p></dd><dt><span class="glossterm">сервис (service)</span></dt><dd class="glossdef"><p>Класс серверов, предоставляющих похожую или связанную
+              функциональность, и требующую подобную аутентификацию.  Политики
+              PAM задаются на основе сервисов, так что ко всем серверам,
+              объявляющим одно и тоже имя сервиса, будет применяться одна и та
+              же политика.</p></dd><dt><span class="glossterm">сеанс (session)</span></dt><dd class="glossdef"><p>Контекст, в котором сервис оказывается аппликанту сервером.
+              Одна из четырех подсистем PAM, управление сеансом, касается
+              исключительно настройке и очистке этого контекста.</p></dd><dt><span class="glossterm">ключ (token)</span></dt><dd class="glossdef"><p>Блок информации, связанный с учётной записью, например,
+              пароль или ключевая фраза, которую аппликант должен предоставить
+              для своей идентификации.</p></dd><dt><span class="glossterm">транзакция (transaction)</span></dt><dd class="glossdef"><p>Последовательность запросов от одного и того же аппликанта к
+              одному и тому же экземпляру того же самого сервера, начиная с
+              аутентификации и установления сеанса и заканчивая закрытием
+              сеанса.</p></dd></dl></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-usage-examples"></a>2.2. Примеры использования</h3></div></div></div><p>Этот раздел предназначен для иллюстрации значений некоторых
+        терминов, определенных выше, при помощи простых примеров.</p><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70188880"></a>2.2.1. Объединенные клиент и сервер</h4></div></div></div><p>В этом простом примере показывается пользователь
+          <code class="literal">alice</code>, выполняющий команду <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> для
+          того, чтобы стать пользователем <code class="literal">root</code>.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>whoami</code></strong>
+alice
+<code class="prompt">%</code> <strong class="userinput"><code>ls -l `which su`</code></strong>
+-r-sr-xr-x  1 root  wheel  10744 Dec  6 19:06 /usr/bin/su
+<code class="prompt">%</code> <strong class="userinput"><code>su -</code></strong>
+Password: <strong class="userinput"><code>xi3kiune</code></strong>
+<code class="prompt">#</code> whoami
+root</pre><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Аппликантом является <code class="literal">alice</code>.</p></li><li class="listitem"><p>Учетной записью является <code class="literal">root</code>.</p></li><li class="listitem"><p>Процесс <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> является как клиентом, так и
+              сервером.</p></li><li class="listitem"><p>Аутентификационным ключом является
+              <code class="literal">xi3kiune</code>.</p></li><li class="listitem"><p>Арбитратором выступает <code class="literal">root</code>, и именно
+              поэтому у команды <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> выставлен бит выполнения с
+              правами <code class="literal">root</code>.</p></li></ul></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70237264"></a>2.2.2. Клиент и сервер разделены</h4></div></div></div><p>В примере ниже рассматривается пользователь
+          <code class="literal">eve</code>, пытающийся установить <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a>-соединение
+          с <code class="literal">login.example.com</code>, и успешно входя как
+	  пользователь <code class="literal">bob</code>.  Боб должен был выбрать пароль
+          получше!</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>whoami</code></strong>
+eve
+<code class="prompt">%</code> <strong class="userinput"><code>ssh bob@login.example.com</code></strong>
+bob@login.example.com's password: <strong class="userinput"><code>god</code></strong>
+Last login: Thu Oct 11 09:52:57 2001 from 192.168.0.1
+Copyright (c) 1980, 1983, 1986, 1988, 1990, 1991, 1993, 1994
+        The Regents of the University of California.  All rights reserved.
+FreeBSD 4.4-STABLE (LOGIN) #4: Tue Nov 27 18:10:34 PST 2001
+
+Welcome to FreeBSD!
+<code class="prompt">%</code></pre><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Аппликантом является <code class="literal">eve</code>.</p></li><li class="listitem"><p>Клиентом является процесс <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a> пользователя
+              Eve.</p></li><li class="listitem"><p>Сервером является процесс <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sshd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sshd</span>(8)</span></a> на машине
+	      <code class="literal">login.example.com</code></p></li><li class="listitem"><p>Учетной записью является <code class="literal">bob</code>.</p></li><li class="listitem"><p>Ключом аутентификации является
+	      <code class="literal">god</code>.</p></li><li class="listitem"><p>Хотя этого не видно в примере, но арбитратором является
+	      <code class="literal">root</code>.</p></li></ul></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70288848"></a>2.2.3. Пример политики</h4></div></div></div><p>Следующее является политикой, используемой во FreeBSD по
+          умолчанию для <code class="literal">sshd</code>:</p><pre class="programlisting">sshd   auth            required        pam_nologin.so  no_warn
+sshd   auth            required        pam_unix.so     no_warn try_first_pass
+sshd   account         required        pam_login_access.so
+sshd   account         required        pam_unix.so
+sshd   session         required        pam_lastlog.so  no_fail
+sshd   password        required        pam_permit.so</pre><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Эта политика применяется к службе <code class="literal">sshd</code>
+              (что не обязательно ограничено сервером <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sshd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sshd</span>(8)</span></a>).</p></li><li class="listitem"><p><code class="literal">auth</code>, <code class="literal">account</code>,
+	      <code class="literal">session</code> и
+	      <code class="literal">password</code> являются подсистемами.</p></li><li class="listitem"><p><code class="filename">pam_nologin.so</code>,
+	      <code class="filename">pam_unix.so</code>,
+              <code class="filename">pam_login_access.so</code>,
+              <code class="filename">pam_lastlog.so</code> и
+	      <code class="filename">pam_permit.so</code> являются модулями.  Из этого
+              примера видно, что <code class="filename">pam_unix.so</code>
+	      реализует по крайней мере две подсистемы (аутентификацию и
+              управление учётными записями).</p></li></ul></div></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-essentials"></a>3. Основы PAM</h2></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-facilities-primitives"></a>3.1. Подсистемы и
+        примитивы</h3></div></div></div><p>API для PAM предоставляет шесть различных примитивов для
+        аутентификации, сгруппированных в четыре подсистемы, каждая из которых
+        описывается ниже.</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="literal">auth</code></span></dt><dd><p><span class="emphasis"><em>Аутентификация.</em></span> Эта подсистема,
+              собственно говоря, реализует аутентификацию аппликанта и
+              выяснение полномочий учётной записи.  Она предоставляет два
+              примитива:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Функция <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_authenticate&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_authenticate</span>(3)</span></a> аутентифицирует
+                  аппликанта, обычно запрашивая аутентификационный ключ и
+                  сравнивая его со значением, хранящимся в базе данных или
+                  получаемым от сервера аутентификации.</p></li><li class="listitem"><p>Функция <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_setcred&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_setcred</span>(3)</span></a> устанавливает полномочия
+                  учётной записи, такие, как идентификатор пользователя,
+                  членство в группах и ограничения на использование
+                  ресурсов.</p></li></ul></div></dd><dt><span class="term"><code class="literal">account</code></span></dt><dd><p><span class="emphasis"><em>Управление учётной записью.</em></span> Эта
+              подсистема обрабатывает вопросы доступности учетной записи, не
+              связанные с аутентификацией, такие, как ограничения в доступе на
+              основе времени суток или загрузки сервера.  Он предоставляет
+              единственный примитив:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Функция <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_acct_mgmt&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_acct_mgmt</span>(3)</span></a> проверяет, доступна ли
+                  запрашиваемая учётная запись.</p></li></ul></div></dd><dt><span class="term"><code class="literal">session</code></span></dt><dd><p><span class="emphasis"><em>Управление сеансом.</em></span> Эта подсистема
+              отрабатывает задачи, связанные с установлением и закрытием
+              сеанса, такие, как учет входов пользователей.  Она предоставляет
+              два примитива:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Функция <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_open_session&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_open_session</span>(3)</span></a> выполняет действия,
+                  связанные с установлением сеанса: добавление записей в базы
+                  данных <code class="filename">utmp</code> и <code class="filename">wtmp</code>,
+                  запуск агента SSH и так далее.</p></li><li class="listitem"><p>Функция <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_close_session&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_close_session</span>(3)</span></a> выполняет
+                  действия, связанные с закрытием сеанса: добавление записей в
+                  базы данных <code class="filename">utmp</code> и
+                  <code class="filename">wtmp</code>, завершение работы агента SSH и так
+                  далее.</p></li></ul></div></dd><dt><span class="term"><code class="literal">password</code></span></dt><dd><p><span class="emphasis"><em>Управление паролем.</em></span>  Эта подсистема
+              используется для изменения ключа аутентификации, связанного с
+              учетной записью, по причине истечения его срока действия или
+              желания пользователя изменить его.  Она предоставляет
+              единственный примитив:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Функция <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_chauthtok&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_chauthtok</span>(3)</span></a> изменяет ключ
+                  аутентификации, опционально проверяя, что он труден для
+                  подбора, не использовался ранее и так далее.</p></li></ul></div></dd></dl></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules"></a>3.2. Модули</h3></div></div></div><p>Модули являются центральной концепцией в PAM; в конце концов, им
+        соответствует буква <span class="quote"><<<span class="quote">M</span>>></span> в сокращении <span class="quote"><<<span class="quote">PAM</span>>></span>.
+        Модуль PAM представляет собой самодостаточный кусок программного кода,
+        который реализует примитивы одной или большего количества подсистем
+        одного конкретного механизма; к возможным механизмам для подсистемы
+        аутентификации, к примеру, относятся базы данных паролей <span class="trademark">UNIX</span>(R),
+        системы NIS, LDAP или Radius.</p><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-module-naming"></a>3.2.1. Именование модулей</h4></div></div></div><p>Во FreeBSD каждый механизм реализуется в отдельном модуле с
+          именем <code class="literal">pam_<em class="replaceable"><code>mechanism</code></em>.so</code>
+          (например, <code class="literal">pam_unix.so</code> для механизма <span class="trademark">UNIX</span>(R).)
+          В других реализациях иногда отдельные модули используются для разных
+          подсистем, и в их имя включается, кроме названия механизма, и имя
+          подсистемы.  К примеру, в <span class="trademark">Solaris</span>TM имеется модуль
+          <code class="literal">pam_dial_auth.so.1</code>, который часто используется
+          для аутентификации пользователей, работающих по коммутируемым
+          каналам связи.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-module-versioning"></a>3.2.2. Версии модулей</h4></div></div></div><p>Изначальная реализация PAM во FreeBSD, которая была основана на
+          Linux-PAM, не использовала номера версий для модулей PAM.  Это будет
+          приводить к проблемам при работе унаследованных приложений, которые
+          могут быть скомпонованы со старыми версиями системных библиотек, так
+          как способа подгрузить соответствующую версию требуемых модулей
+          нет.</p><p>OpenPAM, с другой стороны, ищет модули, которые имеют тот же
+          самый номер версии, что и библиотека PAM (на данный момент 2), и
+          использует модуль без версии, только если модуль с известной версией
+          не был загружен.  Поэтому для старых приложений могут предоставляться
+          старые модули, при этом новые (или заново построенные) приложения
+          будут использовать все возможности последних версий модулей.</p><p>Хотя модули PAM в <span class="trademark">Solaris</span>TM имеют номер версии, по-настоящему
+          номер версии в них не отслеживается, потому что номер является частью
+          имени и должен включаться в конфигурацию.</p></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-chains-policies"></a>3.3. Цепочки и политики</h3></div></div></div><p>Когда сервер инициирует PAM-транзакцию, библиотека PAM
+        пытается загрузить политику для службы, указанной при вызове функции
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_start&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_start</span>(3)</span></a>.  Политика определяет, как должны
+        обрабатываться запросы на аутентификацию, и задаётся в
+        конфигурационном файле.  Это составляет другую основополагающую
+        концепцию PAM: возможность администратору настраивать политику
+        безопасности системы (в самом широком её понимании) простым
+        редактированием текстового файла.</p><p>Политика состоит из четырёх цепочек, по одной на каждый из
+        методов PAM.  Каждое звено представляет собой последовательность
+        конфигурационных утверждений, задающих вызываемый модуль, некоторые
+        (необязательные) параметры для передачи в модуль, и управляющий флаг,
+        описывающий, как интерпретировать возвращаемый из модуля код.</p><p>Понимание смысла управляющего флага необходимо для понимания
+        конфигурационных файлов PAM.  Существуют четыре различных управляющих
+        флага:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="literal">binding</code></span></dt><dd><p>Если модуль отработал успешно, и ни один из предыдущих
+              модулей в цепочке не сработал отрицательно, то цепочка
+              прерывается, а запрос подтверждается.  Если же модуль отработает
+              неудачно, то выполняется оставшаяся часть цепочки, однако
+              запрос отвергается.</p><p>Этот управляющий флаг был добавлен компанией Sun в <span class="trademark">Solaris</span>TM
+              9 (<span class="trademark">SunOS</span>TM 5.9), и поддерживается в OpenPAM.</p></dd><dt><span class="term"><code class="literal">required</code></span></dt><dd><p>Если модуль возвратил положительный ответ, выполняется
+              оставшаяся часть цепочки, запрос удовлетворяется, если никакой
+              другой модуль не отработает отрицательно.  Если же модуль
+              возвратит отрицательный ответ, остаток цепочки тоже
+              отрабатывается, но запрос отвергается.</p></dd><dt><span class="term"><code class="literal">requisite</code></span></dt><dd><p>Если модуль возвращает положительный ответ, выполняется
+              оставшаяся часть цепочки, запрос удовлетворяется, если никакой
+              другой модуль не отработает отрицательно.  Если же модуль
+              отрабатывает отрицательно, то отработка цепочки немедленно
+              прекращается, а запрос отвергается.</p></dd><dt><span class="term"><code class="literal">sufficient</code></span></dt><dd><p>Если модуль возвратит положительный ответ, и ни один из
+              предыдущих модулей в цепочке на отработал отрицательно, то
+              отработка цепочки немедленно прекращается, а запрос
+              удовлетворяется.  Если модуль отработал отрицательно, то
+              результат игнорируется и цепочка отрабатывается дальше.</p><p>Так как семантика этого флага может оказаться запутанной,
+              особенно при его использовании с последним модулем в цепочке,
+              рекомендуется вместо него использовать управляющий флаг
+              <code class="literal">binding</code>, если реализация его
+              поддерживает.</p></dd><dt><span class="term"><code class="literal">optional</code></span></dt><dd><p>Модуль отрабатывается, но результат выполнения игнорируется.
+              Если все модули в цепочке помечены как
+              <code class="literal">optional</code>, то удовлетворяться будут все
+              запросы.</p></dd></dl></div><p>Когда сервер вызывает один из шести PAM-примитивов, PAM
+        запрашивает цепочку подсистемы, к которой принадлежит примитив, и
+        запускает каждый модуль, перечисленный в цепочке в порядке их
+        перечисления, пока список не будет исчерпан либо не будет определено,
+        что дальнейшей обработки не нужно (по причине достижение модуля,
+        вернувшего положительный ответ при условии <code class="literal">binding</code>
+        или <code class="literal">sufficient</code>, либо отрицательный с условием
+        <code class="literal">requisite</code>).  Запрос подтверждается, если только
+        был вызван по крайней мере один модуль, и все неопциональные модули
+        вернули положительный ответ.</p><p>Заметьте, что возможно, хотя это не распространено, перечислять
+        один и тот же модуль несколько раз в одной цепочке.  К примеру,
+        модуль, просматривающий имена и пароли пользователя в сервере
+        каталога может быть вызван несколько раз с различными параметрами,
+        задающими различные серверы каталогов для связи.  PAM считает
+        различные появления одного модуля в той же самой цепочке разными и
+        не связанными модулями.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-transactions"></a>3.4. Транзакции</h3></div></div></div><p>Жизненный цикл типичной PAM-транзакции описан ниже.  Заметьте,
+        что в случае, если любой из перечисленных шагов оканчивается неудачно,
+        сервер должен выдать клиенту соответствующее сообщение об ошибке
+        и прервать транзакцию.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Если это необходимо, сервер получает полномочия арбитратора
+            через независимый от PAM механизм-чаще всего по факту
+            запуска пользователем <code class="literal">root</code> или с установленным
+            setuid-битом <code class="literal">root</code>.</p></li><li class="listitem"><p>Сервер вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_start&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_start</span>(3)</span></a> для
+            инициализации библиотеки PAM и задания имени сервиса и целевой
+            учётной записи, а также регистрации подходящего способа
+            общения.</p></li><li class="listitem"><p>Сервер получает различную информацию, относящуюся к транзакции
+            (такую, как имя пользователя аппликанта и имя хоста, на котором
+            запущен клиент), и отправляет её в PAM при помощи функции
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_set_item&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_set_item</span>(3)</span></a>.</p></li><li class="listitem"><p>Сервер вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_authenticate&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_authenticate</span>(3)</span></a>
+            для аутентификации аппликанта.</p></li><li class="listitem"><p>Сервер вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_acct_mgmt&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_acct_mgmt</span>(3)</span></a> для проверки
+            того, что запрошенная учётная запись доступна и корректна.  Если
+            пароль верен, но его срок истёк, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_acct_mgmt&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_acct_mgmt</span>(3)</span></a> возвратит
+            результат <code class="literal">PAM_NEW_AUTHTOK_REQD</code>, а не
+            <code class="literal">PAM_SUCCESS</code>.</p></li><li class="listitem"><p>Если на предыдущем шаге был получен результат
+            <code class="literal">PAM_NEW_AUTHTOK_REQD</code>, то сервер вызывает функцию
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_chauthtok&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_chauthtok</span>(3)</span></a> для того, чтобы вынудить клиента
+            изменить ключ аутентификации для запрошенной учётной записи.</p></li><li class="listitem"><p>Теперь, когда аппликант полностью аутентифицирован, сервер
+            вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_setcred&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_setcred</span>(3)</span></a> для получения
+            полномочий запрошенной учётной записи.  Сделать это возможно,
+            потому что он работает как арбитратор, и оставляет за собой
+            полномочия арбитратора.</p></li><li class="listitem"><p>После получения необходимых полномочий, сервер вызывает функцию
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_open_session&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_open_session</span>(3)</span></a> для установления сеанса.</p></li><li class="listitem"><p>Теперь сервер выполняет тот сервис, который затребовал
+            клиент-например, предоставляет аппликанту оболочку.</p></li><li class="listitem"><p>После того, как сервер закончил обслуживание клиента, он
+            вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_close_session&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_close_session</span>(3)</span></a> для закрытия
+            сеанса.</p></li><li class="listitem"><p>Наконец, сервер вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_end&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_end</span>(3)</span></a>
+            для оповещения библиотеки PAM о том, что работа с ней завершена и
+            какие-либо выделенные в течение сеанса ресурсы можно
+            освободить.</p></li></ol></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-config"></a>4. Настройка PAM</h2></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-config-file"></a>4.1. Файлы политик PAM</h3></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-config-pam.conf"></a>4.1.1. Файл
+          <code class="filename">/etc/pam.conf</code></h4></div></div></div><p>Традиционно файлом политик PAM является
+          <code class="filename">/etc/pam.conf</code>.  Он содержит все политики PAM
+          для вашей системы.  Каждая строка файла описывает один шаг в цепочке,
+          как показано ниже:</p><pre class="programlisting">login   auth    required        pam_nologin.so  no_warn</pre><p>Поля следуют в таком порядке: имя службы, имя подсистемы,
+          управляющий флаг, имя модуля и параметры модуля.  Любые
+          дополнительные поля интерпретируются как дополнительные параметры
+          модуля.</p><p>Для каждой пары сервис/подсистема составляется отдельная цепочка,
+          и тогда получается, что, хотя порядок следования строк для одной и той
+          же услуги и подсистемы является значимым, порядок перечисления
+          отдельных сервисов не значим.  В примерах из оригинальной
+          работы по PAM строки конфигурации сгруппированы по подсистемам, в
+          поставляемом с <span class="trademark">Solaris</span>TM файле <code class="filename">pam.conf</code> именно
+          так и сделано, но в стандартном конфигурационном файле из поставки
+          FreeBSD строки настроек сгруппированы по сервисам.  Подходит любой
+          из этих способов; они имеют один и тот же смысл.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-config-pam.d"></a>4.1.2. Каталог
+          <code class="filename">/etc/pam.d</code></h4></div></div></div><p>OpenPAM и Linux-PAM поддерживают альтернативный механизм
+          настройки, который для FreeBSD является предпочтительным.  В этой
+          схеме каждая политика содержится в отдельном файле с именем,
+          соответствующем сервису, к которому она применяется.  Эти файлы
+          размещаются в каталоге <code class="filename">/etc/pam.d/</code>.</p><p>Такие файлы политик, ориентированные на сервисы, имеют только
+          четыре поля, вместо пяти полей в файле <code class="filename">pam.conf</code>:
+          поле имени сервиса опущено.  Таким образом, вместо примера строки
+          файла <code class="filename">pam.conf</code> из предыдущего раздела получится
+          следующая строка в файле <code class="filename">/etc/pam.d/login</code>:</p><pre class="programlisting">auth    required        pam_nologin.so  no_warn</pre><p>Как следствие такого упрощённого синтаксиса, возможно
+          использование одних и тех же политик для нескольких сервисов,
+          связывая каждое имя сервиса с тем же самым файлом политик.  К
+          примеру, для использования той же самой политики для сервисов
+          <code class="literal">su</code> и <code class="literal">sudo</code>, можно сделать
+          следующее:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/pam.d</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s su sudo</code></strong></pre><p>Это работает, потому что имя сервиса определяется именем файла, а
+          не его указанием в файле политики, так что один и тот же файл может
+          использоваться для нескольких сервисов с разными названиями.</p><p>Так как политика каждого сервиса хранится в отдельном файле,
+          то механизм <code class="filename">pam.d</code> делает установку
+          дополнительных политик для программных пакетов сторонних
+          разработчиков очень лёгкой задачей.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-config-file-order"></a>4.1.3. Порядок поиска политик</h4></div></div></div><p>Как вы видели выше, политики PAM могут находиться в нескольких
+          местах.  Что будет, если политики для одного и того же сервиса
+          имеются в разных местах?</p><p>Необходимо осознать, что система конфигурации PAM ориентирована
+          на цепочки.</p></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-config-breakdown"></a>4.2. Структура строки настройки</h3></div></div></div><p>Как это объяснено в <a class="xref" href="#pam-config-file" title="4.1. Файлы политик PAM">Раздел 4.1, <<Файлы политик PAM>></a>,
+        каждая строка файла
+        <code class="filename">/etc/pam.conf</code> состоит из четырёх или большего
+        количества полей: имени сервиса, имени подсистемы, управляющего флага,
+        имени модуля и дополнительных параметров модуля, которые могут
+        отсутствовать.</p><p>Имя сервиса обычно (хотя не всегда) является именем приложения,
+        которое этот сервис обслуживает.  Если вы не уверены, обратитесь к
+        документации по конкретному приложению для определения используемого
+        имени сервиса.</p><p>Заметьте, что если вы используете <code class="filename">/etc/pam.d/</code>
+        вместо <code class="filename">/etc/pam.conf</code>, то имя сервиса задается
+        именем файла политики, и опускается из строк настройки, которые в таком
+        случае начинаются с названия подсистемы.</p><p>Имя подсистемы представляет собой одно из четырёх ключевых слов,
+        описанных в <a class="xref" href="#pam-facilities-primitives" title="3.1. Подсистемы и примитивы">Раздел 3.1, <<Подсистемы и
+        примитивы>></a>.</p><p>Точно также управляющий флаг является одним из четырёх ключевых
+        слов, описанных в <a class="xref" href="#pam-chains-policies" title="3.3. Цепочки и политики">Раздел 3.3, <<Цепочки и политики>></a>,
+        в котором рассказано, как
+        интерпретировать возвращаемый из модуля код.  В Linux-PAM
+        поддерживается альтернативный синтаксис, который позволяет указать
+        действие, связанной с каждый возможным кодом возврата, но этого
+        следует избегать, так как он не является стандартным и
+        тесно связан со способом диспетчеризации вызовов сервисов в Linux-PAM
+        (а он значительно отличается от способа взаимодействия в <span class="trademark">Solaris</span>TM и
+        OpenPAM).  Не вызывает удивления тот факт, что в OpenPAM этот синтаксис
+        не поддерживается.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-policies"></a>4.3. Политики</h3></div></div></div><p>Для корректной настройки PAM необходимо понимать, как происходит
+        интерпретация политик.</p><p>В момент, когда приложение вызывает функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_start&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_start</span>(3)</span></a>,
+        библиотека PAM загружает политику для указанного сервиса и выстраивает
+        четыре цепочки модулей (по одной для каждой подсистемы).  Если
+        одна или большее количество этих цепочек являются пустыми, то
+        будут выполняться подстановки соответствующих цепочек из политики для
+        сервиса <code class="literal">other</code>.</p><p>Когда затем приложение вызывает одну из шести примитивов PAM,
+        библиотека PAM выделяет из цепочки нужную подсистему и вызывает
+        функцию, соответствующую сервису, в каждом модуле, перечисленном в
+        цепочке, в том порядке, в каком они перечислены в конфигурации.  После
+        каждого обращения к функции сервиса, тип модуля и возвращённый из этой
+        функции код результата выполнения используются для того, что делать
+        дальше.  За некоторыми исключениями, которые будут описаны ниже,
+        применяется такая таблица:</p><div class="table"><a id="idp70639184"></a><div class="table-title">Таблица 1. Сводная таблица отработки цепочек PAM</div><div class="table-contents"><table summary="Сводная таблица отработки цепочек PAM" border="1"><colgroup><col class="type" /><col class="success" /><col class="ignore" /><col class="other" /></colgroup><thead><tr><th> </th><th><code class="literal">PAM_SUCCESS</code></th><th><code class="literal">PAM_IGNORE</code></th><th><code class="literal">other</code></th></tr></thead><tbody><tr><td>binding</td><td>if (!fail) break;</td><td>-</td><td>fail = true;</td></tr><tr><td>required</td><td>-</td><td>-</td><td>fail = true;</td></tr><tr><td>requisite</td><td>-</td><td>-</td><td>fail = true; break;</td></tr><tr><td>sufficient</td><td>if (!fail) break;</td><td>-</td><td>-</td></tr><tr><td>optional</td><td>-</td><td>-</td><td>-</td></tr></tbody></table></div></div><br class="table-break" /><p>Если переменная <code class="varname">fail</code> принимает истинное
+        значение в конце отработки цепочки, или когда достигнут
+        <span class="quote"><<<span class="quote">break</span>>></span>, диспетчер возвращает код ошибки, возвращённый
+        первым модулем, отработавшим неудачно.  В противном случае
+        возвращается <code class="literal">PAM_SUCCESS</code>.</p><p>Первым исключением является то, что код ошибки
+	<code class="literal">PAM_NEW_AUTHTOK_REQD</code> интерпретируется как успешный
+        результат, кроме случая, когда модуль отработал успешно, и по крайней
+        мере один модуль возвратил <code class="literal">PAM_NEW_AUTHTOK_REQD</code>,
+        тогда диспетчер возвратит результат
+        <code class="literal">PAM_NEW_AUTHTOK_REQD</code>.</p><p>Вторым исключением является то, что <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_setcred&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_setcred</span>(3)</span></a> считает,
+        что модули <code class="literal">binding</code> и <code class="literal">sufficient</code>
+        являются равнозначными <code class="literal">required</code>.</p><p>Третьим и последним исключением является то, что функция
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_chauthtok&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_chauthtok</span>(3)</span></a> отрабатывает полную цепочку дважды (один раз для
+        предварительных проверок, и ещё раз для реального задания пароля), и
+        на подготовительной фазе она считает, что модули
+	<code class="literal">binding</code> и <code class="literal">sufficient</code> являются
+	равнозначными <code class="literal">required</code>.</p></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-freebsd-modules"></a>5. Модули PAM во FreeBSD</h2></div></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-deny"></a>5.1. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_deny&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_deny</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_deny&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_deny</span>(8)</span></a> является одним из простейших доступных
+        модулей; на любой запрос он возвращает результат
+        <code class="literal">PAM_AUTH_ERR</code>.
+        Он полезен для быстрого отключения сервиса (добавьте его на верх
+        каждой цепочки) или завершения цепочек модулей
+        <code class="literal">sufficient</code>.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-echo"></a>5.2. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_echo&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_echo</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_echo&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_echo</span>(8)</span></a> просто передаёт свои параметры в функцию
+        взаимодействия как сообщение <code class="literal">PAM_TEXT_INFO</code>.  В
+        основном полезна для отладки, но также может использоваться для
+        вывода сообщений, таких как <span class="quote"><<<span class="quote">Unauthorized access will be
+        prosecuted</span>>></span> до запуска процедуры аутентификации.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-exec"></a>5.3. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_exec&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_exec</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_exec&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_exec</span>(8)</span></a> воспринимает первый переданный ему
+        параметр как имя программы для выполнения, а остальные аргументы
+        передаются этой программе в качестве параметров командной строки.
+        Одним из возможных применений является его использование для запуска
+        в момент регистрации в системе программы монтирования домашнего
+        каталога пользователя.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-ftpusers"></a>5.4. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_ftpusers&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_ftpusers</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_ftpusers&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_ftpusers</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-group"></a>5.5. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_group&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_group</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_group&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_group</span>(8)</span></a> принимает или отвергает аппликантов в
+        зависимости от их членства в определённой файловой группе (обычно
+        <code class="literal">wheel</code> для <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a>).  В первую очередь
+        предназначен для сохранения традиционного поведения утилиты
+        BSD <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a>, хотя имеет и много других применений, таких как
+        отключение определённых групп пользователей от некоторого
+        сервиса.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-guest"></a>5.6. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_guest&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_guest</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_guest&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_guest</span>(8)</span></a> позволяет осуществлять гостевые входы
+        с использованием фиксированных имён входа в систему.  На пароль могут
+        накладываться различные ограничения, однако действием по умолчанию
+        является ввод любого пароля при использовании имени, соответствующего
+        гостевому входу.  Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_guest&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_guest</span>(8)</span></a> можно легко использовать
+        для реализации анонимных входов на FTP.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-krb5"></a>5.7. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_krb5&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_krb5</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_krb5&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_krb5</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-ksu"></a>5.8. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_ksu&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_ksu</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_ksu&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_ksu</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-lastlog"></a>5.9. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_lastlog&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_lastlog</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_lastlog&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_lastlog</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-login-access"></a>5.10. 
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_login_access&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_login_access</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_login_access&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_login_access</span>(8)</span></a> предоставляет реализацию примитива
+        для управления учётными записями, который вводит в действие
+        ограничения на вход, задаваемые в таблице <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=login.access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">login.access</span>(5)</span></a>.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-nologin"></a>5.11. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_nologin&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_nologin</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_nologin&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_nologin</span>(8)</span></a> отвергает любые входы не пользователем
+        root, если существует файл <code class="filename">/var/run/nologin</code>.
+        Обычно этот файл создаётся утилитой <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=shutdown&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">shutdown</span>(8)</span></a>, когда до
+        запланированного завершения работы системы остаётся менее пяти
+        минут.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-opie"></a>5.12. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opie&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opie</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opie&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opie</span>(8)</span></a> реализует метод аутентификации
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=opie&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">opie</span>(4)</span></a>.  Система <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=opie&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">opie</span>(4)</span></a> является механизмом работы по
+        схеме запрос-ответ, при котором ответ на каждый запрос является
+        прямой функцией от запроса и ключевой фразы, так что ответ может быть
+        легко и <span class="quote"><<<span class="quote">вовремя</span>>></span> вычислен любым, знающим ключевую фразу,
+        что избавляет от необходимости передавать пароль.  Кроме того, так
+        как в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=opie&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">opie</span>(4)</span></a> никогда повторно не используется запрос, ответ на
+        который был корректно получен, эта схема является устойчивой к
+        атакам, основанным на повторе действий.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-opieaccess"></a>5.13. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opieaccess&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opieaccess</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opieaccess&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opieaccess</span>(8)</span></a> дополняет модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opie&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opie</span>(8)</span></a>.
+        Его работа заключается в выполнении ограничений, задаваемых файлом
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=opieaccess&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">opieaccess</span>(5)</span></a>, который определяет условия, при которых
+        пользователь, нормально прошедший аутентификацию посредством
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=opie&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">opie</span>(4)</span></a>, может использовать альтернативные методы.  Чаще всего
+        он используется для запрета использования аутентификации на основе
+        паролей с непроверенных хостов.</p><p>Для эффективности модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opieaccess&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opieaccess</span>(8)</span></a> должен быть
+        определён в цепочке <code class="literal">auth</code> как
+        <code class="literal">requisite</code> сразу же после записи
+        <code class="literal">sufficient</code> для <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_opie&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_opie</span>(8)</span></a>, но перед любыми
+        другими модулями.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-passwdqc"></a>5.14. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_passwdqc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_passwdqc</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_passwdqc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_passwdqc</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-permit"></a>5.15. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_permit&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_permit</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_permit&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_permit</span>(8)</span></a> является одним из самых простым из
+        имеющихся; на любой запрос он отвечает <code class="literal">PAM_SUCCESS</code>.
+        Он полезен в качестве замены пустого места для сервисов, когда
+        одна или большее количество цепочек в противном случае останутся
+        пустыми.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-radius"></a>5.16. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_radius&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_radius</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_radius&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_radius</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-rhosts"></a>5.17. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_rhosts&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_rhosts</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_rhosts&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_rhosts</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-rootok"></a>5.18. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_rootok&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_rootok</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_rootok&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_rootok</span>(8)</span></a> возвращает положительный результат в том
+        и только в том случае, если реальный id пользователя процесса, его
+        вызвавшего (предполагается, что его запускает аппликант) равен 0.  Это
+        полезно для несетевых сервисов, таких как <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> или
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=passwd&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">passwd</span>(1)</span></a>, к которым пользователь <code class="literal">root</code> должен
+        иметь автоматический доступ.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-securetty"></a>5.19. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_securetty&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_securetty</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_securetty&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_securetty</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-self"></a>5.20. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_self&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_self</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_self&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_self</span>(8)</span></a> возвращает положительный результат тогда и
+        только тогда, когда имена аппликанта соответствуют целевой учётной
+        записи.  Больше всего это пригодится в несетевых сервисах, таких как
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a>, в которых идентификация аппликанта может быть с лёгкостью
+        проверена.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-ssh"></a>5.21. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_ssh&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_ssh</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_ssh&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_ssh</span>(8)</span></a> предоставляет как сервис аутентификации,
+        так и сеанса.  Сервис аутентификации позволяет пользователям, имеющим
+        секретные ключи SSH, защищённые паролями, в своих каталогах
+        <code class="filename">~/.ssh</code>, аутентифицироваться посредством этих
+        паролей.  Сеансовый сервис запускает <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh-agent&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh-agent</span>(1)</span></a> и загружает
+        ключи, которые были расшифрованы на фазе аутентификации.  Такая
+        возможность, в частности, полезна для локальных входов в систему,
+        как в систему X (посредством <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=xdm&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">xdm</span>(1)</span></a> или другого X-менеджера
+        входов, умеющего работать с PAM), так и на консоль.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-tacplus"></a>5.22. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_tacplus&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_tacplus</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_tacplus&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_tacplus</span>(8)</span></a></p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-modules-unix"></a>5.23. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_unix&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_unix</span>(8)</span></a></h3></div></div></div><p>Модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_unix&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_unix</span>(8)</span></a> реализует традиционную аутентификацию
+        <span class="trademark">UNIX</span>(R) на основе паролей, использующую функцию <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=getpwnam&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">getpwnam</span>(3)</span></a> для
+        получения пароля целевой учётной записи и сравнивающую её с тем, что
+        представил аппликант.  Он также предоставляет средства управления
+        учётными записями (отслеживая время действия учётной записи и пароля) и
+        смены паролей.  Наверное, это самый полезный модуль, так как
+        подавляющее большинство администраторов хотят сохранить исторически
+        сложившееся поведение по крайней мере некоторых сервисов.</p></div></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-appl-prog"></a>6. Программирование приложений с PAM</h2></div></div></div><p>Этот раздел ещё не написан.</p></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pam-module-prog"></a>7. Программирование модуля PAM</h2></div></div></div><p>Этот раздел ещё не написан.</p></div><div class="appendix"><h2 class="title" style="clear: both"><a id="pam-sample-appl"></a>A. Пример PAM-приложения</h2><p>Далее следует минимальная реализация программы <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> с
+      использованием PAM.  Заметьте, что в ней используется специфичная для
+      OpenPAM функция взаимодействия <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=openpam_ttyconv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">openpam_ttyconv</span>(3)</span></a>, объявление
+      которой расположено в файле <code class="filename">security/openpam.h</code>.
+      Если вы собираетесь строить это приложение в системе с другой
+      библиотекой PAM, вам необходимо будет создать собственную функцию
+      взаимодействия.  Надёжную функцию взаимодействия неожиданно трудно
+      написать; та, что находится в <a class="xref" href="#pam-sample-conv" title="C. Пример функции взаимодействия PAM">Приложение C, <em>Пример функции взаимодействия
+      PAM</em></a>,
+      хороша в качестве отправной
+      точки, но в реальных приложениях использоваться не может.</p><pre class="programlisting">
+/*-
+ * Copyright (c) 2002,2003 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $P4: //depot/projects/openpam/bin/su/su.c#10 $
+ * $FreeBSD$
+ */
+
+#include &lt;sys/param.h&gt;
+#include &lt;sys/wait.h&gt;
+
+#include &lt;err.h&gt;
+#include &lt;pwd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;syslog.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_appl.h&gt;
+#include &lt;security/openpam.h&gt;	/* for openpam_ttyconv() */
+
+extern char **environ;
+
+static pam_handle_t *pamh;
+static struct pam_conv pamc;
+
+static void
+usage(void)
+{
+
+	fprintf(stderr, "Usage: su [login [args]]\n");
+	exit(1);
+}
+
+int
+main(int argc, char *argv[])
+{
+	char hostname[MAXHOSTNAMELEN];
+	const char *user, *tty;
+	char **args, **pam_envlist, **pam_env;
+	struct passwd *pwd;
+	int o, pam_err, status;
+	pid_t pid;
+
+	while ((o = getopt(argc, argv, "h")) != -1)
+		switch (o) {
+		case 'h':
+		default:
+			usage();
+		}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc &gt; 0) {
+		user = *argv;
+		--argc;
+		++argv;
+	} else {
+		user = "root";
+	}
+
+	/* initialize PAM */
+	pamc.conv = &amp;openpam_ttyconv;
+	pam_start("su", user, &amp;pamc, &amp;pamh);
+
+	/* set some items */
+	gethostname(hostname, sizeof(hostname));
+	if ((pam_err = pam_set_item(pamh, PAM_RHOST, hostname)) != PAM_SUCCESS)
+		goto pamerr;
+	user = getlogin();
+	if ((pam_err = pam_set_item(pamh, PAM_RUSER, user)) != PAM_SUCCESS)
+		goto pamerr;
+	tty = ttyname(STDERR_FILENO);
+	if ((pam_err = pam_set_item(pamh, PAM_TTY, tty)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* authenticate the applicant */
+	if ((pam_err = pam_authenticate(pamh, 0)) != PAM_SUCCESS)
+		goto pamerr;
+	if ((pam_err = pam_acct_mgmt(pamh, 0)) == PAM_NEW_AUTHTOK_REQD)
+		pam_err = pam_chauthtok(pamh, PAM_CHANGE_EXPIRED_AUTHTOK);
+	if (pam_err != PAM_SUCCESS)
+		goto pamerr;
+
+	/* establish the requested credentials */
+	if ((pam_err = pam_setcred(pamh, PAM_ESTABLISH_CRED)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* authentication succeeded; open a session */
+	if ((pam_err = pam_open_session(pamh, 0)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* get mapped user name; PAM may have changed it */
+	pam_err = pam_get_item(pamh, PAM_USER, (const void **)&amp;user);
+	if (pam_err != PAM_SUCCESS || (pwd = getpwnam(user)) == NULL)
+		goto pamerr;
+
+	/* export PAM environment */
+	if ((pam_envlist = pam_getenvlist(pamh)) != NULL) {
+		for (pam_env = pam_envlist; *pam_env != NULL; ++pam_env) {
+			putenv(*pam_env);
+			free(*pam_env);
+		}
+		free(pam_envlist);
+	}
+
+	/* build argument list */
+	if ((args = calloc(argc + 2, sizeof *args)) == NULL) {
+		warn("calloc()");
+		goto err;
+	}
+	*args = pwd-&gt;pw_shell;
+	memcpy(args + 1, argv, argc * sizeof *args);
+
+	/* fork and exec */
+	switch ((pid = fork())) {
+	case -1:
+		warn("fork()");
+		goto err;
+	case 0:
+		/* child: give up privs and start a shell */
+
+		/* set uid and groups */
+		if (initgroups(pwd-&gt;pw_name, pwd-&gt;pw_gid) == -1) {
+			warn("initgroups()");
+			_exit(1);
+		}
+		if (setgid(pwd-&gt;pw_gid) == -1) {
+			warn("setgid()");
+			_exit(1);
+		}
+		if (setuid(pwd-&gt;pw_uid) == -1) {
+			warn("setuid()");
+			_exit(1);
+		}
+		execve(*args, args, environ);
+		warn("execve()");
+		_exit(1);
+	default:
+		/* parent: wait for child to exit */
+		waitpid(pid, &amp;status, 0);
+
+		/* close the session and release PAM resources */
+		pam_err = pam_close_session(pamh, 0);
+		pam_end(pamh, pam_err);
+
+		exit(WEXITSTATUS(status));
+	}
+
+pamerr:
+	fprintf(stderr, "Sorry\n");
+err:
+	pam_end(pamh, pam_err);
+	exit(1);
+}
+
+    </pre></div><div class="appendix"><h2 class="title" style="clear: both"><a id="pam-sample-module"></a>B. Пример PAM-модуля</h2><p>Далее приведена минимальная реализация <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_unix&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pam_unix</span>(8)</span></a>,
+      предоставляющая только сервисы аутентификации.  Она должна строиться и
+      работать с большинством из реализаций PAM, но использует возможности
+      расширений OpenPAM, если они присутствуют: отметьте использование
+      функции <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pam_get_authtok&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">pam_get_authtok</span>(3)</span></a>, которая кардинально упрощает
+      организацию ввода пароля пользователем.</p><pre class="programlisting">
+/*-
+ * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $P4: //depot/projects/openpam/modules/pam_unix/pam_unix.c#3 $
+ * $FreeBSD$
+ */
+
+#include &lt;sys/param.h&gt;
+
+#include &lt;pwd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_modules.h&gt;
+#include &lt;security/pam_appl.h&gt;
+
+#ifndef _OPENPAM
+static char password_prompt[] = "Password:";
+#endif
+
+#ifndef PAM_EXTERN
+#define PAM_EXTERN
+#endif
+
+PAM_EXTERN int
+pam_sm_authenticate(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+#ifndef _OPENPAM
+	struct pam_conv *conv;
+	struct pam_message msg;
+	const struct pam_message *msgp;
+	struct pam_response *resp;
+#endif
+	struct passwd *pwd;
+	const char *user;
+	char *crypt_password, *password;
+	int pam_err, retry;
+
+	/* identify user */
+	if ((pam_err = pam_get_user(pamh, &amp;user, NULL)) != PAM_SUCCESS)
+		return (pam_err);
+	if ((pwd = getpwnam(user)) == NULL)
+		return (PAM_USER_UNKNOWN);
+
+	/* get password */
+#ifndef _OPENPAM
+	pam_err = pam_get_item(pamh, PAM_CONV, (const void **)&amp;conv);
+	if (pam_err != PAM_SUCCESS)
+		return (PAM_SYSTEM_ERR);
+	msg.msg_style = PAM_PROMPT_ECHO_OFF;
+	msg.msg = password_prompt;
+	msgp = &amp;msg;
+#endif
+	for (retry = 0; retry &lt; 3; ++retry) {
+#ifdef _OPENPAM
+		pam_err = pam_get_authtok(pamh, PAM_AUTHTOK,
+		    (const char **)&amp;password, NULL);
+#else
+		resp = NULL;
+		pam_err = (*conv-&gt;conv)(1, &amp;msgp, &amp;resp, conv-&gt;appdata_ptr);
+		if (resp != NULL) {
+			if (pam_err == PAM_SUCCESS)
+				password = resp-&gt;resp;
+			else
+				free(resp-&gt;resp);
+			free(resp);
+		}
+#endif
+		if (pam_err == PAM_SUCCESS)
+			break;
+	}
+	if (pam_err == PAM_CONV_ERR)
+		return (pam_err);
+	if (pam_err != PAM_SUCCESS)
+		return (PAM_AUTH_ERR);
+
+	/* compare passwords */
+	if ((!pwd-&gt;pw_passwd[0] &amp;&amp; (flags &amp; PAM_DISALLOW_NULL_AUTHTOK)) ||
+	    (crypt_password = crypt(password, pwd-&gt;pw_passwd)) == NULL ||
+	    strcmp(crypt_password, pwd-&gt;pw_passwd) != 0)
+		pam_err = PAM_AUTH_ERR;
+	else
+		pam_err = PAM_SUCCESS;
+#ifndef _OPENPAM
+	free(password);
+#endif
+	return (pam_err);
+}
+
+PAM_EXTERN int
+pam_sm_setcred(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_open_session(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_close_session(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_chauthtok(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SERVICE_ERR);
+}
+
+#ifdef PAM_MODULE_ENTRY
+PAM_MODULE_ENTRY("pam_unix");
+#endif
+
+    </pre></div><div class="appendix"><h2 class="title" style="clear: both"><a id="pam-sample-conv"></a>C. Пример функции взаимодействия
+      PAM</h2><p>Функция взаимодействия, приводимая ниже, является значительно
+      упрощённой версией функции <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=openpam_ttyconv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">openpam_ttyconv</span>(3)</span></a> из OpenPAM.  Она
+      полнофункциональна, и должна послужить источником идей о том, как
+      должна себя вести функция взаимодействия, однако она слишком проста для
+      реальных приложений.  Даже если вы не используете OpenPAM, можете
+      сгрузить исходный код и использовать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=openpam_ttyconv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">openpam_ttyconv</span>(3)</span></a> в своих
+      целях; мы надеемся, что она достаточно надёжна в качестве функции
+      для взаимодействия с терминальными устройствами.</p><pre class="programlisting">
+/*-
+ * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_appl.h&gt;
+
+int
+converse(int n, const struct pam_message **msg,
+	struct pam_response **resp, void *data)
+{
+	struct pam_response *aresp;
+	char buf[PAM_MAX_RESP_SIZE];
+	int i;
+
+	data = data;
+	if (n &lt;= 0 || n &gt; PAM_MAX_NUM_MSG)
+		return (PAM_CONV_ERR);
+	if ((aresp = calloc(n, sizeof *aresp)) == NULL)
+		return (PAM_BUF_ERR);
+	for (i = 0; i &lt; n; ++i) {
+		aresp[i].resp_retcode = 0;
+		aresp[i].resp = NULL;
+		switch (msg[i]-&gt;msg_style) {
+		case PAM_PROMPT_ECHO_OFF:
+			aresp[i].resp = strdup(getpass(msg[i]-&gt;msg));
+			if (aresp[i].resp == NULL)
+				goto fail;
+			break;
+		case PAM_PROMPT_ECHO_ON:
+			fputs(msg[i]-&gt;msg, stderr);
+			if (fgets(buf, sizeof buf, stdin) == NULL)
+				goto fail;
+			aresp[i].resp = strdup(buf);
+			if (aresp[i].resp == NULL)
+				goto fail;
+			break;
+		case PAM_ERROR_MSG:
+			fputs(msg[i]-&gt;msg, stderr);
+			if (strlen(msg[i]-&gt;msg) &gt; 0 &amp;&amp;
+			    msg[i]-&gt;msg[strlen(msg[i]-&gt;msg) - 1] != '\n')
+				fputc('\n', stderr);
+			break;
+		case PAM_TEXT_INFO:
+			fputs(msg[i]-&gt;msg, stdout);
+			if (strlen(msg[i]-&gt;msg) &gt; 0 &amp;&amp;
+			    msg[i]-&gt;msg[strlen(msg[i]-&gt;msg) - 1] != '\n')
+				fputc('\n', stdout);
+			break;
+		default:
+			goto fail;
+		}
+	}
+	*resp = aresp;
+	return (PAM_SUCCESS);
+ fail:
+        for (i = 0; i &lt; n; ++i) {
+                if (aresp[i].resp != NULL) {
+                        memset(aresp[i].resp, 0, strlen(aresp[i].resp));
+                        free(aresp[i].resp);
+                }
+        }
+        memset(aresp, 0, n * sizeof *aresp);
+	*resp = NULL;
+	return (PAM_CONV_ERR);
+}
+
+    </pre></div><div class="bibliography"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-further"></a>Дополнительная литература</h2></div></div></div><div class="bibliodiv"><h3 class="title"><a id="idp71088208"></a>Работы</h3><div class="biblioentry"><a id="idp71089872"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://www.sun.com/software/solaris/pam/pam.external.pdf" target="_top">
+	  Making Login Services Independent of Authentication
+          Technologies</a></em>. </span><span class="authorgroup"><span class="firstname">Vipin</span> <span class="surname">Samar</span>  <span class="firstname">Charlie</span> <span class="surname">Lai</span>. </span><span class="orgname">Sun Microsystems. </span></p></div><div class="biblioentry"><a id="idp71102416"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://www.opengroup.org/pubs/catalog/p702.htm" target="_top">X/Open
+          Single Sign-on Preliminary Specification</a></em>. </span><span class="orgname">The Open Group. </span><span class="biblioid">1-85912-144-6. </span><span class="pubdate">Июнь 1997. </span></p></div><div class="biblioentry"><a id="idp71116368"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://www.kernel.org/pub/linux/libs/pam/pre/doc/current-draft.txt" target="_top">
+          Pluggable Authentication Modules</a></em>. </span><span class="author"><span class="firstname">Andrew</span> <span class="othername">G.</span> <span class="surname">Morgan</span>. </span><span class="pubdate">6 октября 1999. </span></p></div></div><div class="bibliodiv"><h3 class="title"><a id="idp71123408"></a>Руководства пользователя</h3><div class="biblioentry"><a id="idp71125328"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://www.sun.com/software/solaris/pam/pam.admin.pdf" target="_top">PAM
+          Administration</a></em>. </span><span class="orgname">Sun Microsystems. </span></p></div></div><div class="bibliodiv"><h3 class="title"><a id="idp71130320"></a>Web-страницы по данной тематике</h3><div class="biblioentry"><a id="idp71132880"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://openpam.sourceforge.net/" target="_top">Домашняя страница
+          OpenPAM</a></em>. </span><span class="author"><span class="firstname">Dag-Erling</span> <span class="surname">Smorgrav</span>. </span><span class="orgname">ThinkSec AS. </span></p></div><div class="biblioentry"><a id="idp71148752"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://www.kernel.org/pub/linux/libs/pam/" target="_top">Домашняя
+          страница Linux-PAM</a></em>. </span><span class="author"><span class="firstname">Andrew</span> <span class="othername">G.</span> <span class="surname">Morgan</span>. </span></p></div><div class="biblioentry"><a id="idp71158864"></a><p><span class="citetitle"><em class="citetitle"><a class="link" href="http://wwws.sun.com/software/solaris/pam/" target="_top">Домашняя
+          страница Solaris PAM</a></em>. </span><span class="orgname">Sun Microsystems. </span></p></div></div></div></div></body></html>

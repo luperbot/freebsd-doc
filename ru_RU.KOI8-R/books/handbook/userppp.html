@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>23.2. PPP уровня пользователя</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="ppp-and-slip.html" title="Глава 23. PPP и SLIP" /><link rel="prev" href="ppp-and-slip.html" title="Глава 23. PPP и SLIP" /><link rel="next" href="ppp.html" title="23.3. PPP уровня ядра" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">23.2. PPP уровня пользователя</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ppp-and-slip.html">Пред.</a> </td><th width="60%" align="center">Глава 23. PPP и SLIP</th><td width="20%" align="right"> <a accesskey="n" href="ppp.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="userppp"></a>23.2. PPP уровня пользователя</h2></div><div><span class="authorgroup">Обновил и расширил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div><div><span class="authorgroup">Первоначально предоставил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Brian</span> <span class="surname">Somers</span></span>. </span></div><div><span class="authorgroup">Дополнительную информацию предоставили <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nik</span> <span class="surname">Clayton</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Dirk</span> <span class="surname">Fr"omberg</span></span>  <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Peter</span> <span class="surname">Childs</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95325520"></a>23.2.1. Настройка PPP уровня пользователя</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95326160"></a>23.2.1.1. Предположения</h4></div></div></div><p>В этом документе предполагается, что у вас есть следующее:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><a id="ppp-isp" class="indexterm"></a><a id="ppp-ppp2" class="indexterm"></a><p>Учетная запись у провайдера интернет (Internet Service
+	      Provider, ISP), к которому вы подсоединяетесь, используя
+	      PPP.</p></li><li class="listitem"><p>Модем или другое  подключенное к системе и правильно
+	      настроенное устройство, позволяющее подключиться к
+	      провайдеру.</p></li><li class="listitem"><p>Номер модемного пула провайдера.</p></li><li class="listitem"><a id="ppp-pap" class="indexterm"></a><a id="ppp-chap" class="indexterm"></a><a id="ppp-unix" class="indexterm"></a><a id="ppp-login" class="indexterm"></a><a id="ppp-password" class="indexterm"></a><p>Имя пользователя (логин) и пароль (обычная <span class="trademark">UNIX</span>(R) пара
+	      логин/пароль, или PAP/CHAP пара логин/пароль).</p></li><li class="listitem"><a id="ppp-nameserver" class="indexterm"></a><p>IP адреса одного или нескольких серверов имен.  Обычно
+	      провайдер дает для этих целей два IP адреса.  Если нет
+	      ни одного, вы можете использовать команду <code class="command">enable
+	      dns</code> в <code class="filename">ppp.conf</code> и
+	      <span class="application">ppp</span> настроит список серверов имен.
+	      Эта возможность зависит от наличия поддержки согласования
+	      DNS в реализации PPP провайдера.</p></li></ul></div><p>Следующая информация может поставляться провайдером, но не
+	  является совершенно необходимой:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>IP адрес шлюза провайдера.  Шлюз это компьютер, к которому
+	      вы подключитесь и который будет настроен в качестве
+	      <span class="emphasis"><em>маршрута по умолчанию</em></span> (<span class="emphasis"><em>default
+	      route</em></span>).  Если у вас нет этой информации, она
+	      может быть получена от PPP сервера после подключения.</p><p>Программой <span class="application">ppp</span> этот IP адрес
+	      обозначается как <code class="literal">HISADDR</code>.</p></li><li class="listitem"><p>Сетевая маска, которую вы должны использовать.
+	      Если провайдер не предоставил ее значение, вы можете
+	      использовать <code class="systemitem">255.255.255.255</code>.</p></li><li class="listitem"><a id="ppp-static-ip" class="indexterm"></a><p>Если провайдер предоставил статический IP и имя хоста,
+	      используйте их.  Иначе позвольте удаленной стороне
+	      назначить свободный IP адрес.</p></li></ul></div><p>Если у вас нет всей необходимой информации, свяжитесь с
+	  провайдером.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">В этом разделе строки файлов настройки из многих примеров
+	    пронумерованы.  Эти номера приведены только для обсуждения
+	    настроек, они не должны помещаться в действующую настройку.
+	    Правильные отступы с табуляцией и пробелами также важны.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95373008"></a>23.2.1.2. Создание файлов устройств PPP</h4></div></div></div><a id="idp95373648" class="indexterm"></a><p>В обычной ситуации, большинству пользователей нужно только
+	  одно устройство <code class="filename">tun</code>
+	  (<code class="filename">/dev/tun0</code>).  Ссылки на
+	  <code class="filename">tun0</code> ниже могут быть заменены на
+	  <code class="filename">tun<em class="replaceable"><code>N</code></em></code>,
+	  где <em class="replaceable"><code>N</code></em> это любой номер устройства,
+	  соответствующий вашей системе.</p><p>Для систем FreeBSD без <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs</span>(5)</span></a> (FreeBSD 4.X более
+	  ранние), необходимо проверить устройство
+	  <code class="filename">tun0</code> (это не требуется, если включена
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs</span>(5)</span></a>, поскольку файлы устройств будут создаваться
+	  автоматически).</p><p>Простейший способ убедиться, что устройство
+	  <code class="filename">tun0</code> настроено правильно, это пересоздать
+	  устройство.  Для пересоздания устройства выполните следующее:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /dev</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>sh MAKEDEV tun0</code></strong></pre><p>Если вам необходимы 16 туннельных устройств, потребуется их
+	  создать.  Это можно сделать, выполнив следующие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /dev</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>sh MAKEDEV tun15</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95405008"></a>23.2.1.3. Автоматическая настройка <span class="application">PPP</span></h4></div></div></div><a id="idp95405904" class="indexterm"></a><p>И <code class="command">ppp</code> и <code class="command">pppd</code>
+	  (реализация PPP уровня ядра) используют файлы настройки,
+	  расположенные в каталоге <code class="filename">/etc/ppp</code>.
+	  Примеры для ppp уровня пользователя можно найти в
+	  <code class="filename">/usr/share/examples/ppp/</code>.</p><p>Настройка <code class="command">ppp</code> требует редактирования
+	  нескольких файлов, в зависимости от ваших потребностей.  То,
+	  что вы поместите в эти файлы, зависит в некоторой степени
+	  от того, предоставит ли провайдер статический IP адрес
+	  (т.е. вы получите один определенный IP адрес и будете использовать
+	  его постоянно) или динамический (т.е. ваш IP адрес будет изменяться
+	  при каждом подключении к провайдеру).</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-staticIP"></a>23.2.1.3.1. PPP и статические IP адреса</h5></div></div></div><a id="idp95410128" class="indexterm"></a><p>Вам потребуется отредактировать файл настройки
+	    <code class="filename">/etc/ppp/ppp.conf</code>.  Он похож на приведенный
+	    ниже пример.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Строки, оканчивающиеся на <code class="literal">:</code>,
+	      вводятся без отступа в начале строки, остальные строки
+	      должны быть введены с отступом, как показано в примере.</p></div><pre class="programlisting">1     default:
+2       set log Phase Chat LCP IPCP CCP tun command
+3       ident user-ppp VERSION (built COMPILATIONDATE)
+4       set device /dev/cuaa0
+5       set speed 115200
+6       set dial "ABORT BUSY ABORT NO\\sCARRIER TIMEOUT 5 \
+7                 \"\" AT OK-AT-OK ATE1Q0 OK \\dATDT\\T TIMEOUT 40 CONNECT"
+8       set timeout 180
+9       enable dns
+10
+11    provider:
+12      set phone "(123) 456 7890"
+13      set authname foo
+14      set authkey bar
+15      set login "TIMEOUT 10 \"\" \"\" gin:--gin: \\U word: \\P col: ppp"
+16      set timeout 300
+17      set ifaddr <em class="replaceable"><code>x.x.x.x</code></em> <em class="replaceable"><code>y.y.y.y</code></em> 255.255.255.255 0.0.0.0
+18      add default HISADDR</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term">Строка 1:</span></dt><dd><p>Начинает настройку по умолчанию (default).  Команды
+		  этой настройки выполняются автоматически при запуске
+		  ppp.</p></dd><dt><span class="term">Строка 2:</span></dt><dd><p>Включает параметры протоколирования.  Когда настройка
+		  работает удовлетворительно, эта строка должна быть
+		  сокращена до следующей формы
+
+		  </p><pre class="programlisting">set log phase tun</pre><p>
+
+		  для предотвращения появления слишком больших лог
+		  файлов.</p></dd><dt><span class="term">Строка 3:</span></dt><dd><p>Указывает PPP как идентифицировать себя на удаленной
+		  стороне.  PPP идентифицирует себя на удаленной стороне если
+		  возникают проблемы согласования и установки соединения,
+		  предоставляя информацию, по которой администратор на
+		  удаленной стороне может воспользоваться для решения
+		  таких проблем.</p></dd><dt><span class="term">Строка 4:</span></dt><dd><p>Указывает устройство, к которому подключен модем.
+		  <code class="filename">COM1</code> это
+		  <code class="filename">/dev/cuaa0</code>, а
+		  <code class="filename">COM2</code> это
+		  <code class="filename">/dev/cuaa1</code>.</p></dd><dt><span class="term">Строка 5:</span></dt><dd><p>Устанавливает желаемую скорость подключения к модему.
+		  Если 115200 не работает (хотя должна работать для
+		  любого относительно нового модема) попробуйте
+		  38400.</p></dd><dt><span class="term">Строки 6 и 7:</span></dt><dd><a id="idp95441360" class="indexterm"></a><p>Строка дозвона.  PPP уровня пользователя применяет
+		  expect-send синтаксис, похожий на синтаксис <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chat</span>(8)</span></a>.
+		  Обратитесь к странице справочника за информацией о
+		  возможностях этого языка.</p><p>Обратите внимание, что эта команда продолжается на
+		  следующей строке для улучшения читаемости.  Любая команда
+		  в <code class="filename">ppp.conf</code> может быть продолжена
+		  на следующей строке, если последний символ предыдущей
+		  строки <span class="quote"><<<span class="quote"><code class="literal">\</code></span>>></span>.</p></dd><dt><span class="term">Строка 8:</span></dt><dd><p>Устанавливает предельное время ожидания для соединения.
+		  Значение 180 секунд используется по умолчанию, так что
+		  строка с этим значением чисто косметическая.</p></dd><dt><span class="term">Строка 9:</span></dt><dd><p>Указывает PPP запросить у удаленной стороны
+		  сервера имен.  Если вы работаете с локальным сервером имен,
+		  эта строка должна быть закомментирована или удалена.</p></dd><dt><span class="term">Строка 10:</span></dt><dd><p>Пустая строка для улучшения читаемости.  Пустые строки
+		  игнорируются PPP.</p></dd><dt><span class="term">Строка 11:</span></dt><dd><p>Определяет настройки для провайдера, называемого
+		  <span class="quote"><<<span class="quote">provider</span>>></span>.  Это имя может быть изменено
+		  на имя вашего провайдера, чтобы в дальнейшем вы могли
+		  использовать <code class="option">load
+		  <em class="replaceable"><code>provider</code></em></code> для
+		  начала соединения.</p></dd><dt><span class="term">Строка 12:</span></dt><dd><p>Определяет телефонный номер для этого провайдера.
+		  Несколько телефонных номеров могут быть указаны с
+		  помощью двоеточия (<code class="literal">:</code>) или
+		  символа канала (<code class="literal">|</code>) в качестве
+		  разделителя.  Различия между двумя разделителями описаны
+		  в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ppp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ppp</span>(8)</span></a>.  Главным образом они заключаются в том, что
+		  если вы хотите перебирать номера, используйте двоеточие.
+		  Если вы хотите дозваниваться по первому номеру в первую
+		  очередь, и использовать другие номера только если
+		  дозвон по первому завершится неудачно, используйте символ
+		  канала.  Всегда заключайте список номеров в кавычки, как
+		  показано в примере.</p><p>Вы должны включить телефонный номер в кавычки
+		  (<code class="literal">"</code>) если в нем используются пробелы.
+		  Отсутствие кавычек может вызвать простую, но трудно
+		  обнаруживаемую ошибку.</p></dd><dt><span class="term">Строки 13 и 14:</span></dt><dd><p>Задают имя пользователя и пароль.  При использовании
+		  приглашения login в стиле <span class="trademark">UNIX</span>(R), эти значения
+		  используются командой <code class="command">set login</code>
+		  через переменные \U и \P.  При соединении с использованием
+		  PAP или CHAP, эти значения используются во время
+		  аутентификации.</p></dd><dt><span class="term">Строка 15:</span></dt><dd><a id="idp95463504" class="indexterm"></a><a id="idp95464016" class="indexterm"></a><p>Если вы используете PAP или CHAP, приглашение
+		  на вход не появится, и эта строка должна быть
+		  закомментирована или удалена.  Обратитесь к
+		  странице <a class="link" href="userppp.html#userppp-PAPnCHAP" title="23.2.1.3.12. Аутентификация PAP и CHAP">аутентификация
+		  PAP и CHAP</a> за дальнейшей информацией.</p><p>Строка для входа записана в том же chat-подобном
+		  синтаксисе, что и строка для дозвона.  В этом примере
+		  строка работает для сервиса, сессия входа которого выглядит
+		  примерно так:</p><pre class="screen">J. Random Provider
+login: <em class="replaceable"><code>foo</code></em>
+password: <em class="replaceable"><code>bar</code></em>
+protocol: ppp</pre><p>Вам потребуется изменить эту строку для использования
+		  с другим сервисом.  При первом составлении скрипта
+		  убедитесь, что вы включили <span class="quote"><<<span class="quote">chat</span>>></span>
+		  протоколирование, чтобы убедиться, что
+		  соединение происходит как ожидалось.</p></dd><dt><span class="term">Строка 16:</span></dt><dd><a id="idp95473104" class="indexterm"></a><p>Установка максимального времени ожидания по умолчанию
+		  для соединения.  В данном случае соединение будет разорвано
+		  автоматически после 300 секунд неактивности.  Если вы не
+		  хотите, чтобы соединение разрывалось, установите эту
+		  переменную в нуль, или используйте параметр командной
+		  строки<code class="option">-ddial</code>.</p></dd><dt><span class="term">Строка 17:</span></dt><dd><a id="idp95475536" class="indexterm"></a><p>Устанавливает адрес интерфейса.  Строка
+		  <em class="replaceable"><code>x.x.x.x</code></em> должна быть
+		  заменена на IP адрес, который выделил вам провайдер.
+		  Строка <em class="replaceable"><code>y.y.y.y</code></em> должна быть
+		  заменена на IP адрес шлюза провайдера (компьютер, к
+		  которому вы подключаетесь).  Если провайдер не сообщил
+		  адрес шлюза, используйте <code class="systemitem">10.0.0.2/0</code>.
+		  Если вам требуется использовать <span class="quote"><<<span class="quote">вычисленные</span>>></span>
+		  адреса, убедитесь, что создана запись в
+		  <code class="filename">/etc/ppp/ppp.linkup</code> в соответствии
+		  с инструкциями для <a class="link" href="userppp.html#userppp-dynamicIP" title="23.2.1.3.2. PPP и динамические IP адреса">PPP
+		  и динамических IP адресов</a>.  Если эта строка
+		  опущена, <code class="command">ppp</code> не может быть запущен в
+		  режиме <code class="option">-auto</code>.</p></dd><dt><span class="term">Строка 18:</span></dt><dd><p>Добавляет маршрут по умолчанию к шлюзу провайдера.
+		  Специальное слово <code class="literal">HISADDR</code> заменяется
+		  адресом шлюза, указанном в строке 17.  Важно, чтобы
+		  эта строка появилась после строки 17, до нее
+		  переменная <code class="literal">HISADDR</code> еще не
+		  инициализирована.</p><p>Если вы не будете запускать ppp с параметром
+		  <code class="option">-auto</code>, эта строка должна быть перемещена
+		  в файл <code class="filename">ppp.linkup</code>.</p></dd></dl></div><p>Нет необходимости добавлять запись в
+	    <code class="filename">ppp.linkup</code>, если у вас статический IP
+	    адрес и ppp работает в режиме <code class="option">-auto</code>,
+	    поскольку таблица маршрутизации настроена правильно еще
+	    до подключения.  Однако, вы возможно захотите создать запись
+	    для запуска программ после соединения.  Эта ситуация описана
+	    далее в примере по sendmail.</p><p>Примерные файлы настройки находятся в каталоге
+	    <code class="filename">/usr/share/examples/ppp/</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-dynamicIP"></a>23.2.1.3.2. PPP и динамические IP адреса</h5></div></div></div><a id="idp95486800" class="indexterm"></a><a id="idp95487568" class="indexterm"></a><p>Если провайдер не выделил статический IP адрес,
+	    <code class="command">ppp</code> может быть настроен для определения
+	    локального и удаленного адреса.  Это делается путем
+	    <span class="quote"><<<span class="quote">вычисления</span>>></span> IP адреса и настройки его программой
+	    <code class="command">ppp</code> с использованием IP
+	    Configuration Protocol (IPCP) после установления соединения.
+	    Файл настройки <code class="filename">ppp.conf</code> тот же, что и
+	    в примере <a class="link" href="userppp.html#userppp-staticIP" title="23.2.1.3.1. PPP и статические IP адреса">PPP и статические
+	    IP адреса</a>, со следующим изменением:</p><pre class="programlisting">17      set ifaddr 10.0.0.1/0 10.0.0.2/0 255.255.255.255</pre><p>Как и раньше, не включайте номер строки, он используется
+	    только для ссылки на строку в этом примере.  Требуется отступ хотя
+	    бы в один пробел.</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Строка 17:</span></dt><dd><p>Номер после символа <code class="literal">/</code> это число
+		  бит в адресе, которые будут запрошены ppp.  Вы можете
+		  использовать более подходящие вам IP адреса, но пример
+		  выше всегда будет работать.</p></dd></dl></div><p>Если вы не используете режим <code class="option">-auto</code>,
+	    потребуется создать запись в
+	    <code class="filename">/etc/ppp/ppp.linkup</code>.
+	    Этот файл используется после установки соединения.  На этот момент
+	    <code class="command">ppp</code> уже настроит адреса интерфейсов и
+	    станет возможным добавление записей в таблицу
+	    маршрутизации:</p><pre class="programlisting">1     provider:
+2      add default HISADDR</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term">Строка 1:</span></dt><dd><p>При установке соединения, <code class="command">ppp</code>
+		  ищет запись в <code class="filename">ppp.linkup</code>
+		  по следующим правилам: сначала в соответствии с
+		  меткой, используемой в <code class="filename">ppp.conf</code>.
+		  Если это не сработает, ведется поиск записи для
+		  IP адреса шлюза.  Это метка в IP записывается в
+		  виде IP адреса.  Если запись все еще не найдена,
+		  используется запись <code class="literal">MYADDR</code>.</p></dd><dt><span class="term">Строка 2:</span></dt><dd><p>Эта строка сообщает <code class="command">ppp</code> добавить
+		  маршрут по умолчанию, указывающий на
+		  <code class="literal">HISADDR</code>.  <code class="literal">HISADDR</code>
+		  будет заменен на IP адрес шлюза, определенного
+		  IPCP.</p></dd></dl></div><p>Детальный пример находится в записи
+	    <code class="literal">pmdemand</code> файлов
+	    <code class="filename">/usr/share/examples/ppp/ppp.conf.sample</code>
+	    и
+	    <code class="filename">/usr/share/examples/ppp/ppp.linkup.sample</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95516112"></a>23.2.1.3.3. Прием входящих звонков</h5></div></div></div><a id="idp95516752" class="indexterm"></a><p>При настройке <span class="application">ppp</span> для приема
+	    входящих звонков на компьютере, подключенном к локальной сети,
+	    вам необходимо решить, перенаправлять ли пакеты в локальную сеть.
+	    Если вы будете делать это, выделите удаленной стороне IP адрес
+	    из диапазона адресов локальной сети, и используйте команду
+	    <code class="command">enable proxy</code> в файле
+	    <code class="filename">/etc/ppp/ppp.conf</code>.  Вам потребуется также
+	    убедиться, что в файле <code class="filename">/etc/rc.conf</code>
+	    присутствует строка:</p><pre class="programlisting">gateway_enable="YES"</pre></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95519952"></a>23.2.1.3.4. Какой getty?</h5></div></div></div><p>Раздел <a class="link" href="dialup.html" title="22.4. Входящие соединения по модему">Настройка FreeBSD для
+	      входящих соединений</a> дает хорошее описание включения
+	      входящих соединений с использованием <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=getty&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">getty</span>(8)</span></a>.</p><p>Альтернатива <code class="command">getty</code> это <a class="link" href="http://www.leo.org/~doering/mgetty/index.html" target="_top">mgetty</a>,
+	      более интеллектуальная версия <code class="command">getty</code>,
+	      разработанная специально для приема входящих звонков..</p><p>Преимущество использование <code class="command">mgetty</code> в
+	      том, что она активно <span class="emphasis"><em>общается</em></span> с модемами,
+	      то есть если порт будет выключен в
+	      <code class="filename">/etc/ttys</code>, модем не будет отвечать на
+	      звонок.</p><p>Последние версии <code class="command">mgetty</code> (от
+	      0.99beta и выше) поддерживают также автоматическое определение
+	      потоков PPP, позволяя клиентам безскриптовое подключение
+	      к серверу.</p><p>Обратитесь к разделу <a class="link" href="userppp.html#userppp-mgetty" title="23.2.1.3.10. mgetty и AutoPPP">Mgetty и
+	      AutoPPP</a> за дальнейшей информацией по
+	      <code class="command">mgetty</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95548368"></a>23.2.1.3.5. Права <span class="application">PPP</span></h5></div></div></div><p>Программа <code class="command">ppp</code> обычно запускается с
+	      правами пользователя <code class="systemitem">root</code>.
+	      Если вы хотите разрешить запуск <code class="command">ppp</code>
+	      в режиме сервера с правами обычного пользователя
+	      путем запуска <code class="command">ppp</code> как описано ниже,
+	      этого пользователя необходимо добавить в группу
+	      <code class="systemitem">network</code> в файле
+	      <code class="filename">/etc/group</code>.</p><p>Вам также потребуется дать ему доступ к одному или более
+	      разделов конфигурации, используя команду
+	      <code class="command">allow</code>:</p><pre class="programlisting">allow users fred mary</pre><p>Если эта команда используется в разделе
+	      <code class="literal">default</code>, она дает пользователю полный
+	      доступ.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95591248"></a>23.2.1.3.6. Оболочки PPP для пользователей с динамическими IP</h5></div></div></div><a id="idp95591888" class="indexterm"></a><p>Создайте файл, называющийся
+	      <code class="filename">/etc/ppp/ppp-shell</code> и содержащий
+	      следующее:</p><pre class="programlisting">#!/bin/sh
+IDENT=`echo $0 | sed -e 's/^.*-\(.*\)$/\1/'`
+CALLEDAS="$IDENT"
+TTY=`tty`
+
+if [ x$IDENT = xdialup ]; then
+        IDENT=`basename $TTY`
+fi
+
+echo "PPP for $CALLEDAS on $TTY"
+echo "Starting PPP for $IDENT"
+
+exec /usr/sbin/ppp -direct $IDENT</pre><p>Этот скрипт должен быть исполняемым.  Теперь создайте
+	      на этот скрипт символическую ссылку с именем
+	      <code class="filename">ppp-dialup</code> с помощью следующей
+	      команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s ppp-shell /etc/ppp/ppp-dialup</code></strong></pre><p>Используйте этот скрипт в качестве
+	      <span class="emphasis"><em>оболочки</em></span> для удаленных пользователей.
+	      Ниже приведен пример записи в <code class="filename">/etc/password</code>
+	      для удаленных пользователей PPP с именем пользователя
+	      <code class="systemitem">pchilds</code> (не забывайте использовать
+	      <code class="command">vipw</code> для редактирования файла паролей).</p><pre class="programlisting">pchilds:*:1011:300:Peter Childs PPP:/home/ppp:/etc/ppp/ppp-dialup</pre><p>Создайте каталог <code class="filename">/home/ppp</code>,
+	      который доступен для чтения и содержит следующие файлы
+	      нулевой длины:</p><pre class="screen">-r--r--r--   1 root     wheel	   0 May 27 02:23 .hushlogin
+-r--r--r--   1 root     wheel           0 May 27 02:22 .rhosts</pre><p>Это предотвратит отображение
+	      <code class="filename">/etc/motd</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95604304"></a>23.2.1.3.7. Оболочки PPP для пользователей со статическими IP</h5></div></div></div><a id="idp95604944" class="indexterm"></a><p>Создайте файл <code class="filename">ppp-shell</code> как в примере
+	      выше, и для каждой учетной записи со статически назначаемым
+	      IP создайте символическую ссылку на
+	      <code class="filename">ppp-shell</code>.</p><p>Например, если у вас три пользователя удаленного доступа,
+	      <code class="systemitem">fred</code>, <code class="systemitem">sam</code> и
+	      <code class="systemitem">mary</code>, которые подключаются к вашей
+	      сети класса C, выполните следующее:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/ppp/ppp-shell /etc/ppp/ppp-fred</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/ppp/ppp-shell /etc/ppp/ppp-sam</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/ppp/ppp-shell /etc/ppp/ppp-mary</code></strong></pre><p>Оболочка каждого из этих пользователей удаленного доступа
+	      должна быть символической ссылкой, созданной выше
+	      (например, оболочка пользователя <code class="systemitem">mary</code>
+	      должна быть <code class="filename">/etc/ppp/ppp-mary</code>).</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95612624"></a>23.2.1.3.8. Настройка <code class="filename">ppp.conf</code> для пользователей
+	      с динамическими IP</h5></div></div></div><p>Файл <code class="filename">/etc/ppp/ppp.conf</code> должен
+	      содержать примерно такие строки:</p><pre class="programlisting">default:
+  set debug phase lcp chat
+  set timeout 0
+
+ttyd0:
+  set ifaddr 203.14.100.1 203.14.100.20 255.255.255.255
+  enable proxy
+
+ttyd1:
+  set ifaddr 203.14.100.1 203.14.100.21 255.255.255.255
+  enable proxy</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Необходимо соблюдать отступы.</p></div><p>Раздел <code class="literal">default:</code> загружается для
+	      каждого соединения.  Для каждой строки, включенной в
+	      <code class="filename">/etc/ttys</code>, создайте запись,
+	      подобную <code class="literal">ttyd0:</code> выше.  Каждая строка
+	      должна содержать уникальные IP адреса из вашего пула
+	      IP адресов, выделенных пользователям с динамическими
+	      IP.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95617360"></a>23.2.1.3.9. Настройка <code class="filename">ppp.conf</code> для пользователей
+	      со статическими IP</h5></div></div></div><p>Помимо содержимого, описанного в примере файла
+	      <code class="filename">/usr/share/examples/ppp/ppp.conf</code>
+	      выше, вам потребуется добавить раздел для каждого из
+	      пользователей со статическими IP.  Мы продолжим использовать
+	      имена <code class="systemitem">fred</code>, <code class="systemitem">sam</code>
+	      и <code class="systemitem">mary</code> в качестве примера.</p><pre class="programlisting">fred:
+  set ifaddr 203.14.100.1 203.14.101.1 255.255.255.255
+
+sam:
+  set ifaddr 203.14.100.1 203.14.102.1 255.255.255.255
+
+mary:
+  set ifaddr 203.14.100.1 203.14.103.1 255.255.255.255</pre><p>Если требуется, файл <code class="filename">/etc/ppp/ppp.linkup</code>
+	      должен также содержать информацию о маршрутизации для
+	      каждого пользователя со статическим IP.  В строке ниже
+	      через клиентское соединение добавляется маршрут к сети класса
+	      C<code class="systemitem">203.14.101.0</code>.</p><pre class="programlisting">fred:
+  add 203.14.101.0 netmask 255.255.255.0 HISADDR
+
+sam:
+  add 203.14.102.0 netmask 255.255.255.0 HISADDR
+
+mary:
+  add 203.14.103.0 netmask 255.255.255.0 HISADDR</pre></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-mgetty"></a>23.2.1.3.10. <code class="command">mgetty</code> и AutoPPP</h5></div></div></div><a id="idp95624016" class="indexterm"></a><a id="idp95624912" class="indexterm"></a><a id="idp95625424" class="indexterm"></a><p>Настройка и компиляция <code class="command">mgetty</code> с
+	      параметром <code class="literal">AUTO_PPP</code> позволяет
+	      <code class="command">mgetty</code> определять LCP фазу
+	      PPP соединений и автоматически порождать оболочку ppp.
+	      Однако, поскольку стандартный метод логин/пароль не
+	      используется, необходима аутентификация пользователей
+	      через PAP или CHAP.</p><p>В этом разделе предполагается, что пользователь
+	      успешно настроил, скомпилировал и установил версию
+	      <code class="command">mgetty</code> с параметром
+	      <code class="literal">AUTO_PPP</code> (v0.99beta или
+	      более поздняя).</p><p>Убедитесь, что в файле
+	      <code class="filename">/usr/local/etc/mgetty+sendfax/login.config</code>
+	      имеется следующая строка:</p><pre class="programlisting">/AutoPPP/ -     -		      /etc/ppp/ppp-pap-dialup</pre><p>Это укажет <code class="command">mgetty</code> запускать скрипт
+	      <code class="filename">ppp-pap-dialup</code> для обнаруженных
+	      соединений PPP.</p><p>Создайте файл
+	      <code class="filename">/etc/ppp/ppp-pap-dialup</code>, содержащий
+	      следующее (этот файл должен быть выполняемым):</p><pre class="programlisting">#!/bin/sh
+exec /usr/sbin/ppp -direct pap$IDENT</pre><p>Для каждой линии, включенной в
+	      <code class="filename">/etc/ttys</code>, создайте соответствующую запись
+	      в <code class="filename">/etc/ppp/ppp.conf</code>.  Она будет отлично
+	      сочетаться с тем, что было создано выше.</p><pre class="programlisting">pap:
+  enable pap
+  set ifaddr 203.14.100.1 203.14.100.20-203.14.100.40
+  enable proxy</pre><p>Для каждого пользователя, входящего по этому
+	      методу, в файле <code class="filename">/etc/ppp/ppp.secret</code>
+	      должна присутствовать запись с логином/паролем,
+	      или, в качестве альтернативы, для аутентификации пользователей
+	      по PAP через <code class="filename">/etc/password</code>, необходимо
+	      использовать следующий параметр.</p><pre class="programlisting">enable passwdauth</pre><p>Если вы хотите присвоить некоторым пользователям статический
+	      IP, задайте его в качестве третьего аргумента в
+	      <code class="filename">/etc/ppp/ppp.secret</code>.  Обратитесь к
+	      к <code class="filename">/usr/share/examples/ppp/ppp.secret.sample</code>
+	      за примерами.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95645008"></a>23.2.1.3.11. MS расширения</h5></div></div></div><a id="idp95645648" class="indexterm"></a><a id="idp95646160" class="indexterm"></a><a id="idp95646672" class="indexterm"></a><p>Возможна настройка PPP для выдачи адресов DNS и
+	      NetBIOS по запросу.</p><p>Для включения этих расширений с PPP версии 1.x, необходимо
+	      добавить к соответствующему разделу
+	      <code class="filename">/etc/ppp/ppp.conf</code>следующие строки.</p><pre class="programlisting">enable msext
+set ns 203.14.100.1 203.14.100.2
+set nbns 203.14.100.5</pre><p>Для PPP версии 2 и выше:</p><pre class="programlisting">accept dns
+set dns 203.14.100.1 203.14.100.2
+set nbns 203.14.100.5</pre><p>Клиентам будут выдаваться адреса первичного и вторичного
+	      серверов имен, и адрес хоста NetBIOS.</p><p>Если в версии 2 и выше строка <code class="literal">set dns</code>
+	      будет опущена, PPP использует значения из
+	      <code class="filename">/etc/resolv.conf</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-PAPnCHAP"></a>23.2.1.3.12. Аутентификация PAP и CHAP</h5></div></div></div><a id="idp95652432" class="indexterm"></a><a id="idp95652944" class="indexterm"></a><p>Некоторые провайдеры настраивают систему так, что
+	    аутентификация производится с использованием либо PAP либо
+	    CHAP.  В этом случае, приглашение <code class="prompt">login:</code>
+	    при соединении не выдается и соединение PPP
+	    начинается сразу.</p><p>PAP менее безопасен, чем CHAP, но безопасность в данном
+	    случае не страдает, поскольку хотя пароли и передаются открытым
+	    текстом, они передаются только по модемной линии.  У кракеров
+	    не так много возможностей для кражи паролей.</p><p>В примерах выше <a class="link" href="userppp.html#userppp-staticIP" title="23.2.1.3.1. PPP и статические IP адреса">PPP
+	    и статические IP адреса</a> или <a class="link" href="userppp.html#userppp-dynamicIP" title="23.2.1.3.2. PPP и динамические IP адреса">PPP и динамические IP адреса</a>
+	    должны быть сделаны следующие изменения:</p><pre class="programlisting">13      set authname <em class="replaceable"><code>MyUserName</code></em>
+14      set authkey <em class="replaceable"><code>MyPassword</code></em>
+15      set login</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term">Строка 13:</span></dt><dd><p>Эта строка указывает имя пользователя PAP/CHAP.  Вам
+		  потребуется заменить <em class="replaceable"><code>MyUserName</code></em>
+		  на правильное значение.</p></dd><dt><span class="term">Строка 14:</span></dt><dd><a id="idp95664464" class="indexterm"></a><p>Эта строка указывает пароль PAP/CHAP.  Вам потребуется
+		  заменить <em class="replaceable"><code>MyPassword</code></em> на
+		  правильное значение.  Вы можете также добавить
+		  дополнительную строку, такую как:</p><pre class="programlisting">16      accept PAP</pre><p>или</p><pre class="programlisting">16      accept CHAP</pre><p>для явного указания протокола, но и PAP и CHAP
+		  поддерживаются по умолчанию.</p></dd><dt><span class="term">Строка 15:</span></dt><dd><p>Ваш провайдер обычно не потребует входа на сервер
+		  при использовании PAP или CHAP.  Следовательно, вы
+		  должны отключить строку <span class="quote"><<<span class="quote">set login</span>>></span>.</p></dd></dl></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95669840"></a>23.2.1.3.13. Изменение настроек <code class="command">ppp</code> <span class="quote"><<<span class="quote">на
+	    лету</span>>></span></h5></div></div></div><p>Возможно изменение настроек <code class="command">ppp</code>
+	    программы во время ее работы в фоновом режиме, но только если
+	    открыт соответствующий диагностический порт.  Для его открытия
+	    добавьте в настройку следующую строку:</p><pre class="programlisting">set server /var/run/ppp-tun<em class="replaceable"><code>%d</code></em> DiagnosticPassword 0177</pre><p>С этой директивой ppp будет прослушивать заданный <span class="trademark">UNIX</span>(R)
+	    сокет, запрашивая у клиентов пароль перед выдачей доступа.
+	    Символы<code class="literal">%d</code> заменяются на номер используемого
+	    устройства <code class="filename">tun</code>.</p><p>Как только сокет открыт, в скриптах, выполняющих настройку
+	    работающей программы, можно использовать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pppctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pppctl</span>(8)</span></a>.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-nat"></a>23.2.1.4. Использование NAT</h4></div></div></div><a id="idp95684816" class="indexterm"></a><p>PPP имеет возможность использовать встроенный NAT без
+	  преобразования пакетов в ядре.  Эта возможность может быть включена
+	  следующей строкой в <code class="filename">/etc/ppp/ppp.conf</code>:</p><pre class="programlisting">nat enable yes</pre><p>Альтернативно, PPP NAT может быть включен параметром командной
+	  строки <code class="literal">-nat</code>.  Существует также переменная
+	  <code class="filename">/etc/rc.conf</code> <code class="literal">ppp_nat</code>,
+	  которая включена по умолчанию.</p><p>Если вы используете эту возможность, вы также можете
+	  найти полезными параметры <code class="filename">/etc/ppp/ppp.conf</code>
+	  для включения пересылки входящих соединений:</p><pre class="programlisting">nat port tcp 10.0.0.2:ftp ftp
+nat port tcp 10.0.0.2:http http</pre><p>или отключить все входящие соединения</p><pre class="programlisting">nat deny_incoming yes</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="userppp-final"></a>23.2.1.5. Завершающая настройка системы</h4></div></div></div><a id="idp95695696" class="indexterm"></a><p>Теперь, когда программа <code class="command">ppp</code> настроена,
+	  осталось выполнить еще несколько действий прежде, чем все это
+	  заработает.  Они выполняются путем редактирования файла
+	  <code class="filename">/etc/rc.conf</code>.</p><p>Просматривая этот файл, убедитесь, что добавлена строка
+	  <code class="literal">hostname=</code>, например:</p><pre class="programlisting">hostname="foo.example.com"</pre><p>Если провайдер предоставил вам статический IP адрес и имя,
+	  возможно лучше всего использовать это имя в качестве имени
+	  хоста.</p><p>Проверьте переменную <code class="literal">network_interfaces</code>.
+	  Если вы хотите настроить систему для дозвона по требованию,
+	  убедитесь, что устройство <code class="filename">tun0</code> добавлено
+	  в список, иначе удалите его.</p><pre class="programlisting">network_interfaces="lo0 tun0"
+ifconfig_tun0=</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Переменная <code class="literal">ifconfig_tun0</code> должна быть пуста,
+	    необходимо также создать файл
+	    <code class="filename">/etc/start_if.tun0</code>.  В этом файле должна
+	    находиться строка:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">ppp -auto mysystem</pre><p xmlns="http://www.w3.org/1999/xhtml">Этот скрипт выполняется во время настройки сети, запуская
+	    даемона ppp в автоматическом режиме.  Если эта машина является
+	    шлюзом для локальной сети, вы можете также использовать
+	    переключатель <code class="option">-alias</code>.  Обратитесь к странице
+	    справочника за дальнейшей информацией.</p></div><p>Убедитесь, что программа маршрутизации отключена переменной
+	  в файле <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">router_enable="NO"</pre><a id="idp95708752" class="indexterm"></a><p>Важно, чтобы даемон <code class="command">routed</code> не был запущен,
+	  поскольку он может удалить запись маршрута по умолчанию, создаваемую
+	  <code class="command">ppp</code>.</p><p>Возможно, стоит обратить внимание на переменную
+	  <code class="literal">sendmail_flags</code> и убедиться, что она не включает
+	  параметр <code class="option">-q</code>, иначе <code class="command">sendmail</code>
+	  попытается сразу же обратиться к сети, и компьютер может начать
+	  дозвон.  Вы можете попробовать:</p><pre class="programlisting">sendmail_flags="-bd"</pre><a id="idp95712848" class="indexterm"></a><p>Обратная сторона этого решения в том, что необходим
+	  запуск очереди <code class="command">sendmail</code> после поднятия
+	  соединения ppp:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/sbin/sendmail -q</code></strong></pre><p>Вы можете использовать команду <code class="command">!bg</code> в файле
+	  <code class="filename">ppp.linkup</code> для автоматического выполнения
+	  этой задачи:</p><pre class="programlisting">1     provider:
+2       delete ALL
+3       add 0 0 HISADDR
+4       !bg sendmail -bd -q30m</pre><a id="idp95717200" class="indexterm"></a><p>Если вам это не нужно, возможна настройка
+	  <span class="quote"><<<span class="quote">dfilter</span>>></span> для блокирования SMTP трафика.  Обратитесь
+	  файлам примеров за дальнейшей информацией.</p><p>Все, что осталось, это перегрузить компьютер.  После
+	  перезагрузки вы можете либо выполнить:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ppp</code></strong></pre><p>и затем набрать <code class="command">dial provider</code> для запуска
+	  сессии PPP, либо, если вы хотите, чтобы программа
+	  <code class="command">ppp</code> начинала соединение автоматически при
+	  появлении исходящего трафика (и файл
+	  <code class="filename">start_if.tun0</code> не создан), выполните:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ppp -auto provider</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95726544"></a>23.2.1.6. Итоги</h4></div></div></div><p>Для первоначальной настройки ppp необходимо пройти следующие
+	  шаги:</p><p>Сторона клиента:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Убедитесь, что устройство <code class="filename">tun</code>
+	      встроено в ядро.</p></li><li class="step"><p>Убедитесь, что устройства
+	      <code class="filename">tun<em class="replaceable"><code>N</code></em></code>
+	      находятся в каталоге <code class="filename">/dev</code>.</p></li><li class="step"><p>Создайте запись в
+	      <code class="filename">/etc/ppp/ppp.conf</code>.  Пример
+	      <code class="filename">pmdemand</code> должен подойти для большинства
+	      провайдеров.</p></li><li class="step"><p>Если у вас динамический IP адрес, создайте запись в
+	      <code class="filename">/etc/ppp/ppp.linkup</code>.</p></li><li class="step"><p>Обновите файл <code class="filename">/etc/rc.conf</code>.</p></li><li class="step"><p>Создайте скрипт <code class="filename">start_if.tun0</code>,
+	      если необходим дозвон по требованию.</p></li></ol></div><p>Сторона сервера:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Убедитесь, что устройство <code class="filename">tun</code>
+	      встроено в ядро.</p></li><li class="step"><p>Убедитесь, что устройства
+	      <code class="filename">tun<em class="replaceable"><code>N</code></em></code>
+	      находятся в каталоге <code class="filename">/dev</code>.</p></li><li class="step"><p>Создайте запись в <code class="filename">/etc/passwd</code>
+	      (используя программу <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vipw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vipw</span>(8)</span></a>).</p></li><li class="step"><p>Создайте профиль в домашнем каталоге пользователя,
+	      запускающий <code class="command">ppp -direct direct-server</code>
+	      или подобную команду.</p></li><li class="step"><p>Создайте запись в
+	      <code class="filename">/etc/ppp/ppp.conf</code>.  Пример
+	      <code class="filename">direct-server</code> должен подойти.</p></li><li class="step"><p>Создайте запись в
+	      <code class="filename">/etc/ppp/ppp.linkup</code>.</p></li><li class="step"><p>Обновите файл <code class="filename">/etc/rc.conf</code>.</p></li></ol></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ppp-and-slip.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ppp-and-slip.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="ppp.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 23. PPP и SLIP </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 23.3. PPP уровня ядра</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>16.15. A Nagios elzárása a MAC rendszerrel</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="mac.html" title="16. fejezet - Kötelező hozzáférés-vezérlés (MAC)" /><link rel="prev" href="mac-lomac.html" title="16.14. A LOMAC MAC-modul" /><link rel="next" href="mac-userlocked.html" title="16.16. A felhasználók korlátozása" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">16.15. A Nagios elzárása a MAC rendszerrel</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-lomac.html">Vissza</a> </td><th width="60%" align="center">16. fejezet - Kötelező
+    hozzáférés-vezérlés (MAC)</th><td width="20%" align="right"> <a accesskey="n" href="mac-userlocked.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-implementing"></a>16.15. A Nagios elzárása a MAC rendszerrel</h2></div></div></div><a id="idp89286736" class="indexterm"></a><p>A most következő bemutatóban a
+      <acronym class="acronym">MAC</acronym> moduljainak és a megfelelően
+      beállított házirendek
+      használatával fogunk kialakítani egy
+      biztonságos környezetet.  Ne feledjük azonban,
+      hogy ez csupán egy ártatlan próba és
+      nem pedig a mindenki biztonsági aggályait
+      kielégítő legvégső megoldás.
+      Ha egy házirendet vakon építünk fel
+      és nem értjük meg a
+      működését, az soha nem válik
+      hasznunkra, és egy éles helyzetben
+      katasztrofális hatással járhat.</p><p>A folyamat megkezdése előtt be kell
+      állítanunk a <code class="literal">multilabel</code>
+      opciót mindegyik állományrendszerre, a
+      fejezet elején leírtaknak megfelelően.  Ha ezt
+      a lépést kihagyjuk, akkor hibákat kapunk.
+      Továbbá még az előkészület
+      részeként ne felejtsünk el gondoskodni a
+      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mngt/nagios-plugins/pkg-descr">net-mngt/nagios-plugins</a>,
+      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mngt/nagios/pkg-descr">net-mngt/nagios</a> és
+      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/www/apache13/pkg-descr">www/apache13</a> portok
+      telepítéséről,
+      beállításáról és
+      megfelelő működéséről
+      sem.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89290064"></a>16.15.1. A nem megbízható felhasználók
+	osztályának létrehozása</h3></div></div></div><p>Az eljárást kezdjük az alábbi
+	(insecure) felhasználói osztály
+	hozzáadásával az
+	<code class="filename">/etc/login.conf</code>
+	állományban:</p><pre class="programlisting">insecure:\
+:copyright=/etc/COPYRIGHT:\
+:welcome=/etc/motd:\
+:setenv=MAIL=/var/mail/$,BLOCKSIZE=K:\
+:path=~/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+:manpath=/usr/share/man /usr/local/man:\
+:nologin=/usr/sbin/nologin:\
+:cputime=1h30m:\
+:datasize=8M:\
+:vmemoryuse=100M:\
+:stacksize=2M:\
+:memorylocked=4M:\
+:memoryuse=8M:\
+:filesize=8M:\
+:coredumpsize=8M:\
+:openfiles=24:\
+:maxproc=32:\
+:priority=0:\
+:requirehome:\
+:passwordtime=91d:\
+:umask=022:\
+:ignoretime@:\
+:label=biba/10(10-10):</pre><p>Valamint egészítsük ki az
+	alapértelmezett (default) felhasználói
+	osztályt a következő sorral:</p><pre class="programlisting">:label=biba/high:</pre><p>Ahogy ezzel elkészültünk, az
+	hozzá tartozó adatbázis újbóli
+	legyártásához a következő
+	parancsot kell kiadnunk:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89298384"></a>16.15.2. A rendszerindítással kapcsolatos
+	beállítások</h3></div></div></div><p>Még ne indítsuk újra a
+	számítógépet, csupán a
+	szükséges modulok betöltéséhez
+	bővítsük ki a
+	<code class="filename">/boot/loader.conf</code> állományt
+	az alábbi sorokkal:</p><pre class="programlisting">mac_biba_load="YES"
+mac_seeotheruids_load="YES"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89300304"></a>16.15.3. A felhasználók
+	beállítása</h3></div></div></div><p>Soroljuk be a <code class="systemitem">root</code>
+	felhasználót a <code class="literal">default</code>
+	osztályba:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod root -L default</code></strong></pre><p>Az összes <code class="systemitem">root</code>
+	felhasználón kívüli
+	hozzáférésnek vagy
+	rendszerfelhasználónak most kelleni fog egy
+	bejelentkezési osztály.  A bejelentkezési
+	osztályra egyébként is szükség
+	lesz, mert ennek hiányában a
+	felhasználók még az olyan egyszerű
+	parancsokat sem tudják kiadni, mint például
+	a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a>.  A következő <code class="command">sh</code>
+	szkript nekünk erre pontosan megfelel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>for x in `awk -F: '($3 &gt;= 1001) &amp;&amp; ($3 != 65534) { print $1 }' \</code></strong>
+	<strong class="userinput"><code>/etc/passwd`; do pw usermod $x -L default; done;</code></strong></pre><p>Helyezzük át a <code class="systemitem">nagios</code>
+	és <code class="systemitem">www</code> felhasználókat az
+	insecure osztályba:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod nagios -L insecure</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod www -L insecure</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89314000"></a>16.15.4. A <code class="filename">contexts</code> állomány
+	létrehozása</h3></div></div></div><p>Most csinálnunk kell egy
+	<code class="filename">contexts</code> állományt.  Ebben
+	példában az
+	<code class="filename">/etc/policy.contexts</code>
+	állományt használjuk.</p><pre class="programlisting"># Ez a rendszer alapértelmezett BIBA házirendje.
+
+# Rendszer:
+/var/run                        biba/equal
+/var/run/*                      biba/equal
+
+/dev                            biba/equal
+/dev/*                          biba/equal
+
+/var				biba/equal
+/var/spool                      biba/equal
+/var/spool/*                    biba/equal
+
+/var/log                        biba/equal
+/var/log/*                      biba/equal
+
+/tmp				biba/equal
+/tmp/*				biba/equal
+/var/tmp			biba/equal
+/var/tmp/*			biba/equal
+
+/var/spool/mqueue		biba/equal
+/var/spool/clientmqueue		biba/equal
+
+# Nagios:
+/usr/local/etc/nagios
+/usr/local/etc/nagios/*         biba/10
+
+/var/spool/nagios               biba/10
+/var/spool/nagios/*             biba/10
+
+# Apache:
+/usr/local/etc/apache           biba/10
+/usr/local/etc/apache/*         biba/10</pre><p>Ezzel a házirenddel az információ
+	áramlását szabályozzuk.  Ebben a
+	konkrét konfigurációban a
+	felhasználók, a <code class="systemitem">root</code>
+	és társai, nem férhetnek hozzá a
+	<span class="application">Nagios</span>hoz.  A
+	<span class="application">Nagios</span>
+	beállításait tároló
+	állományok és a neve alatt futó
+	programok így teljesen különválnak
+	vagyis elzáródnak a rendszer többi
+	részétől.</p><p>Ez az iménti állomány a
+	következő parancs hatására kerül be
+	a rendszerünkbe:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A fenti állományrendszer
+	  felépítése a környezettől
+	  függően eltérhet, habár ezt minden
+	  egyes állományrendszeren le kell
+	  futtatni.</p></div><p>Az <code class="filename">/etc/mac.conf</code>
+	állományt törzsét a
+	következőképpen kell még
+	átírnunk:</p><pre class="programlisting">default_labels file ?biba
+default_labels ifnet ?biba
+default_labels process ?biba
+default_labels socket ?biba</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89326544"></a>16.15.5. A hálózat engedélyezése</h3></div></div></div><p>Tegyük hozzá a következő sort az
+	<code class="filename">/boot/loader.conf</code>
+	állományhoz:</p><pre class="programlisting">security.mac.biba.trust_all_interfaces=1</pre><p>Ezt az alábbi beállítást pedig
+	szúrjuk be az <code class="filename">rc.conf</code>
+	állományba a hálózati kártya
+	konfigurációjához.  Amennyiben az
+	internetet <acronym class="acronym">DHCP</acronym>
+	segítségével érjük el, ezt a
+	beállítást manuálisan kell megtenni
+	minden rendszerindítás alkalmával:</p><pre class="programlisting">maclabel biba/equal</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89330000"></a>16.15.6. A konfiguráció
+	kipróbálása</h3></div></div></div><a id="idp89330768" class="indexterm"></a><p>Gondoskodjunk róla, hogy a webszerver és a
+	<span class="application">Nagios</span> nem fog elindulni a rendszer
+	indításakor, majd indítsuk újra a
+	gépet.  Ezenkívül még
+	ellenőrizzük, hogy a <code class="systemitem">root</code> ne
+	tudjon hozzáférni a
+	<span class="application">Nagios</span>
+	beállításait tartalmazó
+	könyvtárhoz.  Ha a <code class="systemitem">root</code>
+	képes kiadni egy <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> parancsot a
+	<code class="filename">/var/spool/nagios</code> könyvtárra,
+	akkor valamit elronthattunk.  Normális esetben egy
+	<span class="errorname">permission denied</span> üzenetet kell
+	kapnunk.</p><p>Ha minden jónak tűnik, akkor a
+	<span class="application">Nagios</span>,
+	<span class="application">Apache</span> és
+	<span class="application">Sendmail</span> most már
+	elindítható a biztonsági házirend
+	szabályozásai szerint.  Ezt a következő
+	parancsokkal tehetjük meg:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/mail &amp;&amp; make stop &amp;&amp; \
+setpmac biba/equal make start &amp;&amp; setpmac biba/10\(10-10\) apachectl start &amp;&amp; \
+setpmac biba/10\(10-10\) /usr/local/etc/rc.d/nagios.sh forcestart</code></strong></pre><p>Kétszer is ellenőrizzük, hogy minden a
+	megfelelő módon viselkedik-e.  Ha valamilyen
+	furcsaságot tapasztalunk, akkor nézzük
+	át a naplókat vagy a hibaüzeneteket.  A
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> használatával tiltsuk le a
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mac_biba&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">mac_biba</span>(4)</span></a> biztonsági modult és
+	próbáljunk meg mindent a szokott módon
+	újraindítani.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A <code class="systemitem">root</code> felhasználó
+	  különösebb aggodalom nélkül
+	  képes megváltoztatni a biztonsági rend
+	  betartatását és átírni a
+	  konfigurációs állományokat.  Egy
+	  frissen indított parancsértelmező
+	  számára ezzel a paranccsal tudjuk
+	  csökkenteni a biztonsági besorolást:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac biba/10 csh</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Ennek kivédésére a
+	  felhasználókat a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=login.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">login.conf</span>(5)</span></a>
+	  beállításaival le kell korlátozni.
+	  Ha a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setpmac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setpmac</span>(8)</span></a> megpróbál a rekesz
+	  határain túl futtatni egy parancsot, akkor
+	  hibát ad vissza és a parancs nem fut le.  Ebben
+	  az esetben a <code class="systemitem">root</code>
+	  felhasználót tegyük a
+	  <code class="literal">biba/high(high-high)</code> értékek
+	  közé.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-lomac.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-userlocked.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">16.14. A LOMAC MAC-modul </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 16.16. A felhasználók
+      korlátozása</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

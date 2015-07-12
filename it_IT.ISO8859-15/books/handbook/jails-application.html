@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>15.6. Applicazioni di Jail</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="jails.html" title="Capitolo 15. Jail" /><link rel="prev" href="jails-tuning.html" title="15.5. Messa a Punto ed Amministrazione" /><link rel="next" href="mac.html" title="Capitolo 16. Mandatory Access Control" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.6. Applicazioni di Jail</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="jails-tuning.html">Indietro</a> </td><th width="60%" align="center">Capitolo 15. Jail</th><td width="20%" align="right"> <a accesskey="n" href="mac.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="jails-application"></a>15.6. Applicazioni di Jail</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails"></a>15.6.1. Servizi Jail</h3></div><div><span class="authorgroup">Contributo di  <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p>Questa sezione è basata su un'idea di Simon L. B. Nielsen (<code class="uri"><a class="uri" href="http://simon.nitro.dk/service-jails.html" target="_top">http://simon.nitro.dk/service-jails.html</a></code>), e su un
+        articolo scritto da by Ken Tom <code class="email">&lt;<a xmlns="" class="email" href="mailto:locals@gmail.com">locals@gmail.com</a>&gt;</code>.
+        Questa sezione illustra come configurare un sistema FreeBSD aggiungendo
+        uno strato di sicurezza addizionale, usando le funzionalità
+        delle <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>.  Inoltre questa sezione assume che la versione
+        FreeBSD del sistema sia almeno la RELENG_6_0 e che siano state capite le
+        informazioni fornite precedentemente nel capitolo.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-design"></a>15.6.1.1. Progetto</h4></div></div></div><p>Uno dei maggiori problemi delle jail è la gestione del loro
+          processo di aggiornamento.  Questo tende a essere un problema
+          poichè ciascuna jail deve essere ricostruita da zero ogni
+          volta che deve essere aggiornata.  Di solito questo non è
+          un problema per una jail singola, poichè il processo
+          di aggiornamento è abbastanza semplice, ma se sono create
+          tante jail può diventare un processo lungo e tedioso.</p><div xmlns="" class="warning"><h3 class="admontitle">Avvertimento: </h3><p xmlns="http://www.w3.org/1999/xhtml">Questa configurazione richiede una esperienza avanzata con
+            FreeBSD.  Se i procedimenti seguenti risultano troppo complicati, si
+            consiglia di dare un'occhiata a un sistema più intuitivo
+            come <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/ezjail/pkg-descr">sysutils/ezjail</a>, che
+            fornisce un modo semplice di amministrare le jail in FreeBSD e non
+            è sofisticato come questa configurazione.</p></div><p>Questa idea è stata presentata per risolvere
+          il problema di condividere quanto più possibile tra le jail,
+          in modo sicuro - usando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mount_nullfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mount_nullfs</span>(8)</span></a> in sola lettura,
+          affinchè l'aggiornamento sia semplice, e per fare diventare
+          più allettante mettere singoli servizi in jail individuali.
+          Inoltre, si fornisce un modo per creare, aggiornare e rimuovere
+          jail.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Esempi di servizi in questo contesto sono: un server
+            <acronym class="acronym">HTTP</acronym>, un server <acronym class="acronym">DNS</acronym>,
+            un server <acronym class="acronym">SMTP</acronym>, e via dicendo.</p></div><p>Gli scopi di configurazione descritti in questa sezione
+          sono:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Comprendere la struttura jail.  Questo implica di
+            <span class="emphasis"><em>not</em></span> dovere eseguire un installworld completo
+            per ogni jail.</p></li><li class="listitem"><p>Semplificare l'aggiunta di una nuova jail o la rimozione
+              di una esistente.</p></li><li class="listitem"><p>Semplificare l'aggiornamento o la modifica di una jail
+              esistente.</p></li><li class="listitem"><p>Rende possibile l'esecuzione di un FreeBSD su misura.</p></li><li class="listitem"><p>Essere paranoici sulla sicurezza, riducendo quanto più
+              possibile la possibilità di mettere a repentaglio il
+              sistema.</p></li><li class="listitem"><p>Salvare spazio e inode, quanto più possibile.</p></li></ul></div><p>Come già menzionato, questa configurazione si basa
+          pesantemente nell'avere un unico template master che è in sola
+          lettura (conosciuto come <span class="application">nullfs</span>) montato in
+          ogni jail e un dispositivo in lettura-scrittura per jail.  Il
+          dispositivo può essere un disco fisico separato, una
+          partizione, o un dispositivo vnode <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=md&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">md</span>(4)</span></a>.  In questo esempio,
+          useremo un <span class="application">nullfs</span> in lettura e
+          scrittura.</p><p>Viene qui descritto il layout del file system:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Ogni jail sarà montata sotto la directory
+              <code class="filename">/home/j</code>.</p></li><li class="listitem"><p><code class="filename">/home/j/mroot</code> è
+              il template per ogni jail e la partizione in sola lettura per
+              tutte le jail.</p></li><li class="listitem"><p>Una directory vuota sarà creata per ogni jail sotto
+            la directory <code class="filename">/home/j</code>.</p></li><li class="listitem"><p>Ogni jail avrà una directory <code class="filename">/s</code>, che sarà linkata
+              alla porzione del sistema in lettura e scrittura.</p></li><li class="listitem"><p>Ogni jail ha il suo sistema in lettura e scrittura in
+              <code class="filename">/home/j/skel</code>.</p></li><li class="listitem"><p>Ogni spazio di jail (la porzione in lettura e scrittura di
+              ogni jail) sarà creato in <code class="filename">/home/js</code>.</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Si assume che le jail siano posizionate sotto la partizione
+          <code class="filename">/home</code>.  Di sicuro, questo
+          può essere modificato con qualcosa di diverso, ma questo
+          cambiamento dovrà essere tenuto in considerazione
+          negli esempi più avanti.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-template"></a>15.6.1.2. Creare il Template</h4></div></div></div><p>Questa sezione descrive le fasi necessarie per creare il
+          template di riferimento che sarà la parte in sola lettura
+          utilizzate dalle jail.</p><p>È sempre una buona idea aggiornare FreeBSD al branch -RELEASE
+          più recente.  Per farlo, consulta il
+          <a class="link" href="../../../../doc/it_IT.ISO8859-15/books/handbook/makeworld.html" target="_top">capitolo</a>
+          di riferimento dell'Handbook.  Nel caso che l'aggiornamento
+          non sia fattibile, sarà necessaria la procedura di buildworld
+          per poter procedere.  Inoltre, è richiesto il pacchetto
+          <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a>.
+          Useremo l'utility <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=portsnap&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">portsnap</span>(8)</span></a> per scaricare la
+          FreeBSD Ports Collection.  Il <a class="link" href="../../../../doc/it_IT.ISO8859-15/books/handbook/portsnap.html" target="_top">Capitolo Portsnap</a>
+          dell'handbook è sempre una buona lettura per i nuovi
+          arrivati.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Primo, creiamo la struttura della directory per il file
+              system in sola lettura che conterrà i binari di FreeBSD
+              per le nostre jail, quindi portiamoci nel ramo della directory
+              dei sorgenti di FreeBSD e installiamo il file system in sola
+              lettura per il template delle jail:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot</code></strong></pre></li><li class="step"><p>Quindi, prepariamo la FreeBSD Ports Collection per le jail
+              così come abbiamo fatto per l'alberatura dei sorgenti,
+              richiesta per <span class="application">mergemaster</span>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir usr/ports</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>portsnap -p /home/j/mroot/usr/ports fetch extract</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src /home/j/mroot/usr/src</code></strong></pre></li><li class="step"><p>Creiamo lo scheletro per la parte del sistema in
+              lettura e scrittura:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/skel /home/j/skel/home /home/j/skel/usr-X11R6 /home/j/skel/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv etc /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv usr/local /home/j/skel/usr-local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv tmp /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv var /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv root /home/j/skel</code></strong></pre></li><li class="step"><p>Usiamo <span class="application">mergemaster</span> per installare
+              i file di configurazione mancanti.  Quindi liberiamoci delle
+              directory extra che <span class="application">mergemaster</span> ha
+              creato:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mergemaster -t /home/j/skel/var/tmp/temproot -D /home/j/skel -i</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R bin boot lib libexec mnt proc rescue sbin sys usr dev</code></strong></pre></li><li class="step"><p>Ora, linkiamo in modo simbolico il file system in lettura
+              e scrittura nel file system di sola lettura.  Assicuriamoci
+              che i link simbolici siano creati nelle posizioni corrette in
+              <code class="filename">s/</code>.  La creazione di
+              directory in posti sbagliati causerà un fallimento
+              durante l'installazione.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../../s/distfiles usr/ports/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Come ultima fase, creiamo un generico
+              <code class="filename">/home/j/skel/etc/make.conf</code> con
+              il seguente contenuto:</p><pre class="programlisting">WRKDIRPREFIX?=  /s/portbuild</pre><p>Avendo settato <code class="literal">WRKDIRPREFIX</code> in questo modo
+              sarà possibile compilare i port di FreeBSD all'interno
+              di ogni jail.  Ricordati che la directory dei port è
+              parte del sistema in sola lettura.  Il percorso ad doc di
+              <code class="literal">WRKDIRPREFIX</code> permette di compilare nella
+              porzione in lettura e scrittura di ogni jail.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-creating"></a>15.6.1.3. Creazione di Jail</h4></div></div></div><p>Ora che abbiamo completato il template della jail, possiamo
+          configurare le jail in
+          <code class="filename">/etc/rc.conf</code>.  Questo esempio mostra
+          la creazione di 3 jail: <span class="quote">«<span class="quote">NS</span>»</span>,
+          <span class="quote">«<span class="quote">MAIL</span>»</span> e <span class="quote">«<span class="quote">WWW</span>»</span>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Inseriamo le seguenti righe nel file
+              <code class="filename">/etc/fstab</code>, in modo tale che
+              il template in sola lettura per le jail e lo spazio
+              in lettura e scrittura sarà disponibile
+              nella rispettive jail:</p><pre class="programlisting">/home/j/mroot   /home/j/ns     nullfs  ro  0   0
+/home/j/mroot   /home/j/mail   nullfs  ro  0   0
+/home/j/mroot   /home/j/www    nullfs  ro  0   0
+/home/js/ns     /home/j/ns/s   nullfs  rw  0   0
+/home/js/mail   /home/j/mail/s nullfs  rw  0   0
+/home/js/www    /home/j/www/s  nullfs  rw  0   0</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Le partizioni con uno 0 come numero di pass non
+                sono verificate da <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> durante il boot, e le partizioni
+                con uno 0 come numero di dump non sono prese in considerazione
+                da <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a>.  Non si vuole che
+                <span class="application">fsck</span> verifichi i mount
+                <span class="application">nullfs</span> o che
+                <span class="application">dump</span> faccia un backup dei mount
+                nullfs in sola lettura delle jail.  Ecco perchè
+                queste partizioni hanno <span class="quote">«<span class="quote">0 0</span>»</span> nelle ultime
+                due colonne di ogni riga di
+                <code class="filename">fstab</code> sopra mosrate.</p></div></li><li class="step"><p>Configuriamo le jail in
+              <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">jail_enable="YES"
+jail_set_hostname_allow="NO"
+jail_list="ns mail www"
+jail_ns_hostname="ns.example.org"
+jail_ns_ip="192.168.3.17"
+jail_ns_rootdir="/usr/home/j/ns"
+jail_ns_devfs_enable="YES"
+jail_mail_hostname="mail.example.org"
+jail_mail_ip="192.168.3.18"
+jail_mail_rootdir="/usr/home/j/mail"
+jail_mail_devfs_enable="YES"
+jail_www_hostname="www.example.org"
+jail_www_ip="62.123.43.14"
+jail_www_rootdir="/usr/home/j/www"
+jail_www_devfs_enable="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Avvertimento: </h3><p xmlns="http://www.w3.org/1999/xhtml">La ragione del perchè la variabile
+                  <code class="varname">jail_<em class="replaceable"><code>nome</code></em>_rootdir</code>
+                  è settata a <code class="filename">/usr/home</code> invece di
+                  <code class="filename">/home</code> è che
+                  il percorso reale della directory <code class="filename">/home</code> in una installazione
+                  standard di FreeBSD è <code class="filename">/usr/home</code>.  La variabile
+                  <code class="varname">jail_<em class="replaceable"><code>nome</code></em>_rootdir</code>
+                  <span class="emphasis"><em>non</em></span> deve essere settata a un percorso
+                  che include link simbolici, altrimenti la jail
+                  rifiuterà di partire.  Usa l'utility <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=realpath&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">realpath</span>(1)</span></a>
+                  per determinare il valore che questa variabile dovrebbe
+                  assumere.  Per favore da un occhio al Security Advisory
+                  FreeBSD-SA-07:01.jail per maggiorni informazioni.</p></div></li><li class="step"><p>Creiamo i punti di mount richiesti per il file system
+              in sola lettura di ogni jail:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/ns /home/j/mail /home/j/www</code></strong></pre></li><li class="step"><p>Installiamo il template in lettura e scrittura
+              in ciascuna jail.  Notare l'utilizzo di <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a>, che assicura
+              una corretta copia di ogni directory:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/js</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/www</code></strong></pre></li><li class="step"><p>In questa fase, le jail sono preparate per essere eseguite.
+              Montiamo il file system richiesto per ogni jail, e quindi
+              avviamole con lo script
+              <code class="filename">/etc/rc.d/jail</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>Le jail dovrebbero essere in esecuzione.  Per verificare che
+          siano state avviate correttamente, usiamo il comando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a>.
+          Il suo output dovrebbe essere simile al seguente:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jls</code></strong>
+   JID  IP Address      Hostname                      Path
+     3  192.168.3.17    ns.example.org                /home/j/ns
+     2  192.168.3.18    mail.example.org              /home/j/mail
+     1  62.123.43.14    www.example.org               /home/j/www</pre><p>A questo punto, dovrebbe essere possibile entrare in ciascuna
+          jail, aggiungere nuovi utenti o configurare demoni.  La colonna
+          <code class="literal">JID</code> indica il numero identificativo
+          di ciascuna jail in esecuzione.  Usa il comando seguente per
+          effettuare compiti amministrativi nella jail con
+          <code class="literal">JID</code> 3:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jexec 3 tcsh</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-upgrading"></a>15.6.1.4. Aggiornamento</h4></div></div></div><p>Il tempo passa, e sarà necessario aggiornare il sistema
+          a una nuova versione di FreeBSD, vuoi per questioni di sicurezza,
+          o perchè sono state implementate nuove funzionalità
+          che ritornano utili per le jail esistenti.  Di seguito si fornisce
+          un modo semplice per effettuare l'aggiornamento delle jail esistenti.
+          Inoltre, questo metodo minimizza il tempo in cui le jail non
+          sono in esecuzione, poichè le jail saranno disattivate solo
+          per un breve periodo.  Questa procedura fornisce un modo per
+          ritornare indietro alle vecchie versioni nel caso qualcosa vada
+          storto.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Il primo passo è aggiornare il sistema host nella
+              maniera usuale.  Quindi creiamo un template temporaneo
+              in sola lettura in <code class="filename">/home/j/mroot2</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong></pre><p>Il processo di <code class="buildtarget">installworld</code> crea
+              alcune directory non necessarie, che possono essere
+              rimosse:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chflags -R 0 var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R etc var root usr/local tmp</code></strong></pre></li><li class="step"><p>Ricreiamo i link simbolici in lettura e scrittura
+              per il file system di riferimento:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>È questo il momento per fermare le jail:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail stop</code></strong></pre></li><li class="step"><p>Smontiamo il file system originale:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">I sistemi in lettura e scrittura sono attaccati al
+                sistema in sola lettura
+                (<code class="filename">/s</code>) e devono essere
+                smontati.</p></div></li><li class="step"><p>Muovi il file system in sola lettura e rimpiazzalo con
+              quello nuovo.  Il vecchio file system in sola lettura
+              servirà da backup in caso qualcosa dovesse andare storto.
+              La convenzione dei nomi qui utilizzata corrisponde a quella
+              utilizzata quando fu creato il file system in sola lettura.
+              Muovi la FreeBSD Ports Collection originale nel nuovo file system
+              per risparmiare spazio e inode:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot mroot.20060601</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot2 mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot.20060601/usr/ports mroot/usr</code></strong></pre></li><li class="step"><p>A questo punto il nuovo template in sola lettura è
+              pronto, quindi ci rimare di rimontare il file system e
+              avviare le jail:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>Usa <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a> per verificare che le jail sono state avviate
+          correttamente.  Non dimenticare di eseguire mergemaster in
+          ciascuna jail.  I file di configurazione dovranno essere aggiornati
+          così come gli script rc.d.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="jails-tuning.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="jails.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="mac.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">15.5. Messa a Punto ed Amministrazione </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> Capitolo 16. Mandatory Access Control</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Kapitel 23. Der Vinum Volume Manager</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="system-administration.html" title="Teil III. Systemadministration" /><link rel="prev" href="filesystems-linux.html" title="22.2. Linux® Dateisysteme" /><link rel="next" href="vinum-intro.html" title="23.2. Ihre Platten sind zu klein." /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Kapitel 23. Der Vinum Volume Manager</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="filesystems-linux.html">Zurück</a> </td><th width="60%" align="center">Teil III. Systemadministration</th><td width="20%" align="right"> <a accesskey="n" href="vinum-intro.html">Weiter</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vinum-vinum"></a>Kapitel 23. Der Vinum Volume Manager</h2></div><div><span class="authorgroup">Ursprünglich geschrieben von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Greg</span> <span class="surname">Lehey</span></span>. </span></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Johann</span> <span class="surname">Kois</span></span> und <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Kay</span> <span class="surname">Abendroth</span></span>. </span></div></div></div><div class="toc"><div class="toc-title">Inhaltsverzeichnis</div><dl class="toc"><dt><span class="sect1"><a href="vinum-vinum.html#vinum-synopsis">23.1. Übersicht</a></span></dt><dt><span class="sect1"><a href="vinum-intro.html">23.2. Ihre Platten sind zu klein.</a></span></dt><dt><span class="sect1"><a href="vinum-access-bottlenecks.html">23.3. Mögliche Engpässe</a></span></dt><dt><span class="sect1"><a href="vinum-data-integrity.html">23.4. Datenintegrität</a></span></dt><dt><span class="sect1"><a href="vinum-objects.html">23.5. Vinum-Objekte</a></span></dt><dt><span class="sect1"><a href="vinum-examples.html">23.6. Einige Beispiele</a></span></dt><dt><span class="sect1"><a href="vinum-object-naming.html">23.7. Objektbenennung</a></span></dt><dt><span class="sect1"><a href="vinum-config.html">23.8. Vinum konfigurieren</a></span></dt><dt><span class="sect1"><a href="vinum-root.html">23.9. Vinum für das Root-Dateisystem benutzen</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-synopsis"></a>23.1. Übersicht</h2></div></div></div><p>Egal, über welche und wieviele Festplatten Ihr System
+      auch verfügt, immer wieder werden Sie mit den folgenden
+      Problemen konfrontiert:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Ihre Platten sind zu klein.</p></li><li class="listitem"><p>Sie sind zu langsam.</p></li><li class="listitem"><p>Ihre Platten sind unzuverlässig.</p></li></ul></div><p>Um derartige Probleme zu lösen, wurden verschiedene
+	Methoden entwickelt.  Eine Möglichkeit bietet der
+	Einsatz von mehreren, manchmal auch redundant ausgelegten
+	Platten.  Zusätzlich zur Unterstützung verschiedener
+	Erweiterungskarten und Controller für Hardware-RAID-Systeme
+	enthält das FreeBSD-Basissystem auch den Vinum
+	Volume Manager, einen Blockgerätetreiber, der die
+	Einrichtung virtueller Platten unterstützt.  Bei
+	<span class="emphasis"><em>Vinum</em></span> handelt es sich um einen
+	sogenannten <span class="emphasis"><em>Volume Manager</em></span>, einen
+	virtuellen Plattentreiber, der obige drei Probleme löst.
+	Vinum bietet Ihnen größere Flexibilität,
+	Leistung und Zuverlässigkeit als die klassische
+	Datenspeicherung auf einzelne Festplatten.  Dazu unterstützt
+	Vinum RAID-0, RAID-1 und RAID-5 (sowohl einzeln als auch in
+	Kombination).</p><p>Dieses Kapitel bietet Ihnen einen Überblick über
+	potentielle Probleme der klassischen Datenspeicherung auf
+	Festplatten sowie eine Einführung in den Vinum
+	Volume Manager.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Für FreeBSD 5.X wurde Vinum überarbeitet und
+	  an die GEOM-Architektur (<a class="xref" href="GEOM.html" title="Kapitel 20. GEOM: Modulares Framework zur Plattentransformation">Kapitel 20, <em>GEOM: Modulares Framework zur
+    Plattentransformation</em></a>) angepasst,
+	  wobei die ursprünglichen Ideeen und Begriffe sowie die
+	  auf der Platte benötigten Metadaten beibehalten wurden.
+	  Die überarbeitete Version wird als
+	  <span class="emphasis"><em>gvinum</em></span> (für
+	  <span class="emphasis"><em>GEOM-Vinum</em></span>) bezeichnet.  Die folgenden
+	  Ausführungen verwenden den Begriff
+	  <span class="emphasis"><em>Vinum</em></span> als abstrakten Namen, unabhängig
+	  davon, welche Variante implementiert wurde.  Sämtliche
+	  Befehlsaufrufe erfolgen über <code class="command">gvinum</code>,
+	  welches nun das Kernelmodul <code class="filename">geom_vinum.ko</code>
+	  (statt <code class="filename">vinum.ko</code>) benötigt.  Analog
+	  finden sich alle Gerätedateien nun unter <code class="filename">/dev/gvinum</code> statt unter <code class="filename">/dev/vinum</code>. Seit FreeBSD 6.x ist die
+	  alte Vinum-Implementierung nicht mehr im Basissystem enthalten.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="filesystems-linux.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="system-administration.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-intro.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">22.2. <span class="trademark">Linux</span>® Dateisysteme </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 23.2. Ihre Platten sind zu klein.</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

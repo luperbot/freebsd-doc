@@ -1,0 +1,767 @@
+<?xml version="1.0" encoding="iso-8859-7"?>
+<!--
+
+  Υλοποίηση του UFS Journaling σε ένα desktop υπολογιστή
+
+  The FreeBSD Greek Documentation Project
+
+  %SOURCE%	en_US.ISO8859-1/articles/gjournal-desktop/article.xml
+  %SRCID%	1.5
+
+-->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="el">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Υλοποίηση του UFS Journaling σε ένα Desktop Υπολογιστή</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Μανώλης</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Κιαγιάς</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">manolis@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2008</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink" role="mailto:manolis@FreeBSD.org">Μανώλης Κιαγιάς</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Το FreeBSD είναι ένα κατοχυρωμένο εμπορικό
+  σύμβολο του FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Πολλές από τις λέξεις ή φράσεις οι οποίες
+  χρησιμοποιούνται από τους κατασκευαστές ή τους πωλητές τους για να
+  διακρίνουν τα προϊόντα τους θεωρούνται εμπορικά σύμβολα.  Όπου αυτές
+  εμφανίζονται σε αυτό το κείμενο και για όσες από αυτές γνωρίζει η Ομάδα
+  Ανάπτυξης του FreeBSD ότι είναι πιθανόν να είναι εμπορικά σύμβολα, θα δείτε
+  ένα από τα σύμβολα: <quote xmlns:xlink="http://www.w3.org/1999/xlink">TM</quote> ή <quote xmlns:xlink="http://www.w3.org/1999/xlink">(R)</quote>.</para>
+    </legalnotice>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ένα σύστημα αρχείων που διαθέτει δυνατότητα journaling,
+	χρησιμοποιεί ένα αρχείο καταγραφής (journal ή ημερολόγιο) στο οποίο
+	γίνονται αρχικά οι εγγραφές πριν καταχωρηθούν στο κανονικό σύστημα
+	αρχείων.  Με τον τρόπο αυτό μπορεί να εξασφαλιστεί η ακεραιότητα του
+	συστήματος αρχείων στην περίπτωση κατάρρευσης ή απότομης διακοπής της
+	τροφοδοσίας του.  Η χρήση του journaling διασφαλίζει την συνολική
+	ακεραιότητα του συστήματος αρχείων, αλλά δεν μπορεί να διασφαλίσει
+	ότι δεν θα έχουμε απώλεια δεδομένων σε μεμονωμένα αρχεία τα οποία
+	ήταν ενδεχομένως σε χρήση την ώρα της κατάρρευσης.  Ένα πλεονέκτημα
+	του journaling είναι η ελαχιστοποίηση του χρόνου που απαιτείται για
+	τον έλεγχο του συστήματος αρχείων σε περίπτωση κακού τερματισμού.  Το
+	σύστημα αρχείων UFS που χρησιμοποιείται από το FreeBSD δεν διαθέτει δικό
+	του ενσωματωμένο journaling.  Ωστόσο, το πλαίσιο λειτουργιών GEOM στο
+	FreeBSD 7.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">X</replaceable> παρέχει ένα νέο journal
+	class το οποίο δίνει αυτή τη δυνατότητα, και μάλιστα ανεξάρτητα από
+	το σύστημα αρχείων που χρησιμοποιείται.  Στο άρθρο αυτό εξετάζουμε
+	πως μπορούμε να χρησιμοποιήσουμε το journaling σε ένα τυπικό desktop
+	μηχάνημα για εργασία γραφείου.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="introduction">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Εισαγωγή</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Αν και οι περισσότεροι εξυπηρετητές που χρησιμοποιούνται σε
+      περιβάλλοντα παραγωγής είναι καλά προστατευμένοι από μη-αναμενόμενους
+      τερματισμούς, δεν συμβαίνει το ίδιο και με το συνηθισμένο desktop
+      μηχάνημα το οποίο βρίσκεται στα χέρια του τελικού χρήστη.  Αυτό συνήθως
+      δεν προστατεύεται από διακοπές ρεύματος, ενώ δεν είναι και οι λίγες οι
+      περιπτώσεις που ο κακός τερματισμός οφείλεται σε λανθασμένο χειρισμό
+      του χρήστη (κατά λάθος πίεση του reset κ.α.).  Στις περισσότερες από
+      αυτές τις περιπτώσεις, τα Soft Updates που χρησιμοποιεί το σύστημα
+      αρχείων UFS μπορούν να το προστατεύσουν αρκετά καλά, αν και μετά τον
+      προβληματικό τερματισμό απαιτείται συνήθως έλεγχος του συστήματος
+      αρχείων, ο οποίος ακόμα και όταν γίνεται στο παρασκήνιο, διαρκεί
+      αρκετό χρόνο.  Σε σπάνιες περιπτώσεις, το σύστημα αρχείων μπορεί να
+      υποστεί ζημιά η οποία να χρειάζεται χειροκίνητη επέμβαση για να
+      διορθωθεί, ενώ είναι πιθανή και η απώλεια δεδομένων.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Η νέα δυνατότητα για journaling που παρέχεται από το GEOM μπορεί
+      να βοηθήσει ιδιαίτερα στις παραπάνω περιπτώσεις, ελαχιστοποιώντας το
+      χρόνο που απαιτείται για τον έλεγχο του συστήματος αρχείων και
+      εξασφαλίζοντας ότι το σύστημα θα επανέλθει πολύ σύντομα σε σταθερή
+      κατάσταση.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Το άρθρο αυτό περιγράφει μια διαδικασία για την υλοποίηση του UFS
+      journaling σε ένα τυπικό desktop PC (στο οποίο χρησιμοποιείται ένας
+      σκληρός δίσκος τόσο για το σύστημα όσο και για τα δεδομένα).  Θα πρέπει
+      να ακολουθήσετε αυτές τις οδηγίες κατά τη διάρκεια μιας νέας
+      εγκατάστασης του FreeBSD.  Τα βήματα είναι αρκετά απλά και δεν απαιτούν
+      ιδιαίτερα πολύπλοκες εντολές.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Αφού διαβάσετε αυτό το άρθρο, θα ξέρετε:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Πως να δεσμεύσετε κάποιο χώρο στο δίσκο για το journaling κατά
+	  τη διάρκεια μιας νέας εγκατάστασης του FreeBSD.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Πως να φορτώσετε και να ενεργοποιήσετε το άρθρωμα (module)
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal> (ή πως να ενσωματώσετε τη
+	  λειτουργία του στον προσαρμοσμένο πυρήνα σας).</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Πως να μετατρέψετε τα υπάρχοντα συστήματα αρχείων σας ώστε
+	  να χρησιμοποιούν journaling, και τι παραμέτρους θα πρέπει να δώσετε
+	  στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> ώστε να τα προσαρτήσετε.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Πως να ενεργοποιήσετε το journaling σε νέες (άδειες)
+	  κατατμήσεις.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Πως να αντιμετωπίσετε προβλήματα που σχετίζονται με το
+	  journaling.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Πριν διαβάσετε αυτό το άρθρο, θα πρέπει:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Να κατανοείτε βασικές έννοιες του <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">UNIX</trademark> και του FreeBSD.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Να είστε εξοικειωμένος με τη διαδικασία εγκατάστασης του FreeBSD
+	  και το βοηθητικό πρόγραμμα
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>.</para>
+      </listitem>
+    </itemizedlist>
+
+    <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Η διαδικασία που περιγράφεται εδώ, προορίζεται για χρήση σε νέες
+	εγκαταστάσεις, όπου δεν υπάρχουν ακόμα αποθηκευμένα δεδομένα χρήστη.
+	Αν και είναι δυνατόν να τροποποιήσετε και να επεκτείνετε τη
+	διαδικασία αυτή σε μηχανήματα που βρίσκονται ήδη σε κανονική χρήση,
+	θα πρέπει οπωσδήποτε να
+	<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">πάρετε αντίγραφα ασφαλείας</emphasis> όλων των σημαντικών
+	δεδομένων πριν επιχειρήσετε οποιαδήποτε αλλαγή.  Όταν κάνετε αλλαγές
+	στα συστήματα αρχείων και στις κατατμήσεις των δίσκων σε τέτοιο
+	επίπεδο, είναι πιθανόν να κάνετε λάθη τα οποία θα αποβούν μοιραία για
+	τα δεδομένα σας.</para>
+    </warning>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="understanding-journaling">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Κατανόηση του Journaling στο FreeBSD</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Το journaling που παρέχεται από το GEOM στο
+      FreeBSD 7.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">X</replaceable> δεν
+      είναι προσανατολισμένο σε κάποιο συγκεκριμένο σύστημα αρχείων (όπως για
+      παράδειγμα συμβαίνει με το σύστημα αρχείων ext3 στο <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark>) αλλά
+      λειτουργεί σε επίπεδο block.  Αν και αυτό σημαίνει ότι μπορεί να
+      χρησιμοποιηθεί σε διαφορετικά συστήματα αρχείων, για το
+      FreeBSD 7.0-RELEASE, είναι δυνατή η χρήση του μόνο στο UFS2.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Οι λειτουργίες journaling παρέχονται φορτώνοντας το άρθρωμα
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal.ko</filename> στον πυρήνα (ή ενσωματώνοντας τη
+      λειτουργία του σε ένα προσαρμοσμένο πυρήνα) και χρησιμοποιώντας την
+      εντολή <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> για τη ρύθμιση των συστημάτων
+      αρχείων.  Η χρήση του journaling είναι γενικά θεμιτή σε μεγάλα
+      συστήματα αρχείων, όπως είναι το <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>.  Θα
+      χρειαστεί ωστόσο να έχετε δεσμεύσει από πριν κάποιο ελεύθερο χώρο στο
+      δίσκο.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Όταν γίνεται χρήση του journaling σε ένα σύστημα αρχείων, απαιτείται
+      κάποιος ελεύθερος χώρος για να αποθηκεύονται τα δεδομένα του ημερολογίου
+      καταγραφής (journal).  Ο χώρος του δίσκου που αποθηκεύονται τα
+      πραγματικά δεδομένα αναφέρεται ως <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">παροχέας δεδομένων (data
+      provider)</emphasis>, ενώ ο χώρος στον οποίο αποθηκεύεται το ημερολόγιο
+      ονομάζεται <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">παροχέας ημερολογίου (journal provider).</emphasis>
+      Σε περίπτωση που το journaling γίνεται σε σύστημα αρχείων το οποίο έχει
+      ήδη δεδομένα, οι δύο παροχείς πρέπει να βρίσκονται σε διαφορετικές
+      κατατμήσεις.  Σε περίπτωση χρήσης journaling σε νέα κατάτμηση, έχετε την
+      επιλογή να χρησιμοποιήσετε τον ίδιο παροχέα και για τα δεδομένα και για
+      το ημερολόγιο.  Σε κάθε περίπτωση, με τη χρήση της εντολής
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command>, οι δύο παροχείς συνδυάζονται για να
+      δημιουργήσουν το τελικό σύστημα αρχείων που υποστηρίζει journaling.
+      Για παράδειγμα:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Θέλετε να χρησιμοποιήσετε journaling στο σύστημα αρχείων
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, το οποίο βρίσκεται στο
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f</filename> (το σύστημα
+	  αρχείων περιέχει ήδη δεδομένα).</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Έχετε κρατήσει κάποιο κενό χώρο στο δίσκο, σε μια κατάτμηση
+	  στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1g</filename>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Με την χρήση της εντολής <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command>, θα
+	  δημιουργηθεί μια νέα συσκευή, η
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f.journal</filename>, όπου
+	  το <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f</filename> θα είναι ο
+	  παροχέας δεδομένων και το
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1g</filename> θα είναι ο
+	  παροχέας ημερολογίου.  Η νέα αυτή συσκευή θα χρησιμοποιείται πλέον
+	  για όλες τις εργασίες που θα εκτελούνται στο σύστημα αρχείων.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Ο χώρος στο δίσκο που απαιτείται για το ημερολόγιο εξαρτάται από
+      τη χρήση του συστήματος αρχείων, και όχι από το μέγεθος του παροχέα
+      δεδομένων.  Για παράδειγμα, σε ένα τυπικό μηχάνημα γραφείου, θα είναι
+      αρκετό να χρησιμοποιήσετε 1 GB για τον παροχέα ημερολογίου του
+      συστήματος αρχείων <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, ενώ σε ένα μηχάνημα το
+      οποίο χρησιμοποιείται σε εργασίες όπου οι εγγραφές στο δίσκο είναι πολύ
+      συχνές και μεγάλες σε μέγεθος (π.χ. επεξεργασία video) θα χρειαστείτε
+      περισσότερο χώρο.  Σε περίπτωση που ο χώρος που έχει δεσμευθεί για το
+      ημερολόγιο εξαντληθεί πριν γίνει δυνατή η εγγραφή δεδομένων στο
+      κανονικό σύστημα αρχείων, το σύστημα θα καταρρεύσει με kernel
+      panic.</para>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Τα μεγέθη που προτείνονται εδώ για τον παροχέα ημερολογίου,
+	είναι απίθανο να προκαλέσουν πρόβλημα σε τυπική χρήση γραφείου
+	(περιήγηση στο διαδίκτυο, επεξεργασία κειμένου, αναπαραγωγή
+	πολυμέσων).  Αν ωστόσο το είδος της εργασίας σας περιλαμβάνει έντονη
+	χρήση του σκληρού δίσκου, μπορείτε να χρησιμοποιήσετε τον ακόλουθο
+	κανόνα για τη μεγαλύτερη δυνατή αξιοπιστία: όλη η μνήμη RAM του
+	συστήματος σας πρέπει να χωράει στο 30% του χώρου του ημερολογίου.
+	Για παράδειγμα, αν το σύστημα σας έχει 1 GB RAM, θα πρέπει να
+	δημιουργήσετε ημερολόγιο μεγέθους περίπου 3.3 GB.
+	(Πολλαπλασιάστε το μέγεθος της RAM με το 3.3 για να βρείτε το μέγεθος
+	του ημερολογίου.)</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Για περισσότερες πληροφορίες σχετικά με το journaling, παρακαλούμε
+      διαβάστε τη σελίδα manual του <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="reserve-space">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Βήματα Κατά την Εγκατάσταση του FreeBSD</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Δέσμευση Χώρου στο Δίσκο για το Journaling</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ένα τυπικό desktop μηχάνημα, έχει συνήθως ένα σκληρό δίσκο στον
+	οποίο αποθηκεύονται τόσο το λειτουργικό όσο και τα δεδομένα του
+	χρήστη.  Συνήθως, οι προεπιλεγμένες κατατμήσεις που δημιουργούνται
+	από το <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> είναι περίπου σωστές:
+	Ένα desktop μηχάνημα δεν χρειάζεται μεγάλη κατάτμηση
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>, ενώ το μεγαλύτερο μέρος του ελεύθερου
+	χώρου αποδίδεται στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, αφού στους
+	υποκαταλόγους του αποθηκεύονται τα δεδομένα του χρήστη και γίνονται
+	και οι εγκαταστάσεις του λογισμικού.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Χρησιμοποιώντας τις προεπιλεγμένες κατατμήσεις (αυτές που
+	δημιουργεί ο επεξεργαστής <application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application> όταν
+	πιέσετε το <keycap xmlns:xlink="http://www.w3.org/1999/xlink">A</keycap>), δεν μένει καθόλου ελεύθερος χώρος.
+	Ωστόσο κάθε κατάτμηση στην οποία θέλετε να χρησιμοποιήσετε
+	journaling, χρειάζεται ακόμα μία για την αποθήκευση του ημερολογίου.
+	Καθώς η κατάτμηση <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> είναι η μεγαλύτερη, το
+	πλέον λογικό είναι να την μικρύνουμε ελαφρά ώστε να εξασφαλίσουμε το
+	χώρο που απαιτείται για το journaling.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Στο παράδειγμα μας, χρησιμοποιείται ένας δίσκος μεγέθους
+	80 GB.  Στην ακόλουθη εικόνα φαίνονται οι προεπιλεγμένες
+	κατατμήσεις όπως δημιουργούνται από τον επεξεργαστή
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application> κατά την εγκατάσταση:</para>
+
+      <mediaobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	<imageobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <imagedata fileref="disklabel1"/>
+	</imageobject>
+      </mediaobject>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Αν τα παραπάνω μεγέθη είναι περίπου τα επιθυμητά για την
+	εγκατάσταση σας, είναι αρκετά εύκολο να ρυθμιστούν ώστε να γίνει
+	δυνατή η χρήση του journaling.  Απλώς χρησιμοποιήστε τα
+	πλήκτρα με τα βελάκια για να
+	μετακινήσετε την μπάρα επιλογής στην κατάτμηση
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> και πιέστε το <keycap xmlns:xlink="http://www.w3.org/1999/xlink">D</keycap> για να
+	την διαγράψετε.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Τώρα, μετακινήστε την μπάρα επιλογής στο όνομα του σκληρού δίσκου
+	στο άνω μέρος της οθόνης, και πιέστε <keycap xmlns:xlink="http://www.w3.org/1999/xlink">C</keycap> για να
+	δημιουργήσετε μια νέα κατάτμηση για το <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>.
+	Η νέα αυτή κατάτμηση θα πρέπει να είναι μικρότερη κατά 1 GB
+	(αν έχετε σκοπό να χρησιμοποιήσετε journaling μόνο στο
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>), ή κατά 2 GB (αν έχετε σκοπό να
+	χρησιμοποιήσετε journaling τόσο στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> όσο και
+	στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>).  Στο διάλογο που θα εμφανιστεί,
+	επιλέξτε να δημιουργήσετε σύστημα αρχείων (file system) και γράψτε
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> ως το σημείο προσάρτησης
+	(mount point).</para>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Είναι αναγκαία η χρήση journaling στην κατάτμηση
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> partition; Φυσιολογικά, το journaling έχει
+	  νόημα μόνο σε αρκετά μεγάλες κατατμήσεις.  Δεν πρόκειται ωστόσο να
+	  δημιουργηθεί κάποιο πρόβλημα αν χρησιμοποιήσετε journaling στο
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.  Αν η χρήση του συγκεκριμένου συστήματος
+	  αρχείων είναι μικρή (το οποίο είναι και το πιθανότερο σε ένα
+	  dekstop μηχάνημα) ίσως είναι καλή ιδέα να χρησιμοποιήσετε λιγότερο
+	  χώρο στο δίσκο για το ημερολόγιο του.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Στο παράδειγμα μας, θα ενεργοποιήσουμε το journaling τόσο στο
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> όσο και στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.
+	  Μπορείτε φυσικά να προσαρμόσετε αυτή τη διαδικασία σύμφωνα με τις
+	  ανάγκες σας.</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Για να απλοποιήσουμε, όσο είναι δυνατόν, τη διαδικασία, θα
+	χρησιμοποιήσουμε το <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> για να
+	δημιουργήσουμε τις κατατμήσεις που απαιτούνται για το journaling.
+	Ωστόσο, κατά τη διάρκεια της εγκατάστασης, το
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> επιμένει να ρωτάει για σημεία
+	προσάρτησης σε κάθε κατάτμηση που δημιουργείται.  Στο σημείο αυτό,
+	δεν υπάρχουν σημεία προσάρτησης για τις κατατμήσεις μας, και στην
+	πραγματικότητα <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">δεν τα χρειαζόμαστε καν</emphasis>.  Οι
+	κατατμήσεις που χρησιμοποιούνται για τα ημερολόγια, δεν προσαρτώνται
+	κάπου.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Για να αποφύγουμε αυτά τα προβλήματα με το
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>, θα δημιουργήσουμε αυτές τις
+	κατατμήσεις ως χώρο swap.  Στο swap δεν γίνεται ποτέ προσάρτηση,
+	ενώ και το <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> δεν έχει κανένα
+	πρόβλημα να δημιουργήσει όσες τέτοιες κατατμήσεις χρειαζόμαστε.  Μετά
+	την πρώτη εκκίνηση, θα πρέπει ωστόσο να επεξεργαστούμε το αρχείο
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> και να αφαιρέσουμε τις έξτρα
+	καταχωρήσεις swap που δημιουργήθηκαν κατά την εγκατάσταση.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Για να δημιουργήσετε τους χώρους swap, χρησιμοποιήστε πάλι τα
+	πλήκτρα με τα βελάκια για να
+	μετακινήσετε την μπάρα επιλογής στο άνω μέρος της οθόνης του
+	επεξεργαστή <application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application>, έτσι ώστε να είναι
+	επιλεγμένο το όνομα του σκληρού δίσκου.  Κατόπιν, πιέστε
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">N</keycap>, δώστε το επιθυμητό μέγεθος
+	(<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">1024M</replaceable>), και επιλέξτε
+	<quote xmlns:xlink="http://www.w3.org/1999/xlink">swap space</quote> από το μενού που εμφανίζεται.  Επαναλάβετε
+	για κάθε ημερολόγιο που επιθυμείτε να δημιουργήσετε.  Στο παράδειγμα
+	μας, δημιουργούμε δύο κατατμήσεις στις οποίες θα αποθηκεύονται τα
+	ημερολόγια των <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> και
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.  Το τελικό αποτέλεσμα φαίνεται στην
+	παρακάτω εικόνα:</para>
+
+      <mediaobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	<imageobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <imagedata fileref="disklabel2"/>
+	</imageobject>
+      </mediaobject>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Μόλις ολοκληρώσετε τη δημιουργία των κατατμήσεων, σας συνιστούμε
+	να σημειώσετε τα ονόματα τους και τα σημεία προσάρτησης για να τα
+	έχετε πρόχειρα κατά τη φάση των ρυθμίσεων.  Με τον τρόπο αυτό θα
+	αποφύγετε τυχόν λάθη που μπορεί να καταστρέψουν την εγκατάσταση σας.
+	Ο παρακάτω πίνακας δείχνει τις σημειώσεις μας για το παράδειγμα
+	μας:</para>
+
+      <table xmlns:xlink="http://www.w3.org/1999/xlink" pgwide="1">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Κατατμήσεις και Ημερολόγια</title>
+	<tgroup xmlns:xlink="http://www.w3.org/1999/xlink" cols="3">
+	<thead xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Κατάτμηση</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Σημείο Προσάρτησης</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Ημερολόγιο</entry>
+	  </row>
+	</thead>
+
+	<tbody xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">/var</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1h</entry>
+	  </row>
+
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">/usr</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1g</entry>
+	  </row>
+	</tbody>
+	</tgroup>
+      </table>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Συνεχίστε την εγκατάσταση όπως συνήθως.  Σας συνιστούμε ωστόσο να
+	μην εγκαταστήσετε εφαρμογές (πακέτα) μέχρι να ολοκληρώσετε τη
+	διαδικασία του journaling.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="first-boot">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Πρώτη Εκκίνηση</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Το σύστημα σας θα ξεκινήσει φυσιολογικά, αλλά θα χρειαστεί να
+	επεξεργαστείτε το <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> και να διαγράψετε
+	τις καταχωρήσεις για τις κατατμήσεις swap που θα χρησιμοποιηθούν στα
+	ημερολόγια.  Φυσιολογικά, η κατάτμηση που χρησιμοποιείται ως κανονικό
+	swap τελειώνει με το γράμμα <quote xmlns:xlink="http://www.w3.org/1999/xlink">b</quote> (π.χ.  ad0s1b στο
+	παράδειγμα μας).  Διαγράψτε όλες τις άλλες καταχωρήσεις για το swap
+	και επανεκκινήστε το σύστημα σας, ώστε να σταματήσει το FreeBSD να τις
+	χρησιμοποιεί.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Μόλις το σύστημα εκκινήσει ξανά, θα είμαστε έτοιμοι να ρυθμίσουμε
+	το journaling.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="configure-journal">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Ρύθμιση του Journaling</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="running-gjournal">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Εκτέλεση της Εντολής <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Έχοντας προετοιμάσει όλες τις απαραίτητες κατατμήσεις, είναι
+	σχετικά απλό να ρυθμίσουμε το journaling.  Θα πρέπει να μεταβούμε σε
+	κατάσταση ενός χρήστη, για το λόγο αυτό εισέλθετε στο σύστημα ως
+	<systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> και γράψτε:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">shutdown now</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Πιέστε <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap> για να βγείτε στο προεπιλεγμένο
+	κέλυφος.  Θα πρέπει να αποπροσαρτήσουμε τις κατατμήσεις στις οποίες
+	θα γίνει το journaling, στο παράδειγμα μας τις
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> και <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">umount /usr /var</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Φορτώστε το άρθρωμα του πυρήνα που απαιτείται για το
+	journaling:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal load</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Χρησιμοποιήστε τώρα τις σημειώσεις σας για να καθορίσετε
+	ποια κατάτμηση χρησιμοποιείται για κάθε ημερολόγιο.  Στο
+	παράδειγμα μας, το <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> βρίσκεται στο
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f</filename> και το ημερολόγιο του
+	θα είναι στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1g</filename>, ενώ το
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> είναι στο
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d</filename> και το ημερολόγιο του
+	θα είναι στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1h</filename>.  Θα
+	χρειαστείτε τις παρακάτω εντολές:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad0s1f ad0s1g</userinput>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad0s1d ad0s1h</userinput>
+
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.</screen>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Αν ο τελευταίος τομέας κάποιας από τις κατατμήσεις είναι σε
+	  χρήση, η εντολή <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> θα σας επιστρέψει ένα
+	  μήνυμα λάθους.  Θα πρέπει να εκτελέσετε την εντολή χρησιμοποιώντας
+	  την παράμετρο <option xmlns:xlink="http://www.w3.org/1999/xlink">-f</option> με την οποία θα υποχρεώσετε την
+	  επανεγγραφή του τομέα, π.χ.:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label -f ad0s1d ad0s1h</userinput></screen>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Μια που πρόκειται για νέα εγκατάσταση, είναι μάλλον απίθανο
+	  να προκαλέσετε κάποιο πρόβλημα.</para></note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Στο σημείο αυτό δημιουργούνται δύο νέες συσκευές, οι
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d.journal</filename> και
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f.journal</filename>.  Αυτές
+	αντιπροσωπεύουν τις κατατμήσεις
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> και <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>
+	που θα πρέπει να προσαρτήσουμε.  Πριν τις προσαρτήσουμε ωστόσο,
+	θα πρέπει να θέσουμε την επιλογή journal και να αναιρέσουμε την
+	επιλογή Soft Updates:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J enable -n disable ad0s1d.journal</userinput>
+
+tunefs: gjournal set
+tunefs: soft updates cleared
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J enable -n disable ad0s1f.journal</userinput>
+
+tunefs: gjournal set
+tunefs: soft updates cleared</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Προσαρτήστε τώρα χειροκίνητα τις νέες συσκευές στα αντίστοιχα
+	σημεία προσάρτησης (σημειώστε ότι μπορούμε πλέον να χρησιμοποιήσουμε
+	την επιλογή <option xmlns:xlink="http://www.w3.org/1999/xlink">async</option> κατά την προσάρτηση):</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o async /dev/ad0s1d.journal /var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o async /dev/ad0s1f.journal /usr</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Επεξεργαστείτε το αρχείο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> και
+	ανανεώστε τις καταχωρήσεις για τις κατατμήσεις
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> και <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f.journal     /usr            ufs     rw,async      2       2
+/dev/ad0s1d.journal     /var            ufs     rw,async      2       2</programlisting>
+
+      <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Βεβαιωθείτε ότι οι παραπάνω καταχωρήσεις είναι σωστές,
+	  διαφορετικά θα έχετε πρόβλημα να εκκινήσετε κανονικά στην επόμενη
+	  επανεκκίνηση του συστήματος σας.</para>
+      </warning>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Τέλος, επεξεργαστείτε το αρχείο
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> και προσθέστε την ακόλουθη
+	γραμμή ώστε να φορτώνεται το άρθρωμα <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> σε κάθε
+	εκκίνηση:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load="YES"</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Συγχαρητήρια! Το σύστημα σας είναι τώρα έτοιμο για journaling.
+	Μπορείτε να γράψετε <userinput xmlns:xlink="http://www.w3.org/1999/xlink">exit</userinput> για να επιστρέψετε
+	στην κανονική λειτουργία (πολλαπλών χρηστών) ή να επανεκκινήσετε το
+	σύστημα σας (συνίσταται) για να ελέγξετε τις ρυθμίσεις σας.  Κατά την
+	εκκίνηση, θα δείτε μηνύματα όπως το παρακάτω:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink">ad0: 76293MB XEC XE800JD-00HBC0 08.02D08 at ata0-master SATA150
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Μετά από ένα προβληματικό τερματισμό θα δείτε μηνύματα όπως το
+	παρακάτω:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink">GEOM_JOURNAL: Journal ad0s1d consistent.</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Αυτό συνήθως σημαίνει ότι το <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> χρησιμοποίησε τις
+	πληροφορίες του ημερολογίου για να επιστρέψει το σύστημα αρχείων
+	σε σταθερή κατάσταση.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="gjournal-new">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Χρήση του Journaling σε Νέες Κατατμήσεις</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Αν και η παραπάνω διαδικασία είναι απαραίτητη για να
+	χρησιμοποιήσετε journaling σε κατατμήσεις που έχουν ήδη δεδομένα, η
+	αντίστοιχη διαδικασία για νέες κατατμήσεις είναι πιο απλή.  Στην
+	περίπτωση αυτή, μπορεί να χρησιμοποιηθεί ο ίδιος παροχέας τόσο για
+	τα δεδομένα όσο και για το ημερολόγιο.  Για παράδειγμα, υποθέστε ότι
+	έχετε προσθέσει ένα νέο δίσκο και έχετε δημιουργήσει την κατάτμηση
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad1s1d</filename>.  Η δημιουργία του
+	ημερολογίου είναι αρκετά απλή και φαίνεται παρακάτω:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad1s1d</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Το προεπιλεγμένο μέγεθος του ημερολογίου είναι 1 GB.
+	Μπορείτε ωστόσο να το ρυθμίσετε χρησιμοποιώντας την επιλογή
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">-s</option>.  Μπορείτε να δώσετε τιμές σε bytes, ή να βάλετε
+	μετά την τιμή ένα από τα γράμματα <literal xmlns:xlink="http://www.w3.org/1999/xlink">K</literal>,
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">M</literal> ή <literal xmlns:xlink="http://www.w3.org/1999/xlink">G</literal> για να δηλώσετε
+	Kilobytes, Megabytes ή Gigabytes αντίστοιχα.  Σημειώστε ότι η εντολή
+	<command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command>, δεν θα σας επιτρέψει να δημιουργήσετε
+	ημερολόγιο που να είναι ακατάλληλο λόγω μικρού μεγέθους.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Για παράδειγμα, για να δημιουργήσετε ένα ημερολόγιο μεγέθους
+	2 GB, μπορείτε να χρησιμοποιήσετε την ακόλουθη εντολή:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label -s 2G ad1s1d</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Μπορείτε έπειτα να δημιουργήσετε ένα σύστημα αρχείων στη νέα σας
+	κατάτμηση, και ταυτόχρονα να ενεργοποιήσετε το journaling,
+	χρησιμοποιώντας την επιλογή <option xmlns:xlink="http://www.w3.org/1999/xlink">-J</option>:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs -J /dev/ad1s1d.journal</userinput></screen>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="configure-kernel">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Ενσωμάτωση του Journaling σε Προσαρμοσμένο Πυρήνα</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Αν δεν θέλετε να φορτώσετε το <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal> ως
+	άρθρωμα, μπορείτε να ενσωματώσετε τις λειτουργίες του στον
+	προσαρμοσμένο πυρήνα σας.  Επεξεργαστείτε το αρχείο ρυθμίσεων του
+	πυρήνα, και βεβαιωθείτε ότι περιλαμβάνει τις ακόλουθες δύο
+	γραμμές:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options UFS_GJOURNAL # Σημείωση: η επιλογή αυτή υπάρχει στο GENERIC
+
+options GEOM_JOURNAL # Θα πρέπει να προσθέσετε αυτή τη γραμμή</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Μεταγλωττίστε και επανεγκαταστήστε τον πυρήνα σας χρησιμοποιώντας
+	τις σχετικές
+	<link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/el_GR.ISO8859-7/books/handbook/kernelconfig.html">οδηγίες στο Εγχειρίδιο του FreeBSD.</link></para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Μην ξεχάσετε να αφαιρέσετε την αντίστοιχη καταχώρηση
+	<quote xmlns:xlink="http://www.w3.org/1999/xlink">load</quote> από το αρχείο
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> αν την είχατε χρησιμοποιήσει
+	προηγουμένως.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="troubleshooting-gjournal">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Αντιμετώπιση Προβλημάτων</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Το ακόλουθο τμήμα καλύπτει συχνές ερωτήσεις σχετικά με προβλήματα
+      που μπορείτε να συναντήσετε στην υλοποίηση του jounaling.</para>
+
+    <qandaset xmlns:xlink="http://www.w3.org/1999/xlink">
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernel-panic">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Κατά τη διάρκεια έντονης χρήσης του δίσκου, το σύστημα μου
+	    σταματάει με kernel panic.  Υπάρχει περίπτωση αυτό να σχετίζεται
+	    με το journaling;</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Είναι πιθανό το ημερολόγιο να γεμίζει πριν προλάβουν τα
+	    προηγούμενα δεδομένα του να μεταφερθούν στο σύστημα αρχείων.  Θα
+	    πρέπει να θυμάστε ότι το μέγεθος του ημερολογίου δεν εξαρτάται
+	    από το μέγεθος του παροχέα δεδομένων, αλλά από το φόρτο εργασίας
+	    του.  Αν η δραστηριότητα του δίσκου σας είναι υψηλή, θα
+	    χρειαστείτε μεγαλύτερο μέγεθος για την κατάτμηση του
+	    ημερολογίου.  Δείτε τη σχετική σημείωση στην ενότητα <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="understanding-journaling">Κατανόηση του Journaling</link>.</para>
+	</answer>
+      </qandaentry>
+
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="unable-boot">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Έκανα κάποιο λάθος στις ρυθμίσεις, και δεν μπορώ πλέον να
+	    ξεκινήσω κανονικά το σύστημα μου.  Υπάρχει τρόπος να το
+	    διορθώσω;</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Πιθανόν ξεχάσατε να προσθέσετε (ή έχετε κάνει λάθος) την
+	    καταχώρηση στο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>, ή ίσως
+	    υπάρχει λάθος στο αρχείο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>.  Τα
+	    λάθη αυτά συνήθως διορθώνονται εύκολα.
+	    Πιέστε <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap> για να ξεκινήσετε το προεπιλεγμένο
+	    κέλυφος λειτουργίας ενός χρήστη.  Μετά εντοπίστε την πηγή του
+	    προβλήματος:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cat /boot/loader.conf</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Αν λείπει ή υπάρχει λάθος στην καταχώρηση
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load</literal>, οι αντίστοιχες συσκευές
+	    δεν δημιουργούνται καν.  Μπορείτε να φορτώσετε το άρθρωμα
+	    χειροκίνητα, να προσαρτήσετε όλες τις κατατμήσεις, και να
+	    συνεχίσετε με την κανονική εκκίνηση:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal load</userinput>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -a</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">exit</userinput>
+<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">(η εκκίνηση συνεχίζεται)</emphasis></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Αν ωστόσο η καταχώρηση αυτή είναι σωστή, ρίξτε μια ματιά
+	    στο αρχείο <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>.  Το πιο πιθανό είναι
+	    να βρείτε ότι κάποια καταχώρηση λείπει, ή είναι λάθος.
+	    Στην περίπτωση αυτή, προσαρτήστε χειροκίνητα όλες τις κατατμήσεις
+	    και συνεχίστε την εκκίνηση κανονικά.</para>
+	</answer>
+      </qandaentry>
+
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="remove-journaling">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Μπορώ να καταργήσω το journaling και να επιστρέψω στο
+	    κανονικό σύστημα αρχείων με τα Soft Updates;</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Βέβαια.  Χρησιμοποιήστε την ακόλουθη διαδικασία η οποία
+	    αναιρεί τις αλλαγές.  Μπορείτε έπειτα να χρησιμοποιήσετε τις
+	    κατατμήσεις των ημερολογίων για άλλο σκοπό, εφόσον το
+	    επιθυμείτε.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Εισέλθετε ως <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> και μεταβείτε σε
+	    κατάσταση ενός χρήστη:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">shutdown now</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Αποπροσαρτήστε τις κατατμήσεις που χρησιμοποιούν
+	    journaling:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">umount /usr /var</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Συγχρονίστε τα ημερολόγια:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal sync</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Σταματήστε τους παροχείς ημερολογίου:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal stop ad0s1d.journal</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal stop ad0s1f.journal</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Διαγράψτε τα metadata του journaling από όλες τις συσκευές
+	    που χρησιμοποιήσατε:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1d</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1f</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1g</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1h</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Αναιρέστε την επιλογή του journaling, και θέστε ξανά την
+	    επιλογή για Soft Updates:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J disable -n enable ad0s1d</userinput>
+
+tunefs: gjournal cleared
+tunefs: soft updates set
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs-J disable -n enable ad0s1f</userinput>
+
+tunefs: gjournal cleared
+tunefs: soft updates set</screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Προσαρτήστε χειροκίνητα τις κανονικές κατατμήσεις:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o rw /dev/ad0s1d  /var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o rw /dev/ad0s1f  /usr</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Επεξεργαστείτε το <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> και
+	    επαναφέρατε τις προηγούμενες ρυθμίσεις:</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f     /usr            ufs     rw      2       2
+/dev/ad0s1d     /var            ufs     rw      2       2</programlisting>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Τέλος, επεξεργαστείτε το αρχείο
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>, αφαιρέστε την καταχώρηση
+	    που φορτώνει το άρθρωμα <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal> και
+	    επανεκκινήστε το σύστημα σας.</para>
+
+	</answer>
+      </qandaentry>
+    </qandaset>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="further-reading">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Επιπλέον Πληροφορίες</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Το journaling είναι μια σχετικά νέα δυνατότητα του FreeBSD, και έτσι
+      δεν είναι ακόμα καλά τεκμηριωμένη.  Ίσως όμως να βρείτε χρήσιμες
+      πληροφορίες στις παρακάτω αναφορές:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Υπάρχει ένα <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/el_GR.ISO8859-7/books/handbook/geom-gjournal.html">νέο τμήμα για το journaling</link>
+	  στο Εγχειρίδιο του FreeBSD.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.freebsd.org/pipermail/freebsd-current/2006-June/064043.html">Αυτή η δημοσίευση</link> στη λίστα
+	  <link xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current">freebsd-current</link> από τον δημιουργό του <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>, Pawel Jakub Dawidek.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.freebsd.org/pipermail/freebsd-questions/2008-April/173501.html">Αυτή η δημοσίευση</link> στη λίστα
+	  <link xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-questions">freebsd-questions</link> από τον Ivan Voras.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Οι σελίδες manual του <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> και <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+</article>

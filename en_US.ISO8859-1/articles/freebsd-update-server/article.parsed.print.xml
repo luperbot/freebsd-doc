@@ -1,0 +1,825 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info>
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Build Your Own FreeBSD Update Server</title>
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink">
+      <personname xmlns:xlink="http://www.w3.org/1999/xlink">
+	<firstname xmlns:xlink="http://www.w3.org/1999/xlink">Jason</firstname>
+	<surname xmlns:xlink="http://www.w3.org/1999/xlink">Helfman</surname>
+      </personname>
+      <affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink">Jason Helfman <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">jgh@FreeBSD.org</email></address>
+      </affiliation>
+    </author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2009</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2010</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2011</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2013</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink" role="mailto:jgh@FreeBSD.org">Jason Helfman</holder>
+    </copyright>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <quote xmlns:xlink="http://www.w3.org/1999/xlink">&#8482;</quote> or the
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">®</quote> symbol.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Intel, Celeron, Centrino, Core, EtherExpress, i386,
+  i486, Itanium, Pentium, and Xeon are trademarks or registered
+  trademarks of Intel Corporation or its subsidiaries in the United
+  States and other countries.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">AMD, AMD Athlon,
+  AMD Opteron, AMD Phenom, AMD Sempron, AMD Turion, Athlon, Élan, Opteron, and PCnet are
+  trademarks of Advanced Micro Devices, Inc.</para>
+    </legalnotice>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This article describes building an internal <application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application>.
+	The <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://svnweb.freebsd.org/base/user/cperciva/freebsd-update-build/">freebsd-update-server</link>
+	is written by Colin Percival <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">cperciva@FreeBSD.org</email>, Security Officer Emeritus of
+	FreeBSD.  For users that think it is convenient to update their
+	systems against an official update server, building their own
+	<application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application> may help to extend its functionality by supporting
+	manually-tweaked FreeBSD releases or by providing a local mirror
+	that will allow faster updates for a number of
+	machines.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="acknowledgments">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Acknowledgments</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This article was subsequently printed at <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://bsdmag.org/magazine/1021-bsd-as-a-desktop">BSD
+	Magazine</link>.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="introduction">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Introduction</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Experienced users or administrators are often responsible
+      for several machines or environments.  They understand the
+      difficult demands and challenges of maintaining such an
+      infrastructure.  Running a <application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application> makes it easier to deploy
+      security and software patches to selected test machines before
+      rolling them out to production.  It also means a number of
+      systems can be updated from the local network rather than a
+      potentially slower Internet connection.  This article outlines
+      the steps involved in creating an internal
+      <application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application>.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="prerequisites">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Prerequisites</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">To build an internal <application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application> some requirements should be
+      met.</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A running FreeBSD system.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">At a minimum, updates require building on a FreeBSD
+	    release greater than or equal to the target release
+	    version for distribution.</para>
+	</note>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A user account with at least 4 GB of available
+	  space.  This will allow the creation of updates for 7.1 and
+	  7.2, but the exact space requirements may change from
+	  version to version.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">An <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> account on a remote machine to upload
+	  distributed updates.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A web server, like <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/network-apache.html">Apache</link>,
+	  with over half of the space required for the build.  For
+	  instance, test builds for 7.1 and 7.2 consume a total amount
+	  of 4 GB, and the webserver space needed to distribute
+	  these updates is
+	  2.6 GB.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Basic knowledge of shell scripting with Bourne shell,
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>.</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="Configuration">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Configuration: Installation &amp; Setup</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Download the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://svnweb.freebsd.org/base/user/cperciva/freebsd-update-build/">
+	freebsd-update-server</link> software by installing
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">devel/subversion</package>, and execute:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">svn co
+	http://svn.freebsd.org/base/user/cperciva/freebsd-update-build
+	freebsd-update-server</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Update <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/build.conf</filename>
+      appropriately.  It is sourced during all build
+      operations.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Here is the default <filename xmlns:xlink="http://www.w3.org/1999/xlink">build.conf</filename>, which
+      should be modified to suit your environment.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink"># Main configuration file for FreeBSD Update builds.  The
+# release-specific configuration data is lower down in
+# the scripts tree.
+
+# Location from which to fetch releases
+export FTP=ftp://ftp2.freebsd.org/pub/FreeBSD/releases<co xml:id="ftp-id"/>
+
+# Host platform
+export HOSTPLATFORM=`uname -m`
+
+# Host name to use inside jails
+export BUILDHOSTNAME=${HOSTPLATFORM}-builder.daemonology.net<co xml:id="buildhost-id"/>
+
+# Location of SSH key
+export SSHKEY=/root/.ssh/id_dsa<co xml:id="sshkey-id"/>
+
+# SSH account into which files are uploaded
+MASTERACCT=builder@wadham.daemonology.net<co xml:id="mstacct-id"/>
+
+# Directory into which files are uploaded
+MASTERDIR=update-master.freebsd.org<co xml:id="mstdir-id"/></programlisting>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Parameters for consideration would be:</para>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="ftp-id">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This is the location where ISO images are downloaded
+	  from (by the <function xmlns:xlink="http://www.w3.org/1999/xlink">fetchiso()</function> subroutine of
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/build.subr</filename>).  The location
+	  configured is not limited to FTP URIs.  Any URI scheme
+	  supported by standard <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">fetch</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> utility should work
+	  fine.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Customizations to the <function xmlns:xlink="http://www.w3.org/1999/xlink">fetchiso()</function>
+	  code can be installed by copying the default
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">build.subr</filename> script to the release and
+	  architecture-specific area at
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/RELEASE/ARCHITECTURE/build.subr</filename>
+	  and applying local changes.</para>
+      </callout>
+
+      <callout arearefs="buildhost-id">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The name of the build host.  This information will be
+	  displayed on updated systems when issuing:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">uname -v</userinput></screen>
+      </callout>
+
+      <callout arearefs="sshkey-id">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> key for uploading
+	  files to the update server.  A key pair can be created by
+	  typing <command xmlns:xlink="http://www.w3.org/1999/xlink">ssh-keygen -t dsa</command>.  This parameter
+	  is optional; standard password authentication will be used
+	  as a fallback authentication method when
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">SSHKEY</literal> is not defined.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh-keygen</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> manual page has more detailed
+	  information about <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> and the
+	  appropriate steps for creating and using one.</para>
+      </callout>
+
+      <callout arearefs="mstacct-id">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Account for uploading files to the update server.</para>
+      </callout>
+
+      <callout arearefs="mstdir-id">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Directory on the update server where files are uploaded
+	  to.</para>
+      </callout>
+    </calloutlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The default <filename xmlns:xlink="http://www.w3.org/1999/xlink">build.conf</filename> shipped with the
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">freebsd-update-server</application> sources is
+      suitable for building i386 releases of FreeBSD.  As an
+      example of building an update server for other architectures,
+      the following steps outline the configuration changes needed for
+      amd64:</para>
+
+    <procedure xmlns:xlink="http://www.w3.org/1999/xlink">
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Create a build environment for amd64:</para>
+
+	<informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir -p /usr/local/freebsd-update-server/scripts/7.2-RELEASE/amd64</userinput></screen>
+	</informalexample>
+      </step>
+
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Install a <filename xmlns:xlink="http://www.w3.org/1999/xlink">build.conf</filename> in the newly
+	  created build directory.  The build configuration options
+	  for FreeBSD 7.2-RELEASE on amd64 should be similar
+	  to:</para>
+
+	<informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink"># SHA256 hash of RELEASE disc1.iso image.
+export RELH=1ea1f6f652d7c5f5eab7ef9f8edbed50cb664b08ed761850f95f48e86cc71ef5<co xml:id="sha256-id"/>
+
+# Components of the world, source, and kernels
+export WORLDPARTS="base catpages dict doc games info manpages proflibs lib32"
+export SOURCEPARTS="base bin contrib crypto etc games gnu include krb5  \
+                lib libexec release rescue sbin secure share sys tools  \
+                ubin usbin cddl"
+export KERNELPARTS="generic"
+
+# EOL date
+export EOL=1275289200<co xml:id="eol-id"/></programlisting>
+	</informalexample>
+
+	<calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <callout arearefs="sha256-id">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">The <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sha256</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> hash key for the desired release,
+	      is published within the respective <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/releases/">release
+		announcement</link>.</para>
+	  </callout>
+
+	  <callout arearefs="eol-id">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">To generate the "End of Life" number for
+	      <filename xmlns:xlink="http://www.w3.org/1999/xlink">build.conf</filename>, refer to the "Estimated
+	      EOL" posted on the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/security/security.html">FreeBSD
+		Security Website</link>.  The value of
+	      <literal xmlns:xlink="http://www.w3.org/1999/xlink">EOL</literal> can be derived from the date
+	      listed on the web site, using the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">date</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> utility,
+	      for example:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">date -j -f '%Y%m%d-%H%M%S' '20090401-000000' '+%s'</userinput></screen>
+	  </callout>
+	</calloutlist>
+      </step>
+    </procedure>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="build">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Building Update Code</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The first step is to run
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/make.sh</filename>.  This will build some
+      binaries, create directories, and generate an RSA signing key
+      used for approving builds.  In this step, a passphrase will have
+      to be supplied for the final creation of the signing key.</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/make.sh</userinput>
+cc -O2 -fno-strict-aliasing -pipe   findstamps.c  -o findstamps
+findstamps.c: In function 'usage':
+findstamps.c:45: warning: incompatible implicit declaration of built-in function 'exit'
+cc -O2 -fno-strict-aliasing -pipe   unstamp.c  -o unstamp
+install findstamps ../bin
+install unstamp ../bin
+rm -f findstamps unstamp
+Generating RSA private key, 4096 bit long modulus
+................................................................................++
+...................++
+e is 65537 (0x10001)
+
+Public key fingerprint:
+27ef53e48dc869eea6c3136091cc6ab8589f967559824779e855d58a2294de9e
+
+Encrypting signing key for root
+enter aes-256-cbc encryption password:
+Verifying - enter aes-256-cbc encryption password:</screen>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Keep a note of the generated key fingerprint.  This value
+	is required in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/freebsd-update.conf</filename>
+	for binary updates.</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">At this point, we are ready to stage a build.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/init.sh <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">amd64 7.2-RELEASE</replaceable></userinput></screen>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">What follows is a sample of an <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">initial</emphasis>
+      build run.</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/init.sh amd64 7.2-RELEASE</userinput>
+Mon Aug 24 16:04:36 PDT 2009 Starting fetch for FreeBSD/amd64 7.2-RELEASE
+/usr/local/freebsd-update-server/work/7.2-RELE100% of  588 MB  359 kBps 00m00s
+Mon Aug 24 16:32:38 PDT 2009 Verifying disc1 hash for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 16:32:44 PDT 2009 Extracting components for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 16:34:05 PDT 2009 Constructing world+src image for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 16:35:57 PDT 2009 Extracting world+src for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 23:36:24 UTC 2009 Building world for FreeBSD/amd64 7.2-RELEASE
+Tue Aug 25 00:31:29 UTC 2009 Distributing world for FreeBSD/amd64 7.2-RELEASE
+Tue Aug 25 00:32:36 UTC 2009 Building and distributing kernels for FreeBSD/amd64 7.2-RELEASE
+Tue Aug 25 00:44:44 UTC 2009 Constructing world components for FreeBSD/amd64 7.2-RELEASE
+Tue Aug 25 00:44:56 UTC 2009 Distributing source for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 17:46:18 PDT 2009 Moving components into staging area for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 17:46:33 PDT 2009 Identifying extra documentation for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 17:47:13 PDT 2009 Extracting extra docs for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 17:47:18 PDT 2009 Indexing release for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 17:50:44 PDT 2009 Indexing world0 for FreeBSD/amd64 7.2-RELEASE
+
+Files built but not released:
+Files released but not built:
+Files which differ by more than contents:
+Files which differ between release and build:
+kernel|generic|/GENERIC/hptrr.ko
+kernel|generic|/GENERIC/kernel
+src|sys|/sys/conf/newvers.sh
+world|base|/boot/loader
+world|base|/boot/pxeboot
+world|base|/etc/mail/freebsd.cf
+world|base|/etc/mail/freebsd.submit.cf
+world|base|/etc/mail/sendmail.cf
+world|base|/etc/mail/submit.cf
+world|base|/lib/libcrypto.so.5
+world|base|/usr/bin/ntpq
+world|base|/usr/lib/libalias.a
+world|base|/usr/lib/libalias_cuseeme.a
+world|base|/usr/lib/libalias_dummy.a
+world|base|/usr/lib/libalias_ftp.a
+...</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Then the build of the world is performed again, with world
+      patches.  A more detailed explanation may be found
+      in <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/build.subr</filename>.</para>
+
+    <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">During this second build cycle, the network time protocol
+	daemon, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ntpd</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>, is turned off.  Per Colin Percival <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">cperciva@FreeBSD.org</email>,
+	Security Officer Emeritus of FreeBSD, "the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://svnweb.freebsd.org/base/user/cperciva/freebsd-update-build/">freebsd-update-server</link>
+	build code needs to identify timestamps which are stored in
+	files so that they can be ignored when comparing builds to
+	determine which files need to be updated.  This
+	timestamp-finding works by doing two builds 400 days apart and
+	comparing the results."</para>
+    </warning>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink">Mon Aug 24 17:54:07 PDT 2009 Extracting world+src for FreeBSD/amd64 7.2-RELEASE
+Wed Sep 29 00:54:34 UTC 2010 Building world for FreeBSD/amd64 7.2-RELEASE
+Wed Sep 29 01:49:42 UTC 2010 Distributing world for FreeBSD/amd64 7.2-RELEASE
+Wed Sep 29 01:50:50 UTC 2010 Building and distributing kernels for FreeBSD/amd64 7.2-RELEASE
+Wed Sep 29 02:02:56 UTC 2010 Constructing world components for FreeBSD/amd64 7.2-RELEASE
+Wed Sep 29 02:03:08 UTC 2010 Distributing source for FreeBSD/amd64 7.2-RELEASE
+Tue Sep 28 19:04:31 PDT 2010 Moving components into staging area for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 19:04:46 PDT 2009 Extracting extra docs for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 19:04:51 PDT 2009 Indexing world1 for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 19:08:04 PDT 2009 Locating build stamps for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 19:10:19 PDT 2009 Cleaning staging area for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 19:10:19 PDT 2009 Preparing to copy files into staging area for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 19:10:20 PDT 2009 Copying data files into staging area for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 12:16:57 PDT 2009 Copying metadata files into staging area for FreeBSD/amd64 7.2-RELEASE
+Mon Aug 24 12:16:59 PDT 2009 Constructing metadata index and tag for FreeBSD/amd64 7.2-RELEASE
+
+Files found which include build stamps:
+kernel|generic|/GENERIC/hptrr.ko
+kernel|generic|/GENERIC/kernel
+world|base|/boot/loader
+world|base|/boot/pxeboot
+world|base|/etc/mail/freebsd.cf
+world|base|/etc/mail/freebsd.submit.cf
+world|base|/etc/mail/sendmail.cf
+world|base|/etc/mail/submit.cf
+world|base|/lib/libcrypto.so.5
+world|base|/usr/bin/ntpq
+world|base|/usr/include/osreldate.h
+world|base|/usr/lib/libalias.a
+world|base|/usr/lib/libalias_cuseeme.a
+world|base|/usr/lib/libalias_dummy.a
+world|base|/usr/lib/libalias_ftp.a
+...</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Finally, the build completes.</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink">Values of build stamps, excluding library archive headers:
+v1.2 (Aug 25 2009 00:40:36)
+v1.2 (Aug 25 2009 00:38:22)
+@(#)FreeBSD 7.2-RELEASE #0: Tue Aug 25 00:38:29 UTC 2009
+FreeBSD 7.2-RELEASE #0: Tue Aug 25 00:38:29 UTC 2009
+    root@server.myhost.com:/usr/obj/usr/src/sys/GENERIC
+7.2-RELEASE
+Mon Aug 24 23:55:25 UTC 2009
+Mon Aug 24 23:55:25 UTC 2009
+##### built by root@server.myhost.com on Tue Aug 25 00:16:15 UTC 2009
+##### built by root@server.myhost.com on Tue Aug 25 00:16:15 UTC 2009
+##### built by root@server.myhost.com on Tue Aug 25 00:16:15 UTC 2009
+##### built by root@server.myhost.com on Tue Aug 25 00:16:15 UTC 2009
+Mon Aug 24 23:46:47 UTC 2009
+ntpq 4.2.4p5-a Mon Aug 24 23:55:53 UTC 2009 (1)
+ * Copyright (c) 1992-2009 The FreeBSD Project.
+Mon Aug 24 23:46:47 UTC 2009
+Mon Aug 24 23:55:40 UTC 2009
+Aug 25 2009
+ntpd 4.2.4p5-a Mon Aug 24 23:55:52 UTC 2009 (1)
+ntpdate 4.2.4p5-a Mon Aug 24 23:55:53 UTC 2009 (1)
+ntpdc 4.2.4p5-a Mon Aug 24 23:55:53 UTC 2009 (1)
+Tue Aug 25 00:21:21 UTC 2009
+Tue Aug 25 00:21:21 UTC 2009
+Tue Aug 25 00:21:21 UTC 2009
+Mon Aug 24 23:46:47 UTC 2009
+
+FreeBSD/amd64 7.2-RELEASE initialization build complete.  Please
+review the list of build stamps printed above to confirm that
+they look sensible, then run
+# sh -e approve.sh amd64 7.2-RELEASE
+to sign the release.</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Approve the build if everything is correct.  More
+      information on determining this can be found in the distributed
+      source file named <filename xmlns:xlink="http://www.w3.org/1999/xlink">USAGE</filename>.  Execute
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/approve.sh</filename>, as directed.  This will
+      sign the release, and move components into a staging area
+      suitable for uploading.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/mountkey.sh</userinput></screen>
+    </informalexample>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh -e scripts/approve.sh amd64 7.2-RELEASE</userinput>
+Wed Aug 26 12:50:06 PDT 2009 Signing build for FreeBSD/amd64 7.2-RELEASE
+Wed Aug 26 12:50:06 PDT 2009 Copying files to patch source directories for FreeBSD/amd64 7.2-RELEASE
+Wed Aug 26 12:50:06 PDT 2009 Copying files to upload staging area for FreeBSD/amd64 7.2-RELEASE
+Wed Aug 26 12:50:07 PDT 2009 Updating databases for FreeBSD/amd64 7.2-RELEASE
+Wed Aug 26 12:50:07 PDT 2009 Cleaning staging area for FreeBSD/amd64 7.2-RELEASE</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">After the approval process is complete, the upload procedure
+      may be started.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/upload.sh <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">amd64 7.2-RELEASE</replaceable></userinput></screen>
+    </informalexample>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">In the event update code needs to be re-uploaded, this may
+	be done by changing to the public distributions directory for
+	the target release and updating attributes of the
+	<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">uploaded</emphasis> file.</para>
+
+      <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server/pub/<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">7.2-RELEASE/amd64</replaceable></userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">touch -t <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">200801010101.01</replaceable> uploaded</userinput></screen>
+      </informalexample>
+    </note>
+
+    <!-- If freebsd-update works with other http servers too, we should
+	 avoid making the instructions Apache-specific here. -->
+
+<!-- there are specific web instructions in the uploaded code that pertain to Apache. I believe it is worded fine here, now, and if others choose to use another web server, that is their choice to figure out -->
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The uploaded files will need to be in the document root of
+      the webserver in order for updates to be distributed.  The exact
+      configuration will vary depending on the web server used.  For
+      the <application xmlns:xlink="http://www.w3.org/1999/xlink">Apache</application> web server, please refer
+      to the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/network-apache.html">Configuration
+	of Apache servers</link> section in the Handbook.</para>
+
+    <!-- This note seems either out of place.  I find it hard to read and it
+	 is a bit difficult to understand why it is related to the rest of
+	 this section.  It looks like something that would fit nicely in an
+	 introductory section about the way a freebsd-update server works. -->
+    <!-- Agreed, it does not suite very well here.  But it is now included
+         above.  I think it can be removed now.  gabor -->
+    <!-- Taken out until we decide what to do with it -->
+
+<!-- Agreed. However, I believe the placement of this works fine as it is.
+    <note>
+      <para>Updates for the current release of the &os; system you are
+	updating, and what you want to upgrade <emphasis>to</emphasis> need
+	to be built in order for &os; Update Server to work properly.  This
+	is necessary for merging of files between releases.  For example, if
+	you are updating a system from &os; 7.1 to &os; 7.2, you will need
+	to have update code built for &os; 7.1-RELEASE and
+	&os; 7.2-RELEASE.</para>
+    </note> -->
+
+    <!-- What is a 'KeyPrint'? -->
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Update client's <literal xmlns:xlink="http://www.w3.org/1999/xlink">KeyPrint</literal> and
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">ServerName</literal> in
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/freebsd-update.conf</filename>, and perform
+      updates as instructed in the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/updating-upgrading-freebsdupdate.html">FreeBSD
+	Update</link>
+      <!-- One sentence, two instances of 'in'.  We can probably
+      reword this
+	   part to avoid repetition. -->
+      <!-- What about "place client's new keyprint and servername
+      values to
+	   freebsd-update.conf, ..."?  gabor --> section of the
+	   Handbook.</para>
+
+<!-- Sorry folks, but I disagree here. I believe it is worded fine. If anything, drop everything after "perform" and change "updates" to "FreeBSD Updates" and link that to the handbook -->
+
+    <important xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">In order for <application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application> to work properly, updates for both
+	the <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">current</emphasis> release and the release
+	<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">one wants to upgrade to</emphasis> need to be built.
+	This is necessary for determining the differences of files
+	between releases.  For example, when upgrading a FreeBSD system
+	from 7.1-RELEASE to 7.2-RELEASE, updates will need to be built
+	and uploaded to your distribution server for both
+	versions.</para>
+    </important>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">For reference, the entire run of <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="init.txt"><filename xmlns:xlink="http://www.w3.org/1999/xlink">init.sh</filename></link> is
+      attached.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="patch">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Building a Patch</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Every time a <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/security/advisories.html">security
+	advisory</link> or <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/security/notices.html">security
+	notice</link> is announced, a patch update can be
+      built.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">For this example, 7.1-RELEASE will be used.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">A couple of assumptions are made for a different release
+      build:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Setup the correct directory structure for the initial
+	  build.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Perform an initial build for 7.1-RELEASE.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Create the patch directory of the respective release under
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/freebsd-update-server/patches/</filename>.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir -p /usr/local/freebsd-update-server/patches/7.1-RELEASE/</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server/patches/7.1-RELEASE</userinput></screen>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">As an example, take the patch for <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">named</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  Read the
+      advisory, and grab the necessary file from <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/security/advisories.html">FreeBSD Security
+	Advisories</link>.  More information on interpreting the
+      advisory, can be found in the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/security-advisories.html">FreeBSD
+	Handbook</link>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">In the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://security.freebsd.org/advisories/FreeBSD-SA-09:12.bind.asc">security
+	brief</link>, this advisory is called
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">SA-09:12.bind</literal>.  After downloading the file,
+      it is required to rename the file to an appropriate patch level.
+      It is suggested to keep this consistent with official FreeBSD patch
+      levels, but its name may be freely chosen.  For this build, let
+      us follow the currently established practice of FreeBSD and call
+      this <literal xmlns:xlink="http://www.w3.org/1999/xlink">p7</literal>.  Rename the file:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server/patches/7.1-RELEASE/; mv bind.patch 7-SA-09:12.bind </userinput></screen>
+    </informalexample>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">When running a patch level build, it is assumed that
+	previous patches are in place.  When a patch build is run, it
+	will run all patches contained in the patch directory.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">There can be custom patches added to any build.  Use the
+	number zero, or any other number.</para>
+    </note>
+
+    <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">It is up to the administrator of the <application xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD Update Server</application> to take
+	appropriate measures to verify the authenticity of every
+	patch.</para>
+    </warning>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">At this point, a <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">diff</emphasis> is ready to be
+      built.  The software checks first to see if a
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/init.sh</filename> has been run on the
+      respective release prior to running the diff build.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/diff.sh <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">amd64 7.1-RELEASE 7</replaceable></userinput></screen>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">What follows is a sample of a
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">differential</emphasis> build run.</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh -e scripts/diff.sh amd64 7.1-RELEASE 7</userinput>
+Wed Aug 26 10:09:59 PDT 2009 Extracting world+src for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 17:10:25 UTC 2009 Building world for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 18:05:11 UTC 2009 Distributing world for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 18:06:16 UTC 2009 Building and distributing kernels for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 18:17:50 UTC 2009 Constructing world components for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 18:18:02 UTC 2009 Distributing source for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 11:19:23 PDT 2009 Moving components into staging area for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 11:19:37 PDT 2009 Extracting extra docs for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 11:19:42 PDT 2009 Indexing world0 for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 11:23:02 PDT 2009 Extracting world+src for FreeBSD/amd64 7.1-RELEASE-p7
+Thu Sep 30 18:23:29 UTC 2010 Building world for FreeBSD/amd64 7.1-RELEASE-p7
+Thu Sep 30 19:18:15 UTC 2010 Distributing world for FreeBSD/amd64 7.1-RELEASE-p7
+Thu Sep 30 19:19:18 UTC 2010 Building and distributing kernels for FreeBSD/amd64 7.1-RELEASE-p7
+Thu Sep 30 19:30:52 UTC 2010 Constructing world components for FreeBSD/amd64 7.1-RELEASE-p7
+Thu Sep 30 19:31:03 UTC 2010 Distributing source for FreeBSD/amd64 7.1-RELEASE-p7
+Thu Sep 30 12:32:25 PDT 2010 Moving components into staging area for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:32:39 PDT 2009 Extracting extra docs for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:32:43 PDT 2009 Indexing world1 for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:35:54 PDT 2009 Locating build stamps for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:36:58 PDT 2009 Reverting changes due to build stamps for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:37:14 PDT 2009 Cleaning staging area for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:37:14 PDT 2009 Preparing to copy files into staging area for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:37:15 PDT 2009 Copying data files into staging area for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:43:23 PDT 2009 Copying metadata files into staging area for FreeBSD/amd64 7.1-RELEASE-p7
+Wed Aug 26 12:43:25 PDT 2009 Constructing metadata index and tag for FreeBSD/amd64 7.1-RELEASE-p7
+...
+Files found which include build stamps:
+kernel|generic|/GENERIC/hptrr.ko
+kernel|generic|/GENERIC/kernel
+world|base|/boot/loader
+world|base|/boot/pxeboot
+world|base|/etc/mail/freebsd.cf
+world|base|/etc/mail/freebsd.submit.cf
+world|base|/etc/mail/sendmail.cf
+world|base|/etc/mail/submit.cf
+world|base|/lib/libcrypto.so.5
+world|base|/usr/bin/ntpq
+world|base|/usr/include/osreldate.h
+world|base|/usr/lib/libalias.a
+world|base|/usr/lib/libalias_cuseeme.a
+world|base|/usr/lib/libalias_dummy.a
+world|base|/usr/lib/libalias_ftp.a
+...
+Values of build stamps, excluding library archive headers:
+v1.2 (Aug 26 2009 18:13:46)
+v1.2 (Aug 26 2009 18:11:44)
+@(#)FreeBSD 7.1-RELEASE-p7 #0: Wed Aug 26 18:11:50 UTC 2009
+FreeBSD 7.1-RELEASE-p7 #0: Wed Aug 26 18:11:50 UTC 2009
+    root@server.myhost.com:/usr/obj/usr/src/sys/GENERIC
+7.1-RELEASE-p7
+Wed Aug 26 17:29:15 UTC 2009
+Wed Aug 26 17:29:15 UTC 2009
+##### built by root@server.myhost.com on Wed Aug 26 17:49:58 UTC 2009
+##### built by root@server.myhost.com on Wed Aug 26 17:49:58 UTC 2009
+##### built by root@server.myhost.com on Wed Aug 26 17:49:58 UTC 2009
+##### built by root@server.myhost.com on Wed Aug 26 17:49:58 UTC 2009
+Wed Aug 26 17:20:39 UTC 2009
+ntpq 4.2.4p5-a Wed Aug 26 17:29:42 UTC 2009 (1)
+ * Copyright (c) 1992-2009 The FreeBSD Project.
+Wed Aug 26 17:20:39 UTC 2009
+Wed Aug 26 17:29:30 UTC 2009
+Aug 26 2009
+ntpd 4.2.4p5-a Wed Aug 26 17:29:41 UTC 2009 (1)
+ntpdate 4.2.4p5-a Wed Aug 26 17:29:42 UTC 2009 (1)
+ntpdc 4.2.4p5-a Wed Aug 26 17:29:42 UTC 2009 (1)
+Wed Aug 26 17:55:02 UTC 2009
+Wed Aug 26 17:55:02 UTC 2009
+Wed Aug 26 17:55:02 UTC 2009
+Wed Aug 26 17:20:39 UTC 2009
+...</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Updates are printed, and approval is requested.</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink">New updates:
+kernel|generic|/GENERIC/kernel.symbols|f|0|0|0555|0|7c8dc176763f96ced0a57fc04e7c1b8d793f27e006dd13e0b499e1474ac47e10|
+kernel|generic|/GENERIC/kernel|f|0|0|0555|0|33197e8cf15bbbac263d17f39c153c9d489348c2c534f7ca1120a1183dec67b1|
+kernel|generic|/|d|0|0|0755|0||
+src|base|/|d|0|0|0755|0||
+src|bin|/|d|0|0|0755|0||
+src|cddl|/|d|0|0|0755|0||
+src|contrib|/contrib/bind9/bin/named/update.c|f|0|10000|0644|0|4d434abf0983df9bc47435670d307fa882ef4b348ed8ca90928d250f42ea0757|
+src|contrib|/contrib/bind9/lib/dns/openssldsa_link.c|f|0|10000|0644|0|c6805c39f3da2a06dd3f163f26c314a4692d4cd9a2d929c0acc88d736324f550|
+src|contrib|/contrib/bind9/lib/dns/opensslrsa_link.c|f|0|10000|0644|0|fa0f7417ee9da42cc8d0fd96ad24e7a34125e05b5ae075bd6e3238f1c022a712|
+...
+FreeBSD/amd64 7.1-RELEASE update build complete.  Please review
+the list of build stamps printed above and the list of updated
+files to confirm that they look sensible, then run
+# sh -e approve.sh amd64 7.1-RELEASE
+to sign the build.</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Follow the same process as noted before for approving a
+      build:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh -e scripts/approve.sh amd64 7.1-RELEASE</userinput>
+Wed Aug 26 12:50:06 PDT 2009 Signing build for FreeBSD/amd64 7.1-RELEASE
+Wed Aug 26 12:50:06 PDT 2009 Copying files to patch source directories for FreeBSD/amd64 7.1-RELEASE
+Wed Aug 26 12:50:06 PDT 2009 Copying files to upload staging area for FreeBSD/amd64 7.1-RELEASE
+Wed Aug 26 12:50:07 PDT 2009 Updating databases for FreeBSD/amd64 7.1-RELEASE
+Wed Aug 26 12:50:07 PDT 2009 Cleaning staging area for FreeBSD/amd64 7.1-RELEASE
+
+The FreeBSD/amd64 7.1-RELEASE update build has been signed and is
+ready to be uploaded.  Remember to run
+# sh -e umountkey.sh
+to unmount the decrypted key once you have finished signing all
+the new builds.</screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">After approving the build, upload the software:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/local/freebsd-update-server</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sh scripts/upload.sh <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">amd64 7.1-RELEASE</replaceable></userinput></screen>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">For reference, the entire run of <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="diff.txt"><filename xmlns:xlink="http://www.w3.org/1999/xlink">diff.sh</filename></link> is
+      attached.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="tips">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Tips</title>
+
+    <!-- These are nice tips, but there are only a few of them and they need a
+	 bit of rewording to make sense.  I'd like to see something that
+	 explains at least the following for every tip:
+
+	 * Why is this tip necessary?  What is the original problem it tries
+	   to solve?
+	 * How to install the changes of the tip, preferably in a <procedure>
+	   element, with clearly separated steps.
+	 * How to check that the changes of the tip had a measurable and
+	   noticeable effect.
+
+	 We can do this in a followup commit.  It doesn't have to be completed
+	 *before* we commit this to CVS. -->
+
+<!-- thank you, i just learned these in the process, and thought I would share. They are "tips" and not necessary, so I do see your point, and I would suggest maybe even renaming the section to something more appropriate. Nothing really comes to mind now, though. -->
+
+<!-- this tip will allow you to maintain a custom release and custom kernel, and update it like any other binary update -->
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">If a custom release is built using the native
+	  <command xmlns:xlink="http://www.w3.org/1999/xlink">make release</command> <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/articles/releng/release-build.html">procedure</link>,
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">freebsd-update-server</application> code will
+	  work from your release.  As an example, a release without
+	  ports or documentation can be built by clearing
+	  functionality pertaining to documentation subroutines
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink"> findextradocs ()</function>,
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">addextradocs ()</function> and altering the
+	  download location in <function xmlns:xlink="http://www.w3.org/1999/xlink">fetchiso ()</function>,
+	  respectively, in <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/build.subr</filename>.
+	  As a last step, change the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sha256</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> hash in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">build.conf</filename> under your respective
+	  release and architecture and you are ready to build off your
+	  custom release.</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"># Compare ${WORKDIR}/release and ${WORKDIR}/$1, identify which parts
+	# of the world|doc subcomponent are missing from the latter, and
+	# build a tarball out of them.
+	findextradocs () {
+	}
+
+	# Add extra docs to ${WORKDIR}/$1
+	addextradocs () {
+	}</screen>
+      </listitem>
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Adding <option xmlns:xlink="http://www.w3.org/1999/xlink">-j
+	    <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">NUMBER</replaceable></option> flags to
+	  <buildtarget>buildworld</buildtarget> and
+	  <buildtarget>obj</buildtarget> targets in the
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">scripts/build.subr</filename> script may speed up
+	  processing depending on the hardware used, however it is not
+	  necessary.  Using these flags in other targets is not
+	  recommended, as it may cause the build to become
+	  unreliable.</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink">               # Build the world
+		   log "Building world"
+		   cd /usr/src &amp;&amp;
+		   make -j 2 ${COMPATFLAGS} buildworld 2&gt;&amp;1
+
+		# Distribute the world
+		   log "Distributing world"
+		   cd /usr/src/release &amp;&amp;
+		   make -j 2 obj &amp;&amp;
+		   make ${COMPATFLAGS} release.1 release.2 2&gt;&amp;1</screen>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Create an appropriate <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/network-dns.html">DNS</link>
+	  SRV record for the update server, and put others behind it
+	  with variable weights.  Using this facility will provide
+	  update mirrors, however this tip is not necessary unless you
+	  wish to provide a redundant service.</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"> _http._tcp.update.myserver.com.                  IN SRV   0 2 80   host1.myserver.com.
+							     SRV   0 1 80   host2.myserver.com.
+							     SRV   0 0 80   host3.myserver.com.</screen>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+</article>

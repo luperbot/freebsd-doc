@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>9.4. 字符设备</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="driverbasics.html" title="第 9 章 编写 FreeBSD 设备驱动程序" /><link rel="prev" href="driverbasics-access.html" title="9.3. 访问设备驱动程序" /><link rel="next" href="driverbasics-block.html" title="9.5. 块设备(消亡中)" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">9.4. 字符设备</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="driverbasics-access.html">上一页</a> </td><th width="60%" align="center">第 9 章 编写 FreeBSD 设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="driverbasics-block.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="driverbasics-char"></a>9.4. 字符设备</h2></div></div></div><a id="idp71432144" class="indexterm"></a><p>字符设备驱动程序直接从用户进程传输数据，或传输数据到用户进程。
+      这是最普通的一类设备驱动程序，源码树中有大量的简单例子。</p><p>这个简单的伪设备例子会记住你写给它的任何值，并且当你读取它的时候
+      会将这些值返回给你。下面显示了两个版本，一个适用于FreeBSD 4.X，
+      一个适用于FreeBSD 5.X。</p><div class="example"><a id="idp71433424"></a><div class="example-title">例 9.1. 适用于FreeBSD 4.X的回显伪设备驱动程序实例</div><div class="example-contents"><pre class="programlisting">/*
+ * 简单‘echo’伪设备KLD
+ *
+ * Murray Stokely
+ */
+
+#define MIN(a,b) (((a) &lt; (b)) ? (a) : (b))
+
+#include &lt;sys/types.h&gt;
+#include &lt;sys/module.h&gt;
+#include &lt;sys/systm.h&gt;  /* uprintf */
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/param.h&gt;  /* kernel.h中用到的定义 */
+#include &lt;sys/kernel.h&gt; /* 模块初始化中使用的类型 */
+#include &lt;sys/conf.h&gt;   /* cdevsw结构 */
+#include &lt;sys/uio.h&gt;    /* uio结构 */
+#include &lt;sys/malloc.h&gt;
+
+#define BUFFERSIZE 256
+
+/* 函数原型 */
+d_open_t	echo_open;
+d_close_t	echo_close;
+d_read_t	echo_read;
+d_write_t	echo_write;
+
+/* 字符设备入口点 */
+static struct cdevsw echo_cdevsw = {
+	echo_open,
+	echo_close,
+	echo_read,
+	echo_write,
+	noioctl,
+	nopoll,
+	nommap,
+	nostrategy,
+	"echo",
+	33,              /* 为lkms保留 - /usr/src/sys/conf/majors */
+	nodump,
+	nopsize,
+	D_TTY,
+	-1
+};
+
+typedef struct s_echo {
+	char msg[BUFFERSIZE];
+	int len;
+} t_echo;
+
+/* 变量 */
+static dev_t sdev;
+static int count;
+static t_echo *echomsg;
+
+MALLOC_DECLARE(M_ECHOBUF);
+MALLOC_DEFINE(M_ECHOBUF, "echobuffer", "buffer for echo module");
+
+/*
+ * 这个函数被kld[un]load(2)系统调用来调用，
+ * 以决定加载和卸载模块时需要采取的动作。
+ */
+
+static int
+echo_loader(struct module *m, int what, void *arg)
+{
+	int err = 0;
+
+	switch (what) {
+	case MOD_LOAD:                /* kldload */
+		sdev = make_dev(<code class="literal">&amp;</code>echo_cdevsw,
+		    0,
+		    UID_ROOT,
+		    GID_WHEEL,
+		    0600,
+		    "echo");
+		/* kmalloc分配供驱动程序使用的内存 */
+		MALLOC(echomsg, t_echo *, sizeof(t_echo), M_ECHOBUF, M_WAITOK);
+		printf("Echo device loaded.\n");
+		break;
+	case MOD_UNLOAD:
+		destroy_dev(sdev);
+		FREE(echomsg,M_ECHOBUF);
+		printf("Echo device unloaded.\n");
+		break;
+	default:
+		err = EOPNOTSUPP;
+		break;
+	}
+	return(err);
+}
+
+int
+echo_open(dev_t dev, int oflags, int devtype, struct proc *p)
+{
+	int err = 0;
+
+	uprintf("Opened device \"echo\" successfully.\n");
+	return(err);
+}
+
+int
+echo_close(dev_t dev, int fflag, int devtype, struct proc *p)
+{
+	uprintf("Closing device \"echo.\"\n");
+	return(0);
+}
+
+/*
+ * read函数接受由echo_write()存储的buf，并将其返回到用户空间，
+ * 以供其他函数访问。
+ * uio(9)
+ */
+
+int
+echo_read(dev_t dev, struct uio *uio, int ioflag)
+{
+	int err = 0;
+	int amt;
+
+	/*
+	 * 这个读操作有多大？
+	 * 与用户请求的大小一样，或者等于剩余数据的大小。
+	 */
+	amt = MIN(uio-&gt;uio_resid, (echomsg-&gt;len - uio-&gt;uio_offset &gt; 0) ?
+	    echomsg-&gt;len - uio-&gt;uio_offset : 0);
+	if ((err = uiomove(echomsg-&gt;msg + uio-&gt;uio_offset,amt,uio)) != 0) {
+		uprintf("uiomove failed!\n");
+	}
+	return(err);
+}
+
+/*
+ * echo_write接受一个字符串并将它保存到缓冲区，用于以后的访问。
+ */
+
+int
+echo_write(dev_t dev, struct uio *uio, int ioflag)
+{
+	int err = 0;
+
+	/* 将字符串从用户空间的内存复制到内核空间 */
+	err = copyin(uio-&gt;uio_iov-&gt;iov_base, echomsg-&gt;msg,
+	    MIN(uio-&gt;uio_iov-&gt;iov_len, BUFFERSIZE - 1));
+
+	/* 现在需要以null结束字符串，并记录长度 */
+	*(echomsg-&gt;msg + MIN(uio-&gt;uio_iov-&gt;iov_len, BUFFERSIZE - 1)) = 0;
+	echomsg-&gt;len = MIN(uio-&gt;uio_iov-&gt;iov_len, BUFFERSIZE);
+
+	if (err != 0) {
+		uprintf("Write failed: bad address!\n");
+	}
+	count++;
+	return(err);
+}
+
+DEV_MODULE(echo,echo_loader,NULL);</pre></div></div><br class="example-break" /><div class="example"><a id="idp71439184"></a><div class="example-title">例 9.2. 适用于FreeBSD 5.X回显伪设备驱动程序实例</div><div class="example-contents"><pre class="programlisting">/*
+ * 简单‘echo’伪设备 KLD
+ *
+ * Murray Stokely
+ *
+ * 此代码由Søren (Xride) Straarup转换到5.X
+ */
+
+#include &lt;sys/types.h&gt;
+#include &lt;sys/module.h&gt;
+#include &lt;sys/systm.h&gt;  /* uprintf */
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/param.h&gt;  /* kernel.h中用到的定义 */
+#include &lt;sys/kernel.h&gt; /* 模块初始化中使用的类型 */
+#include &lt;sys/conf.h&gt;   /* cdevsw结构 */
+#include &lt;sys/uio.h&gt;    /* uio结构 */
+#include &lt;sys/malloc.h&gt;
+
+#define BUFFERSIZE 256
+
+
+/* 函数原型 */
+static d_open_t      echo_open;
+static d_close_t     echo_close;
+static d_read_t      echo_read;
+static d_write_t     echo_write;
+
+/* 字符设备入口点 */
+static struct cdevsw echo_cdevsw = {
+	.d_version = D_VERSION,
+	.d_open = echo_open,
+	.d_close = echo_close,
+	.d_read = echo_read,
+	.d_write = echo_write,
+	.d_name = "echo",
+};
+
+typedef struct s_echo {
+	char msg[BUFFERSIZE];
+	int len;
+} t_echo;
+
+/* 变量 */
+static struct cdev *echo_dev;
+static int count;
+static t_echo *echomsg;
+
+MALLOC_DECLARE(M_ECHOBUF);
+MALLOC_DEFINE(M_ECHOBUF, "echobuffer", "buffer for echo module");
+
+/*
+ * 这个函数被kld[un]load(2)系统调用来调用,
+ * 以决定加载和卸载模块时需要采取的动作.
+ */
+
+static int
+echo_loader(struct module *m, int what, void *arg)
+{
+	int err = 0;
+
+	switch (what) {
+	case MOD_LOAD:                /* kldload */
+		echo_dev = make_dev(<code class="literal">&amp;</code>echo_cdevsw,
+		    0,
+		    UID_ROOT,
+		    GID_WHEEL,
+		    0600,
+		    "echo");
+		/* kmalloc分配供驱动程序使用的内存 */
+		echomsg = malloc(sizeof(t_echo), M_ECHOBUF, M_WAITOK);
+		printf("Echo device loaded.\n");
+		break;
+	case MOD_UNLOAD:
+		destroy_dev(echo_dev);
+		free(echomsg, M_ECHOBUF);
+		printf("Echo device unloaded.\n");
+		break;
+	default:
+		err = EOPNOTSUPP;
+		break;
+	}
+	return(err);
+}
+
+static int
+echo_open(struct cdev *dev, int oflags, int devtype, struct thread *p)
+{
+	int err = 0;
+
+	uprintf("Opened device \"echo\" successfully.\n");
+	return(err);
+}
+
+static int
+echo_close(struct cdev *dev, int fflag, int devtype, struct thread *p)
+{
+	uprintf("Closing device \"echo.\"\n");
+	return(0);
+}
+
+/*
+ * read函数接受由echo_write()存储的buf，并将其返回到用户空间，
+ * 以供其他函数访问。
+ * uio(9)
+ */
+
+static int
+echo_read(struct cdev *dev, struct uio *uio, int ioflag)
+{
+	int err = 0;
+	int amt;
+
+	/*
+	 * 这个读操作有多大？
+	 * 等于用户请求的大小，或者等于剩余数据的大小。
+	 */
+	amt = MIN(uio-&gt;uio_resid, (echomsg-&gt;len - uio-&gt;uio_offset &gt; 0) ?
+	     echomsg-&gt;len - uio-&gt;uio_offset : 0);
+	if ((err = uiomove(echomsg-&gt;msg + uio-&gt;uio_offset, amt, uio)) != 0) {
+		uprintf("uiomove failed!\n");
+	}
+	return(err);
+}
+
+/*
+ * echo_write接受一个字符串并将它保存到缓冲区, 用于以后的访问.
+ */
+
+static int
+echo_write(struct cdev *dev, struct uio *uio, int ioflag)
+{
+	int err = 0;
+
+	/* 将字符串从用户空间的内存复制到内核空间 */
+	err = copyin(uio-&gt;uio_iov-&gt;iov_base, echomsg-&gt;msg,
+	    MIN(uio-&gt;uio_iov-&gt;iov_len, BUFFERSIZE - 1));
+
+	/* 现在需要以null结束字符串，并记录长度 */
+	*(echomsg-&gt;msg + MIN(uio-&gt;uio_iov-&gt;iov_len, BUFFERSIZE - 1)) = 0;
+	echomsg-&gt;len = MIN(uio-&gt;uio_iov-&gt;iov_len, BUFFERSIZE);
+
+	if (err != 0) {
+		uprintf("Write failed: bad address!\n");
+	}
+	count++;
+	return(err);
+}
+
+DEV_MODULE(echo,echo_loader,NULL);</pre></div></div><br class="example-break" /><p>在FreeBSD 4.X上安装此驱动程序，你将首先需要用如下命令在
+      你的文件系统上创建一个节点：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mknod /dev/echo c 33 0</code></strong></pre><p>驱动程序被加载后，你应该能够键入一些东西，如：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo -n "Test Data" &gt; /dev/echo</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat /dev/echo</code></strong>
+Test Data</pre><p>真正的硬件设备在下一章描述。</p><p>补充资源
+    </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><a class="link" href="http://ezine.daemonnews.org/200010/blueprints.html" target="_top">Dynamic
+	Kernel Linker (KLD) Facility Programming Tutorial</a> -
+	<a class="link" href="http://www.daemonnews.org/" target="_top">Daemonnews</a> October 2000</li><li class="listitem"><a class="link" href="http://ezine.daemonnews.org/200007/newbus-intro.html" target="_top">How
+	to Write Kernel Drivers with NEWBUS</a> - <a class="link" href="http://www.daemonnews.org/" target="_top">Daemonnews</a> July
+	2000</li></ul></div><p>
+    </p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="driverbasics-access.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="driverbasics.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="driverbasics-block.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">9.3. 访问设备驱动程序 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 9.5. 块设备(消亡中)</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

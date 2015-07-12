@@ -1,0 +1,722 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!--
+  The FreeBSD Russian Documentation Project
+  $FreeBSD$
+  Original revision: r43184
+-->
+<!-- Перевод: Тарас Коренко -->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="ru">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Настройка журналирования UFS для настольного компьютера.</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Manolis</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Kiagias</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">manolis@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2008</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink" role="mailto:manolis@FreeBSD.org">Manolis Kiagias</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD это зарегистрированная торговая
+  марка FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Многие из обозначений, используемые
+  производителями и продавцами для обозначения своих продуктов, заявляются
+  в качестве торговых марок.  Когда такие обозначения появляются в этом
+  документе, и Проекту FreeBSD известно о торговой марке, к обозначению
+  добавляется знак <quote xmlns:xlink="http://www.w3.org/1999/xlink">TM</quote> или
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">(R)</quote>.</para>
+    </legalnotice>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Журналируемая файловая система использует лог для записи всех
+	транзакций, происходящих в файловой системе, который также
+	сохраняет ее целостность в случае краха системы или пропадания
+	питания. Несмотря на то, что всё еще возможна потеря несохранённых
+	изменений файлов, журналирование почти полностью исключает
+	возможность повреждения структуры файловой системы, вызванное
+	непредвиденным остановом работы. Журналирование также сокращает
+	до минимума время, необходимое для проверки файловой системы после
+	отказа. Несмотря на то, что в используемой FreeBSD файловой системе
+	UFS нет поддержки журналирования, новый класс системы GEOM
+	в FreeBSD 7.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">X</replaceable> может быть использован
+	для для ведения независимого от файловой системы журналирования.
+	Эта статья объясняет, как реализовать журналирование UFS для
+	типичного настольного компьютера.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="introduction">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Вступление</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Серверное оборудование обычно хорошо защищено от потери питания.
+      Настольный компьютер часто подвержен неожиданным пропаданиям питания,
+      случайным нажатиям кнопки Reset и другим происшествиям (часто
+      связанным с неосторожностью пользователей), которые могут привести
+      к непредвиденным выключениям. Механизм Soft Updates, как правило,
+      достаточно эффективно защищает файловую систему в таких случаях, однако
+      в последствии требуется длительная фоновая проверка. В очень редких
+      случаях повреждения файловой системы достигают того уровня, при
+      котором становится необходимым вмешательство пользователя и данные
+      могут быть утерянными.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Новая возможность журналирования, предоставленная системой GEOM,
+      может существенно выручить в подобных случаях, исключая время,
+      необходимое для проверки файловых систем и удостовериваясь,
+      что файловая система быстро восстановлена в целостное состояние.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Эта статья описывает порядок действий, необходимых для
+      конфигурирования журналирования UFS на типичном настольном компьютере,
+      в котором один жесткий диск используется для размещения как
+      операционной системы, так и данных. В статье подразумевается
+      установка FreeBSD "с нуля". Шаги достаточно просты и не требуют
+      чрезмерно сложных манипуляций с командной строкой</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">После прочтения данной статьи вы будете знать:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Как зарезервировать место для журнала во время новой
+	  установки FreeBSD.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Как загрузить модуль <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal> (или
+	  включить поддержку журналирования в специализированном ядре
+	  системы).</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Как преобразовать существующую файловую систему, в систему,
+	  использующую журналирование, и какие опции монтирования
+	  использовать в <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Как реализовать журналирование на новых (пустых) разделах.</para>
+      </listitem>
+
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Как диагностировать неполадки, связанные с журналированием.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Перед прочтением этой статьи вам необходимо:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Понимать базовые концепции таких операционных систем,
+	  как <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">UNIX</trademark> и FreeBSD.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Быть знакомым с процедурой установки FreeBSD, а также с программой
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>.</para>
+      </listitem>
+    </itemizedlist>
+
+    <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Процедура, описанная здесь, подразумевает подготовку к новой
+	установке, в которой на дисках еще нет пользовательских данных.
+	Так как эту процедуру можно модифицировать и расширить на системы,
+	которые уже используются, вам настоятельно рекомендуется сделать
+	<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">резервную копию</emphasis> всех ценных данных.
+	Путаница в низкоуровневых операциях с дисками и разделами может
+	привести к фатальным ошибкам и потере данных.</para>
+    </warning>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="understanding-journaling">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Реализация журналирования в FreeBSD</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Журналирование, предоставляемое системой GEOM
+      в FreeBSD 7.<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">X</replaceable>, не является особенностью
+      файловой системы (в отличие от, например, файловой системы ext3
+      в <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark>), оно функционирует на блочном уровне. А это значит,
+      что оно может быть применено к разным типам файловых систем,
+      однако для FreeBSD 7.0-RELEASE журналирование может быть применено
+      только для UFS2.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Возможность журналирования обеспечивается загрузкой модуля
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal.ko</filename> в ядро (или сборкой собственного
+      ядра с активированием соответствующих опций) и использованием команды
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> для конфигурирования файловой системы.
+      В общем, вы предпочтете журналировать файловые системы большого размера,
+      к примеру - <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>. Однако, вам придется
+      зарезервировать некоторое количество свободного места (см.
+      следующий раздел).</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Когда файловая система журналируется, некоторая часть
+      дискового пространства требуется для хранения самого журнала.
+      Дисковое пространство, содержащее данные, называется
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">поставщиком данных (data provider)</emphasis>,
+      а часть пространства, содержащая журнал, называется
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">поставщиком журнала (journal provider)</emphasis>.
+      Поставщики данных и журнала должны быть на разных разделах,
+      если журналирование достраивается к содержащему данные разделу.
+      А если журналирование включается для нового раздела, у вас есть
+      возможность использовать один поставщик для данных и журнала.
+      В любом из двух вышеупомянутых случаев команда
+      <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> задействует поставщики и создаст
+      конечную журналируемую файловую систему. Например:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Вы намереваетесь журналировать файловую систему
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, размещенную на
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f</filename>,
+	  файловая система уже содержит данные.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Вы зарезервировали часть дискового пространства на разделе
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1g</filename>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Используя команду <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command>,
+	  создаем новый файл устройства
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f.journal</filename>,
+	  для которого <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f</filename>
+	  является поставщиком данных, а
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1g</filename> -
+	  поставщик журнала. Это новое устройство необходимо использовать
+	  во всех последующих операциях.</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Размер дискового пространства, отводимого под поставщик журнала,
+      зависит от нагруженности файловой системы, а не от размера самого
+      поставщика данных. Например, для типичного настольного компьютера
+      достаточно отвести 1 Гб под поставщик журнала для файловой
+      системы <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, в то время как компьютеру,
+      имеющему интенсивный дисковый ввод/вывод (например, редактирование
+      видео) может потребоваться больше. Если свободное место на поставщике
+      журнала заканчивается раньше, чем происходит сброс журнала на
+      диск, - вы получите панику ядра.</para>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Очень маловероятно то, что размеры журнала, предложенные здесь,
+	станут причиной проблем с обычным настольным компьютером (на котором
+	вы просматриваете веб-страницы, обрабатываете текст или проигрываете
+	мультимедийные файлы). Если работа вашего компьютера подразумевает
+	интенсивную дисковую активность, то для обеспечения стабильности
+	следует придерживаться следующего правила: размер ОЗУ должен
+	уместиться в 30% размера, отведенного под журнал. Например, если в
+	вашем компьютере установлен 1 Гб ОЗУ, создайте под поставщик
+	журнала раздел размером около 3.3 Гб. (Умножьте размер ОЗУ
+	в 3.3 раза, чтоб получить размер журнала).</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Для получения дополнительной информации о журналировании, пожалуйста,
+      прочитайте страницу справочника, посвященную <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="reserve-space">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Действия, необходимые во время установки FreeBSD</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Выделение места под журналирование</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Типичный настольный компьютер обычно имеет один жесткий диск, на
+	котором хранится как операционная система, так и пользовательские
+	данные. Вероятно, что схема разбития винчестера (по умолчанию),
+	выбранная в меню <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>, является
+	более или менее подходящей: настольному компьютеру не требуется большой
+	раздел <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>, в то время, как для раздела
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> выделяется значительный объем дискового
+	пространства, ввиду того, что пользовательские данные и множество
+	пэкэджей хранятся именно в поддиректориях <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>.
+	</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Разбиение по умолчанию (получаемое при нажатии <keycap xmlns:xlink="http://www.w3.org/1999/xlink">A</keycap>
+	в редакторе разделов FreeBSD, называемом
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application>) не оставляет свободного места.
+	Каждый подлежащий журналированию раздел требует отдельного раздела
+	для журнала. Ввиду того, что раздел <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> -
+	наибольший, есть смысл немного уменьшить его размер, чтобы получить
+	пространство, необходимое для журнала.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">В нашем примере используется жесткий диск размером 80 Гб.
+	Следующий скриншот показывает результаты разбиения по умолчанию,
+	выполненного при помощи <application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application>
+	в процессе установки операционной системы:</para>
+
+      <mediaobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	<imageobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <imagedata fileref="disklabel1"/>
+	</imageobject>
+      </mediaobject>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Если это разбиение более или менее вас устраивает, то его легко
+	модифицировать для журналирования. Используйте клавиши со стрелками
+	для того, чтобы выделить раздел, отведенный под
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, потом нажмите <keycap xmlns:xlink="http://www.w3.org/1999/xlink">D</keycap>
+	чтобы удалить его.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь переведите подсвечивание к имени диска, находящемуся вверху
+	экрана, и нажмите <keycap xmlns:xlink="http://www.w3.org/1999/xlink">C</keycap> - создайте новый раздел
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>. Новый раздел должен быть меньше на 1 Гб
+	(если вы собираетесь журналировать только <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>)
+	или на 2 Гб (если журналированию подлежат как
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>, так и <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>).
+	Во всплывающем окне выберите "создать файловую систему" и укажите
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> точкой монтирования.</para>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Следует ли журналировать <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> раздел?
+	  Обычно есть смысл журналировать большие разделы. Вы можете решить
+	  не журналировать <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>, однако журналирование
+	  на обычном настольном компьютере не причинит вреда.  Если
+	  файловая система не нагружена (что типично для настольной системы),
+	  то можно выделить меньше дискового пространства под журнал.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">В этом примере подразумевается журналирование двух файловых
+	  систем: <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> и <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.
+	  Естественно, вы можете подкорректировать процедуру под свои
+	  задачи.</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Чтобы не усложнять описываемую методику, для создания разделов,
+	необходимых для размещения журналов, мы будем использовать утилиту
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>. Однако, во время установки
+	утилита <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> требует указания
+	точек монтирования для каждого созданного вами раздела. Но разделы,
+	содержащие журналы, вам никогда и никуда монтировать
+	не придется.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Чтобы избежать вопросов о точках монтирования, мы создадим разделы
+	под журналы и установим их тип в swap. Раздел, предназначенный для
+	свопа, никогда и никуда не монтируется, плюс к тому, утилита
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> позволяет создавать столько
+	разделов под своп, сколько необходимо. После первой перезагрузки
+	необходимо подредактировать файл <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>,
+	удалив в нём лишние записи о своп-разделах.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Для создания своп-раздела, используя клавиши со стрелками,
+	перемещайте подсвечивание к верхней части экрана в утилите
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">Disklabel</application> так, чтобы стало подсвеченным
+	имя диска. Потом, нажмите <keycap xmlns:xlink="http://www.w3.org/1999/xlink">N</keycap>, введите необходимый
+	размер раздела (<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">1024M</replaceable>), а после -
+	выберите во всплывшем окне <quote xmlns:xlink="http://www.w3.org/1999/xlink">swap space</quote>. Повторите
+	эти шаги для всех оставшихся журналов. В этом примере мы создаем
+	два раздела, на которых будут размещаться журналы для
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> и <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>. Конечный
+	результат показан на следующем скриншоте:</para>
+
+      <mediaobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	<imageobject xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <imagedata fileref="disklabel2"/>
+	</imageobject>
+      </mediaobject>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">По завершении создания разделов мы рекомендуем вам записать
+	на бумагу названия разделов и их точек монтирования: с этой информацией
+	вы будете сверяться во время конфигурирования. Это также поможет
+	уменьшить количество ошибок, приводящих к повреждению установки.
+	Следующая табличка отображает наши заметки, сделанные для данного
+	примера:</para>
+
+      <table xmlns:xlink="http://www.w3.org/1999/xlink" pgwide="1">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Разделы и журналы</title>
+	<tgroup xmlns:xlink="http://www.w3.org/1999/xlink" cols="3">
+	<thead xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Раздел</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Точка монтирования</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">Журнал</entry>
+	  </row>
+	</thead>
+
+	<tbody xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">/var</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1h</entry>
+	  </row>
+
+	  <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">/usr</entry>
+	    <entry xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1g</entry>
+	  </row>
+	</tbody>
+	</tgroup>
+      </table>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Дальше продолжайте обычную установку. Однако, мы рекомендуем
+	вам отложить инсталляцию приложений сторонних разработчиков (пакетов)
+	до полной настройки журналирования.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="first-boot">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Первая загрузка</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ваша система загрузится нормально, однако вам необходимо будет
+	подредактировать <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> и удалить те
+	лишние своп-разделы, которые вы создавали под журналы.
+	Как правило, в названии файла устройства, созданного автоматически
+	утилитой <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>, присутствует
+	суффикс <quote xmlns:xlink="http://www.w3.org/1999/xlink">b</quote> (в нашем примере это ad0s1b). Удалите
+	другие записи о своп-разделах и перезагрузите компьютер, после чего
+	FreeBSD перестанет их использовать.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">После второй перезагрузки, компьютер будет готов к
+	конфигурированию журналирования.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="configure-journal">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Настройка журналирования</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="running-gjournal">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Работа с командой <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Подготовив необходимые разделы, перейдем к конфигурированию
+	журналирования. Нам будет необходимо загрузиться в
+	однопользовательском режиме, для этого залогинимся пользователем
+	<systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> и напечатаем:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">shutdown now</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Нажмите <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap> для получения приглашения
+	командного интерпретатора. Нам необходимо будет размонтировать
+	разделы, которые подлежат журналированию, в нашем примере это
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> и <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>.</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">umount /usr /var</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Загрузите модуль ядра, необходимый для журналирования:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal load</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">На данном этапе сверьтесь со своими записями и определите, какие
+	разделы будут использоваться под какой журнал. В нашем примере
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> располагается на
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f</filename>, а его журнал
+	будет располагаться на <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1g</filename>,
+	и, по аналогии, для <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>: файловая система
+	располагается на <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d</filename>,
+	а ее журнал - на <filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1h</filename>.
+	Наберите следующие команды:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad0s1f ad0s1g</userinput>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad0s1d ad0s1h</userinput>
+
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.</screen>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Если последний сектор любого из двух разделов (поставщиков
+	  данных) используется, команда <command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command>
+	  возвратит ошибку. Вам необходимо будет использовать флаг
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">-f</option> для принудительной перезаписи, например:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label -f ad0s1d ad0s1h</userinput></screen>
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Так как это - новая установка, очень маловероятен факт,
+	  что что-нибудь будет действительно переписано.</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">На данном этапе созданы два устройства:
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1d.journal</filename> и
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ad0s1f.journal</filename>. Они
+	представляют <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> и <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>
+	соответственно. Перед монтированием, нам необходимо установить флаг
+	журналирования и снять флаг механизма Soft Updates:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J enable -n disable ad0s1d.journal</userinput>
+
+tunefs: gjournal set
+tunefs: soft updates cleared
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J enable -n disable ad0s1f.journal</userinput>
+
+tunefs: gjournal set
+tunefs: soft updates cleared</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь, смонтируйте новые устройства в соответствующие места
+	файловой системы (обратите внимание на то, что мы можем использовать
+	опцию монтирования <option xmlns:xlink="http://www.w3.org/1999/xlink">async</option>):</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o async /dev/ad0s1d.journal /var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o async /dev/ad0s1f.journal /usr</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Откройте <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> и исправьте записи для
+	следующих файловых систем: <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> и
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f.journal     /usr            ufs     rw,async      2       2
+/dev/ad0s1d.journal     /var            ufs     rw,async      2       2</programlisting>
+
+      <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Убедитесь, что упомянутые выше записи правильные, иначе старт
+	  системы будет проблематичным после перезагрузки!</para>
+      </warning>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">И напоследок, подредактируйте
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>: добавьте следующую строку
+	и модуль <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> будет загружаться автоматически при старте
+	системы:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load="YES"</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Поздравляем! Журналирование успешно сконфигурировано. Вам
+	необходимо лишь набрать <userinput xmlns:xlink="http://www.w3.org/1999/xlink">exit</userinput> для возвращения
+	в многопользовательский	режим или перезагрузить систему, чтобы полностью
+	проверить вашу конфигурацию (рекомендуется). Во время загрузки
+	вы увидите сообщения, подобные следующим:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink">ad0: 76293MB XEC XE800JD-00HBC0 08.02D08 at ata0-master SATA150
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">После непредвиденного останова работы системы сообщения будут
+	немного отличаться, например:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink">GEOM_JOURNAL: Journal ad0s1d consistent.</screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Это обычно значит, что <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> воспользовался
+	информацией в журнале для возвращения файловой системы к целостному
+	состоянию.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="gjournal-new">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Журналирование новых разделов</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Процедура, описанная выше, необходима для подключения
+	журналирования разделов, содержащих данные. Журналирование пустых
+	разделов немного проще, ввиду того, что поставщик данных и поставщик
+	журнала могут быть размещены на одном и том же разделе. Например,
+	предположим, что был установлен новый жесткий диск и был создан новый
+	раздел <filename xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad1s1d</filename>. Создание
+	журнала не сложнее набора:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label ad1s1d</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Размер журнала - 1 Гб по умолчанию. Однако, вы можете
+	изменить это значение используя ключ <option xmlns:xlink="http://www.w3.org/1999/xlink">-s</option>. Значение
+	можно задавать в байтах, в килобайтах, мегабайтах или гигабайтах
+	(используя суффикс <literal xmlns:xlink="http://www.w3.org/1999/xlink">K</literal>, <literal xmlns:xlink="http://www.w3.org/1999/xlink">M</literal> или
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">G</literal>). Имейте ввиду, что команда
+	<command xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</command> не позволит вам создать журнал
+	недопустимо малого размера.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">К примеру, чтобы создать журнал размером в 2Гб, можно использовать
+	следующую команду:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal label -s 2G ad1s1d</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Далее, вы можете создать файловую систему на новом разделе,
+	а также разрешить журналирование ключом <option xmlns:xlink="http://www.w3.org/1999/xlink">-J</option>:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs -J /dev/ad1s1d.journal</userinput></screen>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="configure-kernel">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Встраивание журналирования в специализированное ядро</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Если вы не желаете загружать <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal>
+	как модуль, то можно встроить его функции прямо в ваше
+	специализированное ядро. Редактируя конфигурационный файл ядра,
+	убедитесь, что в нем находятся следующие две строки:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options UFS_GJOURNAL # Прим.: Это включено в GENERIC
+
+options GEOM_JOURNAL # А эту строку необходимо добавить</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Соберите и установите новое ядро следуя указаниям
+	<link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/ru_RU.KOI8-R/books/handbook/kernelconfig.html">
+	Руководства FreeBSD .</link></para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">И не забудьте удалить соответствующую строку загрузки модуля
+	(<quote xmlns:xlink="http://www.w3.org/1999/xlink">load</quote>) из <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>
+	(если на предыдущем этапе она была туда внесена).</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="troubleshooting-gjournal">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Устранение неполадок с журналированием</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Этот раздел содержит часто задаваемые вопросы касательно неполадок,
+      связанных с журналированием.</para>
+
+    <qandaset xmlns:xlink="http://www.w3.org/1999/xlink">
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernel-panic">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Я получаю паники ядра во время высокой дисковой активности.
+	    Как это связано с журналированием?</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Вероятно, что журнал заполняется раньше, чем происходит
+	    сброс его на диск. Помните, размер журнала зависит от
+	    загруженности диска, а не от размера поставщика данных.
+	    Если загрузка диска высокая, вам потребуется раздел большего
+	    размера для журнала. См. замечания в разделе
+	    <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="understanding-journaling">Реализация
+	    журналирования</link></para>
+	</answer>
+      </qandaentry>
+
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="unable-boot">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Я допустил некоторые ошибки во время конфигурирования,
+	    теперь система не загружается. Можно это как-нибудь
+	    исправить?</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Вы либо забыли внести запись (опечатались) в
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>, либо есть ошибки в
+	    файле <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>. Это легко исправить.
+	    Нажмите <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap>, чтобы получить приглашение
+	    командного интерпретатора в однопользовательском режиме.
+	    Потом, проверьте возможные варианты:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cat /boot/loader.conf</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Если отсутствует запись <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load</literal>,
+	    или она содержит ошибки, журналируемые устройства не создадутся.
+	    Загрузите модуль вручную, примонтируйте все разделы и
+	    переходите в многопользовательский режим (продолжайте
+	    загрузку).</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal load</userinput>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -a</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">exit</userinput>
+<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">(boot continues)</emphasis></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Если же запись о <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal_load</literal>
+	    верна, то проверьте <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename>.
+	    Вероятней всего, что вы обнаружите опечатку или отсутствие
+	    необходимой записи. В этом случае смонтируйте вручную
+	    оставшиеся разделы и продолжите загрузку в многопользовательский
+	    режим.</para>
+	</answer>
+      </qandaentry>
+
+      <qandaentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<question xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="remove-journaling">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Возможно ли отказаться от журналирования и вернуться
+	    к моей привычной файловой системе с механизмом Soft Updates?</para>
+	</question>
+
+	<answer xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Несомненно. Используйте приведенную ниже последовательность
+	    действий, которая обращает изменения. Разделы, созданные для
+	    поставщиков журналов, могут позже быть использованы для других
+	    целей.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Залогиньтесь <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> и переведите систему
+	    в однопользовательский режим:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">shutdown now</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Размонтируйте журналируемые разделы:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">umount /usr /var</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Синхронизируйте журналы:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal sync</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Остановите поставщиков журналов:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal stop ad0s1d.journal</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal stop ad0s1f.journal</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Удалите метаданные журналирования со всех задействованных
+	    устройств:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1d</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1f</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1g</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gjournal clear ad0s1h</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Снимите флаг журналирования и установите флаг механизма Soft
+	    Updates:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J disable -n enable ad0s1d</userinput>
+
+tunefs: gjournal cleared
+tunefs: soft updates set
+
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tunefs -J disable -n enable ad0s1f</userinput>
+
+tunefs: gjournal cleared
+tunefs: soft updates set</screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Смонтируйте вручную старые (первоначальные) устройства:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o rw /dev/ad0s1d /var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount -o rw /dev/ad0s1f /usr</userinput></screen>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Откройте файл <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> и приведите
+	    его к изначальному виду:</para>
+
+          <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">/dev/ad0s1f     /usr            ufs     rw      2       2
+/dev/ad0s1d     /var            ufs     rw      2       2</programlisting>
+
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">И напоследок, удалите строку, загружающую модуль
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">geom_journal</literal>, из файла
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> и перезагрузите
+	    операционную систему.</para>
+
+	</answer>
+      </qandaentry>
+    </qandaset>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="further-reading">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Для дальнейшего ознакомления</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Журналирование - относительно новая функциональная возможность
+      FreeBSD, и как такова, она еще недостаточно документирована. Однако, вы
+      можете сочти полезными следующие источники:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Новый <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.FreeBSD.org/doc/ru_RU.KOI8-R/books/handbook/geom-gjournal.html">раздел
+	  Руководства FreeBSD</link>, посвященный журналированию.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.freebsd.org/pipermail/freebsd-current/2006-June/064043.html">Этот пост</link>
+	  в списке рассылки <link xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current">freebsd-current</link>, написанный Pawel Jakub Dawidek <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">pjd@FreeBSD.org</email> -
+	  автором <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.freebsd.org/pipermail/freebsd-questions/2008-April/173501.html">Этот пост</link>
+	  от Ivan Voras <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">ivoras@FreeBSD.org</email> в списке рассылки <link xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-questions">freebsd-questions</link>.</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Страницы справочника <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gjournal</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> и <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+</article>

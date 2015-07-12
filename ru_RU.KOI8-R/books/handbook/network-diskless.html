@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>27.6. Работа с бездисковыми станциями</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="advanced-networking.html" title="Глава 27. Сложные вопросы работы в сети" /><link rel="prev" href="network-bridging.html" title="27.5. Мосты" /><link rel="next" href="network-isdn.html" title="27.7. ISDN" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.6. Работа с бездисковыми станциями</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-bridging.html">Пред.</a> </td><th width="60%" align="center">Глава 27. Сложные вопросы работы в сети</th><td width="20%" align="right"> <a accesskey="n" href="network-isdn.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-diskless"></a>27.6. Работа с бездисковыми станциями</h2></div><div><span class="authorgroup">Текст обновил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Jean-Francois</span> <span class="surname">Dock`es</span></span>. </span></div><div><span class="authorgroup">Реорганизовал и улучшил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Alex</span> <span class="surname">Dupre</span></span>. </span></div></div></div><a id="idp100351184" class="indexterm"></a><p>Машина с FreeBSD может загружаться по сети и работать без наличия
+      локального диска, используя файловые системы, монтируемые с сервера <acronym class="acronym">NFS</acronym>.
+      Кроме стандартных конфигурационных файлов, не нужны никакие модификации
+      в системе.  Такую систему легко настроить, потому что все необходимые
+      элементы уже готовы:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Имеется по крайней мере два возможных способа загрузки ядра по
+	  сети:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><acronym class="acronym">PXE</acronym>: Система <span class="trademark">Intel</span>(R) Preboot eXecution
+	      Environment является формой загрузочного ПЗУ, встроенного в
+	      некоторые сетевые адаптеры или материнские платы.  Обратитесь к
+	      справочной странице по <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> для получения более полной
+	      информации.</p></li><li class="listitem"><p>Порт <span class="application">Etherboot</span> (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/etherboot/pkg-descr">net/etherboot</a>) генерирует код,
+	      который может применяться в ПЗУ для загрузки ядра по сети.  Код
+	      может быть либо прошит в загрузочный PROM на сетевом адаптере,
+	      либо загружен с локальной дискеты (или винчестера), или с
+	      работающей системы <span class="trademark">MS-DOS</span>(R).  Поддерживаются многие сетевые
+	      адаптеры.</p></li></ul></div></li><li class="listitem"><p>Примерный скрипт
+	  (<code class="filename">/usr/share/examples/diskless/clone_root</code>)
+	  облегчает создание и поддержку корневой файловой системы рабочей
+	  станции на сервере.  Скрипт, скорее всего, потребует некоторых
+	  настроек, но он позволит вам быстро начать работу.</p></li><li class="listitem"><p>Стандартные файлы начального запуска системы, располагающиеся в
+	  <code class="filename">/etc</code>, распознают и поддерживают загрузку системы
+	  в бездисковом варианте.</p></li><li class="listitem"><p>Подкачка, если она нужна, может выполняться через файл <acronym class="acronym">NFS</acronym> либо
+	  на локальный диск.</p></li></ul></div><p>Существует много способов настройки бездисковой рабочей станции.  При
+      этом задействованы многие компоненты, и большинство из них могут быть
+      настроены для удовлетворения ваших вкусов.  Далее будет описаны варианты
+      полной настройки системы, при этом упор будет делаться на простоту и
+      совместимость с стандартной системой скриптов начальной загрузки FreeBSD.
+      Описываемая система имеет такие характеристики:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Бездисковые рабочие станции совместно используют
+	  файловую систему <code class="filename">/</code> в режиме только
+	  чтения, а также используют <code class="filename">/usr</code> совместно тоже
+	  в режиме только чтения.</p><p>Корневая файловая система является копией
+	  стандартной корневой системы FreeBSD (обычно сервера), с некоторыми
+	  настроечными файлами, измененными кем-то специально для бездисковых
+	  операций или, возможно, для рабочей станции, которой она
+	  предназначена.</p><p>Части корневой файловой системы, которые
+	  должны быть доступны для записи, перекрываются файловыми системами
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=md&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">md</span>(4)</span></a>.
+	  Любые изменения будут потеряны при перезагрузках
+	  системы.</p></li><li class="listitem"><p>Ядро передается и загружается посредством
+	  <span class="application">Etherboot</span> или <acronym class="acronym">PXE</acronym>,
+	  и в некоторых ситуациях может быть использован любой из
+	  этих методов.</p></li></ul></div><div xmlns="" class="caution"><h3 class="admontitle">Внимание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Как описано, эта система не защищена.  Она должна располагаться в
+	защищенной части сети, а другие хосты не должны на нее
+	полагаться.</p></div><p>Вся информация этого раздела была протестирована с
+      релизом FreeBSD 5.2.1-RELEASE.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100376912"></a>27.6.1. Общая информация</h3></div></div></div><p>Настройка бездисковых рабочих станций относительно проста,
+	но в то же время легко сделать ошибку.  Иногда сложно
+	диагностировать эти ошибки по нескольким причинам.
+	Например:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Параметры компиляции могут по-разному проявлять
+	    себя во время работы.</p></li><li class="listitem"><p>Сообщения об ошибках бывают загадочны или вовсе
+	    отсутствуют.</p></li></ul></div><p>В данной ситуации некоторые знания, касающиеся используемых
+	внутренних механизмов, очень полезны при разрешении проблем,
+	которые могут возникнуть.</p><p>Для выполнения успешной загрузки необходимо произвести
+	несколько операций:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Компьютеру необходимо получить начальные параметры, такие
+	    как собственный IP адрес, имя исполняемого файла, корневой
+	    каталог.  Для этого используются протоколы <acronym class="acronym">DHCP</acronym>
+	    или BOOTP.   <acronym class="acronym">DHCP</acronym> это совместимое расширение
+	    BOOTP, используются те же номера портов и основной формат
+	    пакетов.</p><p>Возможна настройка системы для использования только BOOTP.
+	    Серверная программа <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bootpd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bootpd</span>(8)</span></a> включена в основную систему
+	    FreeBSD.</p><p>Тем не менее, у <acronym class="acronym">DHCP</acronym> есть множество
+	    преимуществ над BOOTP (лучше файлы настройки, возможность
+	    использования <acronym class="acronym">PXE</acronym>, плюс многие другие
+	    преимущества, не относящиеся непосредственно к бездисковым
+	    операциям), и мы в основном будем описывать настройку
+	    <acronym class="acronym">DHCP</acronym>, с эквивалентными примерами
+	    для <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bootpd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bootpd</span>(8)</span></a>, когда это возможно.  Пример
+	    конфигурации будет использовать пакет
+	    <span class="application">ISC DHCP</span> (релиз
+	    3.0.1.r12 был установлен на тестовом сервере).</p></li><li class="listitem"><p>Компьютеру требуется загрузить в локальную память одну
+	    или несколько программ.  Используются <acronym class="acronym">TFTP</acronym>
+	    или <acronym class="acronym">NFS</acronym>.  Выбор между
+	    <acronym class="acronym">TFTP</acronym> или <acronym class="acronym">NFS</acronym>
+	    производится во время компилирования в нескольких местах.
+	    Часто встречающаяся ошибка это указание имен файлов для
+	    другого протокола: <acronym class="acronym">TFTP</acronym> обычно
+	    загружает все файлы с одного каталога сервера, и принимает
+	    имена файлов относительно этого каталога.  <acronym class="acronym">NFS</acronym>
+	    нужны абсолютные пути к файлам.</p></li><li class="listitem"><p>Необходимо инициализировать и выполнить возможные
+	    промежуточные программы загрузки и ядро.  В этой области
+	    существует несколько важных вариаций:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><acronym class="acronym">PXE</acronym> загрузит <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a>,
+		являющийся модифицированной версией загрузчика
+		третьей стадии FreeBSD.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a> получит большинство
+		параметров, необходимых для старта системы, и оставит
+		их в окружении ядра до контроля передачи.  В этом
+		случае возможно использование ядра
+		<code class="filename">GENERIC</code>.</p></li><li class="listitem"><p><span class="application">Etherboot</span>, непосредственно
+		загрузит ядро, с меньшей подготовкой.  Вам потребуется
+		собрать ядро со специальными параметрами.</p></li></ul></div><p><acronym class="acronym">PXE</acronym> и <span class="application">Etherboot</span>
+	    работают одинаково хорошо; тем не менее, поскольку ядро
+	    обычно позволяет <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a> выполнить больше
+	    предварительной работы, метод <acronym class="acronym">PXE</acronym>
+	    предпочтителен.</p><p>Если ваш <acronym class="acronym">BIOS</acronym> и сетевые карты поддерживают
+	    <acronym class="acronym">PXE</acronym>, используйте его.</p></li><li class="listitem"><p>Наконец, компьютеру требуется доступ к файловым системам.
+	    <acronym class="acronym">NFS</acronym> используется во всех случаях.</p></li></ul></div><p>Обратитесь также к странице справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diskless&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">diskless</span>(8)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100409424"></a>27.6.2. Инструкции по настройке</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100410192"></a>27.6.2.1. Конфигурация с использованием ISC DHCP</h4></div></div></div><a id="idp100410832" class="indexterm"></a><p>Сервер <span class="application">ISC DHCP</span> может обрабатывать
+	    как запросы BOOTP, так и запросы <acronym class="acronym">DHCP</acronym>.</p><p><span class="application">ISC DHCP 3.0</span>
+	    не включается в поставку системы.  Сначала вам нужно будет
+	    установить порт <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/isc-dhcp3-server/pkg-descr">net/isc-dhcp3-server</a>
+	    или соответствующий пакет.</p><p>После установки <span class="application">ISC DHCP</span> ему для
+	    работы требуется конфигурационный файл (обычно называемый
+	    <code class="filename">/usr/local/etc/dhcpd.conf</code>).  Вот
+	    прокомментированный пример, где хост <code class="systemitem">margaux</code>
+	    использует <span class="application">Etherboot</span>, а хост
+	    <code class="systemitem">corbieres</code> использует
+	    <acronym class="acronym">PXE</acronym>:</p><pre class="programlisting">
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+
+option domain-name "example.com";
+option domain-name-servers 192.168.4.1;
+option routers 192.168.4.1;
+
+subnet 192.168.4.0 netmask 255.255.255.0 {
+  use-host-decl-names on; <a id="co-dhcp-host-name"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+  option subnet-mask 255.255.255.0;
+  option broadcast-address 192.168.4.255;
+
+  host margaux {
+    hardware ethernet 01:23:45:67:89:ab;
+    fixed-address margaux.example.com;
+    next-server 192.168.4.4; <a id="co-dhcp-next-server"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+    filename "/data/misc/kernel.diskless"; <a id="co-dhcp-filename"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+    option root-path "192.168.4.4:/data/misc/diskless"; <a id="co-dhcp-root-path"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+  }
+  host corbieres {
+    hardware ethernet 00:02:b3:27:62:df;
+    fixed-address corbieres.example.com;
+    next-server 192.168.4.4;
+    filename "pxeboot";
+    option root-path "192.168.4.4:/data/misc/diskless";
+  }
+}
+	  </pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-host-name"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Этот параметр указывает <span class="application">dhcpd</span> посылать
+		значения деклараций <code class="literal">host</code> как имя хоста для
+		бездисковой машины.  Альтернативным способом было бы добавление
+		<code class="literal">option host-name
+		<em class="replaceable"><code>margaux</code></em></code> внутри объявлений
+		<code class="literal">host</code>.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-next-server"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Директива <code class="literal">next-server</code> определяет сервер
+		<acronym class="acronym">TFTP</acronym> или <acronym class="acronym">NFS</acronym>,
+		используемый для получения загрузчика или файла ядра
+		(по умолчанию используется тот же самый хост, на котором
+		расположен сервер <acronym class="acronym">DHCP</acronym>).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-filename"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Директива <code class="literal">filename</code> определяет файл,
+		который <span class="application">Etherboot</span> или
+		<acronym class="acronym">PXE</acronym> будут загружать для следующего шага
+		выполнения.  Он должен быть указан в соответствии с
+		используемым методом передачи.
+		<span class="application">Etherboot</span> может быть скомпилирован
+		для использования <acronym class="acronym">NFS</acronym> или
+		<acronym class="acronym">TFTP</acronym>.  FreeBSD порт по умолчанию использует
+		<acronym class="acronym">NFS</acronym>.  <acronym class="acronym">PXE</acronym> использует
+		<acronym class="acronym">TFTP</acronym>, поэтому здесь применяются
+		относительные пути файлов (это может зависеть от настроек
+		<acronym class="acronym">TFTP</acronym> сервера, но обычно довольно типично).
+		Кроме того, <acronym class="acronym">PXE</acronym> загружает
+		<code class="filename">pxeboot</code>, а не ядро.  Существуют другие
+		интересные возможности, такие как загрузка
+		<code class="filename">pxeboot</code> из каталога
+		<code class="filename">/boot</code> FreeBSD CD-ROM
+		(поскольку <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> может загружать
+		<code class="filename">GENERIC</code> ядро, это делает возможной
+		загрузку с удаленного CD-ROM).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-root-path"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Параметр <code class="literal">root-path</code> определяет путь к
+		корневой файловой системе, в обычной нотации
+		<acronym class="acronym">NFS</acronym>.  При использовании
+		<acronym class="acronym">PXE</acronym>, можно оставить IP хоста отключенным,
+		если параметр ядра BOOTP не используется.  Затем
+		<acronym class="acronym">NFS</acronym> сервер может использоваться так же,
+		как и <acronym class="acronym">TFTP</acronym>.</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100439248"></a>27.6.2.2. Настройка с использованием BOOTP</h4></div></div></div><a id="idp100439888" class="indexterm"></a><p>Далее описана эквивалентная конфигурация с использованием
+	    <span class="application">bootpd</span> (для одного клиента).
+	    Она будет располагаться в
+	    <code class="filename">/etc/bootptab</code>.</p><p>Пожалуйста, отметьте, что <span class="application">Etherboot</span>
+	    должен быть откомпилирован с нестандартной опцией
+	    <code class="literal">NO_DHCP_SUPPORT</code> для того, чтобы можно было
+	    использовать BOOTP, и что для работы <acronym class="acronym">PXE</acronym>
+	    <span class="emphasis"><em>необходим</em></span> <acronym class="acronym">DHCP</acronym>.
+	    Единственным очевидным
+	    преимуществом <span class="application">bootpd</span> является его
+	    наличие в поставке системы.</p><pre class="programlisting">
+.def100:\
+  :hn:ht=1:sa=192.168.4.4:vm=rfc1048:\
+  :sm=255.255.255.0:\
+  :ds=192.168.4.1:\
+  :gw=192.168.4.1:\
+  :hd="/tftpboot":\
+  :bf="/kernel.diskless":\
+  :rp="192.168.4.4:/data/misc/diskless":
+
+margaux:ha=0123456789ab:tc=.def100
+	  </pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100445520"></a>27.6.2.3. Подготовка программы загрузки при помощи
+	  <span class="application">Etherboot</span></h4></div></div></div><a id="idp100446416" class="indexterm"></a><p><a class="link" href="http://etherboot.sourceforge.net" target="_top">Сайт
+	  Etherboot</a> содержит <a class="link" href="http://etherboot.sourceforge.net/doc/html/userman/t1.html" target="_top">
+	  подробную документацию</a>, в основном предназначенную для систем
+	  Linux, но несомненно, она полезна.  Далее будет просто кратко
+	  описано, как вы должны использовать
+	  <span class="application">Etherboot</span> в системе FreeBSD.</p><p>Сначала вы должны установить пакет или порт <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/etherboot/pkg-descr">net/etherboot</a>.</p><p>Вы можете изменить настройку
+	  <span class="application">Etherboot</span> (например, для использования
+	  <acronym class="acronym">TFTP</acronym> вместо <acronym class="acronym">NFS</acronym>) путем
+	  редактирования файла <code class="filename">Config</code>
+	  в каталоге исходных текстов
+	  <span class="application">Etherboot</span>.</p><p>В нашей ситуации мы будем использовать загрузочную дискету.  Для
+	  других методов (PROM или программа <span class="trademark">MS-DOS</span>(R)) пожалуйста, обратитесь к
+	  документации по <span class="application">Etherboot</span>.</p><p>Для создания загрузочной дискеты, вставьте дискету в дисковод на
+	  машине, где установлен <span class="application">Etherboot</span>, затем
+	  перейдите в каталог <code class="filename">src</code> в дереве
+	  <span class="application">Etherboot</span> и наберите:</p><pre class="screen">
+<code class="prompt">#</code> <strong class="userinput"><code>gmake bin32/<em class="replaceable"><code>devicetype</code></em>.fd0</code></strong>
+	</pre><p><em class="replaceable"><code>devicetype</code></em> зависит от типа адаптера
+	  Ethernet на бездисковой рабочей станции.  Обратитесь к файлу
+	  <code class="filename">NIC</code> в том же самом каталоге для определения
+	  правильного значения для
+	  <em class="replaceable"><code>devicetype</code></em>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100466640"></a>27.6.2.4. Загрузка с <acronym class="acronym">PXE</acronym></h4></div></div></div><p>По умолчанию, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> загружает ядро через
+	  <acronym class="acronym">NFS</acronym>.  Он может быть скомпилирован для
+	  использования вместо него <acronym class="acronym">TFTP</acronym> путем
+	  указания параметра <code class="literal">LOADER_TFTP_SUPPORT</code> в
+	  <code class="filename">/etc/make.conf</code>.  Смотрите комментарии в
+	  файле <code class="filename">/usr/share/examples/etc/make.conf</code>.</p><p>Есть два не документированных параметра
+	  <code class="filename">make.conf</code>, которые могут быть полезны для
+	  настройки бездискового компьютера с последовательной консолью:
+	  <code class="literal">BOOT_PXELDR_PROBE_KEYBOARD</code>, и
+	  <code class="literal">BOOT_PXELDR_ALWAYS_SERIAL</code>.</p><p>Для использования <acronym class="acronym">PXE</acronym> при загрузке компьютера
+	  вам обычно потребуется выбрать параметр <code class="literal">Boot from
+	  network</code> (загрузка по сети) в настройках
+	  <acronym class="acronym">BIOS</acronym>, или нажать функциональную клавишу во
+	  время загрузки PC.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100474192"></a>27.6.2.5. Настройка серверов <acronym class="acronym">TFTP</acronym> и <acronym class="acronym">NFS</acronym></h4></div></div></div><a id="idp100475472" class="indexterm"></a><a id="idp100476624" class="indexterm"></a><p>Если вы используете <acronym class="acronym">PXE</acronym> или
+	  <span class="application">Etherboot</span>, настроенные для
+	  использования <acronym class="acronym">TFTP</acronym>, вам нужно включить
+	  <span class="application">tftpd</span> на файловом сервере:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Создайте каталог, файлы которого будет обслуживать
+	      <span class="application">tftpd</span>, например,
+	      <code class="filename">/tftpboot</code>.</p></li><li class="step"><p>Добавьте в ваш <code class="filename">/etc/inetd.conf</code> такую
+	      строчку:</p><pre class="programlisting">tftp	dgram	udp	wait	root	/usr/libexec/tftpd	tftpd -l -s /tftpboot</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Бывает, что некоторым версиям <acronym class="acronym">PXE</acronym>
+		требуется <acronym class="acronym">TCP</acronym>-вариант
+		<acronym class="acronym">TFTP</acronym>.  В таком случае добавьте вторую
+		строчку, заменяющую
+		<code class="literal">dgram udp</code> на <code class="literal">stream
+		tcp</code>.</p></div></li><li class="step"><p>Сообщите <span class="application">inetd</span> о необходимости
+	      перечитать свой файл конфигурации.
+	      Файл <code class="filename">/etc/rc.conf</code> должен содержать строку
+	      <code class="option">inetd_enable="YES"</code> для корректного исполнения
+	      команды</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/inetd restart</code></strong></pre></li></ol></div><p>Вы можете поместить каталог <code class="filename">tftpboot</code> в любом
+	  месте на сервере.  Проверьте, что это местоположение указано как в
+	  <code class="filename">inetd.conf</code>, так и в
+	  <code class="filename">dhcpd.conf</code>.</p><p>Во всех случаях, вам также нужно включить
+	  <acronym class="acronym">NFS</acronym> и экспортировать
+	  соответствующую файловую систему на сервере
+	  <acronym class="acronym">NFS</acronym>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Добавьте следующее в
+	      <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">nfs_server_enable="YES"</pre></li><li class="step"><p>Экспортируйте файловую систему, в которой расположен
+	      корневой каталог для бездисковой рабочей станции, добавив
+	      следующую строку в <code class="filename">/etc/exports</code> (подправьте
+	      точку монтирования и замените <em class="replaceable"><code>margaux
+	      corbieres</code></em>
+	      именами бездисковых рабочих станций):</p><pre class="programlisting"><em class="replaceable"><code>/data/misc</code></em> -alldirs -ro <em class="replaceable"><code>margaux corbieres</code></em></pre></li><li class="step"><p>Заставьте <span class="application">mountd</span> перечитать
+	      настроечный файл.  На самом деле если вам потребовалось на
+	      первом шаге включить <acronym class="acronym">NFS</acronym> в <code class="filename">/etc/rc.conf</code>, то
+	      вам нужно будет выполнить перезагрузку.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/mountd restart</code></strong></pre></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100519632"></a>27.6.2.6. Построение ядра для бездисковой рабочей станции</h4></div></div></div><a id="idp100520272" class="indexterm"></a><p>При использовании <span class="application">Etherboot</span>, вам
+	  потребуется создать конфигурационный файл ядра для бездискового
+	  клиента со
+	  следующими параметрами (вдобавок к обычным):</p><pre class="programlisting">
+options     BOOTP          # Use BOOTP to obtain IP address/hostname
+options     BOOTP_NFSROOT  # NFS mount root filesystem using BOOTP info
+	</pre><p>Вам может потребоваться использовать
+	  <code class="literal">BOOTP_NFSV3</code>, <code class="literal">BOOT_COMPAT</code>
+	  и <code class="literal">BOOTP_WIRED_TO</code>
+	  (посмотрите файл <code class="filename">NOTES</code>).</p><p>Эти имена параметров сложились исторически, и могут немного
+	  ввести в заблуждение, поскольку включают необязательное
+	  использование <acronym class="acronym">DHCP</acronym> и BOOTP в ядре (возможно
+	  включение обязательного использования BOOTP
+	  или <acronym class="acronym">DHCP</acronym> use).</p><p>Постройте ядро (обратитесь к <a class="xref" href="kernelconfig.html" title="Глава 9. Настройка ядра FreeBSD">Глава 9, <em>Настройка ядра FreeBSD</em></a>) и
+	  скопируйте его в каталог, указанный в
+	  <code class="filename">dhcpd.conf</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">При использовании <acronym class="acronym">PXE</acronym>, сборка ядра
+	  с вышеприведенными параметрами не является совершенно необходимой
+	  (хотя желательна).  Включение этих параметров приведет к
+	  выполнению большинства <acronym class="acronym">DHCP</acronym> запросов во время
+	  загрузки ядра, с небольшим риском несоответствия новых значений
+	  и значений, полученных <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> в некоторых особых
+	  случаях.  Преимущество использования в том, что в качестве
+	  побочного эффекта будет установлено имя хоста.  Иначе вам
+	  потребуется установить имя хоста другим методом, например
+	  в клиент-специфичном файле <code class="filename">rc.conf</code>.</p></div><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Для включения возможности загрузки с
+	    <span class="application">Etherboot</span>, в ядро необходимо
+	    включить устройство hints.  Вам потребуется установить
+	    в файле конфигурации следующий параметр (см. файл
+	    комментариев <code class="filename">NOTES</code>):</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">hints		"GENERIC.hints"</pre></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100531408"></a>27.6.2.7. Подготовка корневой файловой системы</h4></div></div></div><a id="idp100532048" class="indexterm"></a><p>Вам нужно создать корневую файловую систему для бездисковых
+	  рабочих станций, в местоположении, заданном как
+	  <code class="literal">root-path</code> в
+	  <code class="filename">dhcpd.conf</code>.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100534480"></a>27.6.2.7.1. Использование процедуры
+	    <code class="command">make world</code></h5></div></div></div><p>Этот метод
+	    установит новую систему (не только корневую) в
+	    <code class="envar">DESTDIR</code>.  Все, что вам потребуется сделать,
+	    это просто выполнить следующий скрипт:</p><pre class="programlisting">#!/bin/sh
+export DESTDIR=/data/misc/diskless
+mkdir -p ${DESTDIR}
+cd /usr/src; make buildworld &amp;&amp; make buildkernel
+cd /usr/src/etc; make distribution</pre><p>Как только это будет сделано, вам может потребоваться
+	    настроить <code class="filename">/etc/rc.conf</code> и
+	    <code class="filename">/etc/fstab</code>, помещенные в
+	    <code class="envar">DESTDIR</code>, в соответствии с вашими
+	    потребностями.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100538576"></a>27.6.2.8. Настройка области подкачки</h4></div></div></div><p>Если это нужно, то файл подкачки, расположенный на сервере, можно
+	  использовать посредством <acronym class="acronym">NFS</acronym>.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100539984"></a>27.6.2.8.1. Подкачка через <acronym class="acronym">NFS</acronym></h5></div></div></div><p>На стадии загрузки ядро не поддерживает подкачку через
+	    <acronym class="acronym">NFS</acronym>.  Подкачка должна быть разрешена при помощи
+	    загрузочных скриптов, монтирующих файловую систему, пригодную для
+	    записи и создающих на ней файл подкачки.  Для создания файла
+	    подкачки подходящего размера вы можете выполнить следующие
+	    команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/zero of=<em class="replaceable"><code>/path/to/swapfile</code></em> bs=1k count=1 oseek=<em class="replaceable"><code>100000</code></em></code></strong></pre><p>Для активации этого файла подкачки следует добавить в файл
+	    <code class="filename">rc.conf</code> строку</p><pre class="programlisting">swapfile=<em class="replaceable"><code>/path/to/swapfile</code></em></pre></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100553296"></a>27.6.2.9. Различные проблемы</h4></div></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100553936"></a>27.6.2.9.1. Работа с <code class="filename">/usr</code>, доступной только для
+	    чтения</h5></div></div></div><a id="idp100555088" class="indexterm"></a><p>Если бездисковая рабочая станция настроена на запуск X, вам
+	    нужно подправить настроечный файл для
+	    <span class="application">XDM</span>, который по умолчанию
+	    помещает протокол ошибок в <code class="filename">/usr</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp100557648"></a>27.6.2.9.2. Использование не-FreeBSD сервера</h5></div></div></div><p>Если сервер с корневой файловой системой работает не под
+	    управлением FreeBSD, вам потребуется создать корневую файловую
+	    систему на машине FreeBSD, а затем скопировать ее в нужно место,
+	    при помощи <code class="command">tar</code> или
+	    <code class="command">cpio</code>.</p><p>В такой ситуации иногда возникают проблемы со
+	    специальными файлами в <code class="filename">/dev</code> из-за различной
+	    разрядности целых чисел для старшего/младшего чисел.  Решением
+	    этой проблемы является экспортирование каталога с не-FreeBSD
+	    сервера, монтирование его на машине с FreeBSD и использование
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs</span>(5)</span></a> для создания файлов устройств прозрачно
+	    для пользователя.</p></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-bridging.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="network-isdn.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">27.5. Мосты </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 27.7. ISDN</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>
