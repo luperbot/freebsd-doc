@@ -50,7 +50,7 @@ def is_single(files):
 def convert_dir(dir_path):
     """dir_path is the path name of all the files to convert (ex en_US.ISO8859-1)"""
     print "Converting .html files to .rst for %s" % dir_path
-    encoding = dir_path.split('/')[1].split('.')[1]
+    encoding = dir_path.split('/')[-2].split('.')[1]
     print "Original encoding is: %s" % encoding
     for root, dirs, files in os.walk(dir_path):
         single = is_single(files)
