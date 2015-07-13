@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>9.7. Hibakeresés</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="printing.html" title="9. fejezet - Nyomtatás" /><link rel="prev" href="printing-lpd-alternatives.html" title="9.6. Más nyomtatási rendszerek" /><link rel="next" href="linuxemu.html" title="10. fejezet - Bináris Linux kompatibilitás" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">9.7. Hibakeresés</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="printing-lpd-alternatives.html">Vissza</a> </td><th width="60%" align="center">9. fejezet - Nyomtatás</th><td width="20%" align="right"> <a accesskey="n" href="linuxemu.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="printing-troubleshooting"></a>9.7. Hibakeresés</h2></div></div></div><p>Miután az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lptest&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lptest</span>(1)</span></a> programmal
+      elvégeztünk néhány egyszerű
+      próbát, a várt helyett a következők
+      egyikét kaphatjuk eredményül:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Egy kis idő után minden remekül
+	  működött, vagy nem dobta ki az egész
+	  lapot.</span></dt><dd><p>A nyomtató nyomtatott egy keveset, aztán
+	    egy ideig csendben maradt és nem csinált
+	    semmit.  Ilyenkor a nyomtatnivalók
+	    megjelenéséhez minden bizonnyal meg kell
+	    nyomnunk a nyomtatón levő <span class="quote">"<span class="quote">PRINT
+	    REMAINING</span>"</span> vagy <span class="quote">"<span class="quote">FORM FEED</span>"</span>
+	    feliratú gombokat.</p><p>Ebben az esetben a nyomtató
+	    valószínűleg még arra várt,
+	    hogy még a nyomtatás megkezdése
+	    előtt érkezik valamilyen további adat.
+	    Ettől a gondtól úgy szabadulhatunk meg,
+	    ha beállítunk egy szövegszűrőt,
+	    amely minden (szükséges) esetben küld egy
+	    <span class="quote">"<span class="quote">FORM FEED</span>"</span> (lapdobás) jelzést is
+	    a nyomtatónak.  Ez kell általában
+	    ahhoz, hogy a szövegnek a nyomtató belső
+	    pufferében megmaradt része azonnal
+	    kinyomtatódjon.  Akkor is a javunkra válhat
+	    ez, ha minden egyes nyomtatási feladatot
+	    külön lapon akarunk kezdeni, mivel így a
+	    következő nyomtatási feladat sosem
+	    közvetlenül ott kezdődik, ahol az
+	    előző feladat befejezte a
+	    nyomtatást.</p><p>A <code class="filename">/usr/local/libexec/if-simple</code>
+	    szűrő helyett a következő szkript
+	    használhatával tudunk minden nyomtatási
+	    feladat elvégzése után elküldeni
+	    egy lapdobást:</p><pre class="programlisting">#!/bin/sh
+#
+# if-simple - Egyszerű lpd szövegszűrő
+# Helye: /usr/local/libexec/if-simple
+#
+# Egyszerűen átmásolja a szabvány bemenetet a szabvány kimenetre, és
+# figyelmen kívül hagyja az összes többi paramétert.  Minden nyomtatási
+# nyomtatási feladat elvégzése után küld egy lapdobást (\f).
+
+/bin/cat &amp;&amp; printf "\f" &amp;&amp; exit 0
+exit 2</pre></dd><dt><span class="term"><span class="quote">"<span class="quote">Lépcsősen</span>"</span> jelentek meg a
+	  sorok.</span></dt><dd><p>Ekkor a következőt látjuk a
+	    lapon:</p><pre class="screen">!"#$%&amp;'()*+,-./01234
+                "#$%&amp;'()*+,-./012345
+                                 #$%&amp;'()*+,-./0123456</pre><a id="idp82994384" class="indexterm"></a><a id="idp82994896" class="indexterm"></a><a id="idp82995408" class="indexterm"></a><p>Az ún.
+	    <span class="emphasis"><em>lépcsőhatás</em></span>
+	    áldozatává váltunk, amelyet a
+	    sortörést jelző karakter eltérő
+	    értelmezései okoznak.  A <span class="trademark">UNIX</span>(R)
+	    stílusú operációs rendszerek
+	    erre mindössze egyetlen karaktert használnak: ez
+	    a 10-es kódú ASCII karakter (sordobás,
+	    Line Feed, LF).  Az <span class="trademark">MS-DOS</span>(R), <span class="trademark">OS/2</span>(R) és mások
+	    pedig két karakterrel oldják meg ezt a
+	    feladatot: a 10-es <span class="emphasis"><em>és</em></span> 13-as
+	    kódú (kocsivissza, Carriage Return, CR) ASCII
+	    karakterekkel.  A sortöréseknél sok
+	    nyomtató az <span class="trademark">MS-DOS</span>(R) szokásait
+	    követi.</p><p>Amikor a FreeBSD-vel nyomtatunk, akkor csak egyetlen
+	    karaktert használunk sortörésre.  Ennek
+	    láttán a nyomtató lépteti a
+	    sort, azonban a fej vízszintes
+	    pozícióját nem változtatja meg a
+	    következő sor nyomtatásának
+	    megkezdésekor.  Erre lenne a kocsivissza karakter,
+	    vagyis ennek hatására fogja a nyomtató
+	    a papír bal oldalára
+	    visszaállítani a következő
+	    nyomtatandó karakter
+	    pozícióját.</p><p>A FreeBSD így szeretné utasítani a
+	    nyomtatót:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>A nyomtató kocsivisszát
+		    kap</td><td>A nyomtató visszalépteti a
+		    pozíciót</td></tr><tr><td>A nyomtató sordobást kap</td><td>A nyomtató új sort kezd</td></tr></tbody></table></div><p>Néhány módszer ennek
+	    kiváltására:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>A nyomtatón található
+		kapcsolók vagy vezérlőpanel
+		segítségével
+		próbáljuk meg
+		átállítani a
+		vezérlőkarakterek nyomtató szerinti
+		értelmezését.  Keressük meg a
+		nyomtató kézikönyvében, hogyan
+		tudjuk ezt megcsinálni.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ha a FreeBSD mellett más
+		  operációs rendszerekkel is
+		  használni akarjuk a nyomtatót, akkor
+		  azok indítása előtt mindig
+		  <span class="emphasis"><em>át kell
+		  állítani</em></span> a nyomtatót a
+		  megfelelő értelmezés
+		  alkalmazására.  Ilyenkor
+		  valószínűleg a lentebb
+		  szereplő megoldásokat
+		  részesítjük majd inkább
+		  előnyben.</p></div></li><li class="listitem"><p>Állítsuk be úgy a FreeBSD soros
+		vonali meghajtóját, hogy
+		magától alakítsa át az LF
+		karaktereket CR+LF párokká.
+		Természetesen ez a megoldás
+		<span class="emphasis"><em>csak</em></span> a soros portra
+		csatlakozó nyomtatók esetében
+		működhet.  Ehhez az
+		<code class="filename">/etc/printcap</code>
+		állományban a nyomtató
+		leírásánál az
+		<code class="literal">ms#</code> tulajdonságnál
+		adjuk meg az <code class="literal">onlcr</code>
+		módot.</p></li><li class="listitem"><p>Küldjünk olyan
+		<span class="emphasis"><em>kódot</em></span> a nyomtatónak,
+		amelynek hatására ideiglenesen
+		máshogy fogja kezelni az LF karaktereket.
+		Nézzük meg a nyomtatóhoz
+		mellékelt útmutatóban, hogy milyen
+		kódokat tudunk ilyen célra
+		használni.  Ha találtunk ilyen
+		kódot, akkor írjuk át úgy a
+		hozzá tartozó szövegszűrőt,
+		hogy a nyomtatási feladatok előtt mindig
+		elküldjük azt.</p><a id="idp83009744" class="indexterm"></a><p>Most bemutatjuk egy olyan szövegszűrő
+		kódját, amely a Hewlett-Packard PCL
+		kódjait ismerő nyomtatókhoz
+		készült.  Ebben a szűrőben
+		először kiadjuk, hogy az LF karaktereket LF
+		és CR karakterek
+		kombinációjának tekintse a
+		nyomtató, majd elküldjük magát a
+		nyomtatási feladatot, és a
+		nyomtatási feladat eredményének
+		utolsó lapja után elküldünk egy
+		lapdobást.  Szinte az összes Hewlett Packard
+		nyomtatóval működnie kell.</p><pre class="programlisting">#!/bin/sh
+#
+# hpif - Egyszerű lpd bemeneti szűrő a HP-PCL alapú nyomtatókhoz
+# Helye: /usr/local/libexec/hpif
+#
+# Egyszerűen átmásolja a szabvány kimenetet a szabvány bemenetre, és
+# figyelmen kívül hagyja a paramétereket. Elküldi a nyomtatónak, hogy
+# az LF karaktereket CR+LF-ként kezelje, majd a feladat befejeztével
+# lapot dobat.
+
+printf "\033&amp;k2G" &amp;&amp; cat &amp;&amp; printf "\033&amp;l0H" &amp;&amp; exit 0
+exit 2</pre><p>Példaként megadjuk még az
+		<code class="systemitem">orchid</code> nevű
+		számítógép
+		<code class="filename">/etc/printcap</code>
+		állományát is.  Ebben egyetlen
+		nyomtató csatlakozik a párhuzamos portra,
+		amelynek a típusa LaserJet 3Si és a neve
+		<code class="literal">teak</code>.  Az előbb bemutatott
+		szövegszűrőt használja:</p><pre class="programlisting">#
+#  /etc/printcap (orchid)
+#
+teak|hp|laserjet|Hewlett Packard LaserJet 3Si:\
+        :lp=<code class="filename">/dev/lpt0</code>:sh:sd=<code class="filename">/var/spool/lpd/teak</code>:mx#0:\
+        :if=<code class="filename">/usr/local/libexec/hpif</code>:</pre></li></ul></div></dd><dt><span class="term">Egymásra írja a sorokat.</span></dt><dd><p>A nyomtató nem lépteti a sorokat,
+	    ezért az összes sor egymáson jelenik
+	    meg.</p><p>Ez pontosan a ritka <span class="quote">"<span class="quote">ellentéte</span>"</span> a
+	    fentebb leírt lépcsőhatásnak.  A
+	    FreeBSD által sortörésre használt LF
+	    karakterek valamiért CR karakterekként
+	    viselkednek, ezért a nyomtató nem sort
+	    vált, hanem a lap bal szélére
+	    állítja a fejet.</p><p>A nyomtatón található
+	    kapcsolókkal vagy vezérlőpanellel
+	    így állítsuk be a sordobás
+	    és kocsivissza karakterek
+	    értelmezését:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Amit a nyomtató kap</th><th>Arra a nyomtató nyomtat</th></tr></thead><tbody><tr><td>CR</td><td>CR</td></tr><tr><td>LF</td><td>CR + LF</td></tr></tbody></table></div></dd><dt><span class="term">A nyomtató elhagy karaktereket.</span></dt><dd><p>Miközben nyomtatunk, a nyomtató bizonyos
+	    karaktereket nem hajlandó megjeleníteni.  A
+	    probléma ennél nagyobb, ha a nyomtató
+	    működése közben egyre több
+	    és több karaktert hagy ki.</p><p>Itt az a gond, hogy a nyomtató nem képes
+	    tartani az iramot a számítógép
+	    által a soros vonalon átküldött
+	    adatok sebességével (ez a probléma nem
+	    jelentkezhet a párhuzamos nyomtatók
+	    esetén).  Két módon kerekedhetünk
+	    felül ezen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Ha a nyomtató ismeri a XON/XOFF
+		típusú
+		forgalomirányítást, akkor az
+		<code class="literal">ms#</code> tulajdonságnál
+		adjuk meg a FreeBSD számára az
+		<code class="literal">ixon</code>
+		beállítást.</p></li><li class="listitem"><p>Ha a nyomtató ismeri a <span class="quote">"<span class="quote">Request to Send
+		/ Clear to Send</span>"</span> alapú hardveres
+		kézfogást (más néven
+		<code class="literal">RTS/CTS</code>
+		forgalomirányítást), akkor az
+		<code class="literal">ms#</code> tulajdonságnál a
+		<code class="literal">crtscts</code>
+		beállítást adjuk meg.
+		Gondoskodjunk róla, hogy a
+		számítógépet és a
+		nyomtatót összekötő kábel
+		meg tudjon majd birkózni ezzel a
+		típusú
+		forgalomirányítással.</p></li></ul></div></dd><dt><span class="term">Mindenféle szemetet nyomtat.</span></dt><dd><p>A nyomtató nem a nyomtatni kívánt
+	    szöveget hozza létre, hanem összevissza
+	    nyomtat.</p><p>Ez a soros nyomtatók helytelen
+	    kommunikációs
+	    beállításának egy másik
+	    jellemző tünete.  Ellenőrizzük a
+	    <code class="literal">br</code> tulajdonságnál megadott
+	    adatátviteli sebességet és az
+	    <code class="literal">ms#</code> tulajdonságnál megadott
+	    paritási beállításokat.
+	    Egyeztessük a nyomtató saját és az
+	    <code class="filename">/etc/printcap</code> állományban
+	    tárolt beállításait.</p></dd><dt><span class="term">Semmi sem történik.</span></dt><dd><p>Ha semmi sem történt, akkor a gond
+	    magával a FreeBSD-vel lehet, nem pedig a hardverrel.  Az
+	    <code class="filename">/etc/printcap</code> állományba
+	    a vizsgálni kívánt nyomtató
+	    leírásához (az <code class="literal">lf</code>
+	    tulajdonsággal) illesszünk be
+	    naplózást.  Például így
+	    fog kinézni a <code class="literal">rattan</code> nevű
+	    nyomtató bejegyzése az <code class="literal">lf</code>
+	    tulajdonság megadásával
+	    kibővítve:</p><pre class="programlisting">rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:sd=<code class="filename">/var/spool/lpd/rattan</code>:\
+        :lp=<code class="filename">/dev/lpt0</code>:\
+        :if=<code class="filename">/usr/local/libexec/if-simple</code>:\
+        :lf=<code class="filename">/var/log/rattan.log</code></pre><p>Miután ezt megcsináltuk,
+	    próbálkozzunk újra.  Nézzük
+	    meg a naplóállományban (ami a
+	    példánkban a
+	    <code class="filename">/var/log/rattan.log</code> nevén
+	    érhető el), hogy látunk-e valamilyen
+	    hibaüzenetet.  Az itt tapasztalt hibaüzenetek
+	    nyomán elindulva igyekezzünk megszüntetni a
+	    probléma forrását.</p><p>Ha nem adjuk meg az <code class="literal">lf</code>
+	    tulajdonságot, akkor az
+	    <span class="application">LPD</span> erre a célra
+	    alapértelmezés szerint a <code class="filename">/dev/console</code>
+	    állományt használja.</p></dd></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="printing-lpd-alternatives.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="printing.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="linuxemu.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">9.6. Más nyomtatási rendszerek </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 10. fejezet - Bináris Linux kompatibilitás</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

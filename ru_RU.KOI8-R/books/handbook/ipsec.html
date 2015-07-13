@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>14.10. VPN через IPsec</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="security.html" title="Глава 14. Безопасность" /><link rel="prev" href="openssl.html" title="14.9. OpenSSL" /><link rel="next" href="openssh.html" title="14.11. OpenSSH" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">14.10. VPN через IPsec</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="openssl.html">Пред.</a> </td><th width="60%" align="center">Глава 14. Безопасность</th><td width="20%" align="right"> <a accesskey="n" href="openssh.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ipsec"></a>14.10. VPN через IPsec</h2></div><div><span class="authorgroup">Написал <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nik</span> <span class="surname">Clayton</span></span>. </span></div></div></div><a id="idp89052496" class="indexterm"></a><p>Создание VPN между двумя сетями, соединенными через интернет,
+      с использованием шлюзов FreeBSD.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89053648"></a>14.10.1. Принципы работы IPsec</h3></div><div><span class="authorgroup">Написал <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Hiten M.</span> <span class="surname">Pandya</span></span>. </span></div></div></div><p>Этот раздел послужит вам руководством по настройке IPsec и его
+	использованию в среде FreeBSD и <span class="application"><span class="trademark">Microsoft</span>(R) <span class="trademark">Windows</span>(R)
+	2000/XP</span>, соединяемых безопасным способом.
+	Для настройки IPsec необходимо ознакомиться с процессом
+	сборки ядра (<a class="xref" href="kernelconfig.html" title="Глава 9. Настройка ядра FreeBSD">Глава 9, <em>Настройка ядра FreeBSD</em></a>).</p><p><span class="emphasis"><em>IPsec</em></span> это протокол, расположенный поверх
+	слоя Internet Protocol (IP).  Он позволяет двум или более хостам
+	связываться защищенным способом (отсюда и название протокола).
+	<span class="quote"><<<span class="quote">Сетевой стек</span>>></span> FreeBSD IPsec основан на
+	реализации <a class="link" href="http://www.kame.net/" target="_top">KAME</a>,
+	поддерживающей оба семейства протоколов, IPv4 и IPv6.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">FreeBSD содержит <span class="quote"><<<span class="quote">аппаратно
+	  поддерживаемый</span>>></span> стек IPsec, известный как <span class="quote"><<<span class="quote">Fast
+	  IPsec</span>>></span>, заимствованный из OpenBSD.  Для оптимизации
+	  производительности IPsec он задействует криптографическое
+	  оборудование (когда оно доступно) через подсистему <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crypto&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">crypto</span>(4)</span></a>.
+	  Это новая подсистема и она не поддерживает всех возможностей,
+	  доступных в KAME версии IPsec.  Для включения IPsec с аппаратной
+	  поддержкой необходимо добавить в файл настройки ядра следующий
+	  параметр:</p><a xmlns="http://www.w3.org/1999/xhtml" id="idp89062864" class="indexterm"></a><pre xmlns="http://www.w3.org/1999/xhtml" class="screen">options	  FAST_IPSEC  # new IPsec (cannot define w/ IPSEC)</pre><p xmlns="http://www.w3.org/1999/xhtml">Обратите внимание, что на данный момент невозможно
+	  использовать подсистему <span class="quote"><<<span class="quote">Fast IPsec</span>>></span> вместе
+	  с KAME реализацией IPsec.  Обратитесь к странице справочника
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fast_ipsec&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">fast_ipsec</span>(4)</span></a> за дальнейшей информацией.</p></div><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Для того, чтобы применять к туннелям <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gif&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gif</span>(4)</span></a>
+	  межсетевые экраны, вам потребуется включить в ядро опцию
+	  <code class="option">IPSEC_FILTERGIF</code>:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen">
+options   IPSEC_FILTERGIF  #filter ipsec packets from a tunnel
+	</pre></div><a id="idp89072592" class="indexterm"></a><a id="idp89073744" class="indexterm"></a><p>IPsec состоит из двух подпротоколов:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>Encapsulated Security Payload
+	    (ESP)</em></span>, защищающей данные IP пакета от вмешательства
+	    третьей стороны путем шифрования содержимого с помощью
+	    симметричных криптографических алгоритмов (таких как
+	    Blowfish,3DES).</p></li><li class="listitem"><p><span class="emphasis"><em>Authentication Header (AH)</em></span>,
+	    защищающий заголовок IP пакета от вмешательства третьей стороны
+	    и подделки путем вычисления криптографической контрольной суммы
+	    и хеширования полей заголовка IP пакета защищенной функцией
+	    хеширования.  К пакету добавляется дополнительный заголовок
+	    с хэшем, позволяющий аутентификацию информации пакета.</p></li></ul></div><p><acronym class="acronym">ESP</acronym> и <acronym class="acronym">AH</acronym> могут быть
+	использованы вместе или по отдельности, в зависимости от
+	обстоятельств.</p><a id="idp89078992" class="indexterm"></a><a id="idp89079760" class="indexterm"></a><p>IPsec может быть использован или для непосредственного шифрования
+	трафика между двумя хостами (<span class="emphasis"><em>транспортный
+	режим</em></span>); или для построения <span class="quote"><<<span class="quote">виртуальных
+	туннелей</span>>></span> между двумя подсетями, которые могут быть
+	использованы для защиты соединений между двумя корпоративными
+	сетями (<span class="emphasis"><em>туннельный режим</em></span>).  Последний обычно
+	называют <span class="emphasis"><em>виртуальной частной сетью</em></span>
+	(Virtual Private Network, VPN).  За детальной информацией о
+	подсистеме IPsec в FreeBSD обратитесь к странице справочника
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipsec&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ipsec</span>(4)</span></a>.</p><p>Для включения поддержки IPsec в ядре, добавьте следующие
+	параметры к файлу настройки ядра:</p><a id="idp89083984" class="indexterm"></a><a id="idp89089360" class="indexterm"></a><pre class="screen">options   IPSEC        #IP security
+options   IPSEC_ESP    #IP security (crypto; define w/ IPSEC)</pre><a id="idp89090896" class="indexterm"></a><p>Если желательна поддержка отладки IPsec, должна быть также
+	добавлена следующая строка:</p><pre class="screen">
+options   IPSEC_DEBUG  #debug for IP security
+      </pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89092944"></a>14.10.2. Проблема</h3></div></div></div><p>Не существует стандарта VPN.  Они могут быть реализованы
+	множеством различных технологий, каждая из которых имеет свои
+	сильные и слабые стороны.  Этот раздел представляет
+	сценарий и стратегию реализации VPN для этого сценария.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89094096"></a>14.10.3. Сценарий: Две сети, подключенных к интернет, работающие как
+	одна</h3></div></div></div><a id="idp89094864" class="indexterm"></a><p>Исходные условия таковы:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Существует как минимум две сети</p></li><li class="listitem"><p>Внутри обеих сетей используется IP</p></li><li class="listitem"><p>Обе сети соединены через интернет через шлюз,
+	    работающий на FreeBSD.</p></li><li class="listitem"><p>У шлюза каждой из сетей есть как минимум один публичный
+	    IP адрес.</p></li><li class="listitem"><p>Внутренние IP адреса двух сетей могут быть публичными или
+	    приватными, не имеет значения.  На шлюзе может работать
+	    NAT, если это необходимо.</p></li><li class="listitem"><p>Внутренние IP адреса двух сетей <span class="emphasis"><em>не должны
+	    пересекаться</em></span>.  Хотя вероятно теоретически возможно
+	    использование комбинации VPN технологии и NAT для настройки
+	    такой конфигурации, эта конфигурация будет кошмарна.</p></li></ul></div><p>Если две сети, которые вы пытаетесь соединить, используют один
+	и тот же диапазон приватных адресов (например, обе используют
+	<code class="systemitem">192.168.1.x</code>), номера в одной из
+	сетей необходимо изменить.</p><p>Топология сети может выглядеть примерно так:</p><div class="mediaobject" align="center"><img src="security/ipsec-network.png" align="middle" /></div><p>Заметьте, что здесь присутствуют два публичных IP-адреса.  В
+	дальнейшем для их обозначения
+	будут использоваться буквы.  Если вы увидите эти буквы, замените
+	их на свои публичные IP адреса.  Также обратите внимание, что
+	у обеих шлюзов внутренний адрес заканчивается на .1 и диапазоны
+	приватных адресов двух сетей различны (<code class="systemitem">192.168.1.x</code> и <code class="systemitem">192.168.2.x</code> соответственно).  Все компьютеры
+	локальных сетей настроены на использование в качестве шлюза по
+	умолчанию компьютера с адресом, оканчивающимся на
+	<code class="systemitem">.1</code>.</p><p>С сетевой точки зрения замысел в том, чтобы каждая сеть
+	видела компьютеры из другой сети так, как если бы они были
+	непосредственно подключены к тому же самому маршрутизатору -
+	хотя и немного медленному маршрутизатору, иногда теряющему
+	пакеты.</p><p>Это означает, что (например) компьютер <code class="systemitem">192.168.1.20</code> может запустить</p><pre class="programlisting">ping 192.168.2.34</pre><p>и это будет прозрачно работать.  Компьютеры с <span class="trademark">Windows</span>(R)
+	должны видеть компьютеры в другой сети, просматривать сетевые
+	ресурсы, и так далее, точно так же, как и для компьютеров в
+	локальной сети.</p><p>И все это безопасным способом.  Это означает, что трафик
+	между сетями зашифрован.</p><p>Создание VPN между этими двумя сетями это многошаговый
+	процесс.  Этапы создания VPN таковы:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Создание <span class="quote"><<<span class="quote">виртуального</span>>></span> сетевого подключения
+	    между двумя сетями через интернет.  Тестирование подключения с
+	    помощью таких инструментов как <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a>, чтобы убедиться, что
+	    оно работает.</p></li><li class="listitem"><p>Применение политики безопасности чтобы убедиться, что трафик
+	    между двумя сетями прозрачно шифруется и расшифровывается если
+	    необходимо.  Тестирование с помощью таких инструментов как
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a>, чтобы убедиться, что трафик шифруется.</p></li><li class="listitem"><p>Настройка дополнительных программ на шлюзах FreeBSD,
+	    чтобы компьютеры <span class="trademark">Windows</span>(R) из одной сети видели компьютеры
+	    в другой через VPN.</p></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89120336"></a>14.10.3.1. Шаг 1: Создание и тестирование <span class="quote"><<<span class="quote">виртуального</span>>></span>
+	сетевого подключения</h4></div></div></div><p>Предположим, что вы работаете на шлюзе сети #1 (с публичным
+	адресом <code class="systemitem">A.B.C.D</code>, приватным
+	адресом <code class="systemitem">192.168.1.1</code>) и запускаете
+	<code class="command">ping 192.168.2.1</code>, т.е. на приватный адрес
+	машины с IP адресом <code class="systemitem">W.X.Y.Z</code>.
+	Что должно произойти, чтобы это сработало?</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Шлюз должен знать, как достичь <code class="systemitem">192.168.2.1</code>.  Другими словами, у него
+	    должен быть маршрут к <code class="systemitem">192.168.2.1</code>.</p></li><li class="listitem"><p>Приватные IP адреса, такие как диапазон <code class="systemitem">192.168.x</code> не адресуются в
+	    интернет.  Каждый пакет, отправляемый на
+	    <code class="systemitem">192.168.2.1</code> должен быть
+	    <span class="quote"><<<span class="quote">завернут</span>>></span> в другой пакет.  Исходным адресом пакета
+	    должен быть <code class="systemitem">A.B.C.D</code>,
+	    а адресом назначения <code class="systemitem">W.X.Y.Z</code>.
+	    Этот процесс называется
+	    <em class="firstterm">инкапсуляцией</em>.</p></li><li class="listitem"><p>Как только этот пакет достигнет <code class="systemitem">W.X.Y.Z</code>, необходимо будет
+	    <span class="quote"><<<span class="quote">декапсулировать</span>>></span> его и доставить к <code class="systemitem">192.168.2.1</code>.</p></li></ol></div><p>Как вы можете увидеть, это требует <span class="quote"><<<span class="quote">туннеля</span>>></span>
+	между двумя сетями.  Два конца <span class="quote"><<<span class="quote">туннеля</span>>></span>
+	это IP адреса <code class="systemitem">A.B.C.D</code> и
+	<code class="systemitem">W.X.Y.Z</code>.  Туннель используется для
+	передачи трафика с приватными IP адресами через интернет.</p><p>В FreeBSD этот туннель создается с помощью устройства generic
+	interface, или <code class="filename">gif</code>.  Как вы можете
+	догадаться, интерфейс <code class="filename">gif</code> на каждом хосте
+	должен быть настроен с четырьмя IP адресами; два для публичных
+	IP адресов и два для приватных IP адресов.</p><p>В ядро обеих компьютеров FreeBSD должна быть встроена
+	поддержка устройства gif.  Вы можете сделать это, добавив
+	строку:</p><pre class="programlisting">device gif</pre><p>к файлу настройки ядра на обеих компьютерах, с последующей
+	компиляцией, установкой и перезагрузкой.</p><p>Настройка туннеля это двухшаговый процесс.  Во-первых,
+	необходимо задать сведения о внешнем (или публичном) IP адресе
+	с помощью <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>.  Затем о приватном IP адресе, также
+	с помощью <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>.</p><p>На шлюзе сети #1 для настройки туннеля вам потребуется запустить
+	следующие две команды.</p><pre class="programlisting">ifconfig gif0 A.B.C.D W.X.Y.Z
+ifconfig gif0 inet 192.168.1.1 192.168.2.1 netmask 0xffffffff
+      </pre><p>На другом шлюзе подобные команды, но с IP адресами в обратном
+	порядке.</p><pre class="programlisting">ifconfig gif0 W.X.Y.Z A.B.C.D
+ifconfig gif0 inet 192.168.2.1 192.168.1.1 netmask 0xffffffff
+      </pre><p>Затем вы можете запустить:</p><pre class="programlisting">ifconfig gif0</pre><p>для просмотра настройки.  Например, на шлюзе сети #1
+	вы увидите:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0</code></strong>
+gif0: flags=8011&lt;UP,POINTTOPOINT,MULTICAST&gt; mtu 1280
+inet 192.168.1.1 --&gt; 192.168.2.1 netmask 0xffffffff
+physical address inet A.B.C.D --&gt; W.X.Y.Z
+      </pre><p>Как вы можете видеть, был создан туннель между физическими
+	адресами <code class="systemitem">A.B.C.D</code> и
+	<code class="systemitem">W.X.Y.Z</code>, для туннелирования разрешен
+	трафик между <code class="systemitem">192.168.1.1</code> и <code class="systemitem">192.168.2.1</code>.</p><p>Это также добавляет запись к таблице маршрутизации на обеих
+	машинах, вы можете проверить запись командой <code class="command">netstat
+	-rn</code>.  Вот вывод этой команды на шлюзе сети #1.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>netstat -rn</code></strong>
+Routing tables
+
+Internet:
+Destination      Gateway       Flags    Refs    Use    Netif  Expire
+...
+192.168.2.1      192.168.1.1   UH        0        0    gif0
+...
+      </pre><p>Как показывает значение поля <span class="quote"><<<span class="quote">Flags</span>>></span>, это маршрут
+	к хосту, что означает, что каждый шлюз знает, как достичь другого
+	шлюза, но не знает как достичь остальной части соответствующей сети.
+	Эта проблема будет быстро решена.</p><p>Вероятно, на обеих машинах запущен брандмауэр.  VPN
+	должен обходить его.  Вы можете разрешить весь трафик между
+	двумя сетями, или включить правила, защищающие каждый конец
+	соединения от другого.</p><p>Это сильно упрощает тестирование настройки брандмауэра,
+	если вы разрешаете весь трафик через VPN.  Вы всегда можете
+	Вы всегда можете усилить защиту позже.  Если вы используете
+	на шлюзах <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>, команда вроде этой</p><pre class="programlisting">ipfw add 1 allow ip from any to any via gif0</pre><p>разрешит весь трафик между двумя концами VPN без влияния на
+	другие правила брандмауэра.  Очевидно, вам потребуется
+	запустить эту команду на обеих шлюзах.</p><p>Этого достаточно для включения ping с одного шлюза на другой.
+	На <code class="systemitem">192.168.1.1</code>, вы сможете
+	запустить</p><pre class="programlisting">ping 192.168.2.1</pre><p>и получить ответ, и аналогично на другом шлюзе.</p><p>Однако, машины в другой сети пока недоступны.  Это из-за
+	маршрутизации - хотя шлюзы знают, как связаться друг с
+	другом, они не знают, как связаться с сетью за другим шлюзом.</p><p>Для решения этой проблемы вы должны добавить статический маршрут
+	на каждом шлюзе.  Команда на первом шлюзе будет выглядеть так:</p><pre class="programlisting">route add 192.168.2.0 192.168.2.1 netmask 0xffffff00
+      </pre><p>Она говорит <span class="quote"><<<span class="quote">Для достижения хостов в сети
+	<code class="systemitem">192.168.2.0</code>, отправляйте пакеты
+	хосту <code class="systemitem">192.168.2.1</code></span>>></span>.  Вам
+	потребуется запустить похожую команду на другом шлюзе, но с
+	адресами <code class="systemitem">192.168.1.x</code>.</p><p>IP трафик с хостов в одной сети теперь может достичь хосты в
+	другой сети.</p><p>Теперь создано две трети VPN между двумя сетями, поскольку
+	это <span class="quote"><<<span class="quote">виртуальная (virtual)</span>>></span> <span class="quote"><<<span class="quote">сеть (network)</span>>></span>.
+	Она еще не приватная (private).  Вы можете протестировать ее
+	с помощью <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a>.  Войдите на шлюз и
+	запустите</p><pre class="programlisting">tcpdump dst host 192.168.2.1</pre><p>В другой сессии на этом же хосте запустите</p><pre class="programlisting">ping 192.168.2.1</pre><p>Вы увидите примерно такие строки:</p><pre class="programlisting">
+16:10:24.018080 192.168.1.1 &gt; 192.168.2.1: icmp: echo request
+16:10:24.018109 192.168.1.1 &gt; 192.168.2.1: icmp: echo reply
+16:10:25.018814 192.168.1.1 &gt; 192.168.2.1: icmp: echo request
+16:10:25.018847 192.168.1.1 &gt; 192.168.2.1: icmp: echo reply
+16:10:26.028896 192.168.1.1 &gt; 192.168.2.1: icmp: echo request
+16:10:26.029112 192.168.1.1 &gt; 192.168.2.1: icmp: echo reply
+      </pre><p>Как вы видите, ICMP сообщения пересылаются вперед и назад
+	незашифрованными.  Если вы использовали с <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> параметр
+	<code class="option">-s</code> для получения большего объема данных пакета,
+	то увидите больше информации.</p><p>Конечно же это неприемлемо.  В следующем разделе мы обсудим
+	защиту соединения между двумя сетями, так что весь трафик будет
+	автоматически шифроваться.</p><div class="itemizedlist"><div class="itemizedlist-title">Резюме:</div><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Настройте оба ядра с <span class="quote"><<<span class="quote">device gif</span>>></span>.</p></li><li class="listitem"><p>Отредактируйте <code class="filename">/etc/rc.conf</code> на шлюзе
+	    #1 и добавьте следующие строки (подставляя IP адреса где
+	    необходимо).</p><pre class="programlisting">gifconfig_gif0="A.B.C.D W.X.Y.Z"
+ifconfig_gif0="inet 192.168.1.1 192.168.2.1 netmask 0xffffffff"
+static_routes="vpn"
+route_vpn="192.168.2.0 192.168.2.1 netmask 0xffffff00"
+	  </pre></li><li class="listitem"><p>Отредактируйте скрипт брандмауэра
+	  (<code class="filename">/etc/rc.firewall</code>, или подобный) на обеих
+	  хостах и добавьте</p><pre class="programlisting">ipfw add 1 allow ip from any to any via gif0</pre></li><li class="listitem"><p>Выполните соответствующие изменения в
+	    <code class="filename">/etc/rc.conf</code> на шлюзе #2,
+	    меняя порядок IP адресов.</p></li></ul></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89189584"></a>14.10.3.2. Шаг 2: Защита соединения</h4></div></div></div><p>Для защиты соединения мы будем использовать IPsec.  IPsec
+	предоставляет хостам механизм определения ключа для шифрования
+	и для последующего использования этого ключа для шифрования
+	данных между двумя хостами.</p><p>Здесь будут рассмотрены два аспекта настройки.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>У хостов должен быть способ согласования используемого
+	    алгоритма шифрования.  Как только хосты договорятся об этом,
+	    можно говорить об установленном между ними
+	    <span class="quote"><<<span class="quote">безопасном соединении</span>>></span>.</p></li><li class="listitem"><p>Должен быть механизм определения, какой трафик необходимо
+	    шифровать.  Конечно, вам не требуется шифровать весь исходящий
+	    трафик - достаточно шифровать только трафик, идущий
+	    через VPN.  Правила, определяющие то, какой трафик необходимо
+	    шифровать, называются <span class="quote"><<<span class="quote">политикой безопасности</span>>></span>.</p></li></ol></div><p>Безопасное соединение и политика безопасности поддерживаются
+	ядром, и могут быть изменены программами пользователя.  Однако
+	перед тем, как вы сможете сделать это, необходимо настроить
+	поддержку протоколов IPsec и Encapsulated Security Payload (ESP) в
+	ядре.  Это делается добавлением в настройку ядра параметров:</p><a id="idp89194064" class="indexterm"></a><pre class="programlisting">options IPSEC
+options IPSEC_ESP</pre><p>с последующим перекомпилированием, переустановкой и
+	перезагрузкой.  Как и прежде вам потребуется сделать это с ядрами на
+	обеих шлюзах.</p><a id="idp89200208" class="indexterm"></a><p>При настройке параметров безопасности (security associations)
+	у вас есть два варианта.  Вы можете настроить их вручную для обеих
+	хостов, задав алгоритм шифрования, ключи для шифрования и так далее,
+	или использовать даемоны, реализующие Internet Key Exchange protocol
+	(IKE), который сделает это за вас.</p><p>Рекомендуется последнее.  Помимо прочего, этот способ более
+	прост.</p><a id="idp89201872" class="indexterm"></a><a id="idp89203024" class="indexterm"></a><p>Редактирование и отображение политики безопасности выполняется
+	с помощью <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>.  По аналогии, <code class="command">setkey</code>
+	используется для настройки таблиц политики безопасности ядра так же,
+	как <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a> используется для настройки таблиц маршрутизации
+	ядра.  <code class="command">setkey</code> также может отображать текущие
+	параметры безопасности, и продолжая аналогию дальше, это
+	соответствует <code class="command">netstat -r</code>.</p><p>Существует множество даемонов для управления параметрами
+	безопасности в FreeBSD.  Здесь будет описано использование одного из
+	них, racoon - он доступен в составе порта <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/ipsec-tools/pkg-descr">security/ipsec-tools</a> в Коллекции
+	Портов FreeBSD.</p><a id="idp89207888" class="indexterm"></a><p>Даемон <span class="application">racoon</span>
+	должен работать на обеих шлюзах.  На каждом из хостов
+	он настраивается с IP адресом другого конца VPN, и секретным
+	ключом (по вашему выбору, должен быть одним и тем же на обеих
+	шлюзах).</p><p>Эти два даемона подключаются друг к другу, подтверждают, что они
+	именно те, за кого себя выдают (используя секретный ключ, заданный
+	вами).  Затем даемоны генерируют новый секретный ключ и используют
+	его для шифрования трафика через VPN.  Они периодически изменяют
+	этот ключ, так что даже если атакующий сломает один из ключей
+	(что теоретически почти невозможно) это не даст ему слишком много
+	- он сломал ключ, который два даемона уже сменили на
+	другой.</p><p>Настройки racoon сохраняются в файле
+	<code class="filename">${PREFIX}/etc/racoon</code>.  Этот файл не требует
+	слишком больших изменений.  Другим компонентом настройки
+	racoon, который потребуется изменить, является <span class="quote"><<<span class="quote">предварительный
+	ключ</span>>></span>.</p><p>В настройке по умолчанию racoon ищет его в файле
+	<code class="filename">${PREFIX}/etc/racoon/psk.txt</code>.  Необходимо
+	отметить, что предварительный ключ <span class="emphasis"><em>не</em></span>
+	используется для шифрования трафика через VPN соединение
+	это просто маркер, позволяющий управляющим ключами даемонам
+	доверять друг другу.</p><p><code class="filename">psk.txt</code> содержит строку для каждого
+	удаленного сервера, с которым происходит соединение.  В этом примере
+	два сервера, каждый файл <code class="filename">psk.txt</code> будет
+	содержать одну строку (каждый конец VPN общается только с другим
+	концом.</p><p>На шлюзе #1 эта строка будет выглядеть примерно так:</p><pre class="programlisting">W.X.Y.Z            secret</pre><p>То есть <span class="emphasis"><em>публичный</em></span> IP-адрес противоположной
+	стороны, пробел и текстовая строка c секретной фразой.  Конечно, вам
+	не стоит использовать в качестве ключевой фразы слово
+	<span class="quote"><<<span class="quote">secret</span>>></span> -- здесь применяются обычные правила
+	выбора паролей.</p><p>На шлюзе #2 строка будет выглядеть примерно так:</p><pre class="programlisting">A.B.C.D            secret</pre><p>То есть публичный IP адрес удаленной стороны и та же
+	секретная фраза.  Перед запуском racoon режим доступа к файлу
+	<code class="filename">psk.txt</code> должен быть установлен в
+	<code class="literal">0600</code> (т.е. запись и чтение только для
+	<code class="systemitem">root</code>).</p><p>Вы должны запустить racoon на обоих шлюзах.  Вам также
+	потребуется добавить правила для включения IKE трафика,
+	передающегося по UDP через порт ISAKMP (Internet Security Association
+	Key Management Protocol).  Опять же, они должны быть
+	расположены насколько возможно ближе к началу набора правил.</p><pre class="programlisting">ipfw add 1 allow udp from A.B.C.D to W.X.Y.Z isakmp
+ipfw add 1 allow udp from W.X.Y.Z to A.B.C.D isakmp
+      </pre><p>Как только racoon будет запущен, вы можете попробовать
+	выполнить ping с одного шлюза на другой.  Соединение все еще не
+	зашифровано, но racoon установит параметры безопасности между
+	двумя хостами - это может занять время и вы можете заметить
+	небольшую задержку перед началом ответа команды ping.</p><p>Как только параметры безопасности установлены, вы можете
+	просмотреть их используя <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>.  Запустите</p><pre class="programlisting">setkey -D</pre><p>на любом из хостов для просмотра информации о параметрах
+	безопасности.</p><p>Это одна сторона проблемы.  Другая сторона это настройка
+	политики безопасности.</p><p>Для создания разумной политики безопасности давайте вспомним,
+	что уже было настроено.  Это рассмотрение относится к обеим
+	концам соединения.</p><p>Каждый отправляемый IP пакет имеет заголовок, содержащий информацию
+	о пакете.  Заголовок включает IP адреса источника и назначения.
+	Как мы уже знаем, приватные IP адреса, такие как <code class="systemitem">192.168.x.y</code>, не могут появиться в
+	интернет.  Они должны быть сначала включены внутрь другого
+	пакета.  В этом пакете приватные IP адреса источника и назначения
+	заменяются публичными IP адресами.</p><p>То есть исходящий пакет, который выглядит примерно так:</p><div class="mediaobject" align="center"><img src="security/ipsec-out-pkt.png" align="middle" /></div><p>будет инкапсулирован в другой пакет, выглядящий примерно
+	так:</p><div class="mediaobject" align="center"><img src="security/ipsec-encap-pkt.png" align="middle" /></div><p>Этой инкапсуляцией занимается устройство
+	<code class="filename">gif</code>.  Как вы можете видеть, теперь
+	у пакета есть реальный IP адрес, исходный пакет был включен
+	в этот пакет в виде данных, которые передаются через
+	интернет.</p><p>Конечно, мы хотим зашифровать весь трафик между VPN.
+	Вы можете сформулировать это на словах так:</p><p><span class="quote"><<<span class="quote">Если пакет отправляется с <code class="systemitem">A.B.C.D</code>, и предназначен для <code class="systemitem">W.X.Y.Z</code>, расшифровать его, используя
+	необходимые параметры безопасности.</span>>></span></p><p><span class="quote"><<<span class="quote">Если пакет отправляется с <code class="systemitem">W.X.Y.Z</code>, и предназначен для <code class="systemitem">A.B.C.D</code>, расшифровать его, используя
+	необходимые параметры безопасности.</span>>></span></p><p>Это похоже на желаемое, но не совсем то.  Если вы сделаете
+	это, весь трафик от и к <code class="systemitem">W.X.Y.Z</code>,
+	даже если он не является частью VPN, будет зашифрован.  Правильная
+	политика такова:</p><p><span class="quote"><<<span class="quote">Если пакет отправляется с <code class="systemitem">A.B.C.D</code>, в нем инкапсулирован другой пакет
+	и адрес назначения <code class="systemitem">W.X.Y.Z</code>,
+	зашифровать его, используя необходимые параметры
+	безопасности.</span>>></span></p><p><span class="quote"><<<span class="quote">Если пакет отправляется с <code class="systemitem">W.X.Y.Z</code>, в нем инкапсулирован другой пакет
+	и адрес назначения <code class="systemitem">A.B.C.D</code>,
+	зашифровать его, используя необходимые параметры
+	безопасности.</span>>></span></p><p>Тонкое, но необходимое различие.</p><p>Политика безопасности также устанавливается с использованием
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>.  В <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a> предусмотрен язык определения
+	политики <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>.  Вы можете или ввести инструкции
+	по настройке со стандартного ввода, или использовать параметр
+	<code class="option">-f</code> для задания файла, содержащего эти
+	инструкции.</p><p>Настройка на шлюзе #1 (где есть публичный IP адрес
+	<code class="systemitem">A.B.C.D</code>) для включения шифрования
+	всего предназначенного <code class="systemitem">W.X.Y.Z</code>
+	трафика:</p><pre class="programlisting">
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P out ipsec esp/tunnel/A.B.C.D-W.X.Y.Z/require;
+      </pre><p>Поместите эти команды в файл (например,
+	<code class="filename">/etc/ipsec.conf</code>) и запустите</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -f /etc/ipsec.conf</code></strong></pre><p><code class="option">spdadd</code> указывает <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a> добавить
+	правило к базе данных политики безопасности.  Остальная часть
+	строки указывает какие пакеты будут соответствовать политике.
+	<code class="systemitem">A.B.C.D/32</code> и <code class="systemitem">W.X.Y.Z/32</code> это IP адреса и сетевые маски,
+	определяющие сети или хосты, к которым будет применяться данная
+	политика.  В данном случае мы хотим применить их к трафику между
+	этими двумя хостами.  Параметр <code class="option">ipencap</code> сообщает
+	ядру, что эта политика должна применяться только к пакетам,
+	инкапсулирующим другие пакеты.  Параметр <code class="option">-P out</code>
+	сообщает, что эта политика применяется к исходящим пакетам, и
+	<code class="option">ipsec</code> - то, что пакеты будут
+	зашифрованы.</p><p>Оставшаяся часть строки определяет, как эти пакеты будут
+	зашифрованы.  Будет использоваться протокол <code class="option">esp</code>,
+	а параметр <code class="option">tunnel</code> показывает, что пакет в дальнейшем
+	будет инкапсулирован в IPsec пакет.  Повторное использование
+	<code class="systemitem">A.B.C.D</code> и <code class="systemitem">W.X.Y.Z</code> предназначено для выбора
+	используемых параметров безопасности, и наконец параметр
+	<code class="option">require</code> разрешает шифрование пакетов, попадающих
+	под это правило.</p><p>Это правило соответствует только исходящим пакетам.  Вам
+	потребуется похожее правило, соответствующее входящим пакетам.</p><pre class="programlisting">spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P in ipsec esp/tunnel/W.X.Y.Z-A.B.C.D/require;</pre><p>Обратите внимание, что вместо <code class="option">in</code> используется
+	 <code class="option">out</code> и IP адреса переставлены.</p><p>Другому шлюзу (с публичным IP адресом
+	<code class="systemitem">W.X.Y.Z</code>) потребуются похожие
+	правила.</p><pre class="programlisting">spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P out ipsec esp/tunnel/W.X.Y.Z-A.B.C.D/require;
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P in ipsec esp/tunnel/A.B.C.D-W.X.Y.Z/require;</pre><p>Наконец, вам потребуется добавить правила к брандмауэру
+	для включения прохождения пакетов ESP и IPENCAP в обе стороны.
+	На обеих хостах потребуется добавить следующие правила:</p><pre class="programlisting">ipfw add 1 allow esp from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow esp from W.X.Y.Z to A.B.C.D
+ipfw add 1 allow ipencap from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow ipencap from W.X.Y.Z to A.B.C.D
+      </pre><p>Поскольку правила симметричны, можно использовать их без
+	изменения на обеих хостах</p><p>Исходящие пакеты теперь будут выглядеть примерно так:</p><div class="mediaobject" align="center"><img src="security/ipsec-crypt-pkt.png" align="middle" /></div><p>Когда эти пакеты будут получены на удаленном конце VPN
+	соединения, они будут расшифрованы (используя параметры
+	безопасности, о которых договорился racoon).  Затем они будут
+	переданы интерфейсу <code class="filename">gif</code>, который
+	<span class="quote"><<<span class="quote">развернет</span>>></span> второй слой, оставив пакет с внутренними
+	адресами, который сможет попасть во внутреннюю сеть.</p><p>Вы можете проверить безопасность тем же <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a>, который
+	использовался ранее.  Сначала войдите на шлюз <code class="systemitem">A.B.C.D</code> и запустите:</p><pre class="programlisting">tcpdump dst host 192.168.2.1</pre><p>В другой сессии на том же хосте запустите</p><pre class="programlisting">ping 192.168.2.1</pre><p>В этот момент вы должны увидеть примерно это:</p><pre class="programlisting">XXX tcpdump output</pre><p>Теперь, как видите, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> показывает ESP пакеты.  Если
+	вы попытаетесь просмотреть их с параметром <code class="option">-s</code>,
+	то вероятно увидите  нечто непонятное, поскольку применяется
+	шифрование.</p><p>Поздравляем. Вы только что настроили VPN между двумя удаленными
+	сетями.</p><div class="itemizedlist"><div class="itemizedlist-title">Резюме</div><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Настройте оба ядра с:</p><pre class="programlisting">options IPSEC
+options IPSEC_ESP
+	  </pre></li><li class="listitem"><p>Установите <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/ipsec-tools/pkg-descr">security/ipsec-tools</a>.  Отредактируйте
+	    <code class="filename">${PREFIX}/etc/racoon/psk.txt</code> на обеих
+	    шлюзах, добавив запись для каждого IP адреса удаленного хоста
+	    и секретный ключ, который будет известен им обеим.  Убедитесь,
+	    что режим доступа к файлу 0600.</p></li><li class="listitem"><p>Добавьте к
+	    <code class="filename">/etc/rc.conf</code> на каждом хосте следующие
+	    строки:</p><pre class="programlisting">ipsec_enable="YES"
+ipsec_file="/etc/ipsec.conf"
+	  </pre></li><li class="listitem"><p>Создайте <code class="filename">/etc/ipsec.conf</code> на каждом
+	    хосте с необходимыми строками spdadd.  На шлюзе #1 он будет
+	    таким:</p><pre class="programlisting">
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P out ipsec
+  esp/tunnel/A.B.C.D-W.X.Y.Z/require;
+spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P in ipsec
+  esp/tunnel/W.X.Y.Z-A.B.C.D/require;
+</pre><p>А на шлюзе #2 таким:</p><pre class="programlisting">
+spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P out ipsec
+  esp/tunnel/W.X.Y.Z-A.B.C.D/require;
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P in ipsec
+  esp/tunnel/A.B.C.D-W.X.Y.Z/require;
+</pre></li><li class="listitem"><p>Добавьте правила к брандмауэрам обеих хостов для
+	    включения IKE, ESP и IPENCAP трафика:</p><pre class="programlisting">
+ipfw add 1 allow udp from A.B.C.D to W.X.Y.Z isakmp
+ipfw add 1 allow udp from W.X.Y.Z to A.B.C.D isakmp
+ipfw add 1 allow esp from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow esp from W.X.Y.Z to A.B.C.D
+ipfw add 1 allow ipencap from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow ipencap from W.X.Y.Z to A.B.C.D
+	  </pre></li></ul></div><p>Двух приведенных шагов должно быть достаточно для настройки
+	и включения VPN.  Машины в каждой сети смогут обращаться друг к
+	другу по IP адресам, и весь трафик через соединение будет
+	автоматически надежно зашифрован.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="openssl.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="openssh.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">14.9. OpenSSL </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 14.11. OpenSSH</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

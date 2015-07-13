@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>18.5. Het audit subsysteem beheren.</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="audit.html" title="Hoofdstuk 18. Security Event Auditing" /><link rel="prev" href="audit-config.html" title="18.4. Audit Configuratie" /><link rel="next" href="disks.html" title="Hoofdstuk 19. Opslag" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">18.5. Het audit subsysteem beheren.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="audit-config.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 18. Security Event Auditing</th><td width="20%" align="right"> <a accesskey="n" href="disks.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="audit-administration"></a>18.5. Het audit subsysteem beheren.</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79205584"></a>18.5.1. Audit trails inzien</h3></div></div></div><p>Audit trails worden opgeslagen in het BSM binaire formaat,
+	dus ondersteunende programma's moeten worden gebruikt om de
+	informatie te wijzigen of converteren naar tekst.  Het
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=praudit&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">praudit</span>(1)</span></a> commando converteert trail bestanden naar een
+	simpel tekst formaat; het <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=auditreduce&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">auditreduce</span>(1)</span></a> commando kan
+	gebruikt worden om de audit trail te reduceren voor analyse,
+	archivering of voor het uitprinten van de data.
+	<code class="command">auditreduce</code> ondersteund een variateit aan
+	selectie parameters, zoals evenement type, evenement klasse,
+	gebruiker, datum of tijd van het evenement en het bestandspad
+	of object dat gebruikt wordt.</p><p>Bijvoorbeeld, het <code class="command">praudit</code> programma zal
+	een dump maken van de volledige inhoud van een gespecificeerd
+	audit log bestand in normale tekst:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /var/audit/AUDITFILE</code></strong></pre><p>Waar
+	<code class="filename">AUDITFILE</code> het
+	audit bestand is dat ingelezen moet worden.</p><p>Audit trails bestaan uit een serie van audit records die
+	gevormd worden door tokens, welke <code class="command">praudit</code>
+	sequentieel print één per regel.  Elke token is van
+	een specifiek type, zoals een <code class="literal">header</code> welke
+	de audit record header bevat, of <code class="literal">path</code> welke
+	het bestandspad bevat van een lookup.  Het volgende is een
+	voorbeeld van een <code class="literal">execve</code> evenement:</p><pre class="programlisting">header,133,10,execve(2),0,Mon Sep 25 15:58:03 2006, + 384 msec
+exec arg,finger,doug
+path,/usr/bin/finger
+attribute,555,root,wheel,90,24918,104944
+subject,robert,root,wheel,root,wheel,38439,38032,42086,128.232.9.100
+return,success,0
+trailer,133</pre><p>Deze audit representeert een succesvolle
+	<code class="literal">execve</code> aanroep, waarbij het commando
+	<code class="literal">finger doug</code> is aangeroepen.  Het argument
+	token bevat beide commando's gerepresenteerd door de shell aan
+	de kernel.  Het <code class="literal">path</code> token bevat het pad
+	naar het uitvoerbare bestand zoals opgezocht door de kernel.
+	Het <code class="literal">attribute</code> token beschrijft de binary en
+	om precies te zijn bevat het de bestands mode welke gebruikt
+	kan worden om te zien of het bestand setuid was.  Het
+	<code class="literal">subject</code> token beschrijft het onderwerp
+	proces en bevat sequentieel het audit gebruikers ID, effectieve
+	gebruikers ID en groep ID, echte gebruikers ID, groep ID,
+	proces ID, sessie ID, port ID en login adres.  Let op dat het
+	audit gebruikers ID en het echte gebruikers ID van elkaar
+	verschillen omdat de gebruiker <code class="systemitem">robert</code>
+	veranderd is naar de <code class="systemitem">root</code> gebruiker voordat
+	het commando werd uitgevoerd, maar welke geaudit wordt als de
+	originele geauthoriseerde gebruiker.  Als laatste wordt de
+	<code class="literal">return</code> token gebruikt om aan te geven dat er
+	een succesvolle uitvoer is geweest en <code class="literal">trailer</code>
+	geeft het einde aan van het record.</p><p><code class="command">praudit</code> ook een XML output formaat,
+	welke geselecteerd kan worden door gebruik te maken van het
+	<code class="option">x</code> argument.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79223120"></a>18.5.2. Het reduceren van audit trails</h3></div></div></div><p>Omdat audit logs erg groot kunnen worden, zal de beheerder
+	waarschijnlijk een subset van records willen selecteren om te
+	gebruiken, zoals records die gekoppeld zijn aan een specifieke
+	gebruiker:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>auditreduce -u trhodes /var/audit/AUDITFILE | praudit</code></strong></pre><p>Dit selecteert alle audit records die geproduceert zijn
+	voor de gebruiker <code class="systemitem">trhodes</code> die opgeslagen
+	is in het <code class="filename">AUDITFILE</code>
+	bestand.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79247056"></a>18.5.3. Delegeren van audit onderzoek rechten</h3></div></div></div><p>Leden van de <code class="systemitem">audit</code> groep krijgen
+	permissie om de audit trails te lezen in
+	<code class="filename">/var/audit</code>; standaard is deze
+	groep leeg en kan alleen de <code class="systemitem">root</code> gebruiker deze
+	audit trails lezen.  Gebruikers kunnen toegevoegd worden aan de
+	<code class="systemitem">audit</code> groep zodat onderzoek rechten kunnen
+	worden gedelegeerd aan de geruiker.  Omdat de mogelijkheid van
+	het inzien van audit log inhoud significante inzicht kan geven
+	in het gedrag van gebruikers en processen, wordt het aangeraden
+	dat de delagatie van onderzoek rechten eerst goed overdacht
+	wordt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79250128"></a>18.5.4. Live monitoren door gebruik van audit pipes</h3></div></div></div><p>Audit pipes zijn gecloonde pseudo-devices in het device
+	bestands systeem, welke applicaties toestaat om een tap te
+	plaatsen in de live audit record stream.  Dit is primair
+	interessant voor schrijvers van intrusion detection en systeem
+	monitoring applicaties.  Echter, voor een beheerder is het
+	audit pipe device een makkelijke manier om live monitoring toe
+	te staan zonder dat er problemen kunnen ontstaan met het
+	eigenaarschap van het audit trail bestand, of dat een log
+	rotatie de evenementen stroom in de weg zit.  Om de live audit
+	evenementen stroom te kunnen inzien is het volgende commando
+	benodigd:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /dev/auditpipe</code></strong></pre><p>Standaard zijn de audit pipe device nodes alleen toegankelijk
+	voor de <code class="systemitem">root</code> gebruiker.  Om deze
+	toegankelijk te maken voor leden van de
+	<code class="systemitem">audit</code> groep, moet een
+	<code class="literal">devfs</code> regel toegevoegd worden aan het
+	<code class="filename">devfs.rules</code> bestand:</p><pre class="programlisting">add path 'auditpipe*' mode 0440 group audit</pre><p>Zie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs.rules&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs.rules</span>(5)</span></a> voor meer informatie over het
+	configureren van het devfs bestands systeem.</p><div xmlns="" class="warning"><h3 class="admontitle">Waarschuwing: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het is makkelijk om audit evenement terugkoppeling
+	  cyclussen te creëeren, waarbij het tonen van elk audit
+	  evenement resulteert in het genereren van nog meer audit
+	  evenementen.  Bijvoorbeeld, als alle netwerk I/O wordt geaudit
+	  en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=praudit&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">praudit</span>(1)</span></a> wordt gestart vanuit een SSH sessie, wordt
+	  er een grote continue stroom aan audit evenementen gegenereert
+	  doordat elk getoond evenement een nieuw evenement genereert.
+	  Het is verstandig om <code class="command">praudit</code> te draaien op
+	  een audit pipe device voor sessies zonder diepgaande I/O
+	  auditing om te voorkomen dat dit gebeurd.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79290832"></a>18.5.5. Het roteren van audit trail bestanden</h3></div></div></div><p>Audit trails worden alleen beschreven door de kernel en
+	alleen beheerd worden door de audit daemon,
+	<span class="application">auditd</span>.  Beheerders mogen geen
+	gebruik maken van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">newsyslog.conf</span>(5)</span></a> of soortgelijke
+	programma's om de audit files te roteren.  In plaats daarvan kan
+	het <code class="command">audit</code> management programma gebruikt worden
+	om auditing te stoppen, het audit systeem te herconfigureren en
+	log rotatie uit te voeren.  Het volgende commando zorgt ervoor
+	dat de audit daemon een nieuwe audit log maakt, en vervolgens
+	de kernel een signaal stuurt om het nieuwe logbestand te gaan
+	gebruiken.  Het oude logbestand wordt getermineerd en hernoemd,
+	waarna het bestand gemanipuleerd kan worden door de beheerder.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>audit -n</code></strong></pre><div xmlns="" class="warning"><h3 class="admontitle">Waarschuwing: </h3><p xmlns="http://www.w3.org/1999/xhtml">Als de <span class="application">auditd</span> daemon op dit
+	  moment niet actief is, zal het commando falen en
+	  zal er een error bericht worden geproduceerd.</p></div><p>Als de volgende regel wordt toegevoegd aan het
+	<code class="filename">/etc/crontab</code> bestand, zal er
+	elke twaalf uur een rotatie plaatsvinden door middel
+	van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a>:</p><pre class="programlisting">0     */12       *       *       *       root    /usr/sbin/audit -n</pre><p>Deze wijziging wordt van kracht op het moment dat het
+	nieuwe <code class="filename">/etc/crontab</code> bestand wordt
+	opgeslagen.</p><p>Automatische rotatie van het audit trail bestand gebaseerd
+	op de bestand grootte is mogelijk via de <code class="option">filesz</code>
+	optie in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=audit_control&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">audit_control</span>(5)</span></a> en wordt beschreven in de
+	configuratie bestanden sectie van dit hoofdstuk.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79316432"></a>18.5.6. Audit trails comprimeren</h3></div></div></div><p>Omdat audit trail bestanden erg groot kunnen worden, is het
+	meestal gewenst om de trails te comprimeren of op een andere
+	manier te archiveren zodra ze afgesloten zijn door de audit
+	daemon.  Het <code class="filename">audit_warn</code> script kan gebruikt
+	worden om bewerkte operaties te doen voor een variateit aan
+	audit gerelateerde evenementen inclusief een nette terminatie
+	van audit trails wanneer deze geroteerd worden.  Bijvoorbeeld
+	het volgende kan worden toegevoegd aan het
+	<code class="filename">audit_warn</code> script, dat de audit trails
+	comprimeert zodra ze afgesloten worden:</p><pre class="programlisting">#
+# Compress audit trail files on close.
+#
+if [ "$1" = closefile ]; then
+        gzip -9 $2
+fi</pre><p>Andere archiverings activiteiten kunnen zijn het kopieren van
+	trail bestanden naar een gecentraliseerde server, het verwijderen
+	van oude trail bestanden of het reduceren van de audit trail om
+	onnodige records te verwijderen.  Het script zal alleen draaien
+	als audit trail bestanden netjes worden afgesloten, wat betekend
+	dat het script niet uitgevoerd wordt op trails die niet netjes
+	afgesloten zijn, waardoor bestanden corrupt kunnen raken.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="audit-config.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="audit.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="disks.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">18.4. Audit Configuratie </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> Hoofdstuk 19. Opslag</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>15.4. DES, MD5 と Crypt</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="security.html" title="第15章 セキュリティ" /><link rel="prev" href="securing-freebsd.html" title="15.3. FreeBSDの安全性を高める" /><link rel="next" href="skey.html" title="15.5. S/Key" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.4. DES, MD5 と Crypt</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="securing-freebsd.html">戻る</a>〓</td><th width="60%" align="center">第15章 セキュリティ</th><td width="20%" align="right">〓<a accesskey="n" href="skey.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="crypt"></a>15.4. DES, MD5 と Crypt</h2></div><div><span class="authorgroup">改訂: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Swingle</span> <span class="firstname">Bill</span> [FAMILY Given]</span>. </span></div></div></div><a id="idp89726672" class="indexterm"></a><a id="idp89727824" class="indexterm"></a><a id="idp89728336" class="indexterm"></a><a id="idp89728848" class="indexterm"></a><p><span class="emphasis"><em>訳: 花井 浩之 <code class="email">&lt;<a xmlns="" class="email" href="mailto:hanai@FreeBSD.org">hanai@FreeBSD.org</a>&gt;</code>,
+	12 September 1996.</em></span></p><p><span class="emphasis"><em>訳改訂: 日野 浩志 <code class="email">&lt;<a xmlns="" class="email" href="mailto:hino@ccm.cl.nec.co.jp">hino@ccm.cl.nec.co.jp</a>&gt;</code>,
+	12 March 2001.</em></span></p><p>Unix システムにおけるすべてのユーザは、そのアカウントに対応し
+      た一つのパスワードを持っています。それらのパスワードはユーザ本人
+      と本当のオペレーティングシステムのみが知っているべきであるという
+      ことは明らかでしょう。それらのパスワードを秘密に保っておくために、
+      パスワードは<span class="quote">「<span class="quote">一方向ハッシュ</span>」</span>として知られる方式で暗
+      号化されます。一方向ハッシュとは、簡単に暗号化はできるが解読は難
+      しいという方法です。言葉を換えると、先ほど明らかであると書いたの
+      は実は正しくないのです: オペレーティングシステム自身は<span class="emphasis"><em>
+      本当は</em></span>パスワードを知らないのです。その代わりに
+      <span class="emphasis"><em>暗号化された</em></span>形でのみパスワードを知っていま
+      す。<span class="quote">「<span class="quote">素のテキスト</span>」</span>としてパスワードを得る唯一の方法は、
+      可能な限りのパスワード空間を検索するという力任せの方法です。
+      </p><p>不幸なことに、Unix が生まれようとしているときにパスワードを
+      安全な形で暗号化できる方式は DES (Data Encryption Standard)
+      に基づいたものだけでした。このことは米国に住んでいるユーザにとって
+      は大して問題ではありませんでしたが、DES のソースコードを米国外に
+      輸出することはできないという問題がありました。そのために、
+      FreeBSD は、米国の法律を守ることと、未だに DES を使っていた他の
+      Unix 一族との互換性を保つこととを両立する方法を探し出す必要がありました。</p><p>その解決方法は、米国のユーザは DES のライブラリをインストー
+      ルして DES を使用できるが、米国外のユーザは国外に輸出可能な他の
+      ひとつの暗号化方式を使用することができる、というように暗号化ライ
+      ブラリを分割することでした。これが FreeBSD がデフォルトの暗号化
+      方式として MD5 を使うようになったいきさつです。MD5 は DES よりも
+      より安全であると考えられているため、DES をインストールする一番の
+      理由は互換性を保つためといえます。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89733968"></a>15.4.1. 暗号化機構を理解する</h3></div></div></div><p>FreeBSD 4.4 の前までは、<code class="filename">libcrypt.a</code>
+	は暗号化に使われるライブラリへのシンボリックリンクでした。
+	FreeBSD 4.4 で <code class="filename">libcrypt.a</code>
+	は設定可能なパスワード認証ハッシュライブラリを提供するようになりました。
+	現在のところ、このライブラリは DES, MD5 および Blowfish
+	ハッシュ関数に対応しています。デフォルトでは、FreeBSD
+	はパスワードの暗号化に MD5 を利用します。</p><p>FreeBSD がどの暗号化方式を使うようにセットアップされている
+	かを判断するのは簡単です。
+	<code class="filename">/etc/master.passwd</code> ファイルの中の暗号化さ
+	れたパスワードを調べてみるのが一つの方法です。MD5 ハッシュで暗
+	号化されたパスワードは、DES ハッシュで暗号化されたパスワードよ
+	りも長く、<code class="literal">$1$</code>
+	という文字で始まるという特徴を持っています。
+	<code class="literal">$2$</code>
+	で始まるパスワードは、Blowfish ハッシュ関数で暗号化されています。
+	DES のパスワードはこ
+	れといって識別可能な特徴は持っていませんが、MD5 のパスワードよ
+	りは短く、そして <code class="literal">$</code> という文字を含ま
+	ない 64 文字のアルファベットを使って表現されているので、比較的
+	短い文字列でドル記号で始まっていないものはおそらく DES のパス
+	ワードでしょう。</p><p>新規パスワードがどちらのパスワード形式になるかは、
+	<code class="filename">/etc/login.conf</code> の中の
+	<span class="quote">「<span class="quote">passwd_format</span>」</span> ログインケーパビリティによって制御されます。
+	その値としては、<span class="quote">「<span class="quote">des</span>」</span>、
+	<span class="quote">「<span class="quote">md5</span>」</span> または <span class="quote">「<span class="quote">blf</span>」</span> を設定することができます。
+	ログインケーパビリティに関するより詳細な情報は、
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=login.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">login.conf</span>(5)</span></a> マニュアルページをご覧ください。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="securing-freebsd.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="security.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="skey.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">15.3. FreeBSDの安全性を高める〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓15.5. S/Key</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

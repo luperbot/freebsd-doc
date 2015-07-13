@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>14.6. TCP Wrappers</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="security.html" title="Глава 14. Безопасность" /><link rel="prev" href="one-time-passwords.html" title="14.5. Одноразовые пароли" /><link rel="next" href="kerberosIV.html" title="14.7. KerberosIV" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">14.6. TCP Wrappers</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="one-time-passwords.html">Пред.</a> </td><th width="60%" align="center">Глава 14. Безопасность</th><td width="20%" align="right"> <a accesskey="n" href="kerberosIV.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="tcpwrappers"></a>14.6. TCP Wrappers</h2></div><div><span class="authorgroup">Написал: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp88389328" class="indexterm"></a><p>Каждый, кто знаком с <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a>, возможно когда-то слышал
+      о <acronym class="acronym">TCP</acronym> Wrappers.  Но немногие полностью
+      понимают их полезность в сетевой среде: большинство
+      используют брандмауэр.  Хотя его применимость очень широка,
+      есть вещи, с которыми брандмауэр не может работать, такие
+      как отправка текста обратно вызывающей стороне.  Программное
+      обеспечение уровня <acronym class="acronym">TCP</acronym> может делать это
+      и многое другое.  В следующих нескольких разделах обсуждаются
+      многие возможности <acronym class="acronym">TCP</acronym> Wrappers, и, когда
+      это необходимо, даются примеры настроек.</p><p>Программное обеспечение <acronym class="acronym">TCP</acronym> Wrappers
+      расширяет возможность <code class="command">inetd</code> по поддержке
+      каждого даемона.  С ним становится возможным протоколирование,
+      возврат сообщений вызывающей стороне, ограничение подключений
+      внутренней сетью и т.п.  Хотя некоторые из этих возможностей
+      могут быть реализованы брандмауэром, <acronym class="acronym">TCP</acronym>
+      Wrappers не только предоставляют дополнительный уровень защиты,
+      но и дают больше контроля над системой, чем это возможно
+      с брандмауэром.</p><p>Расширенная функциональность обработчиков <acronym class="acronym">TCP</acronym>
+      не может заменить хороший сетевой экран.  Тем не менее, обработчики
+      <acronym class="acronym">TCP</acronym> могут использоваться совместно с сетевым экраном
+      и другими средствами обеспечения информационной безопасности, обеспечивая
+      тем самым дополнительный уровень защиты системы.</p><p>Поскольку рассматривается расширение к настройкам
+      <code class="command">inetd</code>, предполагается, что читатель ознакомился
+      с разделом о <a class="link" href="network-inetd.html" title="25.2. <<Супер-сервер>> inetd">настройке
+      inetd</a>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Хотя программы, запускаемые из <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a>, на самом деле не
+	соответствуют термину <span class="quote"><<<span class="quote">даемоны</span>>></span>, существует традиция
+	называть их именно так.  Этот термин и используется в данном
+	разделе.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88406608"></a>14.6.1. Начальная настройка</h3></div></div></div><p>Единственное требование для использования <acronym class="acronym">TCP</acronym>
+	Wrappers в FreeBSD это наличие в <code class="filename">rc.conf</code>
+	параметров запуска <code class="command">inetd</code> <code class="option">-Ww</code>;
+	это настройки по умолчанию.  Конечно, ожидается также наличие
+	правильной настройки <code class="filename">/etc/hosts.allow</code>,
+	но <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> отправит сообщения в системный протокол если
+	что-то не так.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">В отличие от других реализаций <acronym class="acronym">TCP</acronym>
+	  Wrappers, использование <code class="filename">hosts.deny</code> не
+	  поддерживается.  Все параметры настройки должны быть помещены
+	  в <code class="filename">/etc/hosts.allow</code>.</p></div><p>В простейшей конфигурации, политика подключения сводится к
+	разрешению или блокированию в зависимости от параметров в
+	<code class="filename">/etc/hosts.allow</code>.  Настройка в FreeBSD
+	по умолчанию заключается в разрешении подключения к любому
+	даемону, запущенному из <code class="command">inetd</code>.  Изменение
+	этого поведения будет обсуждаться только после рассмотрения
+	базовой настройки.</p><p>Базовая настройка обычно принимает форму
+	<code class="literal">daemon : address : action</code>, где
+	<code class="literal">daemon</code> это имя даемона, который запускается
+	<code class="command">inetd</code>.  В поле <code class="literal">address</code>
+	может находиться имя хоста, <acronym class="acronym">IP</acronym> адрес, или
+	IPv6 адрес, заключенный в квадратные скобки ([ ]).
+	Поле action может принимать значения allow или deny,
+	чтобы соответственно разрешать или запрещать доступ.
+	Помните, что поиск правил производится до первого совпадения.
+	При обнаружении совпадения применяется соответствующее правило
+	и поиск прерывается.</p><p>Существуют и другие параметры, но они будут описаны в следующих
+	разделах.  Простая конфигурация может быть, например, такой:
+	для разрешения соединений по протоколу <acronym class="acronym">POP</acronym>3
+	к даемону <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/qpopper/pkg-descr">mail/qpopper</a>,
+	в <code class="filename">hosts.allow</code> необходимо добавить следующие
+	строки:</p><pre class="programlisting"># This line is required for POP3 connections:
+qpopper : ALL : allow</pre><p>После добавления этой строки, <code class="command">inetd</code>
+	необходимо перезапустить.  Это можно выполнить командой
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kill&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">kill</span>(1)</span></a> или скриптом <code class="filename">/etc/rc.d/inetd</code>
+	с параметром <em class="parameter"><code>restart</code></em>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88420176"></a>14.6.2. Расширенная конфигурация</h3></div></div></div><p>У <acronym class="acronym">TCP</acronym> Wrappers имеются дополнительные
+	параметры; они дают дополнительные возможности контроля над
+	соединениями.  Иногда бывает полезно возвращать комментарий
+	определенным хостам или при подключении к определенным
+	даемонам.  В других случаях может быть необходимо добавить
+	запись в лог файл, или отправить письмо администратору.
+	В определенных ситуациях сервис должен использоваться
+	только для локальных соединений.  Все это возможно с
+	использованием параметров c шаблонами, символами подстановки
+	и путем выполнения внешних команд.  Следующие два раздела
+	посвящены этим типам настроек.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88425808"></a>14.6.2.1. Внешние команды</h4></div></div></div><p>Предположим ситуацию, в которой соединение должно
+	  быть запрещено, а о причине необходимо сообщить вызывающей
+	  стороне.  Как это можно сделать?  Соответствующую
+	  возможность предоставляет параметр <code class="option">twist</code>.
+	  При попытке подключения выполняется команда или скрипт,
+	  заданный этим параметром.  Пример дан в файле
+	  <code class="filename">hosts.allow</code>:</p><pre class="programlisting"># The rest of the daemons are protected.
+ALL : ALL \
+        : severity auth.info \
+        : twist /bin/echo "You are not welcome to use %d from %h."</pre><p>В этом примере сообщение,
+	  <span class="quote"><<<span class="quote">You are not allowed to use <code class="literal">daemon</code>
+	  from <code class="literal">hostname</code>.</span>>></span> будет возвращено
+	  от всех даемонов, которые не были предварительно настроены
+	  в файле доступа.  Обратите внимание, что возвращаемое
+	  сообщение <span class="emphasis"><em>должно</em></span> быть заключено в
+	  кавычки; из этого правила нет исключений.</p><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Возможна реализация DoS атаки, когда группа
+	    атакующих производит множество запросов на подключение.</p></div><p>Возможно также использование параметра <code class="option">spawn</code>.
+	  Как и параметр <code class="option">twist</code>, параметр
+	  <code class="option">spawn</code> подразумевает запрет соединения
+	  и может использоваться для запуска команд или скриптов.
+	  В отличие от <code class="option">twist</code>, <code class="option">spawn</code> не
+	  отправляет ответ вызывающей стороне.  Например, следующая
+	  конфигурация:</p><pre class="programlisting"># We do not allow connections from example.com:
+ALL : .example.com \
+        : spawn (/bin/echo %a from %h attempted to access %d &gt;&gt; \
+          /var/log/connections.log) \
+        : deny</pre><p>отклонит все попытки соединения из домена
+	  <code class="systemitem">*.example.com</code>; имя хоста,
+	  <acronym class="acronym">IP</acronym> адрес и даемон протоколируются в файл
+	  <code class="filename">/var/log/connections.log</code>.</p><p>Помимо приведенных выше символов подстановки, например
+	  %a, существует еще несколько символов.  Обратитесь к странице
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> справочной системы за полным списком.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88436432"></a>14.6.2.2. Параметры - шаблоны</h4></div></div></div><p>До этого момента в примерах использовался шаблон
+	  <code class="literal">ALL</code>.  Существуют и другие параметры,
+	  функциональность которых в дальнейшем может быть расширена.
+	  <code class="literal">ALL</code> соответствует любому даемону,
+	  домену или <acronym class="acronym">IP</acronym> адресу.  Другой доступный
+	  шаблон это <code class="literal">PARANOID</code>, который соответствует
+	  хосту, <acronym class="acronym">IP</acronym> адрес которого может быть
+	  подделан.  Другими словами, <code class="literal">paranoid</code>
+	  может быть использован для определения действия с хостами,
+	  <acronym class="acronym">IP</acronym> адрес которых не соответствует имени
+	  хоста.  Вот пример применения этого параметра:</p><pre class="programlisting"># Block possibly spoofed requests to sendmail:
+sendmail : PARANOID : deny</pre><p>В этом примере все запросы на подключения к
+	  <code class="command">sendmail</code> от хостов, <acronym class="acronym">IP</acronym>
+	  адрес которых не соответствует имени хоста, будут
+	  отклонены.</p><div xmlns="" class="caution"><h3 class="admontitle">Внимание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Использование <code class="literal">PARANOID</code> невозможно,
+	    если у клиента или сервера неправильно настроен
+	    <acronym class="acronym">DNS</acronym>.  В таких случаях необходимо
+	    вмешательство администратора.</p></div><p>Более подробная информация о шаблонах и их возможностях
+	  дана на странице <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> справочной
+	  системы.</p><p>Для того, чтобы любая выбранная конфигурация заработала,
+	  в <code class="filename">hosts.allow</code> необходимо закомментировать
+	  первую строку настройки.  В начале раздела об этом не
+	  упоминалось.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="one-time-passwords.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="kerberosIV.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">14.5. Одноразовые пароли </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 14.7. <span class="application">KerberosIV</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

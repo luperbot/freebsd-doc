@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>8.5. 实现说明</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="smp.html" title="第 8 章 SMPng 设计文档" /><link rel="prev" href="smp-lock-strategies.html" title="8.4. 特定数据的锁策略" /><link rel="next" href="smp-misc.html" title="8.6. 其它话题" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8.5. 实现说明</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="smp-lock-strategies.html">上一页</a> </td><th width="60%" align="center">第 8 章 SMPng 设计文档</th><td width="20%" align="right"> <a accesskey="n" href="smp-misc.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="smp-implementation-notes"></a>8.5. 实现说明</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71176016"></a>8.5.1. 休眠队列</h3></div></div></div><p>休眠队列是一种用于保存同处一个等待通道 (wait channel)
+	上休眠线程列表的数据结构。 在等待通道上，
+	每个处于非睡眠状态的线程都会携带一个休眠队列结构。
+	当线程在等待通道上发生阻塞时， 它会将休眠队列结构体送给那个等待通道。
+	与等待通道关联的休眠队列则保存在一个散列表中。</p><p>休眠队列散列表中保存了包含至少一个阻塞线程的等待通道上的休眠队列。
+	这个散列表上的项称作 sleepqueue (休眠队列) 链。 它包含了一个休眠队列的链表，
+	以及一个自旋 mutex。 此处的自旋 mutex 用于保护休眠队列表，
+	以及其上休眠队列结构的内容。 一个等待通道上只会关联一个休眠队列。
+	如果有多个线程在同一等待通道上阻塞，
+	则休眠队列中将关联除第一个线程之外的全部线程。 当从休眠队列中删除线程时，
+	如果它不是唯一的阻塞的休眠线程， 则会获得主休眠队列的空闲表上的休眠队列结构。
+	最后一个线程会在恢复运行时获得主休眠队列。
+	由于线程有可能以和加入休眠队列不同的次序从其中删除，
+	因此， 线程离开队列时可能会携带与其进入时不同的休眠队列。</p><p><code class="function">sleepq_lock</code> 函数会锁住指定等待通道上休眠队列链的自旋
+	mutex。 <code class="function">sleepq_lookup</code>
+	函数会在主休眠队列散列表中查找给定的等待通道。 如果没有找到主休眠队列，
+	它会返回 <code class="constant">NULL</code>。
+	<code class="function">sleepq_release</code> 函数会对给定等待通道所关联的自旋
+	mutex 进行解锁。</p><p>将线程加入休眠队列是通过
+	<code class="function">sleepq_add</code> 来完成的。
+	这个函数的参数包括等待通道、 指向保护等待通道的 mutex 的指针、
+	等待消息描述串， 以及一个标志掩码。 调用此函数之前， 应通过
+	<code class="function">sleepq_lock</code> 为休眠队列链上锁。
+	如果等待通道不是通过 mutex 保护的 (或者它由全局锁保护)，
+	则应将 mutex 指针设置为
+	<code class="constant">NULL</code>。 而 flags (标志) 参数则包括了一个类型字段，
+	用以表示线程即将加入到的休眠队列的类型，
+	以及休眠是否是可中断的 (<code class="constant">SLEEPQ_INTERRUPTIBLE</code>)。
+	目前只有两种类型的休眠队列： 通过
+	<code class="function">msleep</code> 和 <code class="function">wakeup</code>
+	函数管理的传统休眠队列 (<code class="constant">SLEEPQ_MSLEEP</code>)，
+	以及基于条件变量的休眠队列 (<code class="constant">SLEEPQ_CONDVAR</code>)。
+	休眠队列类型和锁指针这两个参数完全是用于内部的断言检查。 调用
+	<code class="function">sleepq_add</code> 的代码， 应明示地在关联的 sleepqueue 链透过
+	<code class="function">sleepq_lock</code> 进行上锁之后， 并使用等待函数在休眠队列上阻塞之前解锁所有用于保护等待通道的
+	interlock。</p><p>通过使用
+	<code class="function">sleepq_set_timeout</code> 可以为休眠设置超时。
+	这个函数的参数包括等待通道， 以及以相对时钟嘀嗒数为单位的超时时间。
+	如果休眠应被某个到来的信号打断， 则还应调用
+	<code class="function">sleepq_catch_signals</code> 函数，
+	这个函数唯一的参数就是等待通道。 如果此线程已经有未决信号，
+	则 <code class="function">sleepq_catch_signals</code> 将返回信号编号；
+	其它情况下， 其返回值则是 0。</p><p>一旦将线程加入到休眠队列中，
+	就可以使用 <code class="function">sleepq_wait</code> 函数族之一将其阻塞了。
+	目前总共提供了四个等待函数， 使用哪个取决于调用这是否希望允许使用超时、
+	收到信号， 或用户态线程调度器打断休眠状态。
+	其中， <code class="function">sleepq_wait</code> 函数简单地等待，
+	直到当前线程通过某个唤醒 (wakeup) 函数显式地恢复运行；
+	<code class="function">sleepq_timedwait</code> 函数则等待，
+	直到当前线程被显式地唤醒， 或者达到早前使用 <code class="function">sleepq_set_timeout</code>
+	设置的超时； <code class="function">sleepq_wait_sig</code> 函数会等待显式地唤醒，
+	或者其休眠被中断； 而
+	<code class="function">sleepq_timedwait_sig</code> 函数则等待显式地唤醒、
+	达到用 <code class="function">sleepq_set_timeout</code>
+	设置的超时， 或线程的休眠被中断这三种条件之一。
+	所有这些等待函数的第一个参数都是等待通道。
+	除此之外， <code class="function">sleepq_timedwait_sig</code>
+	的第二个参数是一个布尔值， 表示之前调用 <code class="function">sleepq_catch_signals</code>
+	时是否有发现未决信号。</p><p>如果线程被显式地恢复运行， 或其休眠被信号终止，
+	则等待函数会返回零， 表示休眠成功。
+	如果线程的休眠被超时或用户态线程调度器打断， 则会返回相应的 errno 数值。
+	需要注意的是， 因为 <code class="function">sleepq_wait</code> 只能返回 0，
+	因此调用者不能指望它返回什么有用信息， 而应假定它完成了一次成功的休眠。
+	同时， 如果线程的休眠时间超时， 并同时被终止， 则
+	<code class="function">sleepq_timedwait_sig</code> 将返回一个表示发生超时的错误代码。
+	如果返回错误代码是
+	0 而且使用 <code class="function">sleepq_wait_sig</code>
+	或 <code class="function">sleepq_timedwait_sig</code> 来执行阻塞， 则应调用
+	<code class="function">sleepq_calc_signal_retval</code> 来检查是否有未决信号，
+	并据此选择合适的返回值。 较早前调用
+	<code class="function">sleepq_catch_signals</code> 得到的信号编号，
+	应作为参数传给
+	<code class="function">sleepq_calc_signal_retval</code>。</p><p>在同一休眠通道上休眠的线程，
+	可以由 <code class="function">sleepq_broadcast</code> 或
+	<code class="function">sleepq_signal</code> 函数来显式地唤醒。
+	这两个函数的参数均包括希望唤醒的等待通道、
+	将唤醒线程的优先级 (priority) 提高到多少，
+	以及一个标志 (flags) 参数表示将要恢复运行的休眠队列类型。
+	优先级参数将作为最低优先级， 如果将恢复的线程的优先级比此参数更高
+	(数值更低) 则其优先级不会调整。 标志参数主要用于函数内部的断言，
+	用以确认休眠队列没有被当做错误的类型对待。 例如，
+	条件变量函数不应恢复传统休眠队列的执行。 <code class="function">sleepq_broadcast</code>
+	函数将恢复所有指定休眠通道上的阻塞线程，
+	而 <code class="function">sleepq_signal</code> 则只恢复在等待通道上优先级最高的阻塞线程。
+	在调用这些函数之前， 应首先使用
+	<code class="function">sleepq_lock</code> 对休眠队列上锁。</p><p>休眠线程也可以通过调用 <code class="function">sleepq_abort</code> 函数来中断其休眠状态。
+	这个函数只有在持有 <code class="varname">sched_lock</code> 时才能调用，
+	而且线程必须处于休眠队列之上。 线程也可以通过使用
+	<code class="function">sleepq_remove</code> 函数从指定的休眠队列中删除。
+	这个函数包括两个参数， 即休眠通道和线程，
+	它只在线程处于指定休眠通道的休眠队列之上时才将其唤醒。
+	如果线程不在那个休眠队列之上， 或同时处于另一等待通道的休眠队列上，
+	则这个函数将什么都不做而直接返回。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71229392"></a>8.5.2. 十字转门 (turnstile)</h3></div></div></div><a id="idp71230032" class="indexterm"></a><p>- 与休眠队列的比较和不同。</p><p>- 查询/等待/释放 (lookup/wait/release)
+        - 介绍 TDF_TSNOBLOCK 竞态条件。</p><p>- 优先级传播。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71231824"></a>8.5.3. 关于 mutex 实现的一些细节</h3></div></div></div><p>- 我们是否应要求  mtx_destroy() 持有 mutex，
+	因为无法安全地断言它们没有被其它对象持有？</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71232848"></a>8.5.3.1. 自旋 mutex</h4></div></div></div><a id="idp71233488" class="indexterm"></a><p>- 使用一临界区...</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71238992"></a>8.5.3.2. 休眠 mutex</h4></div></div></div><a id="idp71239632" class="indexterm"></a><p>- 描述 mutex 冲突时的竞态条件</p><p>- 为何在持有十字转门链锁时， 可以安全地读冲突 mutex 的 mtx_lock。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71241424"></a>8.5.4. Witness</h3></div></div></div><a id="idp71242064" class="indexterm"></a><p>- 它能做什么</p><p>- 它如何工作</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="smp-lock-strategies.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="smp.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="smp-misc.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">8.4. 特定数据的锁策略 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 8.6. 其它话题</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

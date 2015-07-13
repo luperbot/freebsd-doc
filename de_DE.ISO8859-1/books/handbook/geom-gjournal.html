@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.7. UFS Journaling in GEOM</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="GEOM.html" title="Kapitel 20. GEOM: Modulares Framework zur Plattentransformation" /><link rel="prev" href="geom-glabel.html" title="20.6. Das Labeln von Laufwerken" /><link rel="next" href="zfs.html" title="Kapitel 21. Das Z-Dateisystem (ZFS)" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.7. UFS Journaling in GEOM</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="geom-glabel.html">Zurück</a> </td><th width="60%" align="center">Kapitel 20. GEOM: Modulares Framework zur
+    Plattentransformation</th><td width="20%" align="right"> <a accesskey="n" href="zfs.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="geom-gjournal"></a>20.7. UFS Journaling in GEOM</h2></div></div></div><a id="idp82696784" class="indexterm"></a><a id="idp82697552" class="indexterm"></a><p>Mit FreeBSD 7.0 wurde eine lang erwartete Funktion,
+      das Journaling, implementiert.  Diese Funktion wird über
+      das <acronym class="acronym">GEOM</acronym>-Subsystem realisiert und kann
+      über das Werkzeug <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> eingerichtet
+      werden.</p><p>Was ist Journaling?  Bei Journaling wird ein Protokoll
+      über alle Dateisystemtransaktionen angelegt, inklusive
+      aller Veränderungen, aus denen ein kompletter
+      Schreibvorgang besteht, bevor diese Änderungen (Metadaten
+      sowie tatsächliche Schreibvorgänge) physisch auf
+      der Festplatte ausgeführt werden.  Dieses Protokoll kann
+      später erneut aufgerufen werden, um diese Vorgänge
+      zu wiederholen (beispielsweise um Systeminkonsistenzen zu
+      vermeiden).</p><p>Diese Technik bietet eine weitere Möglichkeit,
+      sich vor Datenverlust und Dateisystem-Inkonsistenzen zu
+      schützen.  Im Gegensatz zu Soft Updates (die
+      Metadaten-Aktualisierungen verfolgen und erzwingen) und
+      Snapshots (die ein Image eines Dateisystems darstellen) wird
+      bei Journaling ein tatsächliches Protokoll in einem
+      speziell dafür bereitgestellten Bereich der Festplatte
+      (oder manchmal sogar auf einer separaten Platte)
+      gespeichert.</p><p>Im Gegensatz zu anderen Journaling-Dateisystemen arbeitet
+      die <code class="command">gjournal</code>-Methode blockbasiert und wurde
+      nicht als Teil des Dateisystems implementiert, sondern als
+      <acronym class="acronym">GEOM</acronym>-Erweiterung.</p><p>Um die <code class="command">gjournal</code>-Unterstützung zu
+      aktivieren, muss der FreeBSD-Kernel die folgende Option enthalten
+      (was seit FreeBSD 7.0 bereits in der Voreinstellung der Fall
+      ist):</p><pre class="programlisting">options	UFS_GJOURNAL</pre><p>Um ein Volume mit Journalunterstützung beim Systemstart
+      automatisch zu mounten,  muss das Kernelmodul
+      <code class="filename">geom_journal.ko</code> ebenfalls automatisch geladen
+      werden (durch einen entsprechenden Eintrag in der Datei
+      <code class="filename">/boot/loader.conf</code>):</p><pre class="programlisting">geom_journal_load="YES"</pre><p>Alternativ können Sie auch einen angepassten Kernel
+      bauen, der diese Funktionalität enthält, indem Sie die
+      folgende Zeile in Ihrer Kernelkonfigurationsdatei
+      aufnehmen:</p><pre class="programlisting">options     GEOM_JOURNAL</pre><p>Das Anlegen eines neuen Journals auf einem freien Dateisystem
+      erfolgt durch die folgenden Schritte (im Folgenden wird
+      angenommen, dass es sich bei <code class="filename">da4</code> um
+      eine neue <acronym class="acronym">SCSI</acronym>-Platte handelt):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal label /dev/da4</code></strong></pre><p>Danach sollten die Gerätedateien
+      <code class="filename">/dev/da4</code> sowie
+      <code class="filename">/dev/da4.journal</code> vorhanden sein.  Nun
+      können Sie auf diesem Gerät ein Dateisystem
+      anlegen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -O 2 -J /dev/da4.journal</code></strong></pre><p>Dieser Befehl erzeugt ein <acronym class="acronym">UFS</acronym>2-Dateisystem
+      auf dem Gerät, für das im letzten Schritt das
+      Journaling aktiviert wurde.</p><p>Danach hängen Sie das neue Dateisystem mit
+      <code class="command">mount</code> in Ihren Verzeichnisbaum ein:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da4.journal /mnt</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Falls auf Ihrem System mehrere Slices angelegt sind
+	(beispielsweise <code class="filename">ad4s1</code> sowie
+	<code class="filename">ad4s2</code>), wird
+	<code class="command">gjournal</code> für jedes Slice ein
+	Journal anlegen (also <code class="filename">ad4s1.journal</code>
+	sowie <code class="filename">ad4s2.journal</code>).</p></div><p>Um die Leistung zu optimieren, kann das Journal auf eine
+      externe Platte ausgelagert werden.  In einem solchen Fall
+      geben Sie die Gerätedatei der Platte nach dem Gerät
+      an, für das Sie Journaling aktivieren wollen.
+      Theoretisch ist es auch möglich, Journaling auf bereits
+      existierenden Dateisystemen durch das Werkzeug
+      <code class="command">tunefs</code> zu aktivieren.  Machen Sie aber
+      in jedem Fall ein Backup Ihrer Daten, bevor Sie versuchen,
+      ein existierendes Dateisystem zu ändern.
+      <code class="command">gjournal</code> wird zwar den Vorgang abbrechen,
+      wenn es das Journal nicht erzeugen kann, allerdings schützt
+      Sie dies nicht vor Datenverlust durch einen fehlerhaften Einsatz
+      von <code class="command">tunefs</code>.</p><p>Es ist möglich, Journale auch für die Bootplatte
+      eines FreeBSD-System zu verwenden.  Lesen Sie bitte den Artikel
+      <a class="link" href="../../../../doc/en_US.ISO8859-1/articles/gjournal-desktop/article.html" target="_top">
+      Implementing UFS Journaling on a Desktop PC</a>, wenn Sie
+      an einer derartigen Konfiguration interessiert sind.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="geom-glabel.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="zfs.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">20.6. Das Labeln von Laufwerken </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Kapitel 21. Das Z-Dateisystem (<acronym class="acronym">ZFS</acronym>)</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

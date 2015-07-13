@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>15.6. Uso de las jaulas</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="jails.html" title="Capítulo 15. Jaulas" /><link rel="prev" href="jails-tuning.html" title="15.5. Administración y personalización a fondo" /><link rel="next" href="mac.html" title="Capítulo 16. Mandatory Access Control" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.6. Uso de las jaulas</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="jails-tuning.html">Anterior</a> </td><th width="60%" align="center">Capítulo 15. Jaulas</th><td width="20%" align="right"> <a accesskey="n" href="mac.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="jails-application"></a>15.6. Uso de las jaulas</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails"></a>15.6.1. Jaulas <span class="quote">&#8220;<span class="quote">de servicio</span>&#8221;</span></h3></div><div><span class="authorgroup">Escrito por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p>Esta sección está basada en una idea
+        que Simon L. B. Nielsen presentó por primera vez en <code class="uri"><a class="uri" href="http://simon.nitro.dk/service-jails.html" target="_top">http://simon.nitro.dk/service-jails.html</a></code> y en
+	un artículo con contenido adicional escrito por Ken
+	Tom <code class="email">&lt;<a xmlns="" class="email" href="mailto:locals@gmail.com">locals@gmail.com</a>&gt;</code>.  En esta sección
+	se detalla cómo configurar un sistema FreeBSD que
+	añade una capa adicional de seguridad mediante el uso
+	de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>.  Para su verdadero aprovechamiento se asume
+	que el sistema en el que se vaya a aplicar ejecuta al menos
+	RELENG_6_0 y que la información que contienen las secciones
+	previas de este capítulo se ha comprendido totalmente.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-design"></a>15.6.1.1. Diseño</h4></div></div></div><p>Uno de los mayores problemas de las jaulas es la
+	  gestión de su proceso de actualización.  Este
+	  proceso tiene a ser un problema porque cada jaula tiene que
+	  recompilarse íntegramente desde el código fuente
+	  cada vez que hay que actualizarla.  Esto no es un gran problema
+	  si tenemos una sola jaula puesto que el proceso de
+	  actualización es bastante simple, pero si hay muchas
+	  jaulas será un trabajo largo y tedioso.</p><div xmlns="" class="warning"><h3 class="admontitle">Aviso: </h3><p xmlns="http://www.w3.org/1999/xhtml">: Esta configuración requiere mucha experiencia
+	    con FreeBSD y el uso de sus características.  Si los
+	    pasos que se detallan a continuación le parecen
+	    demasiado complicados puede echar un vistazo a sistemas
+	    más sencillos como <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/ezjail/pkg-descr">sysutils/ezjail</a>, que le
+            permitirá acceder a un método de
+	    administración de jaulas en FreeBSD más sencillo
+	    y no es tan sofisticado como el que le proponemos a
+	    continuación.</p></div><p>El origen de esta idea es resolver los problemas antes
+	  descritos compartiendo el máximo posible entre distintas
+	  jaulas, de un modo seguro (utilizando montajes
+	  using read-only <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mount_nullfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mount_nullfs</span>(8)</span></a> mounts) para que la
+	  actualización sea más sencilla y el ubicar
+	  servicios aislados en jaulas sea más interesante.
+	  Además, se presenta una forma sencilla de añadir
+	  o borrar jaulas así como una forma de actualizarlas.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Los ejemplos de servicios en este contexto son: un
+	    servidor <acronym class="acronym">HTTP</acronym>,un servidor
+	    <acronym class="acronym">DNS</acronym>, un servidor
+	    <acronym class="acronym">SMTP</acronym>, etc.</p></div><p>Los objetivos de la configuración descrita en
+	  esta sección son:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Crear una estructura de jaulas simple y fácil
+	      de entender.  Esto implica <span class="emphasis"><em>no</em></span> tener
+	      que ejecutar un <span class="quote">&#8220;<span class="quote">installworld</span>&#8221;</span> completo en
+	      todas y cada una de las jaulas.</p></li><li class="listitem"><p>Facilitar la creación de nuevas jaulas o
+	      el borrado de jaulas previamente existentes.</p></li><li class="listitem"><p>Facilitar la actualización de jaulas
+	      ya existentes.</p></li><li class="listitem"><p>Hacer posible el uso de una rama de FreeBSD
+	      personalizada.</p></li><li class="listitem"><p>Ser paranoico en cuanto a seguridad, reduciendo
+	      todo lo posible la posibilidad de que los sistemas
+	      se vean comprometidos.</p></li><li class="listitem"><p>Ahorrar todo el espacio e inodos que sea
+	      posible.</p></li></ul></div><p>Como ya se ha dicho, este diseño se basa en
+	  gran medida en el disponer de una única plantilla
+	  en modo de sólo lectura (a la que llamaremos
+	  <span class="application">nullfs</span>) montada en cada jaula
+	  y un dispositivo en modo lectura-escritura por cada jaula.  El
+	  dispositivo puede ser otro disco físico adicional, una
+	  partición o un dispositivo <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=md&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">md</span>(4)</span></a> basado en un
+	  vnode.  En este ejemplo utilizaremos montajes
+	  <span class="application">nullfs</span> en modo
+	  lectura-escritura.</p><p>La estructura del sistema de ficheros se detalla en
+	  la siguiente lista:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Cada jaula se montará bajo <code class="filename">/home/j</code>.</p></li><li class="listitem"><p><code class="filename">/home/j/mroot</code>
+	      será la plantilla para cada jaula y la
+	      partición de sólo lectura para todas las
+	      jaulas.</p></li><li class="listitem"><p>Se creará un directorio vacío para
+	      cada jaula bajo el directorio <code class="filename">/home/j</code>.</p></li><li class="listitem"><p>Cada jaula tendrá un directorio <code class="filename">/s</code> que estará enlazado
+	      con la parte de lectura-escritura del sistema.</p></li><li class="listitem"><p>Cada jaula tendrá su propio sistema en modo
+	      lectura-escritura basado en <code class="filename">/home/j/skel</code>.</p></li><li class="listitem"><p>Cada parte de lectura-escritura correspondiente a cada
+	      jaula se creará en <code class="filename">/home/js</code>.</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Se asume que las jaulas se instalarán bajo
+	    la partición <code class="filename">/home</code>.  Por supuesto esto no
+	    es en absoluto obligatorio, pero hay que tener en cuenta que
+	    debe hacerse el mismo cambio en cada uno de los ejemplos que
+	    se muestran más adelante.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-template"></a>15.6.1.2. Creación de la plantilla</h4></div></div></div><p>En esta sección se describen los pasos necesarios
+	  para crear la plantilla maestra que conformará la
+	  parte de sólo lectura que usarán las jaulas.</p><p>Siempre es recomendable actualizar el sistema FreeBSD a la
+	  última rama -RELEASE.  Consulte el <a class="link" href="../../../../doc/es_ES.ISO8859-1/books/handbook/makeworld.html" target="_top">capítulo</a>
+	  correspondiente de este libro si necesita más
+	  información.  En caso de que la actualización no
+	  sea posible tendrá que usar <span class="quote">&#8220;<span class="quote">buidworld</span>&#8221;</span> para
+	  poder seguir adelante.  También necesitará el
+	  paquete <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a>.  Usaremos
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=portsnap&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">portsnap</span>(8)</span></a> para descargar la Colección de Ports
+	  de FreeBSD.  El capítulo sobre <a class="link" href="../../../../doc/es_ES.ISO8859-1/books/handbook/portsnap.html" target="_top">Portsnap</a>
+	  es siempre una lectura muy recomendable para quienes no tengan
+	  experiencia con su funcionamiento.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Lo primero que haremos será crear una estructura
+	      de directorios para el sistema de ficheros de sólo
+	      lectura que contendrá los binarios de nuestras jaulas,
+	      luego iremos al directorio que contiene el árbol de
+	      código de FreeBSD e instalaremos el sistema de ficheros
+	      de sólo lectura en la plantilla de las jaulas:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot</code></strong></pre></li><li class="step"><p>Una vez hecho esto, prepararemos la Colección
+	      de Ports de FreeBSD para nuestras jaulas así como un
+	      árbol de código FreeBSD, necesario para usar
+	      <span class="application">mergemaster</span>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir usr/ports</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>portsnap -p /home/j/mroot/usr/ports fetch extract</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src /home/j/mroot/usr/src</code></strong></pre></li><li class="step"><p>Crear la estructura de directorios necesaria para la
+	      parte de lectura-escritura del sistema:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/skel /home/j/skel/home /home/j/skel/usr-X11R6 /home/j/skel/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv etc /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv usr/local /home/j/skel/usr-local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv tmp /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv var /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv root /home/j/skel</code></strong></pre></li><li class="step"><p>Usamos <span class="application">mergemaster</span> para
+	      instalar los ficheros de configuración que
+	      falten.  Después nos libramos de los directorios
+	      adicionales que haya creado
+	      <span class="application">mergemaster</span>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mergemaster -t /home/j/skel/var/tmp/temproot -D /home/j/skel -i</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R bin boot lib libexec mnt proc rescue sbin sys usr dev</code></strong></pre></li><li class="step"><p>Ahora enlazamos simbólicamente el sistema
+	      de ficheros de lectura-escritura con el sistema de
+	      ficheros de sólo lectura.  Por favor,
+	      asegúrese de que los enlaces simbólicos
+	      se crean en las ubicaciones correctas: <code class="filename">s/</code>.  Si se usan directorios
+	      reales o directorios erróneos la instalación
+	      no funcionará.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../../s/distfiles usr/ports/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Como último paso, cree un
+	      <code class="filename">/home/j/skel/etc/make.conf</code>
+	      genérico con el siguiente contenido:</p><pre class="programlisting">WRKDIRPREFIX?=  /s/portbuild</pre><p>El tener <code class="literal">WRKDIRPREFIX</code> configurado
+	       de este modo hará posible compilar ports de FreeBSD
+	       dentro de cada jaula.  Recuerde que el el directorio
+	       de los ports es de sólo lectura.  La ruta
+	       personalizada por <code class="literal">WRKDIRPREFIX</code>
+	       permite ejecutar compilaciones en la parte de
+	       sólo lectura de cada jaula.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-creating"></a>15.6.1.3. Creación de las jaulas</h4></div></div></div><p>Ya tenemos una plantilla de jaulas de FreeBSD completa,
+	  así que podemos configurar nuestras jaulas en
+	  <code class="filename">/etc/rc.conf</code>.  En este ejemplo crearemos
+	  3 jaulas: <span class="quote">&#8220;<span class="quote">NS</span>&#8221;</span>,
+	  <span class="quote">&#8220;<span class="quote">MAIL</span>&#8221;</span> y <span class="quote">&#8220;<span class="quote">WWW</span>&#8221;</span>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Introduzca las siguientes lineas en el fichero
+	      <code class="filename">/etc/fstab</code>; con esto cada jaula
+	      tendrá acceso a la plantilla de sólo lectura
+	      y al espacio de lectura-escritura:</p><pre class="programlisting">/home/j/mroot   /home/j/ns     nullfs  ro  0   0
+/home/j/mroot   /home/j/mail   nullfs  ro  0   0
+/home/j/mroot   /home/j/www    nullfs  ro  0   0
+/home/js/ns     /home/j/ns/s   nullfs  rw  0   0
+/home/js/mail   /home/j/mail/s nullfs  rw  0   0
+/home/js/www    /home/j/www/s  nullfs  rw  0   0</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Las particiones que tienen un 0 en la columna
+	        <span class="quote">&#8220;<span class="quote">pass</span>&#8221;</span> no serán revisadas por
+		<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> durante el arranque y las que tienen
+		un 0 en la columna <span class="quote">&#8220;<span class="quote">dump</span>&#8221;</span> no serán
+		copiadas por <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a>.  No nos interesa que
+		<span class="application">fsck</span> compruebe la
+		integridad de montajes <span class="application">nullfs</span>
+		ni que <span class="application">dump</span> haga copias de
+		seguridad de montajes nullfs de sólo lectura de las
+		jaulas.  Por esta razón el ejemplo de
+		<code class="filename">fstab</code> tiene en las dos últimas
+		columnas <span class="quote">&#8220;<span class="quote">0 0</span>&#8221;</span>.</p></div></li><li class="step"><p>Configure las jaulas en
+	      <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">jail_enable="YES"
+jail_set_hostname_allow="NO"
+jail_list="ns mail www"
+jail_ns_hostname="ns.ejemplo.org"
+jail_ns_ip="192.168.3.17"
+jail_ns_rootdir="/usr/home/j/ns"
+jail_ns_devfs_enable="YES"
+jail_mail_hostname="mail.ejemplo.org"
+jail_mail_ip="192.168.3.18"
+jail_mail_rootdir="/usr/home/j/mail"
+jail_mail_devfs_enable="YES"
+jail_www_hostname="www.ejemplo.org"
+jail_www_ip="62.123.43.14"
+jail_www_rootdir="/usr/home/j/www"
+jail_www_devfs_enable="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Aviso: </h3><p xmlns="http://www.w3.org/1999/xhtml">: La razón por la que
+		<code class="varname">jail_<em class="replaceable"><code>nombre</code></em>_rootdir</code>
+		contiene <code class="filename">/usr/home</code> y no
+		<code class="filename">/home</code> es que la ruta
+		física del directorio<code class="filename">/home</code> en una instalación
+		de FreeBSD por omisión es <code class="filename">/usr/home</code>.  La variable
+		<code class="varname">jail_<em class="replaceable"><code>nombre</code></em>_rootdir</code>
+		<span class="emphasis"><em>no</em></span> debe apuntar a una ruta que
+		contenga un enlace simbólico porque sería
+		imposible arrancar las jaulas.  Utilice
+		la herramienta <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=realpath&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">realpath</span>(1)</span></a> para asegurarse del valor
+		exacto que debe asignar a la variable.  Por favor, consulte
+		el aviso de seguridad FreeBSD-SA-07:01.jail para más
+		información.</p></div></li><li class="step"><p>Creamos los puntos de montaje de sistemas de ficheros
+	      de sólo lectura correspondientes a cada jaula:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/ns /home/j/mail /home/j/www</code></strong></pre></li><li class="step"><p>Instalamos la plantilla de lectura-escritura dentro
+	      de cada jaula.  Observe que utilizamos <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a> para asegurarnos
+	      de que se hace una copia exacta de cada directorio:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/js</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/www</code></strong></pre></li><li class="step"><p>Llegados a este punto las jaulas están
+	      configuradas y listas para arrancar.  Monte los sistemas
+	      de ficheros de cada jaula y luego arránquelas
+	      con el script <code class="filename">/etc/rc.d/jail</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>Las jaulas deberían haber arrancado.  Asegúrese
+	  de ello con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a>.  La salida que verá debe parecerse
+	  a esta:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jls</code></strong>
+   JID  IP Address      Hostname                      Path
+     3  192.168.3.17    ns.ejemplo.org                /home/j/ns
+     2  192.168.3.18    mail.ejemplo.org              /home/j/mail
+     1  62.123.43.14    www.ejemplo.org               /home/j/www</pre><p>En este punto debería ser posible entrar a
+	  cada una de las jaulas, añadir nuevos usuarios o
+	  configurar dæmons.  La columna <code class="literal">JID</code>
+	  indica el número de identificación de cada
+	  jaula que esté funcionando en el sistema.  Con el
+	  siguiente comando puede ejecutar tareas administrativas
+	  en la jaula cuyo <code class="literal">JID</code> sea 3:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jexec 3 tcsh</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-upgrading"></a>15.6.1.4. Actualización</h4></div></div></div><p>Llegará el momento en el que sea necesario
+	  actualizar el sistema, bien por seguridad o porque sea
+	  útil para las jaulas disponer de alguna nueva
+	  característica del sistema.  El diseño de
+	  esta configuración facilita una forma fácil
+	  de actualizar sus jaulas.  Además, minimiza la
+	  pérdida de servicio, puesto que las jaulas deben
+	  apagarse sólamente al final de todo el proceso.  Se
+	  ofrece también la posibilidad de volver a la versión
+	  anterior en caso de que algo salga mal.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>El primer paso es actualizar el servidor que aloja
+	      las jaulas de la forma habitual.  Después creamos
+	      una plantilla de sólo lectura temporal en <code class="filename">/home/j/mroot2</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong></pre><p>La ejecución de <code class="buildtarget">installworld</code>
+	      crea unos cuantos directorios innecesarios que debemos
+	      borrar:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chflags -R 0 var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R etc var root usr/local tmp</code></strong></pre></li><li class="step"><p>Creamos de nuevo los enlaces simbólicos de
+	      lectura-escritura del sistema de ficheros principal:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Ha llegado el momento de parar las jaulas:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail stop</code></strong></pre></li><li class="step"><p>Desmontamos los sistemas de ficheros originales:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Los sistemas de ficheros de lectura-escritura
+	        cuelgan del sistema de sólo lectura <code class="filename">/s</code> y por tanto deben
+		desmontarse antes.</p></div></li><li class="step"><p>Movemos el sistema de ficheros de sólo lectura
+	      viejo y lo reemplazamos por el nuevo.  Nos servirá
+	      de copia de seguridad y como archivo en caso de que haya
+	      problemas.  Para darle un nombre usamos la fecha en la que
+	      se creado una nueva copia del sistema de ficheros de
+	      sólo lectura.  Movemos también la
+	      Colección de Ports de FreeBSD al sistema de ficheros
+	      nuevo para ahorrar un poco más de espacio e
+	      inodos:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot mroot.20060601</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot2 mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot.20060601/usr/ports mroot/usr</code></strong></pre></li><li class="step"><p>Una vez llegados a este punto la nueva plantilla de
+	      sólo lectura está lista, de manera que lo
+	      único que nos queda por hacer es montar los sistemas
+	      de ficheros y arrancar las jaulas:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>Compruebe con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a> si las jaulas han arrancado
+	  sin contratiempos.  No olvide ejecutar mergemaster en cada
+	  jaula.  Tendrá que actualizar tanto
+	  los ficheros de configuración como los scripts
+	  rc.d.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="jails-tuning.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="jails.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="mac.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">15.5. Administración y personalización a fondo </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> Capítulo 16. Mandatory Access Control</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

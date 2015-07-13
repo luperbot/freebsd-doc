@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.4. RAID1 - « mirroring »</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="GEOM.html" title="Chapitre 20. GEOM: architecture modulaire de gestion des disques" /><link rel="prev" href="GEOM-striping.html" title="20.3. RAID0 - « Striping »" /><link rel="next" href="geom-ggate.html" title="20.5. Périphériques réseau « GEOM Gate »" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.4. RAID1 - <span class="quote">« <span class="quote">mirroring</span> »</span></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-striping.html">Précédent</a> </td><th width="60%" align="center">Chapitre 20. GEOM: architecture modulaire de gestion des disques</th><td width="20%" align="right"> <a accesskey="n" href="geom-ggate.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-mirror"></a>20.4. RAID1 - <span class="quote">« <span class="quote">mirroring</span> »</span></h2></div></div></div><a id="idp81323600" class="indexterm"></a><a id="idp81324368" class="indexterm"></a><p>Le <span class="quote">« <span class="quote">mirroring</span> »</span> est une technologie
+      utilisée par de nombreuses entreprises et beaucoup de
+      particuliers pour sauvegarder les données sans
+      interruption des activités.  Quand un miroir existe, cela
+      signifie que le disque B est une copie du disque A.  Ou, autre
+      cas, que les disques C+D sont une copie des disques A+B.
+      Indépendamment de la configuration des disques, l'aspect
+      important est que les données d'un disque ou d'une
+      partition sont dupliquées.  Ultérieurement, ces
+      données pourront être plus facilement
+      restaurées, sauvegardées sans interrompre le
+      système ou les accès, et pourront même
+      être stockées physiquement de manière
+      sure.</p><p>Pour commencer, vérifiez que le système dispose de deux
+      disques de taille identique, cet exemple suppose que ce sont des
+      disques <acronym class="acronym">SCSI</acronym> (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=da&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">da</span>(4)</span></a>).</p><p>Installez FreeBSD sur le premier disque avec uniquement deux
+      partitions.  Une partition sera la partition de pagination d'une
+      taille double à celle de la <acronym class="acronym">RAM</acronym> et
+      l'espace restant sera alloué au système de
+      fichiers racine (<code class="filename">/</code>).  Il
+      est possible d'avoir des partitions séparées pour
+      les autres points de montage, cependant cela augmentera
+      énormément le niveau de difficulté en
+      raison des modifications manuelles nécessaires des
+      paramètres de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a> et <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fdisk&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fdisk</span>(8)</span></a>.</p><p>Redémarrez et attendez l'initialisation
+      complète du système.  Ensuite, ouvrez une session
+      sous l'utilisateur <code class="systemitem">root</code>.</p><p>Créez le périphérique
+      <code class="filename">/dev/mirror/gm</code> et liez-le avec
+      <code class="filename">/dev/da1</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror label -vnb round-robin gm0 /dev/da1</code></strong></pre><p>Le système devrait répondre par:</p><pre class="screen">
+Metadata value stored on /dev/da1.
+Done.</pre><p>Initialisez GEOM, cela devrait charger le module du noyau
+      <code class="filename">/boot/kernel/geom_mirror.ko</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror load</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Cette commande devrait créer le fichier
+	spécial de périphérique
+	<code class="filename">gm0</code> sous le répertoire
+	<code class="filename">/dev/mirror</code>.</p></div><p>Installez un label <code class="command">fdisk</code> et un code de
+      d'amorce génériques sur le nouveau
+      périphérique <code class="filename">gm0</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fdisk -vBI /dev/mirror/gm0</code></strong></pre><p>Installez maintenant un label générique
+      <code class="command">bsdlabel</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/mirror/gm0s1</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">S'il existe plusieurs <span class="quote">« <span class="quote">slices</span> »</span> et plusieurs
+	partitions, il faudra modifier les paramètres des deux
+	commandes précédentes.  Elles doivent correspondre
+	aux tailles des partitions et <span class="quote">« <span class="quote">slices</span> »</span> sur l'autre
+	disque.</p></div><p>Utilisez l'utilitaire <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> pour créer un
+      système de fichiers <acronym class="acronym">UFS</acronym> sur le
+      périphérique
+      <code class="filename">gm0s1a</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/mirror/gm0s1a</code></strong></pre><p>Le système devrait alors afficher un certain nombre
+      d'informations et de nombres.  C'est bon signe.  Contrôlez
+      l'affichage à la recherche de messages d'erreur et montez
+      le périphérique sur le point de montage <code class="filename">/mnt</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/mirror/gm0s1a /mnt</code></strong></pre><p>Transférez maintenant toutes les données du
+      disque de démarrage vers ce nouveau système de
+      fichiers.  Dans notre exemple nous utilisons à cet effet
+      les commandes <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a> et <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=restore&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">restore</span>(8)</span></a>, cependant la
+      commande <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dd&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">dd</span>(1)</span></a> conviendrait également.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dump -L -0 -f- / |(cd /mnt &amp;&amp; restore -r -v -f-)</code></strong></pre><p>Cela doit être effectué pour chaque
+      système de fichiers.  Placez simplement le système
+      de fichiers approprié au bon endroit quand vous
+      exécutez la commande précédente.</p><p>Editez ensuite le fichier
+      <code class="filename">/mnt/etc/fstab</code> et supprimez ou mettez en
+      commentaires le fichier de pagination
+      <a href="#ftn.idp81360080" class="footnote" id="idp81360080"><sup class="footnote">[11]</sup></a>.  Modifiez les autres paramètres du
+      système de fichiers pour utiliser le nouveau disque comme
+      présenté l'exemple suivant:</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+#/dev/da0s2b             none            swap    sw              0       0
+/dev/mirror/gm0s1a       /               ufs     rw              1       1</pre><p>Créez maintenant un fichier
+      <code class="filename">boot.config</code> sur la partition racine actuelle
+      et celle nouvellement créée.  Ce fichier
+      <span class="quote">« <span class="quote">aidera</span> »</span> le <acronym class="acronym">BIOS</acronym> à
+      déterminer correctement sur quel disque
+      démarrer:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "1:da(1,a)/boot/loader" &gt; /boot.config</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "1:da(1,a)/boot/loader" &gt; /mnt/boot.config</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Nous l'avons ajouter sur les deux partitions racines afin
+	d'assurer un démarrage correct.  Si pour une raison
+	quelconque le système ne pourrait le lire à partir
+	de la nouvelle partition racine, une version de secours est
+	disponible.</p></div><p>Assurez-vous que le module
+      <code class="filename">geom_mirror.ko</code> sera chargé au
+      démarrage du système en lançant la commande
+      suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_mirror_load="YES"' &gt;&gt; /mnt/boot/loader.conf</code></strong></pre><p>Redémarrez le système:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown -r now</code></strong></pre><p>Si tout s'est bien passé, le système a
+      dû démarrer à partir du
+      périphérique <code class="filename">gm0s1a</code> et
+      une invite d'ouverture de session doit être
+      affichée.  En cas de problème, consultez la
+      section suivante consacrée au dépannage.  Ajoutez
+      maintenant le disque <code class="filename">da0</code> au
+      périphérique <code class="filename">gm0</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror configure -a gm0</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da0</code></strong></pre><p>L'option <code class="option">-a</code> demande à
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a> d'utiliser une synchronisation automatique,
+      c'est à dire dupliquer automatiquement toute
+      écriture disque.  La page de manuel explique comment
+      reconstruire et remplacer les disques, avec la différence
+      qu'elle utilise <code class="filename">data</code> à la place
+      de <code class="filename">gm0</code>.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81378896"></a>20.4.1. Dépannage</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81379536"></a>20.4.1.1. Le système refuse de démarrer</h4></div></div></div><p>Si le démarrage du système s'interrompt
+	  à une invite semblable à:</p><pre class="programlisting">ffs_mountroot: can't find rootvp
+Root mount failed: 6
+mountroot&gt;</pre><p>Redémarrez la machine à l'aide du bouton
+	  de mise en marche ou de <span class="quote">« <span class="quote">reset</span> »</span>.  Au menu de
+	  démarrage, sélectionnez la sixième
+	  option (6).  Le système basculera alors vers une
+	  invite du chargeur (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>).  Chargez manuellement
+	  le module du noyau:</p><pre class="screen">OK? <strong class="userinput"><code>load geom_mirror</code></strong>
+OK? <strong class="userinput"><code>boot</code></strong></pre><p>Si cela fonctionne, cela signifie que pour une raison
+	  quelconque le module n'a pas été correctement
+	  chargé.  Ajoutez la ligne:</p><pre class="programlisting">options	GEOM_MIRROR</pre><p>dans le fichier de configuration du noyau, recompilez-le
+	  puis réinstallez-le.  Cela devrait corriger le
+	  problème.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp81360080" class="footnote"><p><a href="#idp81360080" class="para"><sup class="para">[11] </sup></a>Il est à noter que commenter l'entrée de
+	  l'espace de pagination dans <code class="filename">fstab</code> vous
+	  demandera très probablement de mettre en place une
+	  méthode différente pour activer l'espace de
+	  pagination.  Veuillez vous référer à
+	  la <a class="xref" href="adding-swap-space.html" title="12.14. Ajouter de l'espace de pagination">Section 12.14, « Ajouter de l'espace de pagination »</a> pour plus
+	  d'informations.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-striping.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="geom-ggate.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">20.3. RAID0 - <span class="quote">« <span class="quote">Striping</span> »</span> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 20.5. Périphériques réseau <span class="quote">« <span class="quote">GEOM
+      Gate</span> »</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

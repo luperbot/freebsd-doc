@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>9.8. Funzioni</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Introduzione a Unix" /><link rel="up" href="shell-programming.html" title="Capitolo 9. Programmazione di shell" /><link rel="prev" href="shell-programming-int-input.html" title="9.7. Input interattivo" /><link rel="next" href="shell-programming-control-comm.html" title="9.9. Comandi di controllo" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">9.8. Funzioni</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="shell-programming-int-input.html">Indietro</a> </td><th width="60%" align="center">Capitolo 9. Programmazione di shell</th><td width="20%" align="right"> <a accesskey="n" href="shell-programming-control-comm.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="shell-programming-functions"></a>9.8. Funzioni</h2></div></div></div><p>La shell Bourne permette di definire funzioni.  Queste sono molto
+      simili agli alias della shell C, ma permettono più
+      flessibilità.  Una funzione ha la forma:</p><p><code class="command">funzione () {
+        comando; }</code></p><p>dove lo spazio dopo { e il punto e virgola (;) sono obbligatori;
+      il punto e virgola può essere omesso facendo precedere a } un
+      newline.  Spazi e newline aggiuntivi sono permessi.
+      Alcuni esempi di funzioni possono essere visti nel semplice file
+      <code class="filename">.profile</code> discusso nei primi capitoli, dove si avevano
+      delle funzioni per <code class="command">ls</code> e <code class="command">ll</code>:</p><p><code class="command">ls() { /bin/ls -sbF "$@";}</code></p><p><code class="command">ll() { ls -al "$@";}</code></p><p>La prima funzione ridefinisce <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> affinchè le opzioni
+      <code class="option">-sbF</code> siano sempre fornite dal comando standard
+      <code class="command">/bin/ls</code> e in modo da agire in base all'input fornito,
+      <code class="literal">$@</code>.  La seconda di queste funzioni prende il valore
+      corrente di <code class="command">ls</code> (la funzione precedente) e aggiunge le
+      opzioni <code class="option">-al</code>.</p><p>Le funzioni sono molto utili negli script di shell.  Il seguente
+      script è una versione semplificata di uno script utilizzato per
+      effettuare automaticamente il backup su nastro delle partizioni di
+      sistema.</p><pre class="programlisting">#!/bin/sh
+# Script cron per un completo backup del sistema
+HOST=`/bin/uname -n`
+admin=frank
+Mt=/bin/mt
+Dump=/usr/sbin/ufsdump
+Mail=/bin/mailx
+device=/dev/rmt/0n
+Rewind="$Mt -f $device rewind"
+Offline="$Mt -f $device rewoffl"
+# Failure - exit
+failure () {
+  $Mail -s "Backup fallito - $HOST" $admin &lt;&lt; EOF_failure
+  $HOST
+  Script cron backup fallito. A quanto pare non c'è il nastro nel dispositivo.
+  EOF_failure
+  exit 1
+ }
+# Dump failure - exit
+dumpfail () {
+  $Mail -s "Backup fallito - $HOST" $admin &lt;&lt; EOF_dumpfail
+  $HOST
+  Script cron backup fallito. A quanto pare non c'è il nastro nel dispositivo.
+  EOF_dumpfail
+  exit 1
+ }
+# Success
+success () {
+  $Mail -s "Backup completato con successo - $HOST" $admin &lt;&lt; EOF_success
+  $HOST
+  Script cron backup apparentemente riuscito. Il file /etc/dumpdates è:
+  `/bin/cat /etc/dumpdates`
+  EOF_success
+  }
+# Conferma nastro nel device
+$Rewind || failure
+$Dump 0uf $device / || dumpfail
+$Dump 0uf $device /usr || dumpfail
+$Dump 0uf $device /home || dumpfail
+$Dump 0uf $device /var || dumpfail
+($Dump 0uf $device /var/spool/mail || dumpfail) &amp;&amp; success
+$Offline</pre><p>Questo script illustra alcuni argomenti che sono stati trattati in
+      questo documento.  Lo script inizia settando i valori di alcuni parametri.
+      <code class="literal">HOST</code> viene inizializzato dall'output di un comando,
+      <code class="literal">admin</code> è l'amministratore di sistema,
+      <code class="literal">Mt</code>, <code class="literal">Dump</code> e <code class="literal">Mail</code>
+      sono nomi di programmi, <code class="literal">device</code> è il dispositivo
+      speciale usato per accedere al nastro, <code class="literal">Rewind</code> e
+      <code class="literal">Offline</code> contengono i comandi rispettivamente per
+      riavvolgere e scaricare il nastro usando il riferimento
+      <code class="literal">Mt</code> e le necessarie opzioni.  Vengono definite
+      tre funzioni: <code class="command">failure</code>, <code class="command">dumpfail</code> e
+      <code class="command">success</code>.  Tutte le funzioni in questo script utilizzano
+      la forma <span class="emphasis"><em>here document</em></span> per realizzare il contenuto
+      della funzione stessa.  Si introducono ora gli operatori logici
+      <span class="emphasis"><em>OR</em></span> (<span class="emphasis"><em>||</em></span>) e
+      <span class="emphasis"><em>AND</em></span> (<span class="emphasis"><em>&amp;&amp;</em></span>); ciascuno è
+      posizionato tra una coppia di comandi.  Per l'operatore
+      <span class="emphasis"><em>OR</em></span>, il secondo comando viene eseguito solamente se
+      il primo comando non è stato completato con successo.  Per
+      l'operatore <span class="emphasis"><em>AND</em></span>, il secondo comando viene
+      eseguito solamente se il primo comando è stato completato con
+      successo.</p><p>Lo scopo principale dello script è realizzare i comandi
+      <code class="command">Dump</code>, ad esempio copiando i file system specificati.
+      Prima si tenta di eseguire il riavvolgimento del nastro.  Se questo
+      fallisce, <code class="literal">|| failure</code>, si esegue la funzione
+      <code class="command">failure</code> e si esce dal programma.  Se invece questo ha
+      successo si procede con il backup a turno di ogni partizione, ogni volta
+      verificando che questa operazione sia completamente riuscita
+      (<code class="literal">|| dumpfail</code>).  Se questa operazione non viene eseguita
+      completamente con successo si esegue la procedura
+      <code class="command">dumpfail</code> e si esce.  Se l'ultimo backup ha successo si
+      procede con la funzione <code class="command">success</code> (<code class="literal">(...) &amp;&amp;
+      success</code>).  In fine si riavvolge il nastro e lo si manda fuori
+      linea affinchè altri utenti non possano accidentalmente scriverci
+      sopra.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="shell-programming-int-input.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="shell-programming.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="shell-programming-control-comm.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">9.7. Input interattivo </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 9.9. Comandi di controllo</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

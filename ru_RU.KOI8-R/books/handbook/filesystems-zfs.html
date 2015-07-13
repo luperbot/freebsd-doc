@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>19.2. Файловая система ZFS</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="filesystems.html" title="Глава 19. Поддержка файловых систем" /><link rel="prev" href="filesystems.html" title="Глава 19. Поддержка файловых систем" /><link rel="next" href="l10n.html" title="Глава 20. Локализация - I18N/L10N использование и настройка" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.2. Файловая система ZFS</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="filesystems.html">Пред.</a> </td><th width="60%" align="center">Глава 19. Поддержка файловых систем</th><td width="20%" align="right"> <a accesskey="n" href="l10n.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="filesystems-zfs"></a>19.2. Файловая система ZFS</h2></div></div></div><p>Файловая система ZFS, разработанная компанией <span class="trademark">Sun</span>TM, основана
+      на использовании метода пулов устройств хранения данных.  Это
+      значит, что емкость носителя занимается только тогда, когда она
+      становится необходимой для сохранения данных.  ZFS также была
+      разработана с упором на максимальную целостность данных, поддерживая
+      снимки (snapshot), множество копий и контрольные суммы данных.  Новая
+      модель репликации данных, известная как <acronym class="acronym">RAID</acronym>-Z,
+      подобна <acronym class="acronym">RAID</acronym>-5, но специально разработана для
+      предотвращения повреждений данных при записи.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92868816"></a>19.2.1. Настройка ZFS</h3></div></div></div><p>Подсистема <acronym class="acronym">ZFS</acronym> занимает значительную часть
+	ресурсов системы.  Чтобы получить от нее максимум эффективности
+	в повседневном использовании, потребуется выполнить некоторые
+	настройки.  <acronym class="acronym">ZFS</acronym> является экспериментальной
+	функциональной возможностью в FreeBSD, но ситуация может измениться
+	в ближайшем будущем; однако на данный момент рекомендуется выполнить
+	следующие шаги.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92870608"></a>19.2.1.1. Память</h4></div></div></div><p>Общий размер ОЗУ должен быть как минимум равен одному гигабайту,
+	  хотя рекомендуется два гигабайта или более.  Во всех нижеследующих
+	  примерах используется система с 1ГБ памяти совместно с другими
+	  специальными настройками.</p><p>Известно, что некоторые пользователи преуспели в использовании
+	  <acronym class="acronym">ZFS</acronym> на системах, имеющих менее одного гигабайта
+	  памяти, но с таким ограниченным объемом ОЗУ и при серьезной загрузке
+	  машины очень вероятны паники FreeBSD из-за нехватки памяти.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92872656"></a>19.2.1.2. Настройка ядра</h4></div></div></div><p>Рекомендуется исключить из файла конфигурации ядра
+	  неиспользуемые драйвера и опции.  Так как большинство драйверов
+	  устройств доступно в виде модулей, то они просто могут быть загружены
+	  с помощью соответствующих записей в файле
+	  <code class="filename">/boot/loader.conf</code>.</p><p>Пользователям архитектуры <span class="trademark">i386</span>TM необходимо добавить
+	  следующую опцию в их файл конфигурации ядра, перестроить
+	  ядро и перезагрузиться:</p><pre class="programlisting">options         KVA_PAGES=512</pre><p>Эта опция расширит адресное пространство ядра, тем самым позволяя
+	  переменной <code class="varname">vm.kvm_size</code> быть установленной за
+	  текущий предел в 1 ГБ (2 ГБ для <acronym class="acronym">PAE</acronym>).
+	  Чтобы найти наиболее подходящее значение для этой опции, разделите
+	  имеющийся объем ОЗУ, выраженный в мегабайтах, на 4.  Приведенное
+	  выше значение <code class="literal">512</code> рекомендуется для систем
+	  с 2 ГБ оперативной памяти.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92877008"></a>19.2.1.3. Параметры loader.conf</h4></div></div></div><p>Адресное пространство <code class="filename">kmem</code> должно быть
+	  увеличено на всех FreeBSD архитектурах.  На тестовой системе с одним
+	  гигабайтом физической памяти стабильная работа была получена со
+	  следующими параметрами, которые необходимо внести в файл
+	  <code class="filename">/boot/loader.conf</code> и перезагрузить
+	  систему.</p><pre class="programlisting">vm.kmem_size="330M"
+vm.kmem_size_max="330M"
+vfs.zfs.arc_max="40M"
+vfs.zfs.vdev.cache.size="5M"</pre><p>За более детальными рекомендациями по тонкой настройке
+	  системы под ZFS, обратитесь к странице:
+	  <code class="uri"><a class="uri" href="http://wiki.freebsd.org/ZFSTuningGuide" target="_top">http://wiki.freebsd.org/ZFSTuningGuide</a></code>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92880336"></a>19.2.2. Использование <acronym class="acronym">ZFS</acronym></h3></div></div></div><p>Существует стартовый механизм, позволяющий монтировать
+	<acronym class="acronym">ZFS</acronym> пулы во время инициализации системы.
+	Чтобы его задействовать, выполните следующие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'zfs_enable="YES"' &gt;&gt; /etc/rc.conf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/zfs start</code></strong></pre><p>Здесь и далее в статье подразумевается, что в системе
+	  установлено три <acronym class="acronym">SCSI</acronym> диска с именами
+	  устройств
+	  <code class="filename"><em class="replaceable"><code>da0</code></em></code>,
+	  <code class="filename"><em class="replaceable"><code>da1</code></em></code> и
+	  <code class="filename"><em class="replaceable"><code>da2</code></em></code>.
+	  Использующим <acronym class="acronym">IDE</acronym> диски необходимо
+	  подставить имена устройств
+	  <code class="filename"><em class="replaceable"><code>ad</code></em></code>
+	  вместо имен устройств <acronym class="acronym">SCSI</acronym>.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92887376"></a>19.2.2.1. Простой дисковый пул</h4></div></div></div><p>Для создания простого пула <acronym class="acronym">ZFS</acronym>
+	  без избыточности, задействовав при этом один жесткий диск,
+	  воспользуйтесь командой <code class="command">zpool</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create example /dev/da0</code></strong></pre><p>Чтобы увидеть новый пул, просмотрите вывод команды
+	  <code class="command">df</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem  1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a   2026030  235230  1628718    13%    /
+devfs               1       1        0   100%    /dev
+/dev/ad0s1d  54098308 1032846 48737598     2%    /usr
+example      17547136       0 17547136     0%    /example</pre><p>Этот вывод четко показывает, что пул <code class="literal">example</code>
+	  был не только создан, но также и <span class="emphasis"><em>примонтирован</em></span>.
+	  Он также доступен, как и обычная файловая система, в нем можно
+	  создавать файлы, а пользователи могут просматривать его содержимое,
+	  например:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /example</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>touch testfile</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls -al</code></strong>
+total 4
+drwxr-xr-x   2 root  wheel    3 Aug 29 23:15 .
+drwxr-xr-x  21 root  wheel  512 Aug 29 23:12 ..
+-rw-r--r--   1 root  wheel    0 Aug 29 23:15 testfile</pre><p>Однако в этом примере простого пула не задействованы
+	  никакие функциональные возможности <acronym class="acronym">ZFS</acronym>.
+	  Создайте файловую систему в этом пуле и активируйте
+	  сжатие данных на ней:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set compression=gzip example/compressed</code></strong></pre><p>С этого момента для файловой системы <acronym class="acronym">ZFS</acronym>
+	  <code class="literal">example/compressed</code> активировано сжатие данных.
+	  Попробуйте поместить на нее несколько больших файлов
+	  копируя их в
+	  <code class="filename">/example/compressed</code>.</p><p>А вот как можно отключить сжатие данных:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set compression=off example/compressed</code></strong></pre><p>Для того чтобы размонтировать файловую систему, выполните
+	  следующую команду и проверьте результат утилитой
+	  <code class="command">df</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs umount example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem  1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a   2026030  235232  1628716    13%    /
+devfs               1       1        0   100%    /dev
+/dev/ad0s1d  54098308 1032864 48737580     2%    /usr
+example      17547008       0 17547008     0%    /example</pre><p>Снова смонтируйте файловую систему и проверьте результат
+	  при помощи <code class="command">df</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs mount example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a          2026030  235234  1628714    13%    /
+devfs                      1       1        0   100%    /dev
+/dev/ad0s1d         54098308 1032864 48737580     2%    /usr
+example             17547008       0 17547008     0%    /example
+example/compressed  17547008       0 17547008     0%    /example/compressed</pre><p>Пул и файловая система также отображается в выводе
+	  команды <code class="command">mount</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+/dev/ad0s1a on / (ufs, local)
+devfs on /dev (devfs, local)
+/dev/ad0s1d on /usr (ufs, local, soft-updates)
+example on /example (zfs, local)
+example/data on /example/data (zfs, local)
+example/compressed on /example/compressed (zfs, local)</pre><p>Как вы уже убедились, файловые системы <acronym class="acronym">ZFS</acronym>
+	  после создания могут использоваться как и обычные файловые
+	  системы; однако доступно множество других возможностей.  В следующем
+	  примере мы создадим новую файловую систему <code class="literal">data</code>.
+	  На ней мы будем содержать важные данные, поэтому файловая система
+	  сконфигурирована хранить две копии каждого блока:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create example/data</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set copies=2 example/data</code></strong></pre><p>Снова проверьте свободное и использованное место выполнив
+	  команду <code class="command">df</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a          2026030  235234  1628714    13%    /
+devfs                      1       1        0   100%    /dev
+/dev/ad0s1d         54098308 1032864 48737580     2%    /usr
+example             17547008       0 17547008     0%    /example
+example/compressed  17547008       0 17547008     0%    /example/compressed
+example/data        17547008       0 17547008     0%    /example/data</pre><p>Заметьте, что каждая файловая система в пуле имеет тот же объем
+	  свободного места.  Мы использовали команду <code class="command">df</code>
+	  на протяжении этих примеров, чтобы показать, что файловые системы
+	  занимают только необходимое им пространство, используя ресурс
+	  одного и того же пула.  <acronym class="acronym">ZFS</acronym> уходит от привычных
+	  понятий "том (volume)" и "раздел (partition)", позволяя файловым
+	  системам занимать один и тот же пул.  Уничтожьте файловые системы,
+	  потом уничтожьте пул, так как в них уже нет нужды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs destroy example/compressed</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs destroy example/data</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zpool destroy example</code></strong></pre><p>Жесткие диски со временем выходят из строя, это неизбежно.
+	  Когда этот диск выйдет из строя, данные будут утеряны.  Одним из
+	  способов избежать потери данных из-за вышедшего из строя жесткого
+	  диска является построение <acronym class="acronym">RAID</acronym> массивов.
+	  <acronym class="acronym">ZFS</acronym> поддерживает эту функциональную возможность
+	  в своем дизайне, и это описано в следующем разделе.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92939344"></a>19.2.2.2. <acronym class="acronym">ZFS</acronym> RAID-Z</h4></div></div></div><p>Как уже было сказано выше, в этой статье подразумевается,
+	  что в нашей системе в распоряжении есть три <acronym class="acronym">SCSI</acronym>
+	  диска: <code class="filename">da0</code>, <code class="filename">da1</code>
+	  и <code class="filename">da2</code> (или <code class="filename">ad0</code>
+	  и далее в случае <acronym class="acronym">IDE</acronym> дисков).  Для того, чтобы
+	  создать <acronym class="acronym">RAID</acronym>-Z пул, выполните следующую
+	  команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool create storage raidz da0 da1 da2</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="trademark">Sun</span>TM рекомендует использовать от трех до девяти жестких дисков
+	    в конфигурации <acronym class="acronym">RAID</acronym>-Z.  Если есть необходимость
+	    в использовании 10 или более дисков, подумайте над тем, чтобы
+	    разбить их на меньшие группы <acronym class="acronym">RAID</acronym>-Z.  Если у вас
+	    есть только два диска и вам всё-таки требуется избыточность,
+	    возможно лучшим вариантом будет создание <acronym class="acronym">ZFS</acronym>
+	    зеркала.  Смотрите страницу справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zpool&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zpool</span>(8)</span></a>
+	    для получения более подробных сведений.</p></div><p>По завершении команды должен создаться пул
+	  <code class="literal">storage</code>.  Как и прежде, это может быть проверено
+	  при помощи команд <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mount&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mount</span>(8)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a>.  Больше дисковых
+	  устройств может быть задействовано путем добавления их в конец списка
+	  параметров команды, приведенной выше.  Создайте в пуле новую файловую
+	  систему, называемую <code class="literal">home</code>, в которой будут
+	  размещаться пользовательские файлы:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs create storage/home</code></strong></pre><p>На данном этапе возможно активировать сжатие данных и
+	  организовать автоматическое создание копий пользовательских домашних
+	  каталогов и файлов.  Это может быть достигнуто так же, как и ранее,
+	  при помощи следующих команд:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set copies=2 storage/home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>zfs set compression=gzip storage/home</code></strong></pre><p>Чтобы организовать в этой файловой системе хранение домашних
+	  каталогов пользователей, скопируйте сюда их содержимое и создайте
+	  соответствующие символические ссылки:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp -rp /home/* /storage/home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -rf /home /usr/home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /storage/home /home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /storage/home /usr/home</code></strong></pre><p>С этого момента пользовательские данные сохраняются на новой
+	  файловой системе <code class="filename">/storage/home</code>.
+	  Для проверки создайте учетную запись нового пользователя
+	  и войдите ею в систему.</p><p>Попробуйте создать снимок (snapshot), к которому можно будет
+	  откатиться при необходимости:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs snapshot storage/home@08-30-08</code></strong></pre><p>Заметьте, что снимок (snapshot) захватит реальную файловую
+	  систему, а не домашний каталог или файл.  Символ
+	  <code class="literal">@</code> отделяет имя файловой системы или имя тома
+	  от имени снимка.  Когда возникнет необходимость восстановить
+	  пользовательские домашние каталоги, выполните следующую
+	  команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs rollback storage/home@08-30-08</code></strong></pre><p>Чтобы получить список имеющихся в наличии снимков, выполните
+	  команду <code class="command">ls</code> в каталоге
+	  <code class="filename">.zfs/snapshot</code>.  Например,
+	  чтобы увидеть сделанный ранее снимок, выполните следующую
+	  команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /storage/home/.zfs/snapshot</code></strong></pre><p>Можно написать скрипт, выполняющий снимки пользовательских данных
+	  ежемесячно; однако, со временем, они могут занять значительную часть
+	  дискового пространства.  Предыдущий снимок может быть удален
+	  используя следующую команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs destroy storage/home@08-30-08</code></strong></pre><p>Нет причины после наших экспериментов далее держать
+	  в текущем состоянии
+	  <code class="filename">/storage/home</code>.
+	  Сделаем ее реальной файловой системой
+	  <code class="filename">/home</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set mountpoint=/home storage/home</code></strong></pre><p>Выполнение команд <code class="command">df</code> и
+	  <code class="command">mount</code> покажет, что с этого момента операционная
+	  система воспринимает нашу файловую систему как обычную
+	  <code class="filename">/home</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+/dev/ad0s1a on / (ufs, local)
+devfs on /dev (devfs, local)
+/dev/ad0s1d on /usr (ufs, local, soft-updates)
+storage on /storage (zfs, local)
+storage/home on /home (zfs, local)
+<code class="prompt">#</code> <strong class="userinput"><code>df</code></strong>
+Filesystem   1K-blocks    Used    Avail Capacity  Mounted on
+/dev/ad0s1a    2026030  235240  1628708    13%    /
+devfs                1       1        0   100%    /dev
+/dev/ad0s1d   54098308 1032826 48737618     2%    /usr
+storage       26320512       0 26320512     0%    /storage
+storage/home  26320512       0 26320512     0%    /home</pre><p>На этом завершим конфигурацию <acronym class="acronym">RAID</acronym>-Z.
+	  Чтобы во время ночных запусков <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=periodic&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">periodic</span>(8)</span></a> получать информацию
+	  о статусе созданных файловых систем, выполните следующую
+	  команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'daily_status_zfs_enable="YES"' &gt;&gt; /etc/periodic.conf</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp93012944"></a>19.2.2.3. Восстановление <acronym class="acronym">RAID</acronym>-Z</h4></div></div></div><p>Каждая система программных <acronym class="acronym">RAID</acronym> массивов
+	  предоставляет возможность отображать информацию о своем
+	  <code class="literal">состоянии</code>.
+	  <acronym class="acronym">ZFS</acronym> - не исключение.  Статус устройств
+	  <acronym class="acronym">RAID</acronym>-Z может быть просмотрен при помощи
+	  следующей команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status -x</code></strong></pre><p>Если пулы исправны и всё нормально, возвратится следующее
+	  сообщение:</p><pre class="screen">all pools are healthy</pre><p>А если есть какие-то неполадки, например диск выведен из массива,
+	  возвращенное состояние пула будет подобным следующему:</p><pre class="screen">  pool: storage
+ state: DEGRADED
+status: One or more devices has been taken offline by the administrator.
+	Sufficient replicas exist for the pool to continue functioning in a
+	degraded state.
+action: Online the device using 'zpool online' or replace the device with
+	'zpool replace'.
+ scrub: none requested
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	storage     DEGRADED     0     0     0
+	  raidz1    DEGRADED     0     0     0
+	    da0     ONLINE       0     0     0
+	    da1     OFFLINE      0     0     0
+	    da2     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Вывод показывает, что устройство было переведено в автономный
+	  режим	администратором.  Это верно для данного отдельного примера.
+	  Чтобы перевести диск в автономный режим, была выполнена
+	  команда:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool offline storage da1</code></strong></pre><p>Теперь после останова системы возможно заменить
+	  <code class="filename">da1</code>.  Когда система загрузится снова,
+	  выполните следующую команду чтобы заменить диск в массиве:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool replace storage da1</code></strong></pre><p>С этого момента статус может быть проверен опять и на этот раз
+	  без флага <code class="option">-x</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status storage</code></strong>
+ pool: storage
+ state: ONLINE
+ scrub: resilver completed with 0 errors on Sat Aug 30 19:44:11 2008
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	storage     ONLINE       0     0     0
+	  raidz1    ONLINE       0     0     0
+	    da0     ONLINE       0     0     0
+	    da1     ONLINE       0     0     0
+	    da2     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>В выводе сообщается, что при перестроении массива ошибок
+	  обнаружено не было.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp93027792"></a>19.2.2.4. Проверка данных</h4></div></div></div><p>Как уже было сказано ранее, <acronym class="acronym">ZFS</acronym> использует
+	  <code class="literal">контрольные суммы</code> для проверки целостности
+	  сохраненных данных.  Подсчет и сохранение контрольных сумм включается
+	  автоматически во время создания файловых систем и может быть отключен
+	  при помощи команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zfs set checksum=off storage/home</code></strong></pre><p>Отключение подсчета контрольных сумм - не очень хорошая
+	  идея; особенно ввиду того, что они занимают мало места, а также
+	  при их использовании нет существенных расходов ресурсов системы.
+	  Пока подсчет включен, возможно выполнять проверки целостности данных
+	  <acronym class="acronym">ZFS</acronym>, используя контрольные суммы.  Этот процесс
+	  известен как <span class="quote"><<<span class="quote">очистка (scrubbing)</span>>></span>.  Чтобы проверить
+	  целостность данных пула <code class="literal">storage</code>, выполните
+	  следующую команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool scrub storage</code></strong></pre><p>Этот процесс может занять значительное время в зависимости
+	  от количества сохранённых данных.  Очистка (scrubbing) порождает
+	  интенсивный ввод/вывод, поэтому только один экземпляр этой операции
+	  может выполняться в один момент времени.  После завершения очистки
+	  (scrubbing) статус обновится, его можно просмотреть выполнив
+	  следующий запрос:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>zpool status storage</code></strong>
+ pool: storage
+ state: ONLINE
+ scrub: scrub completed with 0 errors on Sat Aug 30 19:57:37 2008
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	storage     ONLINE       0     0     0
+	  raidz1    ONLINE       0     0     0
+	    da0     ONLINE       0     0     0
+	    da1     ONLINE       0     0     0
+	    da2     ONLINE       0     0     0
+
+errors: No known data errors</pre><p>Время завершения отображается в простом виде в этом примере.
+	  Очистка помогает удостовериться в целостности данных на протяжении
+	  длительного времени.</p><p>В этом разделе была освещена лишь малая часть возможностей
+	  <acronym class="acronym">ZFS</acronym>.  За более подробной информацией обратитесь
+	  к страницам справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zfs</span>(8)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zpool&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zpool</span>(8)</span></a>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="filesystems.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="filesystems.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="l10n.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 19. Поддержка файловых систем </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 20. Локализация - I18N/L10N использование и настройка</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

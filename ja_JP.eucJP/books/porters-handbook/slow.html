@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>第4章 本格的な port</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD port 作成者のためのハンドブック" /><link rel="up" href="index.html" title="FreeBSD port 作成者のためのハンドブック" /><link rel="prev" href="porting-submitting.html" title="3.6. port の提出" /><link rel="next" href="slow-sources.html" title="4.2. オリジナルのソースの入手" /><link rel="copyright" href="trademarks.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第4章 本格的な port</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-submitting.html">戻る</a>〓</td><th width="60%" align="center">〓</th><td width="20%" align="right">〓<a accesskey="n" href="slow-sources.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slow"></a>第4章 本格的な port</h1></div></div></div><div class="toc"><div class="toc-title">目次</div><dl class="toc"><dt><span class="sect1"><a href="slow.html#slow-work">4.1. port 構築の詳細</a></span></dt><dt><span class="sect1"><a href="slow-sources.html">4.2. オリジナルのソースの入手</a></span></dt><dt><span class="sect1"><a href="slow-modifying.html">4.3. port の修正</a></span></dt><dt><span class="sect1"><a href="slow-patch.html">4.4. パッチの適用</a></span></dt><dt><span class="sect1"><a href="slow-configure.html">4.5. コンフィグレーション</a></span></dt><dt><span class="sect1"><a href="slow-user-input.html">4.6. ユーザからの入力の扱い</a></span></dt></dl></div><p>残念ながら移植がそう簡単ではなく、それを動かすために
+      多少の変更が必要になる場合もあるでしょう。
+      このセクションでは、模範的な ports の作法に従い、
+      どのように変更を行なって動くようにするのかを
+      順を追って説明します。</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slow-work"></a>4.1. port 構築の詳細</h2></div></div></div><p>まず、あなたが port のディレクトリで
+	<code class="command">make</code> と
+	入力してから起こる一連の出来事について、
+	順を追って説明します。
+	ここを読むときには、別のウィンドウに
+	<code class="filename">bsd.port.mk</code> を表示しておくと
+	理解の助けになるかもしれません。</p><p>しかし、<code class="filename">bsd.port.mk</code> が何をしているのか
+	完全に理解できなくても 心配する必要はありません。
+	それほど多くの人が理解している というわけでは ありませんから…。
+	<span class="emphasis"><em>f(^_^;)</em></span></p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>まず、<code class="buildtarget">fetch</code> という
+	    ターゲットが実行されます。
+	    この <code class="buildtarget">fetch</code> ターゲットは、
+	    配布ファイルがローカルの <code class="varname">DISTDIR</code> に
+	    存在することを保証する役目を持っています。
+	    もし必要なファイルが <code class="varname">DISTDIR</code> に
+	    存在しなければ、<code class="buildtarget">fetch</code> ターゲットは
+	    <code class="filename">Makefile</code> で指定された
+	    <code class="varname">MASTER_SITES</code> 中の URL や、
+	    FreeBSD のメイン FTP サイト <code class="uri"><a class="uri" href="ftp://ftp.FreeBSD.org/pub/FreeBSD/ports/distfiles/" target="_top">ftp://ftp.FreeBSD.org/pub/FreeBSD/ports/distfiles/</a></code>
+	    (ここにはバックアップとして、われわれ ports 管理者が確認した
+	    配布ファイルを置いてあります) を探しにいきます。
+	    <code class="command">make</code> を実行するマシンがインターネットに
+	    接続されていて、目的のファイルを <code class="varname">FETCH</code> で
+	    取ってこれた場合には、それを <code class="varname">DISTDIR</code> に
+	    保存します。</p></li><li class="step"><p>次に <code class="buildtarget">extract</code> ターゲットが実行されます。
+	    このターゲットは <code class="varname">DISTDIR</code> から
+	    配布ファイル (普通は gzip された tar ファイル) を読み込み、
+	    その内容を作業ディレクトリ <code class="varname">WRKDIR</code>
+	    (デフォルトでは <code class="filename">work</code>) に展開します。</p></li><li class="step"><p>次に <code class="buildtarget">patch</code> ターゲットが実行されます。
+	    まず、<code class="varname">PATCHFILES</code> にパッチファイルが
+	    指定されていれば、そのパッチを適用します。
+
+	    次に、<code class="varname">PATCHDIR</code> ディレクトリ
+	    (デフォルトでは <code class="filename">files</code> サブディレクトリ) に
+	    <code class="filename">patch-*</code> という
+	    名前のパッチファイルが存在すれば、
+	    これらをアルファベット順に適用します。</p></li><li class="step"><p>次に <code class="buildtarget">configure</code> ターゲットが
+	    実行されます。
+	    これには、いろいろな場合があります。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p><code class="filename">scripts/configure</code> が
+		存在する場合には、そのスクリプトが実行されます。</p></li><li class="listitem"><p><code class="varname">HAS_CONFIGURE</code> または
+		<code class="varname">GNU_CONFIGURE</code> がセットされていれば、
+		<code class="filename">WRKSRC/configure</code> が
+		実行されます。</p></li><li class="listitem"><p><code class="varname">USE_IMAKE</code> がセットされていれば、
+		<code class="varname">XMKMF</code>
+		(デフォルトでは <code class="command">xmkmf -a</code>) が
+		実行されます。</p></li></ol></div></li><li class="step"><p>最後に <code class="buildtarget">build</code> ターゲットが実行されます。
+	    これは作業ディレクトリ (<code class="varname">WRKSRC</code>) に降りていき、
+	    ビルド (コンパイル) を実行するのが役目です。
+	    <code class="varname">USE_GMAKE</code> がセットされていれば
+	    GNU <code class="command">make</code> が使用され、
+	    セットされていなければ FreeBSD の <code class="command">make</code> が
+	    使用されます。</p></li></ol></div><p>上記はデフォルトの動作です。これに加えて
+	<code class="buildtarget">pre-<em class="replaceable"><code> 何とか</code></em></code>や
+	<code class="buildtarget">post-<em class="replaceable"><code> 何とか</code></em></code>という
+	ターゲットを定義したり、そのような名前のスクリプトを
+	<code class="filename">scripts</code> サブディレクトリに置くことも可能で、
+	それぞれデフォルトの動作の前や後に実行されます。</p><p>たとえば、<code class="buildtarget">post-extract</code> ターゲットが
+	<code class="filename">Makefile</code> に定義されていて、
+	<code class="filename">scripts</code> サブディレクトリに
+	<code class="filename">pre-build</code> というファイルが置かれている場合、
+	<code class="buildtarget">post-extract</code> ターゲットは
+	通常の展開動作の後に呼び出され、
+	<code class="filename">pre-build</code> スクリプトは
+	デフォルトのコンパイル動作の前に実行されます。
+	実行する動作が簡単であれば、スクリプトよりも
+	<code class="filename">Makefile</code> のターゲットを使用することが
+	推奨されています。
+	なぜなら、その port では どのような非標準の動作が必要とされるのか、
+	一箇所にまとめて書いてあった方が他の人に理解しやすいからです。</p><p>デフォルトの動作は <code class="filename">bsd.port.mk</code> の
+	<code class="buildtarget">do-<em class="replaceable"><code> 何とか</code></em></code>という
+	ターゲットで実行されます。
+	たとえば port を展開するコマンドは
+	<code class="buildtarget">do-extract</code> ターゲットに書かれています。
+	もしデフォルトのターゲットに不満があれば、
+	<code class="filename">Makefile</code> 中で
+	<code class="buildtarget">do-<em class="replaceable"><code> 何とか</code></em></code>という
+	ターゲットを再定義することにより、
+	好きなように変更することができます。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="quote">「<span class="quote">メイン</span>」</span>のターゲット
+	  (たとえば <code class="buildtarget">extract</code>,
+	  <code class="buildtarget">configure</code>、その他) は、
+	  すべての前段階が実行されていることを確認してから、
+	  実際のターゲットやスクリプトを呼び出す以外のことは
+	  行ないませんし、これらが変更されることも想定されていません。
+	  もし展開の方法を変更したいときには
+	  <code class="buildtarget">do-extract</code> の変更によって実現し、
+	  <code class="buildtarget">extract</code>
+	  の動作は絶対に変更しないでください。</p></div><p>これで、ユーザが <code class="command">make</code> と
+	入力したときに何が起こるのかが理解できたと思います。
+	では、完璧な port を作成するための推奨手順を
+	順に見ていきましょう。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-submitting.html">戻る</a>〓</td><td width="20%" align="center">〓</td><td width="40%" align="right">〓<a accesskey="n" href="slow-sources.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">3.6. port の提出〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓4.2. オリジナルのソースの入手</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>FreeBSD en Solid State Apparaten</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Dit artikel behandelt het gebruik van solid state disk-apparaten in FreeBSD voor het maken van embedded systemen. Embedded systemen hebben het voordeel van verhoogde stabiliteit wegens het ontbreken van bewegende delen (harde schijven). Er moet echter rekening worden gehouden met de over het algemeen weinig beschikbare schijfruimte in het systeem en de duurzaamheid van het opslagmedium. Specifieke onderwerpen die aan bod komen omvatten de typen en attributen van solid state-media die geschikt zijn om in FreeBSD als schijf te gebruiken, kernelopties die interessant zijn in zo'n omgeving, de mechanismen van rc.initdiskless die de initialisatie van zulke systemen automatiseren en de noodzaak voor alleen-lezen bestandssystemen, en het van voor af aan bouwen van bestandssystemen. Het artikel zal afsluiten met wat algemene strategiën voor kleine en alleen-lezen FreeBSD-omgevingen. Vertaald door René Ladan." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="nl" class="article" lang="nl"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp60841808"></a>FreeBSD en Solid State Apparaten</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">John</span> <span class="surname">Kozubik</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:john@kozubik.com">john@kozubik.com</a>&gt;</code></p></div></div></div></div></div><div>Herziening: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Copyright © 2001, 2009 The FreeBSD Documentation Project</p></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD is een geregistreerd
+  handelsmerk van de FreeBSD Foundation.</p><p>Veel van de termen die door
+  fabrikanten en verkopers worden gebruikt om hun producten te
+  onderscheiden worden geclaimd als handelsmerk.  Op de plaatsen waar
+  deze handelsmerken in dit document voorkomen, en het FreeBSD Project op
+  de hoogte was van de claim op het handelsmerk, worden de termen
+  gevolgd door het symbool <span class="quote">&#8220;<span class="quote">&#8482;</span>&#8221;</span> of het symbool
+  <span class="quote">&#8220;<span class="quote">®</span>&#8221;</span>.</p></div></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="legalnotice"></a><p class="legalnotice-title"><strong>Copyright</strong></p><p>Redistribution and use in source (XML DocBook) and 'compiled'
+    forms (XML, HTML, PDF, PostScript, RTF and so forth) with or without
+    modification, are permitted provided that the following conditions are
+    met:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Redistributions of source code (XML DocBook) must retain the
+        above copyright notice, this list of conditions and the following
+        disclaimer as the first lines of this file unmodified.</p></li><li class="listitem"><p>Redistributions in compiled form (transformed to other DTDs,
+        converted to PDF, PostScript, RTF and other formats) must
+        reproduce the above copyright notice, this list of conditions and
+        the following disclaimer in the documentation and/or other
+        materials provided with the distribution.</p></li></ol></div><div xmlns="" class="important"><h3 class="admontitle">Belangrijk: </h3><p xmlns="http://www.w3.org/1999/xhtml">THIS DOCUMENTATION IS PROVIDED BY THE FREEBSD DOCUMENTATION
+      PROJECT "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
+      BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+      FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+      THE FREEBSD DOCUMENTATION PROJECT BE LIABLE FOR ANY DIRECT, INDIRECT,
+      INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+      BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+      OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+      ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+      TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+      USE OF THIS DOCUMENTATION, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+      DAMAGE.</p></div></div></div><div>   door .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Samenvatting</div><p>Dit artikel behandelt het gebruik van solid state
+	disk-apparaten in FreeBSD voor het maken van embedded
+	systemen.</p><p>Embedded systemen hebben het voordeel van verhoogde
+	stabiliteit wegens het ontbreken van bewegende delen (harde
+	schijven).  Er moet echter rekening worden gehouden met de over
+	het algemeen weinig beschikbare schijfruimte in het systeem en
+	de duurzaamheid van het opslagmedium.</p><p>Specifieke onderwerpen die aan bod komen omvatten de typen
+	en attributen van solid state-media die geschikt zijn om in FreeBSD
+	als schijf te gebruiken, kernelopties die interessant zijn in
+	zo'n omgeving, de mechanismen van
+	<code class="filename">rc.initdiskless</code> die de initialisatie van zulke
+	systemen automatiseren en de noodzaak voor alleen-lezen
+	bestandssystemen, en het van voor af aan bouwen van
+	bestandssystemen.  Het artikel zal afsluiten met wat algemene
+	strategiën voor kleine en alleen-lezen
+	FreeBSD-omgevingen.</p><p><span class="emphasis"><em>Vertaald door René Ladan</em></span>.</p></div></div></div><hr /></div><div class="toc"><div class="toc-title">Inhoudsopgave</div><dl class="toc"><dt><span class="sect1"><a href="#intro">1. Solid State Disk-apparaten</a></span></dt><dt><span class="sect1"><a href="#kernel">2. Kernelopties</a></span></dt><dt><span class="sect1"><a href="#ro-fs">3. Het <code class="literal">rc</code>-deelsysteem en alleen-lezen
+      bestandssystemen</a></span></dt><dt><span class="sect1"><a href="#idp61833296">4. Een bestandssysteem uit het niets opbouwen</a></span></dt><dt><span class="sect1"><a href="#strategies">5. Systeemstragiën voor kleine en alleen-lezen
+      omgevingen.</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="intro"></a>1. Solid State Disk-apparaten</h2></div></div></div><p>Het bereik van dit artikel zal beperkt zijn tot solid state
+      disk-apparaten die gemaakt zijn met flash-geheugen.
+      Flash-geheugen is een solid state-geheugen (geen bewegende
+      onderdelen) dat niet-vluchtig is (het geheugen blijft gegevens
+      behouden zelf nadat alle stroombronnen zijn ontkoppeld).
+      Flash-geheugen kan enorme fysieke schokken weerstaan en is
+      redelijk snel (de oplossingen met flash-geheugens die in dit
+      artikel worden behandeld zijn iets langzamer dan een EIDE-harde
+      schijf voor schrijfbewerkingen, en veel sneller voor
+      leesbewerkingen).  Een heel belangrijk aspect van flash-geheugen,
+      waarvan de ramnificaties later in dit artikel besproken zullen
+      worden, is dat elke sector een beperkte herschrijfcapaciteit heeft.
+      Een sector flash-geheugen kan maar een bepaald aantal keren
+      beschreven, gewist, en herschreven worden voordat de sector
+      permanent onbruikbaar wordt.  Hoewel veel flash-geheugenproducten
+      automatisch slechte blokken in kaart brengen, en hoewel sommigen
+      zelfs schrijfoperaties gelijkmatig over de eenheid distribueren,
+      blijft het een feit dat er een limiet bestaat aan de hoeveelheid
+      waarmee het apparaat kan worden beschreven.  Concurrerende
+      apparaten hebben tussen de 1.000.000 en 10.000.000
+      schrijfbewerkingen per sector in hun specificaties staan.  Dit
+      getal varieert vanwege de omgevingstemperatuur.</p><p>In het bijzonder worden ATA-compatibele compact-flash-eenheden
+      besproken, welke vrij populair zijn als opslagmedium voor digitale
+      camera's.  Bijzonder interessant is het feit dat de pinnen ervan
+      precies met die van de IDE-bus overeenkomen en dat ze compatibel
+      zijn met de ATA-commandoverzameling.  Daarom kunnen deze apparaten
+      direct aan een IDE-bus in een computer gekoppeld worden met een
+      zeer eenvoudige en goedkope adapter.  Eenmaal op deze wijze
+      geïmplementeerd zien besturingssystemen zoals FreeBSD het
+      apparaat als een normale harde schijf (doch klein).</p><p>Er bestaan nog andere solid state disk-oplossingen, maar hun
+      kosten, zeldzaamheid, en relatieve gebruiksongemak plaatst ze
+      buiten het bereik van dit artikel.</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kernel"></a>2. Kernelopties</h2></div></div></div><p>Enkele kernelopties zijn specifiek interessant voor degenen
+      die een embedded FreeBSD-systeem creëren.</p><p>Alle embedded FreeBSD-systemen die flash-geheugen als
+      systeemschijf gebruiken zullen geïntereseerd zijn
+      in geheugenschijven en geheugenbestandssystemen.  Vanwege het
+      beperkt aantal keren dat het flash-geheugen kan worden beschreven,
+      is het het waarschijnlijkst dat de schijf en de bestandssystemen
+      op de schijf als alleen-lezen worden aangekoppeld.  In deze
+      omgeving zullen bestandssystemen zoals <code class="filename">/tmp</code>
+      en <code class="filename">/var</code> als geheugenbestandssystemen worden
+      aangekoppeld zodat het systeem logs kan creëren en tellers en
+      tijdelijke bestanden kan bijwerken.  Geheugenbestandssystemen zijn
+      een kritiek station naar een succesvolle implementatie van solid
+      state FreeBSD.</p><p>De volgende regels dienen in uw kernelinstellingenbestand te
+      staan:</p><pre class="programlisting">options         MFS             # Geheugenbestandssysteem
+options         MD_ROOT         # md-apparaat bruikbaar als een potentieel root-apparaat
+pseudo-device   md              # geheugenschijf</pre></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ro-fs"></a>3. Het <code class="literal">rc</code>-deelsysteem en alleen-lezen
+      bestandssystemen</h2></div></div></div><p>De post-boot-initialisatie van een embedded FreeBSD-systeem wordt
+      beheerd door <code class="filename">/etc/rc.initdiskless</code>.</p><p><code class="filename">/etc/rc.d/var</code> koppelt
+      <code class="filename">/var</code> als een geheugenbestandssysteem aan,
+      maakt een instelbare lijst van mappen in <code class="filename">/var</code>
+      aan met het commando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mkdir&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">mkdir</span>(1)</span></a>, en verandert de modus van sommige
+      van deze mappen.  Tijdens het uitvoeren van
+      <code class="filename">/etc/rc.d/var</code> is er nog een
+      <code class="filename">rc.conf</code>-variabele in het spel &#8211;
+      <code class="literal">varsize</code>.  Het bestand
+      <code class="filename">/etc/rc.d/var</code> maakt een partitie
+      <code class="filename">/var</code> aan gebaseerd op de waarde van deze
+      variabele in <code class="filename">rc.conf</code>:</p><pre class="programlisting">varsize=8192</pre><p>Onthoud dat deze waarde standaard in sectoren is.</p><p>Het feit dat <code class="filename">/var</code> een bestandssysteem is
+      dat zowel gelezen als geschreven wordt is
+      een belangrijk verschil, aangezien de partitie
+      <code class="filename">/</code> (en alle andere partities die op uw
+      flash-medium kunnen staan) als alleen-lezen aangekoppeld dienen te
+      worden.  In <a class="xref" href="#intro" title="1. Solid State Disk-apparaten">Paragraaf 1, &#8220;Solid State Disk-apparaten&#8221;</a> hebben we de beperkingen van
+      flash-geheugen uiteen gelegd - in bijzonder de beperkte
+      herschrijfcapaciteit.  Het belang van het niet als lezen-schrijven
+      aankoppelen van flash-media en het belang van het niet gebruiken
+      van een wisselbestand kunnen niet genoeg benadrukt worden.  Een
+      wisselbestand op een druk systeem kan binnen een jaar een
+      flash-medium opmaken.  Het uitgebreid loggen of aanmaken en
+      vernietigen van tijdelijke bestanden kan hetzelfde doen.  Daarom
+      dient u, naast het verwijderen van de regel <code class="literal">swap</code>
+      uit het bestand <code class="filename">/etc/fstab</code>, ook de Options
+      van elk bestandssysteem als volgt op <code class="literal">ro</code> te
+      zetten:</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/ad0s1a             /               ufs     ro              1       1</pre><p>Op een gemiddeld systeem zullen enkele applicaties het
+      onmiddellijk niet meer doen als gevolg van deze verandering.
+      cron zal niet correct draaien vanwege ontbrekende cron-tabellen in
+      het <code class="filename">/var</code> dat door
+      <code class="filename">/etc/rc.d/var</code> is aangemaakt, en syslog en
+      DHCP zullen problemen ondervinden als gevolg van het alleen-lezen
+      bestandssysteem en ontbrekende items in het
+      <code class="filename">/var</code> dat
+      <code class="filename">/etc/rc.d/var</code> heeft aangemaakt.  Dit zijn
+      slechts tijdelijke problemen, en worden tezamen met oplossingen
+      voor het uitvoeren van andere veelgebruikte softwarepakketten
+      behandeld in <a class="xref" href="#strategies" title="5. Systeemstragiën voor kleine en alleen-lezen omgevingen.">Paragraaf 5, &#8220;Systeemstragiën voor kleine en alleen-lezen
+      omgevingen.&#8221;</a>.</p><p>Een belangrijk ding om te onthouden is dat een bestandssysteem
+      dat met <code class="filename">/etc/fstab</code> als alleen-lezen was
+      aangekoppeld ten alle tijden lezen-schrijven kan worden gemaakt
+      door dit commando te geven:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/sbin/mount -uw partitie</code></strong></pre><p>en kan op alleen-lezen worden teruggezet met het
+      commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/sbin/mount -ur partitie</code></strong></pre></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp61833296"></a>4. Een bestandssysteem uit het niets opbouwen</h2></div></div></div><p>Omdat ATA-compatibele compact-flash-kaarten door FreeBSD als
+      normale IDE harde schijven worden gezien, kunt u theoretisch FreeBSD
+      vanaf het netwerk installeren door de floppies kern en mfsroot of
+      een CD te gebruiken.</p><p>Zelfs een kleine installatie van FreeBSD die normale
+      installatieprocedures gebruikt kan echter een systeem produceren
+      met een omvang van meer dan 200 MB.  Omdat de meeste mensen
+      kleinere flash-geheugenapparaten zullen gebruiken (128 MB wordt als
+      redelijk groot gezien - 32 of zelfs 16 MB is gebruikelijk) is een
+      installatie dat de normale mechanismen gebruikt niet
+      mogelijk er is simpelweg niet genoeg schijfruimte voor zelfs
+      de kleinste van de conventionele installaties.</p><p>De gemakkelijkste manier om over deze beperking heen te komen
+      is om FreeBSD met conventionele middelen naar een normale harde
+      schijf te installeren.  Kleedt, nadat de installatie voltooid is,
+      het besturingssysteem uit tot een grootte die op uw flash-medium
+      past, en pak vervolgens het gehele bestandssysteem in.  De volgende
+      stappen leiden u door het proces heen van een normaal flash-geheugen
+      voorbereiden op uw ingepakte bestandssysteem.  Omdat er geen normale
+      installatie wordt uitgevoerd, moeten bewerkingen zoals partitioneren,
+      labelen, het aanmaken van bestandssystemen, etcetera met de hand
+      uitgevoerd worden.  Naast de floppies kern en mfsroot heeft u ook
+      de floppy fixit nodig.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Het flash-media-apparaat partitioneren</strong></p><p>Kies nadat er met de floppies kern en mfsroot is opgestart
+	  <code class="literal">custom</code> uit het installatiemenu.  Kies
+	  <code class="literal">partition</code> in het aangepaste
+	  installatiemenu.  In het partitiemenu dient u alle bestaande
+	  partities te wissen met de toets <span class="keycap"><strong>d</strong></span>.  Maak
+	  nadat alle bestaande partities gewist zijn een partitie aan
+	  met de toets <span class="keycap"><strong>c</strong></span> en accepteer de
+	  standaardwaarde voor de grootte van de partitie.  Zorg ervoor
+	  dat het type van de partitie op <code class="literal">165</code> is
+	  ingesteld wanneer daar naar wordt gevraagd.  Schrijf nu deze
+	  partitietabel naar schijf door op de toets <span class="keycap"><strong>w</strong></span>
+	  te drukken (dit is een verborgen optie op dit scherm).  Wanneer
+	  u een ATA-compatibele flash-kaart gebruikt, dient u de
+	  opstartbeheerder van FreeBSD te gebruiken.  Druk nu op de toets
+	  <span class="keycap"><strong>q</strong></span> om het partitiemenu te verlaten.  Het menu
+	  van de opstartbeheerder wordt nog een keer aan u getoond -
+	  herhaal de keuze die u eerder heeft gemaakt.</p></li><li class="step"><p class="title"><strong>De bestandssystemen op uw flash-geheugenapparaat
+	  aanmaken</strong></p><p>Verlaat het aangepaste installatiemenu, en kies van het
+	  hoofdinstallatiemenu de optie <code class="literal">fixit</code>.  Geef
+	  na het binnengaan van de fixit-omgeving het volgende
+	  commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>disklabel -e /dev/ad0c</code></strong></pre><p>Op dit punt bent u de tekstverwerker vi binnengegaan onder
+	  toezien van het commando disklabel.  Vervolgens dient u een
+	  regel met <code class="literal">a:</code> aan het einde van het
+	  bestand toe te voegen.  Deze regel dient er als volgt uit te
+	  zien:</p><pre class="programlisting">a:      <em class="replaceable"><code>123456</code></em>  0       4.2BSD  0       0</pre><p>Hierbij is <em class="replaceable"><code>123456</code></em> een getal dat
+	  exact gelijk is aan het getal in de bestaande regel met
+	  <code class="literal">c:</code> voor de grootte.  In feite dupliceert u
+	  de bestaande regel met <code class="literal">c:</code> als een regel met
+	  <code class="literal">a:</code>, met daarbij <code class="literal">4.2BSD</code>
+	  als type van het bestandssysteem.  Sla het bestand op en
+	  verlaat de tekstverwerker.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>disklabel -B -r /dev/ad0c</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/ad0a</code></strong></pre></li><li class="step"><p class="title"><strong>Uw bestandssysteem op het flash-medium plaatsen</strong></p><p>Koppel het nieuw voorbereide flash-medium aan:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad0a /flash</code></strong></pre><p>Activeer deze machine in het netwerk zodat we ons
+	  tar-bestand kunnen overzenden en het op het bestandssysteem
+	  van het flash-medium kunnen uitpakken.  Een manier om dit te
+	  doen is:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig xl0 192.168.0.10 netmask 255.255.255.0</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>route add default 192.168.0.1</code></strong></pre><p>Nu de machine op het netwerk is, kan het tar-bestand
+	  worden overgezonden.  U kunt nu tegen een dilemma aanlopen -
+	  als bijvoorbeeld uw flash-geheugen 128 MB groot is, en uw
+	  tar-bestand groter is dan 64 MB, kan uw tar-bestand niet op
+	  het zelfde moment op het flash-medium staan als dan wanneer u
+	  het uitpakt - u zult schijfruimte tekort komen.  Een oplossing
+	  voor dit probleem is, wanneer u FTP gebruikt, om het bestand
+	  uitpakt terwijl u het over FTP verzendt.  Als u de overdracht
+	  op deze manier aanpakt, zult u nooit het tar-bestand en de
+	  inhoud ervan op hetzelfde moment op uw schijf hebben:</p><pre class="screen"><code class="prompt">ftp&gt;</code> <strong class="userinput"><code>get tar-bestand.tar "| tar xvf -"</code></strong></pre><p>Als uw tar-bestand met gzip is ingepakt, kunt u dit ook
+	  voor elkaar krijgen:</p><pre class="screen"><code class="prompt">ftp&gt;</code> <strong class="userinput"><code>get tar-bestand.tar "| zcat | tar xvf -"</code></strong></pre><p>Nadat de inhoud van uw ge-tar-de bestandssysteem op het
+	  bestandssysteem van uw flash-geheugen staan, kunt u het
+	  flash-geheugen afkoppelen en opnieuw opstarten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /flash</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>exit</code></strong></pre><p>Aangenomen dat u uw bestandssysteem correct heeft
+	  geconfigureerd toen het gebouwd werd op de normale harde
+	  schijf (met uw bestandssystemen als alleen-lezen aangekoppeld
+	  en met de nodige opties in de kernel gecompileerd) zou u nu
+	  succesvol uw embedded FreeBSD-systeem moeten kunnen
+	  opstarten.</p></li></ol></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="strategies"></a>5. Systeemstragiën voor kleine en alleen-lezen
+      omgevingen.</h2></div></div></div><p>In <a class="xref" href="#ro-fs" title="3. Het rc-deelsysteem en alleen-lezen bestandssystemen">Paragraaf 3, &#8220;Het <code class="literal">rc</code>-deelsysteem en alleen-lezen
+      bestandssystemen&#8221;</a> werd erop gewezen dat het
+      bestandssysteem <code class="filename">/var</code> zoals geconstrueerd
+      door <code class="filename">/etc/rc.d/var</code> en de aanwezigheid van
+      een hoofdbestandssysteem dat alleen gelezen kan worden problemen
+      veroorzaakt met veel alledaagse softwarepakketten die door FreeBSD
+      gebruikt worden.  In dit artikel zullen suggesties voor het
+      succesvol draaien van cron, syslog, ports-installaties en de
+      webserver Apache worden gegeven.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp61938896"></a>5.1. cron</h3></div></div></div><p>Tijdens het opstarten wordt <code class="filename">/var</code> bevolkt door
+	<code class="filename">/etc/rc.d/var</code> dat de lijst van
+	<code class="filename">/etc/mtree/BSD.var.dist</code> gebruikt, dus
+	<code class="filename">cron</code>, <code class="filename">cron/tabs</code>, <code class="filename">at</code>, en nog wat andere
+	standaardmappen worden aangemaakt.</p><p>Dit lost echter nog niet het probleem van het
+	behouden van cron-tabellen na het opnieuw opstarten op.  Wanneer
+	het systeem opnieuw opstart, zal het bestandssysteem
+	<code class="filename">/var</code> dat in het geheugen staat verdwijnen
+	en zullen alle cron-tabellen die er in stonden ook verdwijnen.
+	Daarom is een oplossing hiervoor het aanmaken van cron-tabellen
+	voor de gebruikers die ze nodig hebben, uw bestandssysteem
+	<code class="filename">/</code> als lezen-schrijven aan te koppelen en
+	die cron-tabellen naar een veilige plaats zoals
+	<code class="filename">/etc/tabs</code> te kopiëren en een regel aan
+	het einde van <code class="filename">/etc/rc.initdiskless</code> toe te
+	voegen die deze cron-tabellen naar
+	<code class="filename">/var/cron/tabs</code> kopieert nadat die map is
+	aangemaakt tijdens de syseeminitialisatie.  U moet misschien ook
+	een regel toevoegen die de modi en toestemmingen van de mappen
+	die u aanmaakt en de bestanden die u met
+	<code class="filename">etc/rc.initdiskless</code> kopieert verandert.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp61954384"></a>5.2. syslog</h3></div></div></div><p><code class="filename">syslog.conf</code> specificeert de plaats van
+	bepaalde logbestanden die in <code class="filename">/var/log</code>
+	bestaan.  Deze bestanden worden niet door
+	<code class="filename">/etc/rc.d/var</code> tijdens de
+	systeeminitialisatie aangemaakt.  Daarom dient u ergens na de
+	sectie die de mappen in <code class="filename">/var</code> aanmaakt in
+	<code class="filename">/etc/rc.d/var</code> iets als het volgende
+	toevoegen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/security /var/log/maillog /var/log/cron /var/log/messages</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 0644 /var/log/*</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp61980240"></a>5.3. Ports installeren</h3></div></div></div><p>Voordat de veranderingen die nodig zijn om succesvol de
+	portsboom te gebruiken besproken worden, is een herinnering ten
+	aanzien van de alleen-lezen-natuur van uw bestandssystemen op
+	het flash-medium op zijn plaats.  Aangezien ze alleen-lezen zijn,
+	dient u ze tijdelijk als lezen-schrijven aan te koppelen waarbij
+	de koppelsyntaxis zoals getoond in <a class="xref" href="#ro-fs" title="3. Het rc-deelsysteem en alleen-lezen bestandssystemen">Paragraaf 3, &#8220;Het <code class="literal">rc</code>-deelsysteem en alleen-lezen
+      bestandssystemen&#8221;</a> wordt
+	gebruikt.  U dient deze bestandssystemen altijd als alleen-lezen
+	te herkoppelen als u klaar bent met enig onderhoud - onnodige
+	schrijfacties naar het flash-medium kunnen de levensduur ervan
+	aanzienlijk verkorten.</p><p>Om het mogelijk te maken om een portsmap binnen te gaan en
+	succesvol <code class="command">make</code> <code class="buildtarget">install</code>
+	uit te voeren, moeten we een pakketmap op een bestandssysteem
+	aanmaken dat niet geheugengebaseerd is en dat onze pakketten
+	tussen herstarts bijhoudt.  Omdat het toch nodig is om uw
+	bestandssystemen als lezen-schrijven te koppelen voor het
+	installeren van een pakket, is het zinnig om aan te nemen dat
+	een gebied op het flash-medium ook gebruikt kan worden om
+	pakketinformatie naar te schrijven.</p><p>Maak als eerste een map aan voor de pakketdatabase.  Dit is
+	normaliter <code class="filename">/var/db/pkg</code>, maar we kunnen het
+	daar niet plaatsen aangezien het telkens als het systeem wordt
+	opgestart zal verdwijnen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/pkg</code></strong></pre><p>Voeg nu een regel aan <code class="filename">/etc/rc.d/var</code>
+	toe die de map <code class="filename">/etc/pkg</code> aan
+	<code class="filename">/var/db/pkg</code> koppelt.  Een voorbeeld:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/pkg /var/db/pkg</code></strong></pre><p>Nu zal telkens wanneer u uw bestandssystemen als
+	lezen-schrijven aankoppelt en een pakket installeert,
+	<code class="command">make</code> <code class="buildtarget">install</code> werken,
+	en zal de pakketinformatie succesvol naar
+	<code class="filename">/etc/pkg</code> worden geschreven (omdat het
+	bestandssysteem op dat moment als lezen-schrijven is aangekoppeld)
+	wat altijd als <code class="filename">/var/db/pkg</code> beschikbaar is
+	voor het besturingssysteem.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp62017744"></a>5.4. Apache Web Server</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">De stappen in deze sectie zijn alleen nodig indien Apache
+	  is ingesteld om de pid- of loginformatie buiten <code class="filename">/var</code> te schrijven.  Standaard
+	  houdt Apache het pid-bestand in <code class="filename">/var/run/httpd.pid</code> en de
+	  logbestanden in <code class="filename">/var/log</code>.</p></div><p>Er wordt nu aangenomen dat Apache de logbestanden in een map
+	<code class="filename">apache_log_map</code>
+	buiten <code class="filename">/var</code> bewaart.
+	Wanneer deze map op een alleen-lezen bestandssysteem staat, zal
+	Apache geen logbestanden kunnen opslaan, en kan het werkproblemen
+	hebben.  Indien dit zo is, is het noodzakelijk om een nieuwe map
+	aan de lijst met mappen in <code class="filename">/etc/rc.d/var</code> die
+	in <code class="filename">/var</code> worden aangemaakt toe te voegen, en om
+	<code class="filename">apache_log_map</code>
+	aan <code class="filename">/var/log/apache</code> te koppelen.  Het is
+	ook nodig om de toestemmingen en eigenaarschappen van deze
+	nieuwe map in te stellen.</p><p>Voeg eerst de map <code class="literal">log/apache</code> toe aan de
+	lijst van mappen die in <code class="filename">/etc/rc.d/var</code>
+	aangemaakt moeten worden.</p><p>Voeg ten tweede deze commando's toe aan
+	<code class="filename">/etc/rc.d/var</code> na de sectie die mappen
+	aanmaakt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chmod 0774 /var/log/apache</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chown nobody:nobody /var/log/apache</code></strong></pre><p>Verwijder als laatste de bestaande map
+	<code class="filename">apache_log_map</code>
+	en vervang het door een koppeling:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm -rf apache_log_map</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /var/log/apache apache_log_map</code></strong></pre></div></div></div></body></html>

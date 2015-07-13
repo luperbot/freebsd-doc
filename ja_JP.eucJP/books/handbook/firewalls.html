@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>15.7. ファイアウォール</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="security.html" title="第15章 セキュリティ" /><link rel="prev" href="kerberos.html" title="15.6. Kerberos" /><link rel="next" href="openssl.html" title="15.8. OpenSSL" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.7. ファイアウォール</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="kerberos.html">戻る</a>〓</td><th width="60%" align="center">第15章 セキュリティ</th><td width="20%" align="right">〓<a accesskey="n" href="openssl.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls"></a>15.7. ファイアウォール</h2></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Palmer</span> <span class="firstname">Gary</span> [FAMILY Given]</span> 、 <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Nash</span> <span class="firstname">Alex</span> [FAMILY Given]</span>. </span></div></div></div><a id="idp90174288" class="indexterm"></a><a id="idp90174800" class="indexterm"></a><p><span class="emphasis"><em>訳: 佐伯 隆司 <code class="email">&lt;<a xmlns="" class="email" href="mailto:saeki@jp.FreeBSD.org">saeki@jp.FreeBSD.org</a>&gt;</code>.
+	11 November 1996.</em></span></p><p>ファイアウォールは、
+      インターネットに参加している人はもちろんのこと、
+      プライベートネットワークのセキュリティ向上のための
+      アプリケーションを 探している人にとっても、
+      ますます興味深くなりつつある分野です。
+      このセクションではファイアウォールとは何か、
+      ファイアウォールの使用法、
+      そしてファイアウォールを構築するために FreeBSD のカーネルで
+      提供されているファシリティ (機能)
+      の使用法について説明したいと思います。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">社内のネットワークと <span class="quote">「<span class="quote">巨大かつ信頼のおけない
+	インターネット</span>」</span>との間にファイアウォールを構築することで
+	セキュリティ上のすべての問題が解決できると考える人がいます。
+	ファイアウォールはセキュリティ上の問題を
+	解決する助けになる場合もありますが、
+	充分な設定がなされていないファイアウォールは、
+	まったくファイアウォールを
+	持たない場合よりもセキュリティ上の危険を増大させてしまいます。
+	ファイアウォールにできることは、
+	あなたのシステムにもう一つのセキュリティ層を
+	追加することだけで、
+	本気でアタックをしかけてくるクラッカーが内部ネットワークに
+	侵入するのを妨げることはできません。
+	ファイアウォールを侵入不可能と過信して
+	内部のセキュリティをおろそかにすることは、
+	単にクラッカーの仕事を少し簡単にするだけでしか
+	ありません。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90178640"></a>15.7.1. ファイアウォールとは何か ?</h3></div></div></div><p>現在インターネットで普通に使用されている
+	ファイアウォールには 二つの異なるタイプがあります。一つは、
+	厳密には <span class="emphasis"><em> パケットフィルタリングルータ </em></span>
+	と 呼ばれるタイプのものです。これはマルチホームのホストマシン
+	(複数の ネットワークに接続されているマシン) のカーネルが、
+	ある規則にしたがって
+	パケットを転送したりブロックしたりするものです。もう一つは、
+	<span class="emphasis"><em> proxy (代理) サーバ </em></span>
+	として知られているタイプのものです。これは、
+	おそらくはマルチホームのホストマシン上で、
+	カーネルによるパケット転送を 禁止して、
+	デーモンにより認証の提供とパケットの転送とを
+	おこなうものです。</p><p>二つのタイプのファイアウォールを組み合わせて使用して、
+	特定のマシン (<span class="emphasis"><em> 要塞ホスト </em></span> と呼ばれる)
+	だけが パケットフィルタリングルータを通して内部ネットワークへ
+	パケットを送ることができるよう設定している
+	サイトがしばしば存在します。proxy (代理)
+	サービスは通常の認証機構よりもセキュリティを
+	強化してある 要塞ホストで動作させます。</p><p>FreeBSD は (IPFW として知られる)
+	カーネルパケットフィルタ込みで提供されています。
+	この節の残りでは、このフィルタについて集中して説明します。
+	サードパーティから提供されるソフトウェアを使用することにより、
+	Proxy サーバを FreeBSD 上に構築することができます。
+	しかし、現在入手可能な
+	proxy サーバはたいへんバラエティに富んでいるので、
+	この節でそれらすべてをカバーすることはできません。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-packet-filters"></a>15.7.1.1. パケットフィルタリングルータ</h4></div></div></div><p>ルータとは、二つまたはそれ以上のネットワークの間で
+	  パケットの転送をおこなう マシンのことです。
+	  パケットフィルタリングルータは、そのカーネルの内部に、
+	  一つ一つのパケットをルールリストと比較して
+	  転送するかしないかを決める 特別なコードを持っています。
+	  最近の IP ルーティングソフトウェアのほとんどは、内部に
+	  パケットのフィルタリングをおこなうためのコードを持っていて、
+	  デフォルトでは すべてのパケットを転送するようになっています。
+	  このフィルタを有効にするためには、
+	  パケットの通過を許すべきかどうかを決める
+	  ルールを自分で定義する必要があります。</p><p>パケットを通すべきか通すべきでないかを決めるために、
+	  パケットヘッダの内容にマッチするものが
+	  ルールリストから探されます。マッチするルールが見つかると、
+	  ルールアクションが実行されます。ルールアクションには、
+	  パケットを捨てる、パケットを転送する、
+	  またはパケットの発信元に ICMP
+	  メッセージを送り返すというものがあります。
+	  ルールの検索は先頭から順番におこなわれ、
+	  通常は最初にマッチしたものだけが 適用されます。そのため、
+	  このルールリストは<span class="quote">「<span class="quote">ルールチェーン</span>」</span>
+	  と呼ばれることもあります。</p><p>パケットマッチングの基準は使用するソフトウェアに
+	  よって異なりますが、通常はパケットの発信元 IP アドレス、
+	  宛先 IP アドレス、発信元ポート番号、宛先ポート番号
+	  (ポート番号はポートをサポートするプロトコルの場合のみ)、
+	  パケットタイプ (UDP, TCP, ICMP など)
+	  に基づくルールを指定することができます。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-proxy-servers"></a>15.7.1.2. Proxy サーバ</h4></div></div></div><p>Proxy サーバとは通常のシステムデーモン
+	  (<span class="application">telnetd</span>,
+	  <span class="application">ftpd</span>
+	  など) を 特別なサーバで置き換えたマシンのことです。
+	  これらのサーバは、
+	  通常は中継をおこなって特定方向への接続だけを許すため、
+	  <span class="emphasis"><em>proxy サーバ </em></span> と呼ばれます。(たとえば)
+	  proxy telnet
+	  サーバをファイアウォールホストで走らせておきます。
+	  外部からユーザがファイアウォールに対して telnet
+	  を実行すると、proxy telnet サーバが応答して、
+	  何らかの認証機構を実行します。これを通過した後で、
+	  内部ネットワークへのアクセスがおこなえるように なるのです。
+	  (内部ネットワークからの信号は proxy
+	  サーバがかわりに受け取り、外へ向けて送り出します)。</p><p>Proxy サーバは通常、
+	  普通のサーバより堅固に構築されていて、しばしば
+	  <span class="quote">「<span class="quote">使い捨て</span>」</span>パスワードシステムなどを含む、
+	  多様な認証機構を持っています。
+	  <span class="quote">「<span class="quote">使い捨て</span>」</span>パスワードシステムとは、
+	  どういうものなのでしょうか。仮に誰かが何らかの方法で、
+	  あなたが使用したパスワードを手に入れたとします。しかし、
+	  一度使用したことで、
+	  そのパスワードは既に無効になっているのです。ですから、
+	  そのパスワードをもう一度使用したとしても、あなたのシステムへ
+	  アクセスすることはできないというわけです。
+	  これらのサーバは中継をおこなうだけで、
+	  実際のところサーバホスト自身への
+	  アクセスをユーザに許してはいません。そのため、
+	  何者かがセキュリティシステムに
+	  侵入用の裏口を取り付けることは、
+	  より困難になっています。</p><p>proxy サーバはアクセス制限の方法をいくつも持っていて、
+	  特定のホスト
+	  だけがサーバへのアクセス権を得ることができるように
+	  なっていることがあります。
+	  そして目的のマシンと通信できるユーザを制限するように
+	  設定することもできます。もう一度言いますが、
+	  どんなファシリティ (機能) が使えるかは、どんな proxy
+	  サービスをおこなうソフトウェアを選ぶかに大きく
+	  依存します。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90192464"></a>15.7.2. IPFW で何ができるか</h3></div></div></div><a id="idp90193104" class="indexterm"></a><p>FreeBSD とともに配布されている IPFW は、
+	カーネル内部にあってパケットのフィルタリングとアカウンティングをおこなうシステムであり、
+	ユーザ側のコントロールユーティリティである <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>
+	を含んでいます。
+	ルーティングの決定をおこなう際に、これらは互いに協力して、
+	カーネルで使用されるルールを定義したり、
+	現在使用されているルールを問い合わせたりすることができます。</p><p>IPFW は互いに関連する二つの部分からなっています。
+	ファイアウォールセクションは
+	パケットフィルタリングをおこないます。また、IP
+	アカウンティングセクションはファイアウォールセクションのものと
+	似たルールに基づいてルータの使用を追跡します。これにより、
+	(たとえば) 特定のマシンからルータへのトラフィックがどのくらい
+	発生しているか調べたり、どれだけの WWW (World Wide Web)
+	トラフィックが
+	フォワードされているかを知ることができます。</p><p>IPFW は、
+	ルータではないマシンにおいても入出力コネクションの
+	パケットフィルタリングのために使用することができるように設計されています。
+	これは一般的な IPFW の使用法とは異なる特別な使い方ですが、
+	こういった状況でも同じコマンドとテクニックが使用されます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90200016"></a>15.7.3. FreeBSD で IPFW を有効にする</h3></div></div></div><a id="idp90200656" class="indexterm"></a><p>IPFW システムの中心となる部分はカーネル内部にあります。
+	そのため、どのファシリティ (機能) を必要とするかによって、
+	1 つまたは複数のオプションをカーネルコンフィグレーションファイルに追加し、
+	カーネルを再コンパイルする必要があるでしょう。
+	カーネルの再コンパイル方法の詳細については、
+	「カーネルのコンフィグレーション」(<a class="xref" href="kernelconfig.html" title="第9章 FreeBSD カーネルのコンフィグレーション">9章<em>FreeBSD カーネルのコンフィグレーション</em></a>)
+	をご覧ください。</p><p>現在、IPFW
+	に関係するカーネルコンフィグレーションオプションは
+	三つあります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="literal">options IPFIREWALL</code></span></dt><dd><p>パケットフィルタリングのためのコードを
+	      カーネルに組み込みます。</p></dd><dt><span class="term"><code class="literal">
+	      options IPFIREWALL_VERBOSE</code></span></dt><dd><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> を通じて
+	      パケットのログを取るためのコードを有効にします。
+	      フィルタルールでパケットのログを取るように指定しても、
+	      このオプションが指定されていなければ、
+	      ログを取ることはできません。</p></dd><dt><span class="term"><code class="literal">
+	      options IPFIREWALL_VERBOSE_LIMIT=10</code></span></dt><dd><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> を通じて
+	      ログを取るパケットの数をエントリ毎に制限します。
+	      敵対的な環境においてファイアウォールの
+	      動作のログを取りたいけれど、
+	      syslog の洪水によるサービス拒絶攻撃に対し
+	      無防備でありたくないという場合に、
+	      このオプションを使用したいと思うことが
+	      あるかもしれません。</p><p>チェーンエントリのログが指定された制限数に達すると、
+	      そのエントリに関するログ取りは停止されます。
+	      ログ取りを再開するには、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>
+	      ユーティリティを使用して
+	      関連するカウンタをリセットする必要があります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero 4500</code></strong></pre><p>4500 とは、
+	      ログ取りを続行したいチェーンエントリの番号です。</p></dd></dl></div><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">以前のバージョンの FreeBSD は
+	<code class="literal">IPFIREWALL_ACCT</code> というオプションを
+	持っていました。しかし、
+	ファイアウォールコードがアカウンティングファシリティ (機能) を
+	自動的に含むようになったため、
+	現在では使用されることはなくなっています。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90213072"></a>15.7.4. IPFW の設定</h3></div></div></div><a id="idp90213712" class="indexterm"></a><p>IPFW ソフトウェアの設定は <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>
+	ユーティリティを通じておこないます。
+	このコマンドの構文は非常に複雑に見えますが、
+	一旦その構造を理解すれば比較的単純です。</p><p>このユーティリティでは今のところ四つの異なる
+	コマンドカテゴリが 使用されています: それは追加 / 削除、表示、
+	フラッシュ、およびクリアです。追加 /
+	削除はパケットの受け入れ、拒絶、ログ取りをどのようにおこなうか
+	というルールを構築するのに使用します。表示はルールリスト
+	(またはチェーン) と (アカウンティング用) パケットカウンタの
+	内容を調べるのに使用します。
+	フラッシュはチェーンからすべてのエントリを
+	取り除くのに使用します。
+	クリアは一つまたはそれ以上のアカウンティングエントリを
+	ゼロにするのに 使用します。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90216528"></a>15.7.4.1. IPFW ルールの変更</h4></div></div></div><p>この形式での使用法は:
+	  </p><div class="cmdsynopsis"><p><code class="command">ipfw</code> [-N]  コマンド  [index]  アクション  [log]  プロトコル   アドレス  [オプション]</p></div><p>
+	</p><p>この形式で使用する際に有効なフラグは一つだけです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">-N</span></dt><dd><p>アドレスやサービス名を
+		文字列に変換して表示します。</p></dd></dl></div><p><span class="emphasis"><em> コマンド </em></span>
+	  は一意である限り短縮可能です。有効な <span class="emphasis"><em> コマンド
+	  </em></span> は</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">add</span></dt><dd><p>ファイアウォール / アカウンティングルールリストに
+		エントリを追加します。</p></dd><dt><span class="term">delete</span></dt><dd><p>ファイアウォール /
+		アカウンティングルールリストから
+		エントリを削除します。</p></dd></dl></div><p>以前のバージョンの IPFW では、
+	  ファイアウォールエントリと
+	  パケットアカウンティングエントリが別々に利用されていました。
+	  現在のバージョンでは、それぞれのファイアウォールエントリ毎に
+	  パケットアカウンティングエントリが備えられています。</p><p><span class="emphasis"><em>index</em></span> 値が指定されていると、
+	  エントリはチェーン中の指示された位置に置かれます。
+	  <span class="emphasis"><em>index</em></span> 値が指定されて いなければ、
+	  エントリは (65535 番のデフォルトルールである
+	  パケット拒絶を別にして) 最後のチェーンエントリの index に
+	  100 を足した 位置 (チェーンの最後) に置かれます。</p><p>カーネルが <code class="literal">IPFIREWALL_VERBOSE</code>
+	  つきでコンパイルされている場合、<code class="literal">log</code>
+	  オプションはマッチしたルールを
+	  システムコンソールに出力させます。</p><p>有効な <span class="emphasis"><em> アクション </em></span> は:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">reject</span></dt><dd><p>パケットを捨てます。ICMP ホスト /
+		ポート到達不能パケットを (適切な方を)
+		発信元へ送ります。</p></dd><dt><span class="term">allow</span></dt><dd><p>通常通りパケットを通過させます。(別名:
+		<code class="literal">pass</code> および
+		<code class="literal">accept</code>)</p></dd><dt><span class="term">deny</span></dt><dd><p>パケットを捨てます。発信元は ICMP メッセージによる
+		通知を受けません (そのためパケットが
+		宛先に到達しなかったように見えます)。</p></dd><dt><span class="term">count</span></dt><dd><p>このルールはパケットカウンタを更新するだけで、
+		パケットを 通過させたり拒絶したりしません。
+		検索は次のチェーンエントリから続けられます。</p></dd></dl></div><p>それぞれの <span class="emphasis"><em> アクション </em></span>
+	  は一意な先頭部分だけでも認識されます。</p><p>指定可能な <span class="emphasis"><em> プロトコル </em></span>
+	  は以下の通りです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">all</span></dt><dd><p>任意の IP パケットにマッチします。</p></dd><dt><span class="term">icmp</span></dt><dd><p>ICMP パケットにマッチします。</p></dd><dt><span class="term">tcp</span></dt><dd><p>TCP パケットにマッチします。</p></dd><dt><span class="term">udp</span></dt><dd><p>UDP パケットにマッチします。</p></dd></dl></div><p><span class="emphasis"><em> アドレス </em></span> の指定は:</p><div class="cmdsynopsis"><p> from   <em class="replaceable"><code>address/mask</code></em>  [<em class="replaceable"><code>port</code></em>]  to   <em class="replaceable"><code>address/mask</code></em>  [<em class="replaceable"><code>port</code></em>] [via <em class="replaceable"><code>interface</code></em>]</p></div><p><em class="replaceable"><code>port</code></em> はポートをサポートする
+	  <span class="emphasis"><em> プロトコル </em></span> (UDP と TCP) の
+	  場合にだけ指定可能です。</p><p><code class="option">via</code> は必須ではなく、
+	  特定のインタフェースを通ってきたパケット
+	  だけにマッチするように、IP アドレスまたはローカル IP
+	  インタフェースの ドメイン名、またはインタフェース名
+	  (たとえば <code class="filename">ed0</code>) を
+	  指定することができます。
+	  インタフェースユニット番号はオプションで、
+	  ワイルドカードで指定することが できます。たとえば、
+	  <code class="literal">ppp*</code> はすべてのカーネル PPP
+	  インタフェースに マッチします。</p><p><em class="replaceable"><code>address/mask</code></em> の指定は:
+
+	  </p><pre class="screen"><em class="replaceable"><code>address</code></em></pre><p>
+
+	  または
+
+	  </p><pre class="screen"><em class="replaceable"><code>address</code></em>/<em class="replaceable"><code>mask-bits</code></em></pre><p>
+
+	  または
+
+	  </p><pre class="screen"><em class="replaceable"><code>address</code></em>:<em class="replaceable"><code>mask-pattern</code></em></pre><p>
+	</p><p>IP
+	  アドレスのかわりに有効なホスト名を指定することも可能です。
+	  <code class="option"><em class="replaceable"><code>mask-bits</code></em></code>
+	  はアドレスマスクで上位何ビットを１にするべきかを
+	  示す十進数値です。たとえば次の指定、
+	  <code class="systemitem">192.216.222.1/24</code> はクラス C のサブネット
+	  (この場合 <code class="systemitem">192.216.222</code>)
+	  の任意のアドレスにマッチするマスクを作成します。
+	  <code class="option"><em class="replaceable"><code>mask-pattern</code></em></code>
+	  は与えられたアドレスと 論理 AND される IP アドレスです。
+	  キーワード <code class="literal">any</code> は<span class="quote">「<span class="quote">任意の IP
+	  アドレス</span>」</span>を指定するために
+	  使用することができます。</p><p>ブロックするポート番号は以下のように指定します:
+
+	  </p><div class="cmdsynopsis"><p> <em class="replaceable"><code>port</code></em> [,
+		<em class="replaceable"><code>port</code></em> [,
+		  <em class="replaceable"><code>port</code></em> […
+		  ]]] </p></div><p>
+
+	  のように単独のポートまたはポートのリストを指定します。
+	  または
+
+	  </p><div class="cmdsynopsis"><p> <em class="replaceable"><code>port</code></em>-
+	      <em class="replaceable"><code>port</code></em> </p></div><p>
+
+	  のようにポートの範囲を指定します。
+	  単独のポートとポートのリストを
+	  組み合わせて指定することも可能ですが、
+	  その場合は常に範囲の方を
+	  最初に指定しなければなりません。</p><p>使用可能な <span class="emphasis"><em> オプション </em></span> は:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">frag</span></dt><dd><p>データグラムの最初の
+		フラグメントでなければマッチします。</p></dd><dt><span class="term">in</span></dt><dd><p>入力途中のパケットであればマッチします。</p></dd><dt><span class="term">out</span></dt><dd><p>出力途中のパケットであればマッチします。</p></dd><dt><span class="term">ipoptions <em class="replaceable"><code>spec</code></em></span></dt><dd><p>IP ヘッダが <em class="replaceable"><code>spec</code></em>
+		に指定された カンマで区切られた
+		オプションのリストを含んでいればマッチします。
+		サポートされている IP オプションのリストは:
+		<code class="literal">ssrr</code> (ストリクトソースルート)、
+		<code class="literal">lsrr</code> (ルーズソースルート)、
+		<code class="literal">rr</code> (レコードパケットルート)、
+		そして <code class="literal">ts</code> (タイムスタンプ) です。
+		特定のオプションを含まないことを指定するには
+		<code class="literal">!</code> を先頭につけます。</p></dd><dt><span class="term">established</span></dt><dd><p>パケットが既に確立されている TCP
+		コネクションの一部であれば (つまり RST または ACK
+		ビットがセットされていれば) マッチします。
+		<span class="emphasis"><em>established</em></span>
+		ルールをチェーンの最初の方に置くことで、
+		ファイアウォールのパフォーマンスを向上させることが
+		できます。</p></dd><dt><span class="term">setup</span></dt><dd><p>パケットが TCP
+		コネクションを確立しようとするものであれば (SYN
+		ビットがセットされ ACK ビットはセットされていなければ)
+		マッチします。</p></dd><dt><span class="term">tcpflags <em class="replaceable"><code>flags</code></em></span></dt><dd><p>TCP ヘッダが <em class="replaceable"><code>flags</code></em>
+		に指定された カンマで区切られたフラグの
+		リストを含んでいればマッチします。
+		サポートされているフラグは、<code class="literal">fin</code>,
+		<code class="literal">syn</code>, <code class="literal">rst</code>,
+		<code class="literal">psh</code>, <code class="literal">ack</code> と
+		<code class="literal">urg</code> です。
+		特定のフラグを含まないことを指定するには
+		<code class="literal">!</code> を先頭につけます。</p></dd><dt><span class="term">icmptypes <em class="replaceable"><code>types</code></em></span></dt><dd><p>ICMP タイプが <em class="replaceable"><code>types</code></em>
+		リストに 存在していればマッチします。
+		リストはタイプの範囲または個々のタイプを
+		カンマで区切った任意の組合せで指定できます。
+		一般的に使用されている ICMP タイプは:
+		<code class="literal">0</code> エコーリプライ (ping リプライ)、
+		<code class="literal">3</code> 相手先到達不可能、
+		<code class="literal">5</code> リダイレクト、
+		<code class="literal">8</code> エコーリクエスト (ping
+		リクエスト)、そして <code class="literal">11</code> 時間超過
+		(<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a> で使用されているように、TTL
+		満了を示すのに使用されます) です。</p></dd></dl></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90316112"></a>15.7.4.2. IPFW ルールリストの表示</h4></div></div></div><p>この形式での使用法は:
+	  </p><div class="cmdsynopsis"><p><code class="command">ipfw</code> [-a] [-t] [-N]  l </p></div><p>
+	</p><p>この形式で使用する際に有効なフラグは三つあります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">-a</span></dt><dd><p>リスト表示の際にカウンタの値も表示します。
+		このオプションは アカウンティングカウンタの
+		内容を見る唯一の手段です。</p></dd><dt><span class="term">-t</span></dt><dd><p>各チェーンエントリが最後に
+		マッチした時刻を表示します。この時刻表示は
+		  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> ユーティリティで使用される入力形式と
+		互換性がありません。</p></dd><dt><span class="term">-N</span></dt><dd><p>(可能であれば)
+		アドレスやサービス名を文字列に変換して表示します。</p></dd></dl></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90329808"></a>15.7.4.3. IPFW ルールのフラッシュ</h4></div></div></div><p>チェーンをフラッシュするには:
+	  </p><div class="cmdsynopsis"><p><code class="command">ipfw</code>  flush </p></div><p>
+	</p><p>カーネルに固定されているデフォルトルール (インデックス
+	  65535 番)  以外の、
+	  ファイアウォールチェーンの中のすべてのエントリを削除します。
+	  デフォルトではすべてのパケットが拒絶されるので、
+	  一旦これを実行すると、
+	  パケットを許可するエントリがチェーンに追加されるまで、
+	  あなたのシステムがネットワークから切り放されてしまいます。
+	  そのため、
+	  ルールのフラッシュをおこなうときは注意が必要です。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90332624"></a>15.7.4.4. IPFW パケットカウンタのクリア</h4></div></div></div><p>一つまたはそれ以上のパケットカウンタをクリアするためには:
+	  </p><div class="cmdsynopsis"><p><code class="command">ipfw</code>  zero  [<em class="replaceable"><code>index</code></em>]</p></div><p>
+	</p><p><em class="replaceable"><code>index</code></em> が指定されていなければ、
+	  すべてのパケットカウンタが クリアされます。
+	  <em class="replaceable"><code>index</code></em> が指定されていれば、
+	  特定のチェーンエントリだけが クリアされます。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90336848"></a>15.7.5. <span class="application">ipfw</span> についてのコマンドの例</h3></div></div></div><p>このコマンドは、ホスト <code class="systemitem">evil.crackers.org</code> から ホスト <code class="systemitem">nice.people.org</code> の telnet ポートへの
+	すべてのパケットを拒絶します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw add deny tcp from evil.crackers.org to nice.people.org 23</code></strong></pre><p>次の例は、ネットワーク <code class="systemitem">crackers.org</code> (クラス C) 全体から
+	マシン <code class="systemitem">nice.people.org</code>
+	(の任意のポート) への 任意の TCP トラフィックを拒絶し、
+	ログを取ります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw add deny log tcp from evil.crackers.org/24 to nice.people.org</code></strong></pre><p>あなたの内部ネットワーク (クラス C のサブネット) に対する
+	X セッションを 張れないようにする場合、
+	以下のコマンドで必要なフィルタリングがおこなえます。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw add deny tcp from any to my.org/28 6000 setup</code></strong></pre><p>アカウンティングレコードを見るには:
+
+	</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -a list</code></strong></pre><p>
+
+	または短縮形式で</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -a l</code></strong></pre><p>最後にチェーンエントリがマッチした
+	時刻を見ることもできます。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -at l</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90355664"></a>15.7.6. パケットフィルタリングファイアウォールの構築</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">以下の提案は、ただの提案にすぎません:
+	  必要な処理はそれぞれのファイアウォールで異なるため、
+	  あなた独自の要求にあったファイアウォールを構築する方法を
+	  ここで述べることはできないのです。</p></div><p>最初にファイアウォールをセットアップするとき、
+	コントロールされた環境でファイアウォールホストの
+	設定がおこなえるような
+	テストベンチセットアップが用意できない場合には、
+	カーネルのログ取りを
+	有効にしてログ取り版のコマンドを使用することを
+	強くおすすめします。そうすることで、
+	大した混乱や中断なしに問題となる範囲の特定と処置を
+	素早くおこなうことができます。
+	初期セットアップフェーズが完了してからであっても、
+	アタックの可能性のあるアクセスをトレースしたり、
+	要求の変化に応じてファイアウォールルールを
+	変更したりできるので、`deny'
+	に対するログ取りをおこなうことをおすすめします。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="command">accept</code>
+	  コマンドでログを取っていると、
+	  ファイアウォールをパケットが一つ通過する毎に 1
+	  行のログが生成されるため <span class="emphasis"><em>大量の</em></span>
+	  ログデータが発生します。そのため、大規模な FTP/HTTP
+	  転送などをおこなうと、システムが非常に 遅くなってしまいます。
+	  また、パケットが通過するまでにカーネルにより
+	  多くの仕事を要求するため、パケットのレイテンシ (latency)
+	  を増加させてしまいます。<span class="application">syslogd</span>
+	  もログをディスクに記録するなど、より多くの CPU タイムを
+	  使用し始め、実に容易に <code class="filename">/var/log</code>
+	  が置かれているパーティションを溢れさせてしまう可能性があります。</p></div><p>ファイアウォールは、
+	<code class="filename">/etc/rc.conf.local</code> か、もしくは
+	<code class="filename">/etc/rc.conf</code> によって有効化されるべきです。
+	関連マニュアルページには、どのドアノブ (訳注:
+	ポートや IP アドレスなど、
+	ネットワークからの入口を示すもののこと)
+	に手をつければ良いのかに
+	ついての説明と、ファイアウォール設定の既定値のリストがあります。
+	もし、設定の既定値を使わない場合には、
+	<code class="command">ipfw list</code> とすることで、
+	現在のルールセットを <code class="filename">rc.conf</code> から読み込める形で
+	ファイルに出力できます。
+	また、<code class="filename">/etc/rc.conf.local</code> や
+	<code class="filename">/etc/rc.conf</code>
+	によってファイアウォールを有効化しない場合には、
+	すべての IP インタフェースが設定されるよりも前に、
+	確実にファイアウォールの有効化が行なわれるようにすることが重要です。</p><p>次の問題は、ファイアウォールが実際には何を
+	<span class="emphasis"><em>する</em></span> べきかです !
+	これは外部からそのネットワークへのどんなアクセスを許したいか、
+	また内部から外界へのアクセスを
+	どのくらい許したいかに大きく依存します。
+	いくつか一般的なルールを挙げると:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>1024 番以下のポートへのすべての TCP
+	    入力アクセスをブロックします。ここは finger, SMTP (mail)
+	    そして telnet など、最もセキュリティに敏感な
+	    サービスが存在する場所だからです。</p></li><li class="listitem"><p><span class="emphasis"><em> すべての </em></span> 入力 UDP
+	    トラフィックをブロックします。これは UDP
+	    を使用しているサービスで有用なものは極めて少ないうえ、
+	    (Sun の RPC と NFS プロトコルのように)
+	    有用なトラフィックであったとしても、
+	    通常セキュリティに対する脅威となるためです。UDP
+	    はコネクションレスプロトコルであるため、入力 UDP
+	    トラフィックを拒絶することは すなわち出力 UDP
+	    トラフィックに対する返答をも ブロックすることになるので、
+	    このことはそれなりの不利益をもたらします。たとえば外部の
+	    archie (prospero) サーバを使用している (内部の) ユーザに
+	    とって問題となる可能性があります。もし archie
+	    へのアクセスを許したければ、191 番と 1525 番のポートから
+	    任意の UDP
+	    ポートへ来るパケットがファイアウォールを通過することを
+	    許可しなければなりません。123
+	    番のポートから来るパケットは
+	    <span class="application">ntp</span> パケットで、
+	    これも通過の許可を考慮する必要がある
+	    もう一つのサービスです。</p></li><li class="listitem"><p>外部から 6000
+	    番のポートへのトラフィックをブロックします。6000
+	    番のポートは X11 サーバへのアクセスに使用されるポートで、
+	    セキュリティに対する脅威となりえます。
+	    (特に自分のワークステーションで  <code class="command">xhost
+	      +</code>
+	    をおこなう癖を持っている人がいればなおさらです)。X11
+	    は実際に 6000 番以降のポートを使用する可能性があるため、
+	    通過許可に 上限を定めると、
+	    そのマシンで走らせることのできる X ディスプレイの
+	    個数が制限されます。RFC 1700 (Assigned Numbers)
+	    で定義されているように、上限は 6063 です。</p></li><li class="listitem"><p>内部のサーバ (たとえば SQL サーバなど)
+	    がどのポートを使用するかを チェックします。
+	    それらのポートは通常、上で指定した 1-1024
+	    番の範囲から外れていますので、
+	    これらも同様にブロックしておくことは
+	    おそらく良い考えです。</p></li></ul></div><p>これとは別のファイアウォール設定に 関するチェックリストが
+	CERT から 入手可能です。<a class="link" href="http://www.cert.org/tech_tips/packet_filtering.html" target="_top">http://www.cert.org/tech_tips/packet_filtering.html</a></p><p>前にも述べたように、これはただの <span class="emphasis"><em> ガイドライン
+	</em></span> にすぎません。
+	ファイアウォールでどのようなフィルタルールを使用するかは、
+	あなた自身が 決めなければなりません。
+	これまでのアドバイスに従ったにも関わらず、
+	誰かがあなたのネットワークに 侵入してきたとしても、
+	わたしたちは「いかなる」責任もとることはできません。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ipfw-overhead"></a>15.7.7. IPFW のオーバーヘッドと最適化</h3></div></div></div><p>多くの人が IPFW
+	がどのくらいのオーバヘッドをシステムに加えるかを知りたがっています。
+	この答えは、使っているルールセットとプロセッサのスピードによってほぼ決まります。
+	イーサネットを使っていてルールセットが少ないアプリケーションにとって答えは、
+	<span class="quote">「<span class="quote">その影響は無視できる程度</span>」</span> です。
+	実際の測定値を見ないと満足できない方は、引き続きお読みください。</p><p>次の測定は 486-66 (訳注: Intel 社製 CPU i486, 66MHz のこと)
+	上で 2.2.5-STABLE を使用して行なわれました
+	(IPFW はその後の FreeBSD のリリースで多少変更されていますが、
+	現在も同程度の速度で動きます)。IPFW には、
+	<code class="literal">ip_fw_chk</code> ルーチン内でかかる時間を測定して、
+	1000 パケット毎に結果をコンソールに表示する変更が加えられています。</p><p>それぞれ 1000 ずつのルールからなる
+	2 つのルールセットでテストが行なわれました。
+	1 つ目のルールセットは最悪のケースを見るために、
+	次のルールを繰り返しています。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw add deny tcp from any to any 55555</code></strong></pre><p>これは、最終的にパケットが (ポート番号から)
+	ルールにマッチしないことがわかるまでに IPFW
+	のほとんどのパケットチェックルーチンが実行されるような、
+	最悪の場合を示します。このルールを 999 個繰り返し並べた後に
+	<code class="literal">allow ip from any to any</code>
+	がきます。</p><p>2 つ目のルールセットは、
+	なるべく早く確認が終了するように書かれたものです。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw add deny ip from 1.2.3.4 to 1.2.3.4</code></strong></pre><p>このルールでは、発信元の IP アドレスが一致しないので、
+	すぐに確認が終わります。前とおなじように、1000 個目のルールは
+	<code class="literal">allow ip from any to any</code> です。</p><p>前者のパケットあたりのオーバヘッドはおよそ 2.703 ms/packet
+	または 1 つのルールにつき 2.7 マイクロ秒です。したがって、
+	このルールにおけるパケット処理時間の理論的な限界は、
+	毎秒約 370 パケットです。10 Mbps の Ethernet で
+	1500 バイト程度のパケットサイズを仮定すると、
+	バンド幅の利用効率は 55.5% が限界です。</p><p>後者では、それぞれのパケットがおよそ 1.172 ms
+	または、1 つのルールにつき 1.2 マイクロ秒で処理されていました。
+	パケット処理時間の理論的な限界は、
+	毎秒約 853 パケットとなりますので、10 Mbps Ethernet
+	のバンド幅を使い切ることができます。</p><p>このテストに使われたルールの数が多過ぎることと、
+	その性質から、これは実際の状況を反映したものではありません。
+	これらは上に示したタイミング情報を出すためだけに用いられたものです。
+	効率の良いルールセットを作るためには、
+	次のような事を考えればよいでしょう。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">established</code> ルールは
+	    TCP トラフィックの大半を処理するため、
+	    先頭の方に持ってきてください。このルールの前には
+	    <code class="literal">allow tcp</code>
+	    という記述を置かないでください。</p></li><li class="listitem"><p>良く使われるルールを、
+	    あまり良く使われないルールよりも前の方に
+	    (もちろん<span class="emphasis"><em>ファイアウォールの許可設定を変えない範囲で</em></span>)
+	    持ってきてください。<code class="command">ipfw -a l</code>
+	    でパケット数の統計を取ることで、
+	    どのルールが最もよく使われているかを調べられます。</p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="kerberos.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="security.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="openssl.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">15.6. Kerberos〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓15.8. OpenSSL</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

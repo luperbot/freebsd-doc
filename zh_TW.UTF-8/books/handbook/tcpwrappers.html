@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>14.4. TCP Wrapper</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 使用手冊" /><link rel="up" href="security.html" title="章 14. 系統安全" /><link rel="prev" href="one-time-passwords.html" title="14.3. One-time Passwords" /><link rel="next" href="kerberos5.html" title="14.5. Kerberos" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">14.4. TCP Wrapper</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="one-time-passwords.html">前一頁</a> </td><th width="60%" align="center">章 14. 系統安全</th><td width="20%" align="right"> <a accesskey="n" href="kerberos5.html">下一頁</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="tcpwrappers"></a>14.4. TCP Wrapper</h2></div><div><span class="authorgroup">Written
+	  by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp77895248" class="indexterm"></a><p>每個熟 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a> 的人幾乎都會聽過 <acronym class="acronym">TCP</acronym>
+	Wrappers 這個東西，但很少人能完全瞭解它在網路環境上的好用在哪。
+	大多數的人都會裝防火牆來保護網路，雖然，防火牆用途非常廣泛，但並非萬能。
+	例如：若打算回傳一段文字給連線來源者等之類的。而 <acronym class="acronym">TCP</acronym>
+	軟體卻可以做到這點，還有其他更多事情。在以下段落內，我們將繼續介紹
+	<acronym class="acronym">TCP</acronym> Wrappers 提供的功能，以及一些實際運用的例子。</p><p><acronym class="acronym">TCP</acronym> Wrappers 可以讓 <code class="command">inetd</code>
+	所管理的每個 server daemon ，都會在 <acronym class="acronym">TCP</acronym> Wrappers
+	的掌握之下。透過 <acronym class="acronym">TCP</acronym> Wrappers 這種方式可以支援連線紀錄(logging)
+	、回傳一段文字給連線來源者、可以讓 daemon 只接受內部連線等等。
+	  雖然其中部份功能用防火牆也可以做到，但 <acronym class="acronym">TCP</acronym> Wrappers
+	不只是增加了一層保護，還提供了防火牆所辦不到的事情。</p><p>然而， 由 <acronym class="acronym">TCP</acronym> Wrappers 所提供的這些額外安全功能，
+	不應該視為優秀防火牆的替代方案。應該結合 <acronym class="acronym">TCP</acronym> Wrappers
+	及防火牆、其他加強安全措施來一併運用才對，這樣才可以為系統提供多層安全防護。</p><p>由於這些設定是主要針對
+      <code class="command">inetd</code> 所提供的，所以我們建議您先參閱 <a class="link" href="network-inetd.html" title="29.2. The inetd Super-Server">inetd 設定</a> 一節。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">雖然 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a> 所啟動的程式並非全部都是真正的
+	『daemons』，但一般來講，我們都還是會稱呼為『daemons』，
+	下面我們仍將使用這字眼來表達。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77904336"></a>14.4.1. Initial Configuration</h3></div></div></div><p>若要在 FreeBSD 中使用 <acronym class="acronym">TCP</acronym>
+	Wrappers 的話，只要確定 <code class="command">inetd</code>
+	在啟動時，有在 <code class="filename">/etc/rc.conf</code> 加上
+	<code class="option">-Ww</code> 的參數即可，這個設定在系統預設就有了。
+	當然還需要適當修改 <code class="filename">/etc/hosts.allow</code> 設定檔，但
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> 仍會在系統 log 檔內，紀錄相關資料下來。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">FreeBSD 的 <acronym class="acronym">TCP</acronym> Wrappers 實作方式與其他作業系統上的
+		<acronym class="acronym">TCP</acronym> Wrappers 不太一樣，目前 FreeBSD 已經廢棄不用
+		<code class="filename">/etc/hosts.deny</code> ，而一律改用
+		<code class="filename">/etc/hosts.allow</code>。</p></div><p>最簡單的設定方式是，每個對 daemon 的連線都由
+	<code class="filename">/etc/hosts.allow</code> 來決定是否允許或拒絕。  The default
+	configuration in FreeBSD is to allow a connection to every daemon
+	started with <code class="command">inetd</code>.  Changing this will be
+	discussed only after the basic configuration is covered.</p><p>Basic configuration usually takes the form of
+	<code class="literal">daemon : address : action</code>.  Where
+	<code class="literal">daemon</code> is the daemon name which
+	<code class="command">inetd</code> started.  The
+	<code class="literal">address</code> can be a valid hostname, an
+	<acronym class="acronym">IP</acronym> address or an IPv6 address enclosed in
+	brackets ([ ]).  The action field can be either allow
+	or deny	to grant or deny access appropriately.  Keep in mind
+	that configuration works off a first rule match semantic,
+	meaning that the configuration file is scanned in ascending
+	order for a matching rule.  When a match is found the rule
+	is applied and the search process will halt.</p><p>Several other options exist but they will be explained
+	in a later section.  A simple configuration line may easily be
+	constructed from that information alone.  For example, to
+	allow <acronym class="acronym">POP</acronym>3 connections via the
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/qpopper/pkg-descr">mail/qpopper</a> daemon,
+	the following lines should be appended to
+	<code class="filename">hosts.allow</code>:</p><pre class="programlisting"># This line is required for POP3 connections:
+qpopper : ALL : allow</pre><p>加上上面這行之後，必須重新啟動 <code class="command">inetd</code>。重新啟動的方式可以用
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kill&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">kill</span>(1)</span></a> 指令，或打『 <code class="filename">/etc/rc.d/inetd</code> <em class="parameter"><code>restart</code></em>
+	』 來完成。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77922640"></a>14.4.2. Advanced Configuration</h3></div></div></div><p><acronym class="acronym">TCP</acronym> Wrappers has advanced
+	options too; they will allow for more control over the
+	way connections are handled.  In some cases it may be
+	a good idea to return a comment to certain hosts or
+	daemon connections.  In other cases, perhaps a log file
+	should be recorded or an email sent to the administrator.
+	Other situations may require the use of a service for local
+	connections only.  This	is all possible through the use of
+	configuration options known as <code class="literal">wildcards</code>,
+	expansion characters and external command execution.  The
+	next two sections are written to cover these situations.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77965520"></a>14.4.2.1. External Commands</h4></div></div></div><p>Suppose that a situation occurs where a connection
+	  should be denied yet a reason should be sent to the
+	  individual who attempted to establish that connection.  How
+	  could it be done?  That action can be made possible by
+	  using the <code class="option">twist</code> option.  When a connection
+	  attempt is made, <code class="option">twist</code> will be called to
+	  execute a shell command or script.  An example already exists
+	  in the <code class="filename">hosts.allow</code> file:</p><pre class="programlisting"># The rest of the daemons are protected.
+ALL : ALL \
+        : severity auth.info \
+        : twist /bin/echo "You are not welcome to use %d from %h."</pre><p>This example shows that the message,
+	  <span class="quote">“<span class="quote">You are not allowed to use <code class="literal">daemon</code>
+	  from <code class="literal">hostname</code>.</span>”</span> will be returned
+	  for any daemon not previously configured in the access file.
+	  This is extremely useful for sending a reply back to the
+	  connection initiator right after the established connection
+	  is dropped.  Note that any message returned
+	  <span class="emphasis"><em>must</em></span> be wrapped in quote
+	  <code class="literal">"</code> characters; there are no exceptions to
+	  this rule.</p><div xmlns="" class="warning"><h3 class="admontitle">警告: </h3><p xmlns="http://www.w3.org/1999/xhtml">It may be possible to launch a denial of service attack
+	    on the server if an attacker, or group of attackers could
+	    flood these daemons with connection requests.</p></div><p>Another possibility is to use the <code class="option">spawn</code>
+	  option in these cases.  Like <code class="option">twist</code>, the
+	  <code class="option">spawn</code> implicitly denies the connection and
+	  may be used to run external shell commands or scripts.
+	  Unlike <code class="option">twist</code>, <code class="option">spawn</code> will
+	  not send a reply back to the individual who established the
+	  connection.  For an example, consider the following
+	  configuration line:</p><pre class="programlisting"># We do not allow connections from example.com:
+ALL : .example.com \
+	: spawn (/bin/echo %a from %h attempted to access %d &gt;&gt; \
+	  /var/log/connections.log) \
+	: deny</pre><p>This will deny all connection attempts from the
+	  <code class="systemitem">*.example.com</code> domain;
+	  simultaneously logging the hostname, <acronym class="acronym">IP</acronym>
+	  address and the daemon which they attempted to access in the
+	  <code class="filename">/var/log/connections.log</code> file.</p><p>Aside from the already explained substitution characters
+	  above, e.g. %a, a few others exist.  See the
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> manual page for the complete list.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77976912"></a>14.4.2.2. Wildcard Options</h4></div></div></div><p>Thus far the <code class="literal">ALL</code> example has been used
+	  continuously throughout the examples.  Other options exist
+	  which could extend the functionality a bit further.  For
+	  instance, <code class="literal">ALL</code> may be used to match every
+	  instance of either a daemon, domain or an
+	  <acronym class="acronym">IP</acronym> address. Another wildcard available is
+	  <code class="literal">PARANOID</code> which may be used to match any
+	  host which provides an <acronym class="acronym">IP</acronym> address that may
+	  be forged.  In other words, <code class="literal">paranoid</code> may
+	  be used to define an action to be taken whenever a connection
+	  is made from an <acronym class="acronym">IP</acronym> address that differs
+	  from its hostname.  The following example may shed some more
+	  light on this discussion:</p><pre class="programlisting"># Block possibly spoofed requests to sendmail:
+sendmail : PARANOID : deny</pre><p>In that example all connection requests to
+	  <code class="command">sendmail</code> which have an
+	  <acronym class="acronym">IP</acronym> address that varies from its hostname
+	  will be denied.</p><div xmlns="" class="caution"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">Using the <code class="literal">PARANOID</code> may severely
+	    cripple servers if the client or server has a broken
+	    <acronym class="acronym">DNS</acronym> setup.  Administrator discretion
+	    is advised.</p></div><p>To learn more about wildcards and their associated
+	  functionality, see the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> manual
+	  page.</p><p>Before any of the specific configuration lines above will
+	  work, the first configuration line should be commented out
+	  in <code class="filename">hosts.allow</code>.  This was noted at the
+	  beginning of this section.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="one-time-passwords.html">前一頁</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">上一層</a></td><td width="40%" align="right"> <a accesskey="n" href="kerberos5.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">14.3. One-time Passwords </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 14.5. <span class="application">Kerberos</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

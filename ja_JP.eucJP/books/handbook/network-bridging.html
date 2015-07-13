@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>22.5. ブリッジ</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="advanced-networking.html" title="第22章 高度なネットワーク" /><link rel="prev" href="network-bluetooth.html" title="22.4. Bluetooth" /><link rel="next" href="network-nfs.html" title="22.6. NFS" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">22.5. ブリッジ</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-bluetooth.html">戻る</a>〓</td><th width="60%" align="center">第22章 高度なネットワーク</th><td width="20%" align="right">〓<a accesskey="n" href="network-nfs.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-bridging"></a>22.5. ブリッジ</h2></div><div><span class="authorgroup">原作: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Peterson</span> <span class="firstname">Steve</span> [FAMILY Given]</span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95784272"></a>22.5.1. はじめに</h3></div></div></div><a id="idp95784912" class="indexterm"></a><a id="idp95785424" class="indexterm"></a><p>IP サブネットを作成して、
+	それらのセグメントをルータを使って接続することなしに、
+	(Ethernet セグメントのような)
+	一つの物理ネットワークを二つのネットワークセグメントに分割することはとても有効な場合があります。
+	この方法で二つのネットワークを繋ぐデバイスは
+	<span class="quote">「<span class="quote">ブリッジ</span>」</span> と呼ばれます。
+	二つのネットワークインタフェースカードを持つ FreeBSD
+	システムは、ブリッジとして動作することができます。</p><p>ブリッジは、各ネットワークインタフェイスに繋がるデバイスの
+	MAC 層のアドレス (Ethernet アドレス) を記憶することにより動作します。
+	ブリッジはトラフィックの送信元と受信先が異なったネットワーク上にある場合にのみトラフィックを転送します。</p><p>多くの点で、ブリッジはポート数の少ない Ethernet
+	スイッチのようなものといえます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95787728"></a>22.5.2. ブリッジがふさわしい状況</h3></div></div></div><p>今日ブリッジが活躍する場面は大きく分けて二つあります。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95788752"></a>22.5.2.1. トラフィックの激しいセグメント</h4></div></div></div><p>ひとつは、
+	  物理ネットワークセグメントがトラフィック過剰になっているが、
+	  なんらかの理由によりネットワークをサブネットに分け、
+	  ルータで接続することができない場合です。</p><p>編集部門と製作部門がおなじサブネットに同居している新聞社を例に考えてみましょう。
+	  編集部門のユーザはファイルサーバとして全員サーバ
+	  <code class="systemitem">A</code> を利用し、
+	  製作部門のユーザはサーバ <code class="systemitem">B</code> を利用します。
+	  すべてのユーザを接続するのには Ethernet が使われており、
+	  高負荷となったネットワークは遅くなってしまいます。</p><p>もし編集部門のユーザを一つのネットワークセグメントに分離することができ、
+	  製作部門のユーザも同様にできるのなら、
+	  二つのネットワークセグメントをブリッジで繋ぐことができます。
+	  ブリッジの <span class="quote">「<span class="quote">反対</span>」</span>
+	  側へ向かうネットワークトラフィックだけが転送され、
+	  各ネットワークセグメントの混雑は緩和されます。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95796176"></a>22.5.2.2. パケットフィルタ/帯域制御用ファイアウォール</h4></div></div></div><a id="idp95796816" class="indexterm"></a><a id="idp95797328" class="indexterm"></a><p>もうひとつはネットワークアドレス変換 (NAT)
+	  を使わずにファイアウォール機能を利用したい場合です。</p><p>ここでは DSL もしくは ISDN で
+	  ISP に接続している小さな会社を例にとってみましょう。
+	  この会社は ISP からグローバル IP アドレスを
+	  13 個割り当てられており、ネットワーク上には 10 台の PC が存在します。
+	  このような状況では、サブネット化にまつわる問題から、
+	  ルータを用いたファイアウォールを利用することは困難です。</p><a id="idp95798608" class="indexterm"></a><a id="idp95799120" class="indexterm"></a><a id="idp95799632" class="indexterm"></a><p>ブリッジを用いたファイアウォールなら、
+	  IP アドレスの問題を気にすること無く、
+	  DSL/ISDN ルータの下流側に置くように設定できます。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95800784"></a>22.5.3. ブリッジを設定する</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95801424"></a>22.5.3.1. ネットワークインタフェースカードの選択</h4></div></div></div><p>ブリッジを利用するには少なくとも
+	  2 枚のネットワークカードが必要です。
+	  残念なことに FreeBSD 4.0
+	  ではすべてのネットワークインタフェースカードがブリッジ機能に対応しているわけではありません。
+	  カードに対応しているかどうかについては <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bridge&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">bridge</span>(4)</span></a>
+	  を参照してください。</p><p>以下に進む前に、
+	  二枚のネットワークカードをインストールしてテストしてください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95803984"></a>22.5.3.2. カーネルコンフィグレーションの変更</h4></div></div></div><a id="idp95804624" class="indexterm"></a><p>カーネルでブリッジ機能を有効にするには</p><pre class="programlisting">options BRIDGE</pre><p>という行をカーネルコンフィグレーションファイルに追加して
+	  カーネルを再構築してください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95807056"></a>22.5.3.3. ファイアウォール対応</h4></div></div></div><a id="idp95807696" class="indexterm"></a><p>ファイアウォールとしてブリッジを利用しようとしている場合には
+ 	  <code class="literal">IPFIREWALL</code> オプションも指定する必要があります。
+	  ブリッジをファイアウォールとして設定する際の一般的な情報に関しては、
+	  <a class="xref" href="firewalls.html" title="15.7. ファイアウォール">「ファイアウォール」</a> を参照してください。</p><p>IP 以外のパケット (ARP など)
+	  がブリッジを通過するようにするためには、
+ 	  ファイアウォール用オプションを設定しなければなりません。
+	  このオプションは <code class="literal">IPFIREWALL_DEFAULT_TO_ACCEPT</code>
+	  です。この変更により、
+ 	  デフォルトではファイアウォールがすべてのパケットを受け入れるようになることに注意してください。
+ 	  この設定を行う前に、
+	  この変更が自分のルールセットにどのような影響をおよぼすかを把握しておかなければなりません。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95814480"></a>22.5.3.4. 帯域制御機能</h4></div></div></div><p>ブリッジで帯域制御機能を利用したい場合、
+	  カーネルコンフィグレーションで <code class="literal">DUMMYNET</code>
+	  オプションを加える必要があります。
+	  詳しい情報に関しては <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dummynet&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">dummynet</span>(4)</span></a> を参照してください。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95816912"></a>22.5.4. ブリッジを有効にする</h3></div></div></div><p>ブリッジを有効にするには、
+	<code class="filename">/etc/sysctl.conf</code> に以下の行を加えてください。
+      </p><pre class="programlisting">net.link.ether.bridge=1</pre><p>指定したインタフェースでブリッジを可能にするには以下を加えてください。</p><pre class="programlisting">net.link.ether.bridge_cfg=<em class="replaceable"><code>if1</code></em>,<em class="replaceable"><code>if2</code></em></pre><p>(<em class="replaceable"><code>if1</code></em> および
+	<em class="replaceable"><code>if2</code></em>
+	は二つのネットワークインタフェースの名前に置き換えてください)。
+	ブリッジを経由したパケットを <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> でフィルタしたい場合には、
+	以下の行も付け加える必要があります</p><pre class="programlisting">net.link.ether.bridge_ipfw=1</pre><p>FreeBSD 5.2-RELEASE
+	以降では、かわりに以下の行を使用してください。</p><pre class="programlisting">net.link.ether.bridge.enable=1
+ net.link.ether.bridge.config=<em class="replaceable"><code>if1</code></em>,<em class="replaceable"><code>if2</code></em>
+ net.link.ether.bridge.ipfw=1</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95836496"></a>22.5.5. その他の情報</h3></div></div></div><p>ネットワークからブリッジに <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=telnet&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">telnet</span>(1)</span></a> したい場合、
+ 	ネットワークカードの一つに IP アドレスを割り当てるのが正しいです。
+	一般的に、両方のカードに
+	IP アドレスを割り当てるのはよい考えではないとされています。</p><p>ネットワーク内に複数のブリッジを設置する場合、
+	任意のワークステーション間で一つ以上の経路を持つことはできません。
+	技術的には、
+	これはスパニングツリーのリンク制御はサポートされていない、
+	ということを意味します。</p><p>ブリッジは、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a>
+	にかかる時間を遅らせることがあります。特に、
+	一方のセグメントからもう一方へのトラフィックでそうなります。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-bluetooth.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="network-nfs.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">22.4. Bluetooth〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓22.6. NFS</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>21.3. A hozzáférési idők szűk keresztmetszetei</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="vinum-vinum.html" title="21. fejezet - A Vinum kötetkezelő" /><link rel="prev" href="vinum-intro.html" title="21.2. Kicsik a lemezeink" /><link rel="next" href="vinum-data-integrity.html" title="21.4. Adatintegritás" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.3. A hozzáférési idők szűk
+      keresztmetszetei</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-intro.html">Vissza</a> </td><th width="60%" align="center">21. fejezet - A Vinum kötetkezelő</th><td width="20%" align="right"> <a accesskey="n" href="vinum-data-integrity.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-access-bottlenecks"></a>21.3. A hozzáférési idők szűk
+      keresztmetszetei</h2></div></div></div><p>Napjaink rendszerei szinte állandóan egyszerre
+      több adathoz is hozzá akarnak férni.
+      Például egy nagy forgalmú FTP vagy HTTP
+      szerver több 100 Mbit/s sebességű
+      kapcsolattal is csatlakozhat a világhálóhoz,
+      amelyeken keresztül párhuzamosan többezernyi
+      tranzakciót is folytathat, ami jelentősen meghaladja a
+      legtöbb lemez átlagos átviteli
+      sebességét.</p><p>A jelenleg kapható lemezek soros adatátviteli
+      sebessége egészen 70 MB/s-ig is terjedhet, de
+      ennek az értéknek kevés a
+      jelentősége olyan környezetekben, ahol több,
+      egymástól függetlenül futó program
+      próbál egyszerre hozzáférni, hiszen
+      ilyen esetekben csak a töredékét képesek
+      elérni.  Ilyenkor sokkal érdekesebb a lemezt
+      kezelő alrendszer szempontjából nézni a
+      problémát: így az egyes adatátviteli
+      kérések terhelése lesz a
+      meghatározó paraméter, vagyis az az idő,
+      amit a kérés teljesítésében
+      érintett meghajtók eltöltenek a
+      feldolgozással.</p><p>Bármelyik kérést is vesszük, a
+      kiszolgáláshoz a meghajtónak
+      először a megfelelő helyre kell mozgatnia az
+      író/olvasó fejeket, meg kell várni a
+      fej alatt elhaladó első szektort, majd
+      végrehajtani a megfelelő műveletet.  Ezek a
+      műveletek szétválaszthatatlanok: semmi
+      értelme nincs megszakítani ezeket.</p><p><a id="vinum-latency"></a>Tekintsünk egy
+      átlagosnak mondható, nagyjából
+      10 kB méretű adatátvitelt: a
+      legújabb nagyteljesítményű lemezek
+      átlagosan 3,5 ms alatt képesek
+      pozicionálni a fejeket.  A leggyorsabb lemezek
+      15 000  fordulatot tesznek meg percenként (RPM),
+      így az átlagos forgási
+      késleltetés (egy fél fordulat ideje)
+      2 ms.  70 MB/s-os sebesség mellett az
+      átvitel maga megközelítőleg
+      150 ˝´/4s, ami szinte elhanyagolható a
+      pozicionálás idejéhez képest.  Ilyen
+      esetekben a tényleges adatátviteli sebesség
+      1 MB/s-nél alig valamivel többre esik vissza,
+      és tisztán látszik, hogy erősen
+      függ az átvitt adat
+      mennyiségétől.</p><p>A hagyományos és kézenfekvő
+      megoldása ennek a problémának
+      <span class="quote">"<span class="quote">még több cséve</span>"</span>
+      használata: egyetlen nagy lemez helyett alkalmazzunk
+      több kisebb, de azonos tárkapacitású
+      lemezt.  Mindegyik lemez képes egymástól
+      függetlenül mozgatni a fejeiket és az adatokat,
+      aminek köszönhetően a tényleges
+      adatátvitel mértéke nagyjából a
+      lemezek számával arányosan
+      növekszik.</p><p>Az adatátvitelben bekövetkező javulás
+      pontos aránya természetesen kisebb, mint a lemezek
+      száma: habár az egyes meghajtók
+      képesek párhuzamosan mozgatni az adatokat, semmilyen
+      módon garantálhatjuk, hogy a kérések
+      egyenletesen oszlanak el köztük.  Emiatt szinte
+      elkerülhetetlen, hogy az egyik meghajtót nagyobb
+      terhelés érje, mint a másikat.</p><a id="idp91712976" class="indexterm"></a><a id="idp91713488" class="indexterm"></a><p>A lemezekre eső terhelés egyenletessége
+      erősen függ attól, hogyan osztjuk el az adatokat
+      a meghajtók között.  Az itt használt
+      példában a lemezen tárolt adatokat egy
+      könyv oldalaiként érdemes elképzelni,
+      vagyis rengeteg szám szerint címezhető
+      adatszektorként.  A virtuális lemezt ennek
+      megfelelően a legegyszerűbben úgy tudjuk
+      felosztani az egymás után következő
+      független fizikai lemezek mérete szerint és
+      így használni, mintha egy nagy könyvet kisebb
+      részekre téptünk volna.  Ezt a módszert
+      nevezik <span class="emphasis"><em>összefűzésnek</em></span>,
+      és előnye, hogy a résztvevő lemezeknek nem
+      kell azonos méretűeknek lenniük.  Ez a
+      megoldás remekül működik abban az esetben,
+      amikor a virtuális lemez hozzáférései
+      egyenletesen oszlanak el annak teljes területén.
+      Amikor viszont az elérés csak egy kisebb
+      területre korlátozódik, kevesebb javulás
+      tapasztalható.  A <a class="xref" href="vinum-access-bottlenecks.html#vinum-concat" title="21.1. ábra - Az összefűzött szervezési mód">21.1. ábra - Az összefűzött szervezési
+	  mód</a> mutatja be
+      lemezek egy ilyen összefűzött
+      konfigurációját.</p><p>
+      </p><div class="figure"><a id="vinum-concat"></a><div class="figure-title">21.1. ábra - Az összefűzött szervezési
+	  mód</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-concat.png" alt="Az összefűzött szervezési mód" /></div></div></div><p><br class="figure-break" />
+    </p><a id="idp91758800" class="indexterm"></a><a id="idp91759312" class="indexterm"></a><a id="idp91760464" class="indexterm"></a><p>Feloszthatjuk a virtuális lemezünket kisebb azonos
+    méretű darabokra is, melyeket
+    különböző eszközökön sorosan
+    tárolunk el.  Például az első 256 szektort
+    eltároljuk az első lemezen, majd a következő
+    256 szektort a következő lemezen és így
+    tovább.  Az utolsó lemez kitöltése
+    után az egész folyamat ismétlődik,
+    egészen az összes lemez megtöltéséig.
+    Ezt a leképezést
+    <span class="emphasis"><em>csíkozás</em></span>nak
+    (<span class="quote">"<span class="quote">striping</span>"</span>) vagy <acronym class="acronym">RAID-0</acronym>-nak
+    nevezzük
+    <a href="#ftn.idp91762384" class="footnote" id="idp91762384"><sup class="footnote">[11]</sup></a>.
+    A csíkozás használata során valamivel
+    bonyolultabbá válik az adatok
+    megtalálása és többletmunkát is
+    jelenthet olyan esetekben, amikor az adatátvitel több
+    lemezt is érint, de ezzel egyidőben sokkal jobban
+    szétosztja a terhelést a lemezek között.  A
+    <a class="xref" href="vinum-access-bottlenecks.html#vinum-striped" title="21.2. ábra - A csíkozott szervezési mód">21.2. ábra - A csíkozott szervezési mód</a> mutatja be a lemezek csíkozott
+    szervezését.</p><p>
+      </p><div class="figure"><a id="vinum-striped"></a><div class="figure-title">21.2. ábra - A csíkozott szervezési mód</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-striped.png" alt="A csíkozott szervezési mód" /></div></div></div><p><br class="figure-break" />
+    </p><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp91762384" class="footnote"><p><a href="#idp91762384" class="para"><sup class="para">[11] </sup></a>A <acronym class="acronym">RAID</acronym> jelentése: Olcsó
+	lemezek hibatűrő tömbje (Redundant Array of
+	Inexpensive Disks).  Különféle
+	típusú hibatűrési megoldásokat
+	vonultat fel, habár az eredeti elnevezés
+	félrevezető lehet, mivel redundanciát nem
+	tartalmaz.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-intro.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-data-integrity.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">21.2. Kicsik a lemezeink </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 21.4. Adatintegritás</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

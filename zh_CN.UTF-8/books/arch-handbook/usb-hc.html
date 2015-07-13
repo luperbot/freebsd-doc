@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>13.2. 主控器</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="usb.html" title="第 13 章 USB设备" /><link rel="prev" href="usb.html" title="第 13 章 USB设备" /><link rel="next" href="usb-dev.html" title="13.3. USB设备信息" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">13.2. 主控器</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="usb.html">上一页</a> </td><th width="60%" align="center">第 13 章 USB设备</th><td width="20%" align="right"> <a accesskey="n" href="usb-dev.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="usb-hc"></a>13.2. 主控器</h2></div></div></div><a id="idp72538448" class="indexterm"></a><p>主控器（HC）控制总线上包的传输。使用1毫秒的帧。在每帧开始
+      时，主控器产生一个帧开始（SOF, Start of Frame）包。</p><p>SOF包用于同步帧的开始和跟踪帧的数目。包在帧中被传输，或由host
+      到设备（out），或由设备到host（in）。传输总是由host发起（轮询传输）。
+      因此每条USB总线只能有一个host。每个包的传输都有一个状态阶段，
+      数据接收者可以在其中返回ACK（应答接收），NAK（重试），STALL（错误
+      条件）或什么也没有（混乱数据阶段，设备不可用或已断开）。USB规范
+      <a class="link" href="http://www.usb.org/developers/docs.html" target="_top">USB
+      specification</a>的第8.5节更详细地解释了包的细节。USB总线
+      上可以出现四中不同类型的传输：控制(control)， 大块(bulk)， 中断
+      (interrupt)和同步(isochronous)。传输的类型和他们的特性在下面
+      描述（`管道'子节中）。</p><p>USB总线上的设备和设备驱动程序间的大型传输被主控器或HC
+      驱动程序分割为多个包。</p><p>到默认端点的设备请求（控制传输）有些特殊。它们由两或三个阶段
+      组成：启动（SETUP），数据（DATA，可选）和状态（STATUS）。设置（set-up）
+      包被发送到设备。如果存在数据阶段，数据包的方向在设置包中给出。
+      状态阶段中的方向与数据阶段期间的方向相反，或者当没有数据阶段时
+      为IN。主控器硬件也提供寄存器，用于保存根端口的当前状态和自从
+      状态改变寄存器最后一次复位以来所发生的改变。USB规范[2]建议使用一个
+      虚拟hub来提供对这些寄存器的访问。虚拟hub必须符合规范第11章中给出的
+      hub设备类。它必须提供一个默认管道使得设备请求可以发送给它。它返回
+      标准和hub类特定的一组描述符。它也应当提供一个中断管道用来报告其
+      端口发生的变化。当前可用的主控器规范有两个：
+      <a class="link" href="http://developer.intel.com/design/USB/UHCI11D.htm" target="_top">
+      通用主控器接口</a>（UHCI；英特尔）和<a class="link" href="http://www.compaq.com/productinfo/development/openhci.html" target="_top">
+      开放主控器接口</a>（OHCI；康柏，微软，国家半导体）。
+      UHCI规范的设计通过要求主控器驱动程序为每帧的传输提供完整的调度，
+      从而减少了硬件复杂性。OHCI类型的控制器自身提供一个更抽象的接口来
+      完成很多工作，从而更加独立。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72542288"></a>13.2.1. UHCI</h3></div></div></div><a id="idp72542928" class="indexterm"></a><p>UHCI主控器维护着带有1024个指向每帧数据结构的帧列表。
+        它理解两种不同的数据类型：传输描述符（TD）和队列头（QH）。每个
+	TD表示表示与设备端点进行通信的一个包。QH是将一些TD（和QH）划分
+	成组的一种方法。</p><p>每个传输由一个或多个包组成。UHCI驱动程序将大的传输分割成
+        多个包。除同步传输外，每个传输都会分配一个QH。对于每种类型的
+	传输，都有一个与此类型对应的QH，所有这些QH都会被集中到这个QH上。
+	由于有固定的时延需求，同步传输必须首先执行，它是通过帧列表中的
+	指针直接引用的。最后的同步TD传输引用那一帧的中断传输的QH。中断
+	传输的所有QH指向控制传输的QH，控制传输的QH又指向大块传输的QH。
+	下面的图表给出了一个图形概览：</p><p>这导致下面的调度会在每帧中运行。控制器从帧列表中取得当前帧
+        的指针后，首先为那一帧中的所有的同步(isochronous)包执行TD。
+        这些TD的最后一个
+	引用那一帧的中断传输的QH。然后主控器将从那个QH下行到各个
+	中断传输的QH。完成那一队列后，中断传输的QH会将控制器指向到所有
+	控制传输的QH。它将执行在那儿等待调度的所有子队列，然后是在大块QH中
+	排队的所有传输。为了方便处理已完成或失败的传输，硬件会在每帧末尾
+	产生不同类型的中断。在传输的最后一个TD中，HC驱动程序设置
+	Interrupt-On-Completion位来标记传输完成时的一个中断。如果TD达到了
+	其最大错误数，就标记错误中断。如果在TD中设置短包侦测位，且传输了
+	小于所设置的包长度（的包），就会标记此中断以通知控制器驱动程序传输
+        已完成。找出哪个传输已完成或产生错误是主控器驱动程序的任务。
+	当中断服务例程被调用时，它将定位所有已完成的传输并调用它们的回调。
+        </p><p>更详尽的描述请看 <a class="link" href="http://developer.intel.com/design/USB/UHCI11D.htm" target="_top">UHCI
+        specification。</a></p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72545872"></a>13.2.2. OHCI</h3></div></div></div><a id="idp72546512" class="indexterm"></a><p>对OHCI主控器进行编程要容易得多。控制器假设有一组端点(endpoint)可用，
+        并知道帧中不同传输类型的调度优先级和排序。主控器使用的主要
+	数据结构是端点描述符（ED），它上面连接着一个传输描述符（TD）的队列。
+	ED包含端点所允许的最大的包大小，控制器硬件完成包的分割。每次传输
+	后都会更新指向数据缓冲区的指针，当起始和终止指针相等时，TD就退归
+	到完成队列(done-queue)。四种类型的端点各有其自己的队列。控制和
+	大块(bulk)端点分别在它们自己的队列排队。中断ED在树中排队，在树中的深度
+	定义了它们运行的频度。</p><p>帧列表 中断 同步(isochronous) 控制 大块(bulk)</p><p>主控器在每帧中运行的调度看起来如下。控制器首先运行非
+        周期性控制和大块队列，最长可到HC驱动程序设置的一个时间限制。
+	然后以帧编号低5位作为中断ED树上深度为0的那一层中的索引，运行
+	那个帧编号的中断传输。在这个树的末尾，同步ED被连接，并随后被
+	遍历。同步TD包含了传输应当运行其中的第一个帧的帧编号。所有周期
+	性的传输运行过以后，控制和大块队列再次被遍历。中断服务例程会被
+	周期性地调用，来处理完成的队列，为每个传输调用回调，并重新调度
+	中断和同步端点。</p><p>更详尽的描述请看 <a class="link" href="http://www.compaq.com/productinfo/development/openhci.html" target="_top">
+        OHCI specification</a>。服务层，即中间层，提供了以可控的方式
+	对设备进行访问，并维护着由不同驱动程序和服务层所使用的资源。
+        此层处理下面几方面：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>设备配置信息</p></li><li class="listitem"><p>与设备进行通信的管道</p></li><li class="listitem"><p>探测和连接设备，以及从设备分离(detach)。
+  	  </p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="usb.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="usb.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="usb-dev.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 13 章 USB设备 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 13.3. USB设备信息</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

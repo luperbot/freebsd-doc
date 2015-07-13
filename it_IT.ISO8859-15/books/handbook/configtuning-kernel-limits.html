@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.13. Messa a Punto dei Limiti del Kernel</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="config-tuning.html" title="Capitolo 11. Configurazione e Messa a Punto" /><link rel="prev" href="configtuning-disk.html" title="11.12. Messa a Punto dei Dischi" /><link rel="next" href="adding-swap-space.html" title="11.14. Aggiunta di Spazio di Swap" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.13. Messa a Punto dei Limiti del Kernel</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="configtuning-disk.html">Indietro</a> </td><th width="60%" align="center">Capitolo 11. Configurazione e Messa a Punto</th><td width="20%" align="right"> <a accesskey="n" href="adding-swap-space.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="configtuning-kernel-limits"></a>11.13. Messa a Punto dei Limiti del Kernel</h2></div></div></div><a id="idp82978896" class="indexterm"></a><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="file-process-limits"></a>11.13.1. Limiti dei File/Processi</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kern-maxfiles"></a>11.13.1.1. <code class="varname">kern.maxfiles</code></h4></div></div></div><a id="idp82981840" class="indexterm"></a><p><code class="varname">kern.maxfiles</code> può essere aumentato o
+          abbassato a seconda dei requisiti del tuo sistema.  Questa variabile
+          indica il numero massimo di descrittori di file sul tuo sistema.
+          Quando la tabella dei descrittori di file è piena,
+          apparirà ripetutamente la scritta <span class="errorname">file: table is
+            full</span> nel buffer dei messaggi di sistema, che può
+          essere visualizzato con il comando <code class="command">dmesg</code>.</p><p>Ogni file, socket, o fifo aperta usa un descrittore di file.
+          Un server di produzione di larga scala può richiedere
+          facilmente molte migliaia di descrittori di file, in relazione al tipo
+          e al numero di servizi in esecuzione insieme.</p><p>Nelle vecchie release di FreeBSD, il valore predefinito
+          di <code class="varname">kern.maxfile</code> viene
+          dettato dall'opzione <code class="option">maxusers</code> nel file di
+          configurazione del kernel.  <code class="varname">kern.maxfiles</code> cresce
+          proporzionalmente al valore di <code class="option">maxusers</code>.  Quando si
+          compila un kernel personalizzato, è una buona idea impostare
+          questa opzione di configurazione del kernel in base agli usi del
+          proprio sistema.  Da questo numero, dipendono molti dei limiti
+          predefiniti del kernel.  Anche se una macchina in produzione potrebbe
+          non avere effettivamente 256 utenti connessi contemporaneamente, le
+          risorse necessarie potrebbero essere simili a quelle di un server web
+          su larga scala.</p><p>A partire da FreeBSD 4.5, <code class="varname">kern.maxusers</code>
+          è automaticamente dimensionato sulla base della memoria
+          disponibile nel sistema, e può essere determinato a run-time
+          leggendo il valore del sysctl read-only <code class="varname">kern.maxusers</code>.
+          Alcuni siti richiedono valori minori o maggiori di <code class="varname">kern.maxusers</code>
+          e questo può essere impostato come un parametro modificabile
+          dal loader; valori di 64, 128 o 256 non sono fuori dal comune.
+          Non raccomandiamo di andare oltre i 256 a meno che non si necessiti
+          di un numero esagerato di file descriptor; molti dei valori modificati
+          nel loro default da <code class="varname">kern.maxusers</code> possono essere
+          singolarmente sovrascritti a boot-time o a run-time in
+          <code class="filename">/boot/loader.conf</code> (leggi la pagina di manuale
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">loader.conf</span>(5)</span></a> o il file <code class="filename">/boot/defaults/loader.conf</code>
+          per alcuni suggerimenti) o come descritto altrove in questo documento.
+          Sistemi precedenti a FreeBSD 4.4 devono invece impostare questo valore
+          attraverso l'opzione di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=config&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">config</span>(8)</span></a> <code class="option">maxusers</code>.</p><p>Nelle release precedenti, il sistema setterà
+          in modo automatico <code class="literal">maxusers</code> se lo imposti a
+          <code class="literal">0</code><a href="#ftn.idp82996176" class="footnote" id="idp82996176"><sup class="footnote">[5]</sup></a>.
+          Quando usi quest'opzione, impostalo
+          almeno a 4, specialmente se stai usando il sistema a finestre X o se
+          compili software.  Questo è dovuto al fatto che la tabella
+          più importante settata da <code class="literal">maxusers</code> è
+          quella relativa al numero massimo di processi, risultato di
+          <code class="literal">20 + 16 * maxusers</code>, e quindi se setti
+          <code class="literal">maxusers</code> a 1, puoi avere solo 36 processi in modo
+          simultaneo, inclusi i 18 o più di avvio del sistema e i 15
+          o più che verranno creati all'avvio del sistema a finestre X.
+          Perfino una semplice attività come la lettura di una pagina
+          man avvia fino a 9 processi per filtrare, decomprimere, e visualizzare
+          la pagina.  Settando <code class="literal">maxusers</code> a 64 avrai fino a
+          1044 processi simultanei, che dovrebbero essere sufficienti per quasi
+          tutti gli utenti.  Ad ogni modo, se vedi il temuto errore
+          <span class="errortype">proc table full</span> quando tenti di avviare
+          un programma, o se stai usando un server con molti utenti simultanei
+          (come <code class="systemitem">ftp.FreeBSD.org</code>), puoi sempre
+          incrementare il numero e ricompilare.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="literal">maxusers</code> <span class="emphasis"><em>non</em></span>
+            limita il numero degli utenti che possono loggarsi sulla tua
+            macchina.  Semplicemente setta la dimensione di alcune tabelle
+            a un valore ragionevole considerando il numero massimo di
+            utenti che probabilmente avrai sul tuo sistema e quanti
+            processi ognuno di loro avranno in esecuzione.  Un'opzione
+            che limita il numero di login remoti simultanei e di terminali
+            windows è <a class="link" href="kernelconfig-config.html#kernelconfig-ptys"><code class="literal">pseudo-device pty
+              16</code></a>.  Con FreeBSD 5.X, non ti devi
+            preoccupare di questo numero poichè il driver
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pty&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">pty</span>(4)</span></a> è <span class="quote">«<span class="quote">auto-cloning</span>»</span>; semplicemente
+            usa la linea <code class="literal">device pty</code> nel tuo file di
+            configurazione.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83007824"></a>11.13.1.2. <code class="varname">kern.ipc.somaxconn</code></h4></div></div></div><a id="idp83008592" class="indexterm"></a><p>La variabile sysctl <code class="varname">kern.ipc.somaxconn</code>
+          limita la dimensione della coda in ascolto per le connessioni TCP.
+          Il valore predefinito è di <code class="literal">128</code>,
+          generalmente troppo basso per una gestione robusta di nuove
+          connessioni in ambienti come i web server molto carichi.  Per tali
+          ambienti, è consigliato aumentare questo valore a
+          <code class="literal">1024</code> o maggiore.  Il demone di servizio può
+          a sua volta limitare la dimensione della coda (e.g. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sendmail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sendmail</span>(8)</span></a>,
+          o <span class="application">Apache</span>) ma spesso avrà una
+          direttiva nel proprio file di configurazione per correggere la
+          dimensione della coda.  Grosse code di ascolto aiutano anche ad
+          evitare attacchi di tipo Denial of Service
+          (<abbr class="abbrev">DoS</abbr>).</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="nmbclusters"></a>11.13.2. Limiti di Rete</h3></div></div></div><p>L'opzione di configurazione del kernel <code class="option">NMBCLUSTERS</code>
+        decide la quantità di Mbuf di rete disponibili al sistema.
+        Un server molto trafficato con un numero basso di Mbuf
+        ostacolerebbe le possibilità di FreeBSD.  Ogni cluster
+        rappresenta approssimativamente 2 K di memoria, dunque un valore di
+        1024 rappresenta 2 megabyte di memoria del kernel riservata per i
+        buffer di rete.
+        Può essere effettuato un semplice calcolo per capire
+        quanti ne siano necessari.  Se hai un web server che arriva al massimo
+        a 1000 connessioni simultanee, ed ogni connessione consuma un buffer di
+        16 K in ricezione e un altro di 16 K in trasmissione, avrai
+        bisogno approssimativamente di 32 MB di buffer di rete per coprire
+        il web server.
+        Una buona regola generale è di moltiplicare per 2, dunque
+        2x32 MB / 2 KB =
+        64 MB / 2 KB = 32768.
+        Consigliamo valori compresi  tra
+        4096 e 32768 per macchine con grandi quantità di memoria.
+        In nessun caso dovreste specificare un valore alto arbitrario
+        per questo parametro, poichè potrebbe portare ad un crash
+        all'avvio.  L'opzione <code class="option">-m</code> di
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=netstat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">netstat</span>(1)</span></a> può essere usata per osservare l'uso della
+        rete.</p><p>L'opzione del loader
+        <code class="varname">kern.ipc.nmbclusters</code> può essere usata per
+        impostare questi valori all'avvio.  Solo versioni vecchie di FreeBSD
+        richiedono l'uso dell'opzione <code class="option">NMBCLUSTERS</code> come
+        configurazione del kernel (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=config&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">config</span>(8)</span></a>).</p><p>Per server sotto carico che fanno un uso massiccio della chiamata
+        di sistema <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sendfile&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">sendfile</span>(2)</span></a>, potrebbe essere necessario
+        aumentare il numero di buffer <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sendfile&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">sendfile</span>(2)</span></a> tramite l'opzione di
+        configurazione del kernel <code class="option">NSFBUFS</code> o impostando il suo
+        valore in <code class="filename">/boot/loader.conf</code>
+        (vedere <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a> per maggiori dettagli).  Un indicatore comune
+        che questo parametro deve essere corretto è la comparsa di
+        processi nello stato <span class="errorname">sfbufa</span>.  La variabile sysctl
+        <code class="varname">kern.ipc.nsfbufs</code> è solo un riferimento
+        read-only alla variabile configurata nel kernel.  Questo parametro
+        aumenta nominalmente con <code class="varname">kern.maxusers</code>,
+        in ogni caso potrebbe essere necessario effettuare piccole correzioni
+        per farli concordare.</p><div xmlns="" class="important"><h3 class="admontitle">Importante: </h3><p xmlns="http://www.w3.org/1999/xhtml">Anche se un socket è stato segnalato come non-bloccante,
+          richiamando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sendfile&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">sendfile</span>(2)</span></a> su di esso si potrebbe avere un blocco
+          della chiamata <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sendfile&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">sendfile</span>(2)</span></a> fino a quando non sono disponibili
+          delle <code class="literal">struct sf_buf</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83033296"></a>11.13.2.1. <code class="varname">net.inet.ip.portrange.*</code></h4></div></div></div><a id="idp83034064" class="indexterm"></a><p>La variabili sysctl <code class="varname">net.inet.ip.portrange.*</code>
+          controllano i numeri di porta automaticamente assegnate a socket TCP
+          ed UDP.  Ci sono tre intervalli: uno basso, uno predefinito,
+          ed uno alto.  La maggior parte dei programmi usa l'intervallo
+          predefinito che è controllato da
+          <code class="varname">net.inet.ip.portrange.first</code> e
+          <code class="varname">net.inet.ip.portrange.last</code>, che hanno valori
+          predefiniti di 1024 e 5000.  Questi intervalli sono usati per le
+          connessioni in uscita, ed è possibile che il sistema esaurisca
+          le porte in alcune circostanze.  Ciò accade per lo più
+          quando avete un web proxy molto carico.  L'intervallo di porte
+          non è un problema quando si usano server che abbiano
+          per lo più connessioni in ingresso, come i normali
+          web server, o un numero limitato di connessioni in
+          uscita, come i relay di posta.  Per situazioni
+          nelle quali potreste terminare le porte, è consigliato
+          aumentare leggermente <code class="varname">net.inet.ip.portrange.last</code>.
+          Un valore di <code class="literal">10000</code>, <code class="literal">20000</code> o
+          <code class="literal">30000</code> può essere ragionevole.
+          Dovreste anche considerare gli effetti relativi ad un firewall
+          nel cambiare il range di porte.  Alcuni
+          firewall potrebbero bloccare grandi intervalli di porte (tipicamente
+          le porte basse) ed aspettarsi che i sistemi usino porte più
+          alte per le connessioni in uscita - per questa ragione si
+          consiglia di non abbassare il valore di
+          <code class="varname">net.inet.ip.portrange.first</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83038160"></a>11.13.2.2. Prodotto del Ritardo di Banda TCP</h4></div></div></div><a id="idp83043024" class="indexterm"></a><p>Il limite del Prodotto del Ritardo di Banda TCP è simile a
+          TCP/Vegas in NetBSD.  Può
+          essere abilitato impostando la variabile sysctl
+          <code class="varname">net.inet.tcp.inflight_enable</code>
+          ad <code class="literal">1</code>.  Il sistema tenterà di
+          calcolare il prodotto del ritardo di banda per ogni connessione
+          e limiterà l'ammontare di dati accodati per la trasmissione su
+          rete al livello migliore per garantire il massimo throughput.</p><p>Questa funzionalità è utile quando si inviano dati
+          su modem multipli, su Ethernet Gigabit, o su collegamenti WAN ad alta
+          velocità (o qualsiasi altro  collegamento con un alto prodotto
+          a banda di ritardo), in particolar modo se state usando anche il
+          window scaling o se avete configurato una finestra TCP molto ampia.
+          Se abilitate questa opzione, dovreste anche assicurarvi di impostare
+          a <code class="literal">0</code> <code class="varname">net.inet.tcp.inflight_debug</code>
+          (per disabilitare il debugging), e per un uso di produzione
+          può essere utile impostare
+          <code class="varname">net.inet.tcp.inflight_min</code> ad almeno
+          <code class="literal">6144</code>.  Notate comunque che
+          impostando dei livelli minimi alti può in pratica disabilitare
+          la limitazione di banda, su alcuni tipi di collegamento.
+          La funzionalità di limitazione della banda riduce la
+          quantità di dati creati in rotte intermedie
+          e fa circolare le code di pacchetti così come riduce la
+          quantità di dati creati nella coda di interfaccia dell'host
+          locale.  Con meno pacchetti accodati, le connessioni interattive,
+          specialmente sopra modem lenti, opereranno con lenti
+          <span class="emphasis"><em>Round Trip Times</em></span> (tempi di andata e ritorno).
+          Comunque, nota che questa feature ha effetto solo sulla trasmissione
+          dati (uploading / lato server).  Non ha effetto sulla ricezione
+          (downloading).</p><p>Modificare <code class="varname">net.inet.tcp.inflight.stab</code> non
+          è raccomandato.
+          Questo parametro è di default a 20, rappresentando
+          2 pacchetti massimi aggiunti al ritardo del prodotto della banda
+          della finestra.  La finestra addizionale è richiesta per
+          stabilizzare l'algoritmo e migliorare la risposta alle condizioni che
+          cambiano ma può risultare in tempi lunghi sui ping
+          sopra link lenti (anche se molto più lento di quello che
+          otterresti senza l'algoritmo di inflight).  In questi casi, puoi voler
+          ridurre questo parametro a 15, 10 o 5; e puoi anche ridurre
+          <code class="varname">net.inet.tcp.inflight.min</code> (per esempio, a 3500)
+          per ottenere l'effetto desiderato.  Ridurre questi parametri
+          dovrebbe essere fatto solo come ultima spiaggia.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83049168"></a>11.13.3. Memoria Virtuale</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83049808"></a>11.13.3.1. <code class="varname">kern.maxvnodes</code></h4></div></div></div><p>Un vnode è la rappresentazione di un file o una directory.
+          Aumentare il numero di vnodi disponibili sul sistema
+          operativo aumenterà l'I/O di disco.  Normalmente questo viene
+          gestito dal sistema operativo e non deve essere cambiato.
+          In pochi casi dove l'I/O di disco
+          è un collo di bottiglia ed il sistema sta finendo i suoi vnodi,
+          questo parametro sarà aumentato.  L'aumento di RAM libera ed
+          inattiva sarà tenuto in conto.</p><p>Per vedere il numero corrente di vnodi in uso:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl vfs.numvnodes</code></strong>
+vfs.numvnodes: 91349</pre><p>Per vedere il numero massimo di vnodi:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl kern.maxvnodes</code></strong>
+kern.maxvnodes: 100000</pre><p>Se l'uso del nodo corrente è vicino alla fine,
+          aumentare <code class="varname">kern.maxvnodes</code> di un valore di 1.000
+          è probabilmente una buona idea.  Tenete un occhio sul numero
+          di <code class="varname">vfs.numvnodes</code>.  Se scala al massimo,
+          <code class="varname">kern.maxvnodes</code> dovrà essere incrementato
+          ancora.  Dovrebbe essere visibile con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=top&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">top</span>(1)</span></a>
+          uno spostamento nell'uso della memoria.  Molta memoria dovrebbe essere
+          attiva.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp82996176" class="footnote"><p><a href="#idp82996176" class="para"><sup class="para">[5] </sup></a>L'algoritmo di impostazione automatica setta
+          <code class="literal">maxusers</code> pari alla quantità della
+          memoria del sistema, con un minimo di 32, fino a un massimo
+          di 384.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="configtuning-disk.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="config-tuning.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="adding-swap-space.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">11.12. Messa a Punto dei Dischi </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 11.14. Aggiunta di Spazio di Swap</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

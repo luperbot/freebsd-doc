@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     The FreeBSD Documentation Project
+     The FreeBSD Chinese (Traditional) Documentation Project
+
+     Original Revision: 1.5
+
+-->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="zh_tw">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">遠端安裝 FreeBSD 作業系統而不必接 Remote Console</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Daniel</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Gerzo</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">danger@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD 是 FreeBSD基金會的註冊商標</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">許多製造商和經銷商使用一些稱為商標的圖案或文字設計來彰顯自己的產品。
+  本文中出現的眾多商標，以及 FreeBSD Project 本身廣所人知的商標，後面將以 '™' 或 '®' 符號來標註。</para>
+    </legalnotice>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2008</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD Documentation Project</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">本文介紹如何在沒辦法連到遠端 console 的機器做 FreeBSD 遠端安裝。
+	本文構想來自於作者與 Martin Matuska 的合作成果，
+	以及 Pawel Jakub Dawidek 所投注的諸多心血。</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="background">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">緣起</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">世上有許多 server hosting provider，但其中有官方支援 FreeBSD
+      則不是相當多。  他們通常會在所提供的機器上有 <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark> distribution
+      的安裝支援。</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">有些會讓您可選擇喜好的 <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark> distribution 來裝，
+      像這種情況就可以試著安裝 FreeBSD。  而有些則是會提供救急用的系統，
+      這種也可以用來安裝 FreeBSD。</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">本文介紹這些遠端基本安裝 FreeBSD 的方式，以及 RAID-1 與
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> 設定步驟。</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="intro">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">介紹</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">茲摘錄一下本文的目的以及闡述這邊所涵蓋的東西。
+      對於無官方支援 FreeBSD 的代管服務(colocation)用戶而言，
+      本文中所介紹到的指令會相當有用。</para>
+
+    <procedure xmlns:xlink="http://www.w3.org/1999/xlink">
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">正如先前 <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="background">緣起</link> 所提到的，許多名聲還不賴的
+	  server hosting 公司會提供一些救急用系統，可以透過
+	  <acronym xmlns:xlink="http://www.w3.org/1999/xlink">LAN</acronym> 方式開機，也可以透過
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> 方式進行管理。  通常會有該加值服務，
+	  以讓他們的客戶可以連進來修復有問題的作業系統。
+	  本節之後將介紹如何透過救急系統來安裝 FreeBSD。</para>
+	<!-- XXXTR: Solaris has a restore command, something like
+	  sysrestore, FreeBSD Should have one too. -->
+      </step>
+
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">下一節會介紹如何在本機設定以及打造最小巧的 FreeBSD ——
+	  該版最後會在遠端機器上透過 ramdisk 方式啟動，並以
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 從 <acronym xmlns:xlink="http://www.w3.org/1999/xlink">FTP</acronym>
+	  mirror 站來安裝完整的 FreeBSD 作業系統。</para>
+      </step>
+
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">本文其餘部分將介紹安裝程序，以及 <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application>
+	  檔案系統的設定。</para>
+      </step>
+    </procedure>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="requirements">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">需求</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">為了成功完成遠端安裝，必須要有：</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">要有可以上網的作業系統，並且 <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application>
+	    可以連線。</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">瞭解 FreeBSD 的安裝程序</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">熟悉如何使用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">有 FreeBSD 安裝光碟片或者 <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym> image 檔</para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="preparation">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">準備 - <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application></title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">在裝 FreeBSD 之前，要先打造最小化的 FreeBSD 作業系統 image 檔，
+      以便可以從硬碟上開機。  如此一來，新的系統就可以透過網路來操作，
+      而剩下來的安裝部分即可不必透過 console。</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">而 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 這套工具就是用來打造小型的
+      FreeBSD image 檔。  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> (名字其中
+      <quote xmlns:xlink="http://www.w3.org/1999/xlink">mfs</quote> 就是 <quote xmlns:xlink="http://www.w3.org/1999/xlink">memory file system</quote>)所建造出來的
+      整套系統會透過 ramdisk 方式來運作。  由於此一特色，硬碟的部分就不受限，
+      因此可以用來安裝完整的 FreeBSD 作業系統。  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>
+      的首頁位於 <uri xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://people.freebsd.org/~mm/mfsbsd/">http://people.freebsd.org/~mm/mfsbsd/</uri>，
+      其中連結有該工具的最新 release 部分。</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">請注意：<application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 內部運作方式的細節，不
+      在本文介紹範圍之內。  若對這方面有興趣的讀者，可至
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 官網查閱相關文件。</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">首先下載最新的 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 並解壓縮之，
+      然後切到解壓縮後的工作目錄，也就是 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>
+      script 檔所在處：</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fetch http://people.freebsd.org/~mm/mfsbsd/mfsbsd-latest.tar.gz</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tar xvzf mfsbsd-1.0-beta1.tar.gz</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd mfsbsd-1.0-beta1/</userinput></screen>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="mfsbsd-config">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">設定 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">在將 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 開機之前，
+	有幾個重要設定要先設妥。  此時最重要的設定，很明顯就是網路設定。
+	到底網路怎麼設最好，則取決於所處的網路環境，
+	以及該網路卡會以哪一種驅動程式載入而定。  我們將會看到
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 如何在任何網路情況下進行設定。</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">另一件重要事就是設定 <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> 密碼。
+	這點可以透過 <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rootpw.conf</filename> 來完成。
+	請切記：該檔密碼是以明文方式存放，因此不建議放真正平常有在用的密碼。
+	然而這密碼只是臨時密碼而已，可以在之後開機時再做更換。</para>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">設定網路(<filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/interfaces.conf</filename> 方式)</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">若對要裝的機器網卡為何還不知道是哪一款，但可以善加利用
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 的自動偵測功能。
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 的開機 script 會根據網卡的 MAC
+	  位址範圍來偵測正確的驅動程式，像是下列的
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/interfaces.conf</filename> 設定內容：</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">initconf_interfaces="ext1"
+initconf_mac_ext1="00:00:00:00:00:00"
+initconf_ip_ext1="192.168.0.2"
+initconf_netmask_ext1="255.255.255.0"</programlisting>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">別忘了在 <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename> 內要加上
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">defaultrouter</literal> 的相關設定：</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">defaultrouter="192.168.0.1"</programlisting>
+      </sect3>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">設定網路(<filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename> 方式)</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">若已經知道網卡是哪一種，那麼要設定網路的話直接改
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename> 會比較方便。
+	  該檔設定語法與 FreeBSD 標準的 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> 是一致的。</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">舉個例子，若知道該機器網卡是用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">re</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry>，那麼就在
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename> 做下列類似設定：</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">defaultrouter="192.168.0.1"
+ifconfig_re0="inet 192.168.0.2 netmask 255.255.255.0"</programlisting>
+      </sect3>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="mfsbsd-build">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">打造 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> image</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">打造 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>
+	image 檔的過程相當簡單。</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">首先是把 FreeBSD 安裝光碟或者安裝用的 <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym> image
+	檔丟到 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/cdrom</filename>。
+	為維持所有例子的一致，本文假設都是用 FreeBSD 7.0-RELEASE
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym>。  而把 ISO image 檔掛載到 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/cdrom</filename> 目錄相當簡單，
+	就是用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">mdconfig</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mdconfig -a -t vnode -u 10 -f 7.0-RELEASE-amd64-disc1.iso</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount_cd9660 /dev/md10 /cdrom</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">接著就開始打造可開機的 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>
+	image：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">make BASE=/cdrom/7.0-RELEASE</userinput></screen>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">上述的 <command xmlns:xlink="http://www.w3.org/1999/xlink">make</command> 指令要在
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 的最上層目錄執行，比方說 <filename xmlns:xlink="http://www.w3.org/1999/xlink">~/mfsbsd-1.0-beta1/</filename>。</para>
+      </note>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink"><application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 開動</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">現在 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> image 已經備妥，
+	要上傳到遠端機器的救急系統或者預先安裝的 <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark> distribution。
+	要完成這工作最適合的工具就是 <application xmlns:xlink="http://www.w3.org/1999/xlink">scp</application>：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">scp disk.img root@192.168.0.2:.</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">為了能順利啟動 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> image，
+	要把檔案放在欲安裝機器的第一顆(可開機)硬碟上。
+	假設例子的第一顆開機硬碟代號為 <filename xmlns:xlink="http://www.w3.org/1999/xlink">sda</filename>，
+	那麼作法就類似下面這樣：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">dd if=/root/disk.img of=/dev/sda bs=1m</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">若一切順利，該 image 檔現在應該會在第一顆硬碟的
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">MBR</acronym> 磁區並可以開始進行重開機了。  可以用
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ping</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 工具來檢測該機器開機完畢與否。  一旦 ping 到之後，
+	就可以透過 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> 連進去，並且用 <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem>
+	以及剛設定的密碼登入。</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="installation">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD 作業系統的安裝</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">現在 <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> 已順利啟動，並且應該可以透過
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> 方式來連。  本節將介紹如何建立 slice 分割、設定
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</application> 以作 RAID-1、如何以
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 來安裝 FreeBSD
+      作業系統的最小化安裝。</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">準備硬碟</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">首先要作的是配置硬碟空間給 FreeBSD，像是建立 slice 跟分割區。
+	很明顯地，目前在跑的作業系統是載入到系統記憶體內執行，
+	因此要對硬碟配置並無任何問題。  這些工作可以用
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 或者以 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">fdisk</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 搭配
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 來完成。</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">首先先把各硬碟都先清空。  請對各硬碟作下列指令：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">dd if=/dev/zero of=/dev/ad0 count=2</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">接著，以您慣用的工具來建立 slice 以及設定 label。  通常會建議以
+	的 <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 工具來作會比較輕鬆，
+	或者是強而又不太會出槌的文字介面 <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">UNIX</trademark> 標準工具(像是 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">fdisk</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>,
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>)，這部分稍後也會一併介紹。  前者部分在 FreeBSD Handbook
+	的 <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/zh_TW.UTF-8/books/handbook/install-steps.html">安裝
+	FreeBSD</link> 章節有相當詳盡的介紹，所以這邊主要要介紹的是如何建立
+	RAID-1 系統以及 <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application>。
+	這邊會介紹建立以 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 做成的小型 mirrored 檔案系統：
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/</filename> (根目錄), <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> 以及 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>，而硬碟的其餘剩餘空間則通通以
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">zpool</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 做成 <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> 的 mirrored 檔案系統
+	。  請注意：必須要先把 FreeBSD 作業系統裝好並開完機後，才能進行設定
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> 檔案系統。</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">下面的例子會介紹如何建立 slice 以及 label、在每個分割區上啟用
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>、如何在每個 mirrored 分割區上建立
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">UFS2</application> 檔案系統：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fdisk -BI /dev/ad0</userinput> <co xml:id="fdisk"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fdisk -BI /dev/ad1</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel -wB /dev/ad0s1</userinput> <co xml:id="bsdlabel-writing"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel -wB /dev/ad1s1</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel -e /dev/ad0s1</userinput> <co xml:id="bsdlabel-editing"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel /dev/ad0s1 &gt; /tmp/bsdlabel.txt &amp;&amp; bsdlabel -R /dev/ad1s1 /tmp/bsdlabel.txt</userinput> <co xml:id="bsdlabel-restore"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label root /dev/ad[01]s1a</userinput> <co xml:id="gmirror1"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label var /dev/ad[01]s1d</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label usr /dev/ad[01]s1e</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label -F swap /dev/ad[01]s1b</userinput> <co xml:id="gmirror2"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs /dev/mirror/root</userinput> <co xml:id="newfs"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs /dev/mirror/var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs /dev/mirror/usr</userinput></screen>
+
+      <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<callout arearefs="fdisk">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">對該硬碟建立 slice 並且在第零軌處將開機表作初始。
+	    請對該機器所有硬碟都作此一動作。</para>
+	</callout>
+
+	<callout arearefs="bsdlabel-writing">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">對各硬碟寫入 label 以及 bootstrap 碼。</para>
+	</callout>
+
+	<callout arearefs="bsdlabel-editing">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">現在手動修改該硬碟的 label，至於如何建立分割區(partitions)
+	    請參閱 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 說明。
+	    分割區分別建立：<literal xmlns:xlink="http://www.w3.org/1999/xlink">a</literal> 是給 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/</filename> (根目錄)，
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">b</literal> 給 swap，
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">d</literal> 給 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>，
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">e</literal> 給 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename>，
+	    最後，會在稍後步驟把 <literal xmlns:xlink="http://www.w3.org/1999/xlink">f</literal> 給
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> 使用。</para>
+	</callout>
+
+	<callout arearefs="bsdlabel-restore">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">把剛剛的 label 設定先匯出，再匯入到第二顆硬碟上，
+		如此一來兩邊的硬碟 label 設定就會同樣。</para>
+	</callout>
+
+	<callout arearefs="gmirror1">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">在各分割區上啟用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></para>
+	</callout>
+
+	<callout arearefs="gmirror2">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">請注意：<option xmlns:xlink="http://www.w3.org/1999/xlink">-F</option> 選項是用在 swap 上。
+	    這參數會讓 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 認為該硬體是處於可靠狀態，
+	    即使發生電源故障或系統當掉，也不會去同步。</para>
+	</callout>
+
+	<callout arearefs="newfs">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">在各個有做 mirror 的分割區上建立 <application xmlns:xlink="http://www.w3.org/1999/xlink">UFS2</application>
+	    檔案系統</para>
+        </callout>
+      </calloutlist>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">系統安裝</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">這裡是最重要的一環，
+	本節介紹實際上如何在先前一節所做好的硬碟安裝最小化的 FreeBSD，
+	為了完成此一目標，所有檔案系統都必須掛載妥當，才能讓
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 可以把 FreeBSD 裝到硬碟內：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount /dev/mirror/root /mnt</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir /mnt/var /mnt/usr</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount /dev/mirror/var /mnt/var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount /dev/mirror/usr /mnt/usr</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">做完上述動作之後，請執行 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>。  請從主選單中選擇
+	<guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Custom</guimenuitem> 安裝，選
+	<guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Options</guimenuitem> 按 <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap>。
+	然後以方向鍵移動到 <literal xmlns:xlink="http://www.w3.org/1999/xlink">Install Root</literal> 處，按
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">Space</keycap> 鍵然後改為 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/mnt</filename>，再按 <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap>
+	鍵以將修改值存起來，然後按 <keycap xmlns:xlink="http://www.w3.org/1999/xlink">q</keycap> 鍵即可離開這個
+	<guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Options</guimenuitem> 畫面。</para>
+
+      <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">請注意：本步驟極為重要，若忽略的話那麼
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 就沒辦法安裝 FreeBSD。</para>
+      </warning>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">接著選 <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Distributions</guimenuitem>，然後移動游標到
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">Minimal</option> 處，按 <keycap xmlns:xlink="http://www.w3.org/1999/xlink">Space</keycap> 鍵。
+	本文之所以介紹最小化安裝是為了要節省網路流量，因為系統安裝是透過
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">ftp</application> 方式來進行。  要離開本畫面，請選
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">Exit</option> 即可。</para>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">至於 <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Partition</guimenuitem> 及
+	  <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Label</guimenuitem> 步驟則可略過，
+	  因為這些目前已經都設定完畢了。</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">在 <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Media</guimenuitem> 選單中請選
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">FTP</option>。  請選最近的 mirror 站，並且讓
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> 假設網路已經設妥。
+	接下來就會回到 <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Custom</guimenuitem> 選單。</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">最後，按下 <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Commit</guimenuitem> 即可開始進行安裝。
+	完成安裝後，即可離開 <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>。</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">後續安裝步驟</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">此時 FreeBSD 作業系統應該已經裝完，然而還有些後續流程要做。
+	必須要做一些後續設定，才能讓 FreeBSD 可以開機跟登入。</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">現在必須要用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">chroot</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 以切到剛剛新裝好的系統內。
+	指令如下：</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">chroot /mnt</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">然後再打下列指令以繼續完成：</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">把 <literal xmlns:xlink="http://www.w3.org/1999/xlink">GENERIC</literal> kernel 複製到
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/kernel</filename>
+	    目錄：</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cp -Rp /boot/GENERIC/* /boot/kernel</userinput></screen>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">建立 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>,
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/resolv.conf</filename> 及
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> 檔案。  別忘了，要記得在
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename> 檔設相關網路設定，以及把
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">sshd</application> 啟用。  此外，
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> 檔應該會長像下面這樣：</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/mirror/swap        none            swap    sw              0       0
+/dev/mirror/root        /               ufs     rw              1       1
+/dev/mirror/usr         /usr            ufs     rw              2       2
+/dev/mirror/var         /var            ufs     rw              2       2
+/dev/cd0                /cdrom          cd9660  ro,noauto       0       0</programlisting>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">新增 <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> 檔，
+	    並且內容填入下列：</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">geom_mirror_load="YES"
+zfs_load="YES"</programlisting>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">執行下列指令，以在下次開機時啟用 <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application>
+	    ：</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">echo 'zfs_enable="YES"' &gt;&gt; /etc/rc.conf </userinput></screen>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">使用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">adduser</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 工具來新增其他使用者帳號。  別忘了，
+	    至少要有一個帳號得加入 <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="groupname">wheel</systemitem> 群組，
+	    才能在重開機後以該帳號切換為 root。</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">再次檢查上述相關的設定，是否有遺漏或打錯。</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">現在該系統終於可以重開機了，請用 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">reboot</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	指令以重開機。</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="zfs">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">系統重開機完畢之後，應該就可以登入了。  歡迎使用全新的 FreeBSD 安裝方式，
+      完全透過遠端而不必接上 remote console！</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">接下來只剩要調整 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">zpool</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 以及建立 <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">zfs</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> 檔案系統而已。
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> 的建立及管理是相當淺顯易懂。  首先，
+      建立 mirrored pool：</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zpool create tank mirror /dev/ad[01]s1f</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">接著，建立檔案系統：</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs create tank/ports</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs create tank/src</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set compression=gzip tank/ports</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set compression=on tank/src</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set mountpoint=/usr/ports tank/ports</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set mountpoint=/usr/src tank/src</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">一切就是這樣簡單。  若對 FreeBSD 上的 <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application>
+      細節部分有興趣，請參閱 FreeBSD Wiki 上的 <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://wiki.freebsd.org/ZFS">ZFS</link> 一節說明。</para>
+  </sect1>
+</article>

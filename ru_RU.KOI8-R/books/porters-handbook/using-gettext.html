@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>6.6. Использование GNU gettext</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD по созданию портов" /><link rel="up" href="special.html" title="Глава 6. Особые соглашения" /><link rel="prev" href="using-autotools.html" title="6.5. Использование GNU Autotools" /><link rel="next" href="using-perl.html" title="6.7. Использование Perl" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6.6. Использование GNU <code class="literal">gettext</code></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="using-autotools.html">Пред.</a> </td><th width="60%" align="center">Глава 6. Особые соглашения</th><td width="20%" align="right"> <a accesskey="n" href="using-perl.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="using-gettext"></a>6.6. Использование GNU <code class="literal">gettext</code></h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77314000"></a>6.6.1. Простой вариант использования</h3></div></div></div><p>Если для вашего порта требуется
+	<code class="literal">gettext</code>, добавьте
+	<code class="literal">USES= gettext</code>, и ваш порт унаследует
+	зависимость от <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/devel/gettext/pkg-descr">devel/gettext</a>.
+	<a class="xref" href="appendices.html#uses-values" title="15.1. Значения USES">Раздел 15.1, <<Значения <code class="varname">USES</code>>></a> содержит перечень других
+	значений для использования <code class="literal">gettext</code>.</p><p>Довольно распространенным случаем является использование
+	в порте <code class="literal">gettext</code> и
+	<code class="command">configure</code>.  Как правило, GNU
+	<code class="command">configure</code> способен находить
+	<code class="literal">gettext</code> автоматически.  Если он все же не
+	сможет это сделать, то подсказки для размещения
+	<code class="literal">gettext</code> можно передать через переменные
+	окружения <code class="envar">CPPFLAGS</code> и
+	<code class="envar">LDFLAGS</code>:</p><pre class="programlisting">USES=	gettext
+CPPFLAGS+=	-I${LOCALBASE}/include
+LDFLAGS+=	-L${LOCALBASE}/lib
+
+GNU_CONFIGURE=	yes</pre><p>Конечно же, этот код можно записать в более компактном
+	виде, если передавать флаги в <code class="command">configure</code> не
+	требуется:</p><pre class="programlisting">USES=	gettext
+GNU_CONFIGURE=	yes</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77322064"></a>6.6.2. Оптимальное использование</h3></div></div></div><p>Некоторые программные продукты позволяют отключать NLS,
+	к примеру, передавая параметр <code class="option">--disable-nls</code>
+	сценарию <code class="command">configure</code>.  В этом случае ваш
+	порт должен использовать <code class="literal">gettext</code>, в
+	зависимости от значения <code class="varname">NLS</code>.  Для портов
+	небольшой или средней сложности вы можете полагаться на
+	следующую идиому:</p><pre class="programlisting">GNU_CONFIGURE=	yes
+
+.include &lt;bsd.port.options.mk&gt;
+
+.if ${PORT_OPTIONS:MNLS}
+USES+=			gettext
+PLIST_SUB+=		NLS=""
+.else
+CONFIGURE_ARGS+=	--disable-nls
+PLIST_SUB+=		NLS="@comment "
+.endif
+
+.include &lt;bsd.port.mk&gt;</pre><p>Следующий пункт в вашем списке дел разобраться, чтобы
+	файлы каталога сообщения включались в список упаковки по
+	условию.  Часть, входящая в <code class="filename">Makefile</code>,
+	уже обеспечена этой идиомой.  Остальное объясняется в главе
+	<a class="link" href="plist.html#plist-sub" title="7.1. Изменение содержимого pkg-plist в зависимости от make-переменных">продвинутые практики
+	  <code class="filename">pkg-plist</code></a>.  Вкратце, каждое
+	вхождение <code class="literal">%%NLS%%</code> в
+	<code class="filename">pkg-plist</code> будет заменено на
+	<span class="quote"><<<span class="quote"><code class="literal">@comment </code></span>>></span>, если NLS
+	выключен, или пустой строкой, если включен.  В результате
+	строки, предваряемые <code class="literal">%%NLS%%</code>, станут
+	комментариями в итоговом листе упаковки, если NLS выключен;
+	иначе, префикс будет просто удален.  Всё, что вам нужно, это
+	вставить <code class="literal">%%NLS%%</code> перед каждым путем к
+	файлу каталога сообщений в <code class="filename">pkg-plist</code>.
+	Например:</p><pre class="programlisting">%%NLS%%share/locale/fr/LC_MESSAGES/foobar.mo
+%%NLS%%share/locale/no/LC_MESSAGES/foobar.mo</pre><p>В особо сложных случаях вам понадобиться использовать
+	более продвинутые техники, чем данный рецепт, такие как <a class="link" href="plist-dynamic.html" title="7.4. Динамический или статический список упаковки">динамические списки
+	  упаковки</a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77334608"></a>6.6.3. Управление каталогами сообщений</h3></div></div></div><p>Существует момент, который следует учитывать при
+	установке файлов каталогов сообщений.  Целевые каталоги для
+	размещения, расположенные под
+	<code class="filename">LOCALBASE/share/locale</code>, редко когда
+	должны создаваться и удаляться портом.  Для наиболее
+	популярных языков имеются собственные каталоги, перечисленные
+	в <code class="filename">PORTSDIR/Templates/BSD.local.dist</code>.
+	Каталоги для множества других языков управляются с помощью
+	порта <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/devel/gettext/pkg-descr">devel/gettext</a>.  Обратите
+	внимание на его <code class="filename">pkg-plist</code> и посмотрите,
+	куда данный порт собирается установить файлы каталогов
+	сообщений для единственного в своем роде языка.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="using-autotools.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="special.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="using-perl.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">6.5. Использование GNU Autotools </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 6.7. Использование <span class="application">Perl</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

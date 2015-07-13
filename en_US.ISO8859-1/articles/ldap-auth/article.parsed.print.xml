@@ -1,0 +1,938 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info>
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">LDAP Authentication</title>
+
+    <authorgroup xmlns:xlink="http://www.w3.org/1999/xlink">
+      <author xmlns:xlink="http://www.w3.org/1999/xlink">
+	<personname xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <firstname xmlns:xlink="http://www.w3.org/1999/xlink">Toby</firstname>
+	  <surname xmlns:xlink="http://www.w3.org/1999/xlink">Burress</surname>
+	</personname>
+	<affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <address xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <email xmlns:xlink="http://www.w3.org/1999/xlink">kurin@causa-sui.net</email>
+	  </address>
+	</affiliation>
+      </author>
+    </authorgroup>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2007</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2008</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD Documentation Project</holder>
+    </copyright>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <quote xmlns:xlink="http://www.w3.org/1999/xlink">&#8482;</quote> or the
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">®</quote> symbol.</para>
+    </legalnotice>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This document is intended as a guide for the configuration
+	of an LDAP server (principally an
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> server) for authentication
+	on FreeBSD.  This is useful for situations where many servers
+	need the same user accounts, for example as a replacement for
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">NIS</application>.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="preface">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Preface</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This document is intended to give the reader enough of an
+      understanding of LDAP to configure an LDAP server.  This
+      document will attempt to provide an explanation of
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">net/nss_ldap</package> and
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package> for use with client
+      machines services for use with the LDAP server.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">When finished, the reader should be able to configure and
+      deploy a FreeBSD server that can host an LDAP directory, and to
+      configure and deploy a FreeBSD server which can authenticate
+      against an LDAP directory.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This article is not intended to be an exhaustive account of
+      the security, robustness, or best practice considerations for
+      configuring LDAP or the other services discussed herein.  While
+      the author takes care to do everything correctly, they do not
+      address security issues beyond a general scope.  This article
+      should be considered to lay the theoretical groundwork only, and
+      any actual implementation should be accompanied by careful
+      requirement analysis.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ldap">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Configuring LDAP</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">LDAP stands for <quote xmlns:xlink="http://www.w3.org/1999/xlink">Lightweight Directory Access
+	Protocol</quote> and is a subset of the X.500 Directory Access
+      Protocol.  Its most recent specifications are in <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.ietf.org/rfc/rfc4510.txt">RFC4510</link>
+      and friends.  Essentially it is a database that expects to be
+      read from more often than it is written to.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The LDAP server <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.openldap.org/">OpenLDAP</link> will be
+      used in the examples in this document; while the principles here
+      should be generally applicable to many different servers, most
+      of the concrete administration is
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>-specific.  There are several
+      server versions in ports, for example
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">net/openldap24-server</package>.  Client servers will
+      need the corresponding <package xmlns:xlink="http://www.w3.org/1999/xlink">net/openldap24-client</package>
+      libraries.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There are (basically) two areas of the LDAP service which
+      need configuration.  The first is setting up a server to receive
+      connections properly, and the second is adding entries to the
+      server's directory so that FreeBSD tools know how to interact with
+      it.</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ldap-connect">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Setting Up the Server for Connections</title>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This section is specific to
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>.  If you are using
+	  another server, you will need to consult that server's
+	  documentation.</para>
+      </note>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ldap-connect-install">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Installing <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application></title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">First, install
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>:</para>
+
+	<example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="oldap-install">
+	  <title xmlns:xlink="http://www.w3.org/1999/xlink">Installing
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application></title>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /usr/ports/net/openldap24-server</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> make install clean</screen>
+	</example>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This installs the <command xmlns:xlink="http://www.w3.org/1999/xlink">slapd</command> and
+	  <command xmlns:xlink="http://www.w3.org/1999/xlink">slurpd</command> binaries, along with the required
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> libraries.</para>
+      </sect3>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ldap-connect-config">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Configuring <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application></title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Next we must configure
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">You will want to require encryption in your connections
+	  to the LDAP server; otherwise your users' passwords will be
+	  transferred in plain text, which is considered insecure.
+	  The tools we will be using support two very similar kinds of
+	  encryption, SSL and TLS.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">TLS stands for <quote xmlns:xlink="http://www.w3.org/1999/xlink">Transportation Layer
+	    Security</quote>.  Services that employ TLS tend to
+	  connect on the <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">same</emphasis> ports as the same
+	  services without TLS; thus an SMTP server which supports TLS
+	  will listen for connections on port 25, and an LDAP server
+	  will listen on 389.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">SSL stands for <quote xmlns:xlink="http://www.w3.org/1999/xlink">Secure Sockets Layer</quote>, and
+	  services that implement SSL do <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">not</emphasis>
+	  listen on the same ports as their non-SSL counterparts.
+	  Thus SMTPS listens on port 465 (not 25), HTTPS listens on
+	  443, and LDAPS on 636.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The reason SSL uses a different port than TLS is because
+	  a TLS connection begins as plain text, and switches to
+	  encrypted traffic after the <literal xmlns:xlink="http://www.w3.org/1999/xlink">STARTTLS</literal>
+	  directive.  SSL connections are encrypted from the
+	  beginning.  Other than that there are no substantial
+	  differences between the two.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">We will adjust <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> to
+	    use TLS, as SSL is considered deprecated.</para>
+	</note>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Once <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> is installed
+	  via ports, the following configuration parameters in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/openldap/slapd.conf</filename> will
+	  enable TLS:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">security ssf=128
+
+TLSCertificateFile /path/to/your/cert.crt
+TLSCertificateKeyFile /path/to/your/cert.key
+TLSCACertificateFile /path/to/your/cacert.crt</programlisting>
+
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Here, <literal xmlns:xlink="http://www.w3.org/1999/xlink">ssf=128</literal> tells
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> to require 128-bit
+	  encryption for all connections, both search and update.
+	  This parameter may be configured based on the security needs
+	  of your site, but rarely you need to weaken it, as most LDAP
+	  client libraries support strong encryption.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The <filename xmlns:xlink="http://www.w3.org/1999/xlink">cert.crt</filename>,
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">cert.key</filename>, and
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">cacert.crt</filename> files are necessary for
+	  clients to authenticate <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">you</emphasis> as the
+	  valid LDAP server.  If you simply want a server that runs,
+	  you can create a self-signed certificate with
+	  OpenSSL:</para>
+
+	<example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="genrsa">
+	  <title xmlns:xlink="http://www.w3.org/1999/xlink">Generating an RSA Key</title>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl genrsa -out cert.key 1024</userinput>
+Generating RSA private key, 1024 bit long modulus
+....................++++++
+...++++++
+e is 65537 (0x10001)
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl req -new -key cert.key -out cert.csr</userinput></screen>
+	</example>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">At this point you should be prompted for some values.
+	  You may enter whatever values you like; however, it is
+	  important the <quote xmlns:xlink="http://www.w3.org/1999/xlink">Common Name</quote> value be the fully
+	  qualified domain name of the
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> server.  In our case,
+	  and the examples here, the server is
+	  <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">server.example.org</replaceable>.  Incorrectly
+	  setting this value will cause clients to fail when making
+	  connections.  This can the cause of great frustration, so
+	  ensure that you follow these steps closely.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Finally, the certificate signing request needs to be
+	  signed:</para>
+
+	<example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="self-sign">
+	  <title xmlns:xlink="http://www.w3.org/1999/xlink">Self-signing the Certificate</title>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl x509 -req -in cert.csr -days 365 -signkey cert.key -out cert.crt</userinput>
+Signature ok
+subject=/C=AU/ST=Some-State/O=Internet Widgits Pty Ltd
+Getting Private key</screen>
+	</example>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This will create a self-signed certificate that can be
+	  used for the directives in <filename xmlns:xlink="http://www.w3.org/1999/xlink">slapd.conf</filename>,
+	  where <filename xmlns:xlink="http://www.w3.org/1999/xlink">cert.crt</filename> and
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">cacert.crt</filename> are the same file.  If you
+	  are going to use many <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>
+	  servers (for replication via <literal xmlns:xlink="http://www.w3.org/1999/xlink">slurpd</literal>) you
+	  will want to see <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="ssl-ca"/> to generate a CA
+	  key and use it to sign individual server
+	  certificates.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Once this is done, put the following in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">slapd_enable="YES"</programlisting>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Then run <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/rc.d/slapd
+	  start</userinput>.  This should start
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>.  Confirm that it is
+	  listening on 389 with</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sockstat -4 -p 389</userinput>
+ldap     slapd      3261  7  tcp4   *:389                 *:*</screen>
+      </sect3>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ldap-connect-client">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Configuring the Client</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Install the <package xmlns:xlink="http://www.w3.org/1999/xlink">net/openldap24-client</package>
+	  port for the <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> libraries.
+	  The client machines will always have
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> libraries since that is
+	  all <package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package> and
+	  <package xmlns:xlink="http://www.w3.org/1999/xlink">net/nss_ldap</package> support, at least for the
+	  moment.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The configuration file for the
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> libraries is
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/openldap/ldap.conf</filename>.
+	  Edit this file to contain the following values:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">base dc=example,dc=org
+uri ldap://server.example.org/
+ssl start_tls
+tls_cacert /path/to/your/cacert.crt</programlisting>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">It is important that your clients have access to
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">cacert.crt</filename>, otherwise they will not
+	    be able to connect.</para>
+	</note>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">There are two files called
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename>.  The first is this file,
+	    which is for the <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>
+	    libraries and defines how to talk to the server.  The
+	    second is <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/ldap.conf</filename>,
+	    and is for <application xmlns:xlink="http://www.w3.org/1999/xlink">pam_ldap</application>.</para>
+	</note>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">At this point you should be able to run
+	  <userinput xmlns:xlink="http://www.w3.org/1999/xlink">ldapsearch -Z</userinput> on the client machine;
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">-Z</option> means <quote xmlns:xlink="http://www.w3.org/1999/xlink">use TLS</quote>.  If you
+	  encounter an error, then something is configured wrong; most
+	  likely it is your certificates.  Use <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">openssl</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>'s
+	  <command xmlns:xlink="http://www.w3.org/1999/xlink">s_client</command> and <command xmlns:xlink="http://www.w3.org/1999/xlink">s_server</command>
+	  to ensure you have them configured and signed
+	  properly.</para>
+      </sect3>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ldap-database">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Entries in the Database</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Authentication against an LDAP directory is generally
+	accomplished by attempting to bind to the directory as the
+	connecting user.  This is done by establishing a
+	<quote xmlns:xlink="http://www.w3.org/1999/xlink">simple</quote> bind on the directory with the user name
+	supplied.  If there is an entry with the
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">uid</literal> equal to the user name and that entry's
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">userPassword</literal> attribute matches the password
+	supplied, then the bind is successful.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The first thing we have to do is figure out is where in
+	the directory our users will live.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The base entry for our database is
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">dc=example,dc=org</literal>.  The default location
+	for users that most clients seem to expect is something like
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">ou=people,<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">base</replaceable></literal>,
+	so that is what will be used here.  However keep in mind that
+	this is configurable.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">So the ldif entry for the <literal xmlns:xlink="http://www.w3.org/1999/xlink">people</literal>
+	organizational unit will look like:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">dn: ou=people,dc=example,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: people</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">All users will be created as subentries of this
+	organizational unit.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Some thought might be given to the object class your users
+	will belong to.  Most tools by default will use
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">people</literal>, which is fine if you simply want to
+	provide entries against which to authenticate.  However, if
+	you are going to store user information in the LDAP database
+	as well, you will probably want to use
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">inetOrgPerson</literal>, which has many useful
+	attributes.  In either case, the relevant schemas need to be
+	loaded in <filename xmlns:xlink="http://www.w3.org/1999/xlink">slapd.conf</filename>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">For this example we will use the <literal xmlns:xlink="http://www.w3.org/1999/xlink">person</literal>
+	object class.  If you are using
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">inetOrgPerson</literal>, the steps are basically
+	identical, except that the <literal xmlns:xlink="http://www.w3.org/1999/xlink">sn</literal> attribute is
+	required.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To add a user <literal xmlns:xlink="http://www.w3.org/1999/xlink">testuser</literal>, the ldif would
+	be:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">dn: uid=tuser,ou=people,dc=example,dc=org
+objectClass: person
+objectClass: posixAccount
+objectClass: shadowAccount
+objectClass: top
+uidNumber: 10000
+gidNumber: 10000
+homeDirectory: /home/tuser
+loginShell: /bin/csh
+uid: tuser
+cn: tuser</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">I start my LDAP users' UIDs at 10000 to avoid collisions
+	with system accounts; you can configure whatever number you
+	wish here, as long as it is less than 65536.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">We also need group entries.  They are as configurable as
+	user entries, but we will use the defaults below:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">dn: ou=groups,dc=example,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=tuser,ou=groups,dc=example,dc=org
+objectClass: posixGroup
+objectClass: top
+gidNumber: 10000
+cn: tuser</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To enter these into your database, you can use
+	<command xmlns:xlink="http://www.w3.org/1999/xlink">slapadd</command> or <command xmlns:xlink="http://www.w3.org/1999/xlink">ldapadd</command> on a
+	file containing these entries.  Alternatively, you can use
+	<package xmlns:xlink="http://www.w3.org/1999/xlink">sysutils/ldapvi</package>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The <command xmlns:xlink="http://www.w3.org/1999/xlink">ldapsearch</command> utility on the client
+	machine should now return these entries.  If it does, your
+	database is properly configured to be used as an LDAP
+	authentication server.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="client">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Client Configuration</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The client should already have
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> libraries from <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="ldap-connect-client"/>, but if you are installing
+      several client machines you will need to install
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">net/openldap24-client</package> on each of them.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD requires two ports to be installed to authenticate
+      against an LDAP server, <package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package> and
+      <package xmlns:xlink="http://www.w3.org/1999/xlink">net/nss_ldap</package>.</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="client-auth">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Authentication</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink"><package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package> is configured via
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/ldap.conf</filename>.</para>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This is a <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">different file</emphasis> than the
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> library functions'
+	  configuration file,
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/openldap/ldap.conf</filename>;
+	  however, it takes many of the same options; in fact it is a
+	  superset of that file.  For the rest of this section,
+	  references to <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename> will mean
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/ldap.conf</filename>.</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Thus, we will want to copy all of our original
+	configuration parameters from
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">openldap/ldap.conf</filename> to the new
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename>.  Once this is done, we want to
+	tell <package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package> what to look for on
+	the directory server.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">We are identifying our users with the
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">uid</literal> attribute.  To configure this (though
+	it is the default), set the
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">pam_login_attribute</literal> directive in
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename>:</para>
+
+      <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="set-pam-login-attr">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Setting <literal xmlns:xlink="http://www.w3.org/1999/xlink">pam_login_attribute</literal></title>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">pam_login_attribute uid</programlisting>
+      </example>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">With this set, <package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package> will
+	search the entire LDAP directory under <literal xmlns:xlink="http://www.w3.org/1999/xlink">base</literal>
+	for the value
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">uid=<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">username</replaceable></literal>.
+	If it finds one and only one entry, it will attempt to bind as
+	that user with the password it was given.  If it binds
+	correctly, then it will allow access.  Otherwise it will
+	fail.</para>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="client-auth-pam">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">PAM</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">PAM, which stands for <quote xmlns:xlink="http://www.w3.org/1999/xlink">Pluggable Authentication
+	    Modules</quote>, is the method by which FreeBSD authenticates
+	  most of its sessions.  To tell FreeBSD we wish to use an LDAP
+	  server, we will have to add a line to the appropriate PAM
+	  file.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Most of the time the appropriate PAM file is
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d/sshd</filename>, if you want to use
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> (remember to set the relevant
+	  options in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/ssh/sshd_config</filename>,
+	  otherwise <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> will not use
+	  PAM).</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">To use PAM for authentication, add the line</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">auth  sufficient  /usr/local/lib/pam_ldap.so  no_warn</programlisting>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Exactly where this line shows up in the file and which
+	  options appear in the fourth column determine the exact
+	  behavior of the authentication mechanism; see
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam.d</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry></para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">With this configuration you should be able to
+	  authenticate a user against an LDAP directory.
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">PAM</application> will perform a bind with your
+	  credentials, and if successful will tell
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> to allow access.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">However it is not a good idea to allow
+	  <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">every</emphasis> user in the directory into
+	  <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">every</emphasis> client machine.  With the current
+	  configuration, all that a user needs to log into a machine
+	  is an LDAP entry.  Fortunately there are a few ways to
+	  restrict user access.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename> supports a
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">pam_groupdn</literal> directive; every account that
+	  connects to this machine needs to be a member of the group
+	  specified here.  For example, if you have</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">pam_groupdn cn=servername,ou=accessgroups,dc=example,dc=org</programlisting>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">in <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename>, then only members of
+	  that group will be able to log in.  There are a few things
+	  to bear in mind, however.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Members of this group are specified in one or more
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">memberUid</literal> attributes, and each attribute
+	  must have the full distinguished name of the member.  So
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">memberUid: someuser</literal> will not work; it
+	  must be:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">memberUid: uid=someuser,ou=people,dc=example,dc=org</programlisting>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Additionally, this directive is not checked in PAM
+	  during authentication, it is checked during account
+	  management, so you will need a second line in your PAM files
+	  under <literal xmlns:xlink="http://www.w3.org/1999/xlink">account</literal>.  This will require, in
+	  turn, <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">every</emphasis> user to be listed in the
+	  group, which is not necessarily what we want.  To avoid
+	  blocking users that are not in LDAP, you should enable the
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">ignore_unknown_user</literal> attribute.  Finally,
+	  you should set the
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">ignore_authinfo_unavail</literal> option so that
+	  you are not locked out of every computer when the LDAP
+	  server is unavailable.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Your <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam.d/sshd</filename> might then end up
+	  looking like this:</para>
+
+	<example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam">
+	  <title xmlns:xlink="http://www.w3.org/1999/xlink">Sample <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam.d/sshd</filename></title>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">auth            required        pam_nologin.so          no_warn
+auth            sufficient      pam_opie.so             no_warn no_fake_prompts
+auth            requisite       pam_opieaccess.so       no_warn allow_local
+auth            sufficient      /usr/local/lib/pam_ldap.so      no_warn
+auth            required        pam_unix.so             no_warn try_first_pass
+
+account         required        pam_login_access.so
+account         required        /usr/local/lib/pam_ldap.so      no_warn ignore_authinfo_unavail ignore_unknown_user</programlisting>
+	</example>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Since we are adding these lines specifically to
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam.d/sshd</filename>, this will only have an
+	    effect on <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> sessions.  LDAP
+	    users will be unable to log in at the console.  To change
+	    this behavior, examine the other files in
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d</filename> and modify them
+	    accordingly.</para>
+	</note>
+      </sect3>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="client-nss">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Name Service Switch</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink"><application xmlns:xlink="http://www.w3.org/1999/xlink">NSS</application> is the service that maps
+	attributes to names.  So, for example, if a file is owned by
+	user <literal xmlns:xlink="http://www.w3.org/1999/xlink">1001</literal>, an application will query
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">NSS</application> for the name of
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">1001</literal>, and it might get
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">bob</literal> or <literal xmlns:xlink="http://www.w3.org/1999/xlink">ted</literal> or whatever
+	the user's name is.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Now that our user information is kept in LDAP, we need to
+	tell <application xmlns:xlink="http://www.w3.org/1999/xlink">NSS</application> to look there when
+	queried.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The <package xmlns:xlink="http://www.w3.org/1999/xlink">net/nss_ldap</package> port does this.  It
+	uses the same configuration file as
+	<package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_ldap</package>, and should not need any
+	extra parameters once it is installed.  Instead, what is left
+	is simply to edit <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/nsswitch.conf</filename> to
+	take advantage of the directory.  Simply replace the following
+	lines:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">group: compat
+passwd: compat</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">with</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">group: files ldap
+passwd: files ldap</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This will allow you to map usernames to UIDs and UIDs to
+	usernames.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Congratulations!  You should now have working LDAP
+	authentication.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="caveats">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Caveats</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Unfortunately, as of the time this was written FreeBSD did
+	not support changing user passwords with <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">passwd</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>.
+	Because of this, most administrators are left to implement a
+	solution themselves.  I provide some examples here.  Note that
+	if you write your own password change script, there are some
+	security issues you should be made aware of; see <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="security-passwd"/></para>
+
+      <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="chpw-shell">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Shell Script for Changing Passwords</title>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink"><![CDATA[#!/bin/sh
+
+stty -echo
+read -p "Old Password: " oldp; echo
+read -p "New Password: " np1; echo
+read -p "Retype New Password: " np2; echo
+stty echo
+
+if [ "$np1" != "$np2" ]; then
+  echo "Passwords do not match."
+  exit 1
+fi
+
+ldappasswd -D uid="$USER",ou=people,dc=example,dc=org \
+  -w "$oldp" \
+  -a "$oldp" \
+  -s "$np1"]]></programlisting>
+      </example>
+
+      <caution xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This script does hardly any error checking, but more
+	  important it is very cavalier about how it stores your
+	  passwords.  If you do anything like this, at least adjust
+	  the <literal xmlns:xlink="http://www.w3.org/1999/xlink">security.bsd.see_other_uids</literal> sysctl
+	  value:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">sysctl security.bsd.see_other_uids=0</userinput>.</screen>
+      </caution>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">A more flexible (and probably more secure) approach can be
+	used by writing a custom program, or even a web interface.
+	The following is part of a <application xmlns:xlink="http://www.w3.org/1999/xlink">Ruby</application>
+	library that can change LDAP passwords.  It sees use both on
+	the command line, and on the web.</para>
+
+      <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="chpw-ruby">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Ruby Script for Changing Passwords</title>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink"><![CDATA[require 'ldap'
+require 'base64'
+require 'digest'
+require 'password' # ruby-password
+
+ldap_server = "ldap.example.org"
+luser = "uid=#{ENV['USER']},ou=people,dc=example,dc=org"
+
+# get the new password, check it, and create a salted hash from it
+def get_password
+  pwd1 = Password.get("New Password: ")
+  pwd2 = Password.get("Retype New Password: ")
+
+  raise if pwd1 != pwd2
+  pwd1.check # check password strength
+
+  salt = rand.to_s.gsub(/0\./, '')
+  pass = pwd1.to_s
+  hash = "{SSHA}"+Base64.encode64(Digest::SHA1.digest("#{pass}#{salt}")+salt).chomp!
+  return hash
+end
+
+oldp = Password.get("Old Password: ")
+newp = get_password
+
+# We'll just replace it.  That we can bind proves that we either know
+# the old password or are an admin.
+
+replace = LDAP::Mod.new(LDAP::LDAP_MOD_REPLACE | LDAP::LDAP_MOD_BVALUES,
+                        "userPassword",
+                        [newp])
+
+conn = LDAP::SSLConn.new(ldap_server, 389, true)
+conn.set_option(LDAP::LDAP_OPT_PROTOCOL_VERSION, 3)
+conn.bind(luser, oldp)
+conn.modify(luser, [replace])]]></programlisting>
+      </example>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Although not guaranteed to be free of security holes (the
+	password is kept in memory, for example) this is cleaner and
+	more flexible than a simple <command xmlns:xlink="http://www.w3.org/1999/xlink">sh</command>
+	script.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="secure">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Security Considerations</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now that your machines (and possibly other services) are
+      authenticating against your LDAP server, this server needs to be
+      protected at least as well as
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/master.passwd</filename> would be on a regular
+      server, and possibly even more so since a broken or cracked LDAP
+      server would break every client service.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Remember, this section is not exhaustive.  You should
+      continually review your configuration and procedures for
+      improvements.</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="secure-readonly">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Setting Attributes Read-only</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Several attributes in LDAP should be read-only.  If left
+	writable by the user, for example, a user could change his
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">uidNumber</literal> attribute to <literal xmlns:xlink="http://www.w3.org/1999/xlink">0</literal>
+	and get <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem>
+	access!</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To begin with, the <literal xmlns:xlink="http://www.w3.org/1999/xlink">userPassword</literal>
+	attribute should not be world-readable.  By default, anyone
+	who can connect to the LDAP server can read this attribute.
+	To disable this, put the following in
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">slapd.conf</filename>:</para>
+
+      <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="hide-userpass">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Hide Passwords</title>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">access to dn.subtree="ou=people,dc=example,dc=org"
+  attrs=userPassword
+  by self write
+  by anonymous auth
+  by * none
+
+access to *
+  by self write
+  by * read</programlisting>
+      </example>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This will disallow reading of the
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">userPassword</literal> attribute, while still
+	allowing users to change their own passwords.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Additionally, you'll want to keep users from changing some
+	of their own attributes.  By default, users can change any
+	attribute (except for those which the LDAP schemas themselves
+	deny changes), such as <literal xmlns:xlink="http://www.w3.org/1999/xlink">uidNumber</literal>.  To close
+	this hole, modify the above to</para>
+
+      <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="attrib-readonly">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Read-only Attributes</title>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">access to dn.subtree="ou=people,dc=example,dc=org"
+  attrs=userPassword
+  by self write
+  by anonymous auth
+  by * none
+
+access to attrs=homeDirectory,uidNumber,gidNumber
+  by * read
+
+access to *
+  by self write
+  by * read</programlisting>
+      </example>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This will stop users from being able to masquerade as
+	other users.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="secure-root">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink"><systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> Account
+	Definition</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Often the <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem>
+	or manager account for the LDAP service will be defined in the
+	configuration file.  <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application>
+	supports this, for example, and it works, but it can lead to
+	trouble if <filename xmlns:xlink="http://www.w3.org/1999/xlink">slapd.conf</filename> is compromised.  It
+	may be better to use this only to bootstrap yourself into
+	LDAP, and then define a <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> account there.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Even better is to define accounts that have limited
+	permissions, and omit a <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> account entirely.  For
+	example, users that can add or remove user accounts are added
+	to one group, but they cannot themselves change the membership
+	of this group.  Such a security policy would help mitigate the
+	effects of a leaked password.</para>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="manager-acct">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Creating a Management Group</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Say you want your IT department to be able to change
+	  home directories for users, but you do not want all of them
+	  to be able to add or remove users.  The way to do this is to
+	  add a group for these admins:</para>
+
+	<example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="manager-acct-dn">
+	  <title xmlns:xlink="http://www.w3.org/1999/xlink">Creating a Management Group</title>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">dn: cn=homemanagement,dc=example,dc=org
+objectClass: top
+objectClass: posixGroup
+cn: homemanagement
+gidNumber: 121 # required for posixGroup
+memberUid: uid=tuser,ou=people,dc=example,dc=org
+memberUid: uid=user2,ou=people,dc=example,dc=org</programlisting>
+	</example>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">And then change the permissions attributes in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">slapd.conf</filename>:</para>
+
+	<example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="management-acct-acl">
+	  <title xmlns:xlink="http://www.w3.org/1999/xlink">ACLs for a Home Directory Management Group</title>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">access to dn.subtree="ou=people,dc=example,dc=org"
+  attr=homeDirectory
+  by dn="cn=homemanagement,dc=example,dc=org"
+  dnattr=memberUid write</programlisting>
+	</example>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Now <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">tuser</systemitem> and
+	  <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">user2</systemitem> can change
+	  other users' home directories.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">In this example we have given a subset of administrative
+	  power to certain users without giving them power in other
+	  domains.  The idea is that soon no single user account has
+	  the power of a <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> account, but every
+	  power root had is had by at least one user.  The <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> account then becomes
+	  unnecessary and can be removed.</para>
+      </sect3>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="security-passwd">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Password Storage</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">By default <application xmlns:xlink="http://www.w3.org/1999/xlink">OpenLDAP</application> will store
+	the value of the <literal xmlns:xlink="http://www.w3.org/1999/xlink">userPassword</literal> attribute as
+	it stores any other data: in the clear.  Most of the time it
+	is base 64 encoded, which provides enough protection to keep
+	an honest administrator from knowing your password, but little
+	else.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">It is a good idea, then, to store passwords in a more
+	secure format, such as SSHA (salted SHA).  This is done by
+	whatever program you use to change users' passwords.</para>
+    </sect2>
+  </sect1>
+
+  <appendix xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="useful">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Useful Aids</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There are a few other programs that might be useful,
+      particularly if you have many users and do not want to configure
+      everything manually.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><package xmlns:xlink="http://www.w3.org/1999/xlink">security/pam_mkhomedir</package> is a PAM module
+      that always succeeds; its purpose is to create home directories
+      for users which do not have them.  If you have dozens of client
+      servers and hundreds of users, it is much easier to use this and
+      set up skeleton directories than to prepare every home
+      directory.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><package xmlns:xlink="http://www.w3.org/1999/xlink">sysutils/cpu</package> is a <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pw</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>-like utility
+      that can be used to manage users in the LDAP directory.  You can
+      call it directly, or wrap scripts around it.  It can handle both
+      TLS (with the <option xmlns:xlink="http://www.w3.org/1999/xlink">-x</option> flag) and SSL
+      (directly).</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><package xmlns:xlink="http://www.w3.org/1999/xlink">sysutils/ldapvi</package> is a great utility for
+      editing LDAP values in an LDIF-like syntax.  The directory (or
+      subsection of the directory) is presented in the editor chosen
+      by the <envar xmlns:xlink="http://www.w3.org/1999/xlink">EDITOR</envar> environment variable.  This makes
+      it easy to enable large-scale changes in the directory without
+      having to write a custom tool.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><package xmlns:xlink="http://www.w3.org/1999/xlink">security/openssh-portable</package> has the ability
+      to contact an LDAP server to verify
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> keys.  This is extremely nice if
+      you have many servers and do not want to copy your public keys
+      across all of them.</para>
+  </appendix>
+
+  <appendix xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ssl-ca">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink"><application xmlns:xlink="http://www.w3.org/1999/xlink">OpenSSL</application> Certificates for
+      LDAP</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">If you are hosting two or more LDAP servers, you will
+      probably not want to use self-signed certificates, since each
+      client will have to be configured to work with each certificate.
+      While this is possible, it is not nearly as simple as creating
+      your own certificate authority, and signing your servers'
+      certificates with that.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The steps here are presented as they are with very little
+      attempt at explaining what is going on&#8212;further explanation
+      can be found in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">openssl</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> and its friends.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">To create a certificate authority, we simply need a
+      self-signed certificate and key.  The steps for this again
+      are</para>
+
+    <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="make-cert">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Creating a Certificate</title>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl genrsa -out root.key 1024</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl req -new -key root.key -out root.csr</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl x509 -req -days 1024 -in root.csr -signkey root.key -out root.crt</userinput></screen>
+    </example>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">These will be your root CA key and certificate.  You will
+      probably want to encrypt the key and store it in a cool, dry
+      place; anyone with access to it can masquerade as one of your
+      LDAP servers.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Next, using the first two steps above create a key
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap-server-one.key</filename> and certificate signing
+      request <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap-server-one.csr</filename>.  Once you sign
+      the signing request with <filename xmlns:xlink="http://www.w3.org/1999/xlink">root.key</filename>, you will
+      be able to use <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap-server-one.*</filename> on your
+      LDAP servers.</para>
+
+    <note xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Do not forget to use the fully qualified domain name for
+	the <quote xmlns:xlink="http://www.w3.org/1999/xlink">common name</quote> attribute when generating the
+	certificate signing request; otherwise clients will reject a
+	connection with you, and it can be very tricky to
+	diagnose.</para>
+    </note>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">To sign the key, use <option xmlns:xlink="http://www.w3.org/1999/xlink">-CA</option> and
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">-CAkey</option> instead of
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">-signkey</option>:</para>
+
+    <example xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="ca-sign">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Signing as a Certificate Authority</title>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">openssl x509 -req -days 1024 \
+-in ldap-server-one.csr -CA root.crt -CAkey root.key \
+-out ldap-server-one.crt</userinput></screen>
+    </example>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The resulting file will be the certificate that you can use
+      on your LDAP servers.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Finally, for clients to trust all your servers, distribute
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">root.crt</filename> (the
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">certificate</emphasis>, not the key!) to each client,
+      and specify it in the <literal xmlns:xlink="http://www.w3.org/1999/xlink">TLSCACertificateFile</literal>
+      directive in <filename xmlns:xlink="http://www.w3.org/1999/xlink">ldap.conf</filename>.</para>
+  </appendix>
+</article>

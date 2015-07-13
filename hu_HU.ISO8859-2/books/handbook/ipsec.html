@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>14.10. VPN IPsec felett</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="security.html" title="14. fejezet - Biztonság" /><link rel="prev" href="openssl.html" title="14.9. OpenSSL" /><link rel="next" href="openssh.html" title="14.11. OpenSSH" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">14.10. VPN IPsec felett</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="openssl.html">Vissza</a> </td><th width="60%" align="center">14. fejezet - Biztonság</th><td width="20%" align="right"> <a accesskey="n" href="openssh.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ipsec"></a>14.10. VPN IPsec felett</h2></div><div><span class="authorgroup">Írta: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Clayton</span>, <span class="firstname">Nik</span></span>. </span></div></div></div><a id="idp87599824" class="indexterm"></a><p>VPN létrehozása FreeBSD
+      átjárók használatával
+      két olyan hálózat között, amelyeket
+      egymástól az internet választ el.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87600720"></a>14.10.1. Az IPsec bemutatása</h3></div><div><span class="authorgroup">Írta: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Pandya</span>, <span class="firstname">Hiten M.</span></span>. </span></div></div></div><p>Ebben a szakaszban az IPsec
+	beállításának folyamatát
+	vázoljuk fel.  Az IPsec
+	beállításához elengedhetetlen, hogy
+	tisztában legyünk egy saját rendszermag
+	fordításának alapjaival (lásd <a class="xref" href="kernelconfig.html" title="8. fejezet - A FreeBSD rendszermag testreszabása">8. fejezet - <em>A FreeBSD rendszermag testreszabása</em></a>).</p><p>Az <span class="emphasis"><em>IPsec</em></span> egy olyan protokoll, amely az
+	Internet Protocol (IP) rétegére épül.
+	Segítségével két vagy több
+	számítógép képes
+	biztonságos módon tartani egymással a
+	kapcsolatot (innen ered a neve).  A FreeBSD IPsec
+	<span class="quote">"<span class="quote">hálózati protokollkészlete</span>"</span> a
+	<a class="link" href="http://www.kame.net" target="_top">KAME</a>
+	implementációjára épül, mely
+	egyaránt támogatja az IPv4 és IPv6
+	protokollcsaládokat.</p><a id="idp87618768" class="indexterm"></a><a id="idp87619920" class="indexterm"></a><p>Az IPsec két alprotokollból tevődik
+	össze:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>A hasznos adat biztonságos
+	    becsomagolása (Encapsulated Security Payload,
+	    ESP)</em></span> során egy szimmetrikus
+	    kriptográfiai algoritmussal (mint
+	    például Blowfish, 3DES) titkosítjuk az
+	    IP-csomagok tartalmát, ezáltal
+	    megvédjük ezeket az
+	    illetéktelenektől.</p></li><li class="listitem"><p>A <span class="emphasis"><em>Hitelesítési fejléc
+	    (Authentication Header, AH)</em></span>
+	    használatával megakadályozzuk, hogy az
+	    illetéktelenek meghamisítsák az IP
+	    csomagok fejlécét.  Ezt úgy
+	    érjük el, hogy kiszámolunk egy
+	    kriptográfiai ellenőrző összeget
+	    és az IP-csomagok fejlécének
+	    mezőire egy biztonságos függvénnyel
+	    generálunk valamilyen ujjlenyomatot.  Az ez
+	    után következő
+	    kiegészítő fejléc tartalmazza ezt
+	    az ujjlenyomatot, amellyel a csomag
+	    hitelesíthető.</p></li></ul></div><p>Az <acronym class="acronym">ESP</acronym> és az <acronym class="acronym">AH</acronym>
+	az alkalmazástól függően
+	használható együtt vagy
+	külön-külön.</p><a id="idp87625296" class="indexterm"></a><a id="idp87625808" class="indexterm"></a><p>Az IPsec akár közvetlenül is
+	használható két
+	számítógép forgalmának
+	titkosítására (ezt
+	<span class="emphasis"><em>Szállítási módnak
+	(Transport Mode)</em></span> nevezik), vagy két
+	alhálózat között
+	építhetünk ki vele <span class="quote">"<span class="quote">virtuális
+	tunneleket</span>"</span>, ami remekül alkalmas két
+	vállalati hálózat
+	kommunikációjának
+	bebiztosítására (ez a <span class="emphasis"><em>Tunnel
+	mód (Tunnel Mode)</em></span>).  Ez utóbbit
+	egyszerűen csak <span class="emphasis"><em>Virtuális
+	magánhálózatként (Virtual Private
+	Network, VPN)</em></span> emlegetik.  A FreeBSD IPsec
+	alrendszeréről az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipsec&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ipsec</span>(4)</span></a> man oldalon
+	találhatunk további
+	információkat.</p><p>A rendszermag IPsec támogatásának
+	aktiválásához a következő
+	paramétereket kell beletennünk a
+	konfigurációs állományba:</p><a id="idp87630032" class="indexterm"></a><pre class="screen">
+options   IPSEC        # IP biztonság
+device    crypto
+      </pre><a id="idp87652304" class="indexterm"></a><p>Ha szükségünk van a IPsec
+	nyomkövetésére, a következő
+	beállítást is
+	hozzátehetjük:</p><pre class="screen">
+options   IPSEC_DEBUG  # az IP biztonság nyomkövetése
+      </pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87654352"></a>14.10.2. A probléma</h3></div></div></div><p>Semmilyen szabvány nem fogalmazza meg mi is
+	számít VPN-nek.  A virtuális
+	magánhálózatok tucatnyi
+	különböző technológiával
+	valósíthatóak meg, de mindegyiknek megvan a
+	maga erőssége és gyengesége.  Ebben a
+	szakaszban körvonalazunk egy ilyen helyzetet, valamint a
+	benne felépített VPN
+	megvalósításához alkalmazott
+	stratégiákat.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87655504"></a>14.10.3. A forgatókönyv: adott egy otthoni és egy
+	vállalati hálózat, amelyek
+	külön-külön csatlakoznak az internetre,
+	és <acronym class="acronym">VPN</acronym> használatával
+	ezeket egyetlen hálózatként
+	szeretnénk használni</h3></div></div></div><a id="idp87656528" class="indexterm"></a><p>Előfeltételezéseink a
+	következőek:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>legalább két hálózatunk
+	    van;</p></li><li class="listitem"><p>magán belül mind a két
+	    hálózat IP-t használ;</p></li><li class="listitem"><p>mind a két hálózat egy FreeBSD
+	    átjárón keresztül csatlakozik az
+	    internethez;</p></li><li class="listitem"><p>a hálózatok átjárói
+	    legalább egy publikus IP-címmel
+	    rendelkeznek;</p></li><li class="listitem"><p>a hálózatok belső címei
+	    lehetnek publikus vagy privát IP-címek, nem
+	    számít.  Fontos viszont, hogy ezek ne
+	    ütközzenek, vagyis ne használja egyszerre
+	    mind a kettő a <code class="systemitem">192.168.1.x</code>
+	    címtartományt.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87663056"></a>14.10.4. Az IPsec beállítása FreeBSD alatt</h3></div><div><span class="authorgroup">Írta: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Rhodes</span>, <span class="firstname">Tom</span></span>. </span></div></div></div><p>Kezdésképpen a
+	Portgyűjteményből telepítenünk kell a
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/ipsec-tools/pkg-descr">security/ipsec-tools</a> portot.
+	Ez a programcsomag rengeteg olyan alkalmazást tartalmaz,
+	amely segítségünkre lehet a
+	beállítások elvégzése
+	során.</p><p>A következő lépésben létre
+	kell hoznunk két <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gif&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gif</span>(4)</span></a> típusú
+	pszeudoeszközt, melyeken keresztül a két
+	hálózat között egy tunnel
+	segítségével ki tudjuk
+	építeni a szükséges kapcsolatot.
+	Ehhez <code class="systemitem">root</code>
+	felhasználóként futtassuk a
+	következő parancsokat (a
+	<em class="replaceable"><code>belső</code></em> és
+	<em class="replaceable"><code>külső</code></em>
+	megnevezésű paramétereket
+	cseréljük ki a valós belső és
+	külső átjárók
+	címeire):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0 create</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0 belső1 belső2</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig gif0 tunnel külső1 külső2</code></strong></pre><p>Tekintsük például, hogy a
+	vállalati <acronym class="acronym">LAN</acronym> publikus
+	<acronym class="acronym">IP</acronym>-címe <code class="systemitem">172.16.5.4</code>, valamint a privát
+	<acronym class="acronym">IP</acronym>-címe <code class="systemitem">10.246.38.1</code>.  Az otthoni
+	<acronym class="acronym">LAN</acronym> publikus
+	<acronym class="acronym">IP</acronym>-címe legyen most <code class="systemitem">192.168.1.12</code>, valamint a belső
+	privát <acronym class="acronym">IP</acronym>-címe pedig <code class="systemitem">10.0.0.5</code>.</p><p>Elsőre ez talán még nem teljesen
+	érthető, ezért az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> parancs
+	használatával is nézzük meg a
+	példában szereplő hálózatok
+	konfigurációját:</p><pre class="programlisting">Az első átjáró:
+
+gif0: flags=8051 mtu 1280
+tunnel inet 172.16.5.4 --&gt; 192.168.1.12
+inet6 fe80::2e0::81ff:fe02:5881%gif0 prefixlen 64 scopeid 0x6
+inet 10.246.38.1 --&gt; 10.0.0.5 netmask 0xffffff00
+
+A második átjáró:
+
+gif0: flags=8051 mtu 1280
+tunnel inet 192.168.1.12 --&gt; 172.16.5.4
+inet 10.0.0.5 --&gt; 10.246.38.1 netmask 0xffffff00
+inet6 fe80::250:bfff:fe3a:c1f%gif0 prefixlen 64 scopeid 0x4</pre><p>Miután elvégeztük az iménti
+	beállításokat, a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> paranccsal
+	már mind a két privát
+	<acronym class="acronym">IP</acronym>-tartománynak
+	elérhetőnek kell lennie, ahogy azt az alábbi
+	példa is érzékeltetni
+	kívánja:</p><pre class="programlisting">otthoni-halo# ping 10.0.0.5
+PING 10.0.0.5 (10.0.0.5): 56 data bytes
+64 bytes from 10.0.0.5: icmp_seq=0 ttl=64 time=42.786 ms
+64 bytes from 10.0.0.5: icmp_seq=1 ttl=64 time=19.255 ms
+64 bytes from 10.0.0.5: icmp_seq=2 ttl=64 time=20.440 ms
+64 bytes from 10.0.0.5: icmp_seq=3 ttl=64 time=21.036 ms
+--- 10.0.0.5 ping statistics ---
+4 packets transmitted, 4 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 19.255/25.879/42.786/9.782 ms
+
+vallalati-halo# ping 10.246.38.1
+PING 10.246.38.1 (10.246.38.1): 56 data bytes
+64 bytes from 10.246.38.1: icmp_seq=0 ttl=64 time=28.106 ms
+64 bytes from 10.246.38.1: icmp_seq=1 ttl=64 time=42.917 ms
+64 bytes from 10.246.38.1: icmp_seq=2 ttl=64 time=127.525 ms
+64 bytes from 10.246.38.1: icmp_seq=3 ttl=64 time=119.896 ms
+64 bytes from 10.246.38.1: icmp_seq=4 ttl=64 time=154.524 ms
+--- 10.246.38.1 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 28.106/94.594/154.524/49.814 ms</pre><p>Az elvárásainknak megfelelően
+	tehát a privát címeken mind a két
+	oldalnak képesnek kell lennie <acronym class="acronym">ICMP</acronym>
+	csomagokat küldenie és fogadnia.  A
+	következő lépésben meg kell mondanunk az
+	átjáróknak hogyan
+	irányítsák a csomagokat a két
+	hálózat közti forgalom megfelelő
+	áramlásához.  Ezt az alábbi
+	paranccsal elérhetjük el:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vallalati-halo# route add 10.0.0.0 10.0.0.5 255.255.255.0</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vallalati-halo# route add net 10.0.0.0: gateway 10.0.0.5</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>otthoni-halo# route add 10.246.38.0 10.246.38.1 255.255.255.0</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>otthoni-halo# route add host 10.246.38.0: gateway 10.246.38.1</code></strong></pre><p>Itt már a belső gépeket az
+	      átjárókról és az
+	      átjárók mögül egyaránt
+	      el tudjuk érni.  A következő példa
+	      alapján erről könnyedén meg is
+	      tudunk győződni:</p><pre class="programlisting">vallalati-halo# ping 10.0.0.8
+PING 10.0.0.8 (10.0.0.8): 56 data bytes
+64 bytes from 10.0.0.8: icmp_seq=0 ttl=63 time=92.391 ms
+64 bytes from 10.0.0.8: icmp_seq=1 ttl=63 time=21.870 ms
+64 bytes from 10.0.0.8: icmp_seq=2 ttl=63 time=198.022 ms
+64 bytes from 10.0.0.8: icmp_seq=3 ttl=63 time=22.241 ms
+64 bytes from 10.0.0.8: icmp_seq=4 ttl=63 time=174.705 ms
+--- 10.0.0.8 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 21.870/101.846/198.022/74.001 ms
+
+otthoni-halo# ping 10.246.38.107
+PING 10.246.38.1 (10.246.38.107): 56 data bytes
+64 bytes from 10.246.38.107: icmp_seq=0 ttl=64 time=53.491 ms
+64 bytes from 10.246.38.107: icmp_seq=1 ttl=64 time=23.395 ms
+64 bytes from 10.246.38.107: icmp_seq=2 ttl=64 time=23.865 ms
+64 bytes from 10.246.38.107: icmp_seq=3 ttl=64 time=21.145 ms
+64 bytes from 10.246.38.107: icmp_seq=4 ttl=64 time=36.708 ms
+--- 10.246.38.107 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 21.145/31.721/53.491/12.179 ms</pre><p>A tunnelek beállítása volt
+	igazából a könnyebb rész, egy
+	biztonságos összeköttetés
+	kialakítása azonban már valamivel komolyabb
+	folyamatot rejt magában.  A most következő
+	konfigurációban erre <span class="quote">"<span class="quote">előre
+	ismert</span>"</span> (vagyis pre-shared, <acronym class="acronym">PSK</acronym>)
+	<acronym class="acronym">RSA</acronym>-kulcsokat fogunk használni.  A
+	konkrét <acronym class="acronym">IP</acronym>-címektől
+	eltekintve az átjárókon a
+	<code class="filename">/usr/local/etc/racoon/racoon.conf</code>
+	állományok hasonlóan fognak kinézni,
+	nagyjából valahogy így:</p><pre class="programlisting">path    pre_shared_key "/usr/local/etc/racoon/psk.txt"; # az ismert kulcsot tartalmazó állomány helye
+log     debug;	# a naplózás részletességének beállítása: ha végeztünk a teszteléssel és a hibakereséssel, akkor állítsuk át a 'notify' értékre
+
+padding  # ezeket ne nagyon változtassuk meg
+{
+        maximum_length  20;
+        randomize       off;
+        strict_check    off;
+        exclusive_tail  off;
+}
+
+timer	# időzítési beállítások, állítsuk be igény szerint
+{
+        counter         5;
+        interval        20 sec;
+        persend         1;
+#       natt_keepalive  15 sec;
+        phase1          30 sec;
+        phase2          15 sec;
+}
+
+listen	# cím [port], ahol a racoon majd válaszolni fog
+{
+        isakmp          172.16.5.4 [500];
+        isakmp_natt     172.16.5.4 [4500];
+}
+
+remote  192.168.1.12 [500]
+{
+        exchange_mode   main,aggressive;
+        doi             ipsec_doi;
+        situation       identity_only;
+        my_identifier   address 172.16.5.4;
+        peers_identifier        address 192.168.1.12;
+        lifetime        time 8 hour;
+        passive         off;
+        proposal_check  obey;
+#       nat_traversal   off;
+        generate_policy off;
+
+                        proposal {
+                                encryption_algorithm    blowfish;
+                                hash_algorithm          md5;
+                                authentication_method   pre_shared_key;
+                                lifetime time           30 sec;
+                                dh_group                1;
+                        }
+}
+
+sainfo  (address 10.246.38.0/24 any address 10.0.0.0/24 any) # address $hálózat/$hálózati_maszk $típus address $hálózat/$hálózati_maszk $típus
+ 		  # (a $típus lehet "any" vagy "esp")
+{		  # a $hálózat a két összekapcsolni kívánt belső hálózat legyen
+        pfs_group       1;
+        lifetime        time    36000 sec;
+        encryption_algorithm    blowfish,3des,des;
+        authentication_algorithm        hmac_md5,hmac_sha1;
+        compression_algorithm   deflate;
+}</pre><p>A példában szereplő összes
+	opció részletes kifejtése jóval
+	meghaladná ezen leírás kereteit,
+	ezért a bővebb információkkal
+	kapcsolatban inkább a <span class="application">racoon</span>
+	beállításaihoz tartozó man oldal
+	elolvasását javasoljuk.</p><p>A gépek közti hálózati forgalom
+	titkosításához be kell még
+	állítanunk egy <acronym class="acronym">SPD</acronym>
+	házirendet is, így a FreeBSD és a
+	<span class="application">racoon</span> képes kódolni
+	és dekódolni a csomagokat.</p><p>Ezt a most következő, a vállalati
+	átjárón találhatóhoz
+	hasonló egyszerű shell szkripttel tudjuk
+	elvégezni.  Ezt az állományt a rendszer
+	indításakor fogjuk felhasználni, melyet
+	<code class="filename">/usr/local/etc/racoon/setkey.conf</code>
+	néven mentsünk el:</p><pre class="programlisting">flush;
+spdflush;
+# Az otthoni hálózati felé
+spdadd 10.246.38.0/24 10.0.0.0/24 any -P out ipsec esp/tunnel/172.16.5.4-192.168.1.12/use;
+spdadd 10.0.0.0/24 10.246.38.0/24 any -P in ipsec esp/tunnel/192.168.1.12-172.16.5.4/use;</pre><p>Ahogy ezzel megvagyunk, a <span class="application">racoon</span>
+	az egyes átjárókon a következő
+	paranccsal indítható el:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/local/sbin/racoon -F -f /usr/local/etc/racoon/racoon.conf -l /var/log/racoon.log</code></strong></pre><p>A parancs eredménye ennek megfelelően
+	nagyjából a következő lesz:</p><pre class="programlisting">vallalati-halo# /usr/local/sbin/racoon -F -f /usr/local/etc/racoon/racoon.conf
+Foreground mode.
+2006-01-30 01:35:47: INFO: begin Identity Protection mode.
+2006-01-30 01:35:48: INFO: received Vendor ID: KAME/racoon
+2006-01-30 01:35:55: INFO: received Vendor ID: KAME/racoon
+2006-01-30 01:36:04: INFO: ISAKMP-SA established 72.16.5.4[500]-192.168.1.12[500] spi:623b9b3bd2492452:7deab82d54ff704a
+2006-01-30 01:36:05: INFO: initiate new phase 2 negotiation: 72.16.5.4[0]192.168.1.12[0]
+2006-01-30 01:36:09: INFO: IPsec-SA established: ESP/Tunnel 92.168.1.12[0]-&gt;172.16.5.4[0] spi=28496098(0x1b2d0e2)
+2006-01-30 01:36:09: INFO: IPsec-SA established: ESP/Tunnel 172.16.5.4[0]-&gt;192.168.1.12[0] spi=47784998(0x2d92426)
+2006-01-30 01:36:13: INFO: respond new phase 2 negotiation: 172.16.5.4[0]192.168.1.12[0]
+2006-01-30 01:36:18: INFO: IPsec-SA established: ESP/Tunnel 192.168.1.12[0]-&gt;172.16.5.4[0] spi=124397467(0x76a279b)
+2006-01-30 01:36:18: INFO: IPsec-SA established: ESP/Tunnel 172.16.5.4[0]-&gt;192.168.1.12[0] spi=175852902(0xa7b4d66)</pre><p>A tunnel megfelelő működését
+	úgy tudjuk ellenőrizni, ha átváltunk egy
+	másik konzolra és a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> program
+	segítségével figyeljük a
+	hálózati forgalmat.  A példában
+	szereplő <code class="literal">em0</code> interfészt
+	természetesen ne felejtsük el kicserélni a
+	megfelelő eszköz nevére.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>tcpdump -i em0 host 172.16.5.4 and dst 192.168.1.12</code></strong></pre><p>Ennek hatására az alábbiakhoz
+	hasonló adatoknak kellene megjelennie a konzolon.
+	Amennyiben nem ez történik, valamilyen hiba
+	történt, ezért meg kell keresnünk azt a
+	visszakapott adatok alapján.</p><pre class="programlisting">01:47:32.021683 IP vallalatihalozat.com &gt; 192.168.1.12.otthonihalozat.com: ESP(spi=0x02acbf9f,seq=0xa)
+01:47:33.022442 IP vallalatihalozat.com &gt; 192.168.1.12.otthonihalozat.com: ESP(spi=0x02acbf9f,seq=0xb)
+01:47:34.024218 IP vallalatihalozat.com &gt; 192.168.1.12.otthonihalozat.com: ESP(spi=0x02acbf9f,seq=0xc)</pre><p>Itt már mind a két hálózatnak
+	elérhetőnek kell lennie és egyként kell
+	látszódnia.  A hálózatokat ezen
+	felül még érdemes külön
+	védeni egy tűzfallal is.  Ilyenkor a csomagok
+	két hálózati közti zavartalan
+	oda-vissza vándorlásához további
+	szabályokat kell még felvennünk a tűzfal
+	szabályrendszerébe.  A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> tűzfal
+	esetén ez a következő sorok
+	hozzáadását jelenti a tűzfal
+	konfigurációs
+	állományához:</p><pre class="programlisting">ipfw add 00201 allow log esp from any to any
+ipfw add 00202 allow log ah from any to any
+ipfw add 00203 allow log ipencap from any to any
+ipfw add 00204 allow log udp from any 500 to any</pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A szabályok számozását mindig
+	  az adott gép aktuális
+	  beállításainak megfelelően kell
+	  módosítani.</p></div><p>A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pf&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">pf</span>(4)</span></a> és <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a>
+	felhasználók számára ehhez a
+	következő parancsot javasoljuk:</p><pre class="programlisting">pass in quick proto esp from any to any
+pass in quick proto ah from any to any
+pass in quick proto ipencap from any to any
+pass in quick proto udp from any port = 500 to any port = 500
+pass in quick on gif0 from any to any
+pass out quick proto esp from any to any
+pass out quick proto ah from any to any
+pass out quick proto ipencap from any to any
+pass out quick proto udp from any port = 500 to any port = 500
+pass out quick on gif0 from any to any</pre><p>Végezetül a következő sor
+	hozzáadásával engedélyezzük az
+	<code class="filename">/etc/rc.conf</code> állományban a
+	<acronym class="acronym">VPN</acronym> indítását a rendszer
+	indítása során:</p><pre class="programlisting">ipsec_enable="YES"
+ipsec_program="/usr/local/sbin/setkey"
+ipsec_file="/usr/local/etc/racoon/setkey.conf" # engedélyezzük az spd házirend beállítását a rendszer indításakor
+racoon_enable="yes"</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="openssl.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="openssh.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">14.9. OpenSSL </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 14.11. OpenSSH</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>5.14. Installing files</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter's Handbook" /><link rel="up" href="makefile.html" title="章 5. 設定 Makefile" /><link rel="prev" href="conflicts.html" title="5.13. CONFLICTS" /><link rel="next" href="special.html" title="章 6. Special considerations" /><link rel="copyright" href="trademarks.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5.14. Installing files</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="conflicts.html">前一頁</a> </td><th width="60%" align="center">章 5. 設定 Makefile</th><td width="20%" align="right"> <a accesskey="n" href="special.html">下一頁</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="install"></a>5.14. Installing files</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-macros"></a>5.14.1. INSTALL_* macros</h3></div></div></div><p>Do use the macros provided in <code class="filename">bsd.port.mk</code>
+	  to ensure correct modes and ownership of files in your own
+	  <code class="buildtarget">*-install</code> targets.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="varname">INSTALL_PROGRAM</code> is a command to install
+	      binary executables.</p></li><li class="listitem"><p><code class="varname">INSTALL_SCRIPT</code> is a command to install
+	      executable scripts.</p></li><li class="listitem"><p><code class="varname">INSTALL_KLD</code> is a command to install
+	      kernel loadable modules. Some architectures don't like it when
+	      the modules are stripped, therefor use this command instead
+	      of <code class="varname">INSTALL_PROGRAM</code>.</p></li><li class="listitem"><p><code class="varname">INSTALL_DATA</code> is a command to install
+	      sharable data.</p></li><li class="listitem"><p><code class="varname">INSTALL_MAN</code> is a command to install
+	      manpages and other documentation (it does not compress
+	      anything).</p></li></ul></div><p>These are basically the <code class="command">install</code> command with
+	  all the appropriate flags.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-strip"></a>5.14.2. Stripping Binaries</h3></div></div></div><p>Do not strip binaries manually unless you have to.  All binaries
+	  should be stripped, but the <code class="buildtarget">INSTALL_PROGRAM</code>
+	  macro will install and strip a binary at the same time (see the next
+	  section).</p><p>If you need to strip a file, but do not wish to use the
+	  <code class="varname">INSTALL_PROGRAM</code> macro,
+	  <code class="varname">${STRIP_CMD}</code> will strip your program.  This is
+	  typically done within the <code class="literal">post-install</code>
+	  target.  For example:</p><pre class="programlisting">post-install:
+	${STRIP_CMD} ${PREFIX}/bin/xdl</pre><p>Use the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=file&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">file</span>(1)</span></a> command on the installed executable to
+	  check whether the binary is stripped or not.  If it does not say
+	  <code class="literal">not stripped</code>, it is stripped.  Additionally,
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=strip&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">strip</span>(1)</span></a> will not strip a previously stripped program; it
+	  will instead exit cleanly.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-copytree"></a>5.14.3. Installing a whole tree of files</h3></div></div></div><p>Sometimes, there is a need to install a big number of files,
+	  preserving their hierarchical organization, ie. copying over a whole
+	  directory tree from <code class="varname">WRKSRC</code> to a target directory
+	  under <code class="varname">PREFIX</code>.</p><p>Two macros exists for this situation.  The advantage of using
+	  these macros instead of <code class="command">cp</code> is that they guarantee
+	  proper file ownership and permissions on target files.  First macro,
+	  <code class="varname">COPYTREE_BIN</code>, will set all the installed files to
+	  be executable, thus being suitable for installing into
+	  <code class="filename">PREFIX/bin</code>.  The second
+	  macro, <code class="varname">COPYTREE_SHARE</code>, does not set executable
+	  permissions on files, and is therefore suitable for installing files
+	  under <code class="filename">PREFIX/share</code>
+	  target.</p><pre class="programlisting">post-install:
+	${MKDIR} ${EXAMPLESDIR}
+	(cd ${WRKSRC}/examples/ &amp;&amp; ${COPYTREE_SHARE} \* ${EXAMPLESDIR})</pre><p>This example will install the contents of
+	  <code class="filename">examples</code> directory in the vendor distfile to the
+	  proper examples location of your port.</p><pre class="programlisting">post-install:
+	${MKDIR} ${DATADIR}/summer
+	(cd ${WRKSRC}/temperatures/ &amp;&amp; ${COPYTREE_SHARE} "June July August" ${DATADIR}/summer/)</pre><p>And this example will install the data of summer months to the
+	  <code class="filename">summer</code> subdirectory of a
+	  <code class="filename">DATADIR</code>.</p><p>Additional <code class="command">find</code> arguments can be passed via
+	  the third argument to the <code class="varname">COPYTREE_*</code> macros.
+	  For example, to install all files from the first example except
+	  Makefiles, one can use the following command.</p><pre class="programlisting">post-install:
+	${MKDIR} ${EXAMPLESDIR}
+	(cd ${WRKSRC}/examples/ &amp;&amp; \
+		${COPYTREE_SHARE} \* ${EXAMPLESDIR} "! -name Makefile")</pre><p>Note that these macros does not add the installed files to
+	  <code class="filename">pkg-plist</code>.  You still need to list them.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-documentation"></a>5.14.4. Install additional documentation</h3></div></div></div><p>If your software has some documentation other than the standard
+	  man and info pages that you think is useful for the user, install it
+	  under <code class="filename">PREFIX/share/doc</code>.
+	  This can be done, like the previous item, in the
+	  <code class="buildtarget">post-install</code> target.</p><p>Create a new directory for your port.  The directory name should
+	  reflect what the port is.  This usually means
+	  <code class="varname">PORTNAME</code>. However, if you
+	  think the user might want different versions of the port to be
+	  installed at the same time, you can use the whole
+	  <code class="varname">PKGNAME</code>.</p><p>Make the installation dependent on the variable
+	  <code class="varname">NOPORTDOCS</code> so that users can disable it in
+	  <code class="filename">/etc/make.conf</code>, like this:</p><pre class="programlisting">post-install:
+.if !defined(NOPORTDOCS)
+       ${MKDIR} ${DOCSDIR}
+       ${INSTALL_MAN} ${WRKSRC}/docs/xvdocs.ps ${DOCSDIR}
+.endif</pre><p>Here are some handy variables and how they are expanded
+	  by default when used
+	  in the <code class="filename">Makefile</code>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="varname">DATADIR</code> gets expanded to
+	      <code class="filename">PREFIX/share/PORTNAME</code>.</p></li><li class="listitem"><p><code class="varname">DATADIR_REL</code> gets expanded to
+	      <code class="filename">share/PORTNAME</code>.</p></li><li class="listitem"><p><code class="varname">DOCSDIR</code> gets expanded to
+	      <code class="filename">PREFIX/share/doc/PORTNAME</code>.</p></li><li class="listitem"><p><code class="varname">DOCSDIR_REL</code> gets expanded to
+	      <code class="filename">share/doc/PORTNAME</code>.</p></li><li class="listitem"><p><code class="varname">EXAMPLESDIR</code> gets expanded to
+	      <code class="filename">PREFIX/share/examples/PORTNAME</code>.</p></li><li class="listitem"><p><code class="varname">EXAMPLESDIR_REL</code> gets expanded to
+	      <code class="filename">share/examples/PORTNAME</code>.</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="varname">NOPORTDOCS</code> only controls additional
+	    documentation installed in <code class="varname">DOCSDIR</code>.  It does not
+	    apply to standard man pages and info pages.  Things installed in
+	    <code class="varname">DATADIR</code> and <code class="varname">EXAMPLESDIR</code>
+	    are controlled by <code class="varname">NOPORTDATA</code> and
+	    <code class="varname">NOPORTEXAMPLES</code>, respectively.</p></div><p>These variables are exported to <code class="varname">PLIST_SUB</code>.
+	  Their values will appear there as pathnames relative to
+	  <code class="filename">PREFIX</code> if possible.
+	  That is, <code class="filename">share/doc/PORTNAME</code>
+	  will be substituted for <code class="literal">%%DOCSDIR%%</code>
+	  in the packing list by default, and so on.
+	  (See more on <code class="filename">pkg-plist</code> substitution
+	  <a class="link" href="plist.html#plist-sub" title="7.1. Changing pkg-plist based on make variables">here</a>.)</p><p>All conditionally installed documentation files and directories should
+	  be included in <code class="filename">pkg-plist</code> with the
+	  <code class="literal">%%PORTDOCS%%</code> prefix, for example:</p><pre class="programlisting">%%PORTDOCS%%%%DOCSDIR%%/AUTHORS
+%%PORTDOCS%%%%DOCSDIR%%/CONTACT
+%%PORTDOCS%%@dirrm %%DOCSDIR%%</pre><p>As an alternative to enumerating the documentation files
+	  in <code class="filename">pkg-plist</code>, a port can set the variable
+	  <code class="varname">PORTDOCS</code> to a list of file names and shell
+	  glob patterns to add to the final packing list.
+	  The names will be relative to <code class="varname">DOCSDIR</code>.
+	  Therefore, a port that utilizes <code class="varname">PORTDOCS</code> and
+	  uses a non-default location for its documentation should set
+	  <code class="varname">DOCSDIR</code> accordingly.
+	  If a directory is listed in <code class="varname">PORTDOCS</code>
+	  or matched by a glob pattern from this variable,
+	  the entire subtree of contained files and directories will be
+	  registered in the final packing list. If <code class="varname">NOPORTDOCS</code>
+	  is defined then files and directories listed in
+	  <code class="varname">PORTDOCS</code> would not be installed and neither
+	  would be added to port packing list.
+	  Installing the documentation at <code class="varname">PORTDOCS</code>
+	  as shown above remains up to the port itself.
+	  A typical example of utilizing <code class="varname">PORTDOCS</code>
+	  looks as follows:</p><pre class="programlisting">PORTDOCS=       README.* ChangeLog docs/*</pre><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">The equivalents of <code class="varname">PORTDOCS</code> for files
+	    installed under <code class="varname">DATADIR</code> and
+	    <code class="varname">EXAMPLESDIR</code> are <code class="varname">PORTDATA</code>
+	    and <code class="varname">PORTEXAMPLES</code>, respectively.</p><p xmlns="http://www.w3.org/1999/xhtml">You can also use the <code class="filename">pkg-message</code> file to
+	    display messages upon installation.  See <a class="link" href="pkg-files.html#porting-message" title="8.1. pkg-message">the section on using
+	    <code class="filename">pkg-message</code></a> for details.
+	    The <code class="filename">pkg-message</code> file does not need to be
+	    added to <code class="filename">pkg-plist</code>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-subdirs"></a>5.14.5. Subdirectories under PREFIX</h3></div></div></div><p>Try to let the port put things in the right subdirectories of
+	  <code class="varname">PREFIX</code>.  Some ports lump everything and put it in
+	  the subdirectory with the port's name, which is incorrect.  Also,
+	  many ports put everything except binaries, header files and manual
+	  pages in a subdirectory of <code class="filename">lib</code>, which does
+	  not work well with the BSD paradigm.  Many of the files should be
+	  moved to one of the following: <code class="filename">etc</code>
+	  (setup/configuration files), <code class="filename">libexec</code>
+	  (executables started internally), <code class="filename">sbin</code>
+	  (executables for superusers/managers), <code class="filename">info</code>
+	  (documentation for info browser) or  <code class="filename">share</code>
+	  (architecture independent files).  See <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hier&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">hier</span>(7)</span></a> for details;
+	  the rules governing
+	  <code class="filename">/usr</code> pretty much apply to
+	  <code class="filename">/usr/local</code> too.  The exception are ports
+	  dealing with USENET <span class="quote">“<span class="quote">news</span>”</span>.  They may use
+	  <code class="filename">PREFIX/news</code> as a destination
+	  for their files.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="conflicts.html">前一頁</a> </td><td width="20%" align="center"><a accesskey="u" href="makefile.html">上一層</a></td><td width="40%" align="right"> <a accesskey="n" href="special.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">5.13. <code class="varname">CONFLICTS</code> </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 章 6. Special considerations</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

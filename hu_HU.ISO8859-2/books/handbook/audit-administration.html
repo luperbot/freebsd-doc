@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>17.5. A vizsgálati alrendszer használata</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="audit.html" title="17. fejezet - Biztonsági események vizsgálata" /><link rel="prev" href="audit-config.html" title="17.4. A vizsgálat beállítása" /><link rel="next" href="disks.html" title="18. fejezet - Háttértárak" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">17.5. A vizsgálati alrendszer használata</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="audit-config.html">Vissza</a> </td><th width="60%" align="center">17. fejezet - Biztonsági események vizsgálata</th><td width="20%" align="right"> <a accesskey="n" href="disks.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="audit-administration"></a>17.5. A vizsgálati alrendszer használata</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89479632"></a>17.5.1. A vizsgálati nyomok megtekintése</h3></div></div></div><p>A vizsgálati nyomok a BSM bináris
+	formátumban tárolódnak, ezért a
+	tartalmának konvertálásához
+	és módosításához
+	külön segédprogramokra van szükség.
+	A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=praudit&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">praudit</span>(1)</span></a> parancs a nyomállományokat
+	egyszerű szöveges formátumra alakítja,
+	az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=auditreduce&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">auditreduce</span>(1)</span></a> parancs pedig a nyomok
+	elemzéséhez, archiválásához
+	vagy nyomtatásához szükséges
+	leszűkítéséket végzi el.  Az
+	<code class="command">auditreduce</code> a szűrési
+	feltételek paramétereinek széles
+	skáláját kezeli, beleértve az
+	eseménytípusokat, -osztályokat,
+	felhasználókat, események
+	dátumát vagy időpontját,
+	állományok elérési
+	útvonalát vagy az általuk érintett
+	objektumokat.</p><p>Például a <code class="command">praudit</code>
+	segédprogram képes kilistázni
+	szövegesen egy adott vizsgálati napló teljes
+	tartalmát:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /var/audit/AUDITFILE</code></strong></pre><p>ahol az
+	<code class="filename">AUDITFILE</code> a
+	kiírandó vizsgálati napló.</p><p>A vizsgálati nyomok tokenekből
+	összeállított vizsgálati rekordok,
+	amelyeket a <code class="command">praudit</code> egymás után
+	soronként megjelenít.  Minden token adott
+	típusú, például a
+	<code class="literal">header</code> egy vizsgálati rekord
+	fejlécét tartalmazza, vagy a
+	<code class="literal">path</code>, amely a
+	névfeloldásból származó
+	elérési utat tartalmaz.  A következő
+	példa egy <code class="literal">execve</code> eseményt mutat
+	be:</p><pre class="programlisting">header,133,10,execve(2),0,Mon Sep 25 15:58:03 2006, + 384 msec
+exec arg,finger,doug
+path,/usr/bin/finger
+attribute,555,root,wheel,90,24918,104944
+subject,robert,root,wheel,root,wheel,38439,38032,42086,128.232.9.100
+return,success,0
+trailer,133</pre><p>Ez a vizsgálat egy sikeres <code class="literal">execve</code>
+	hívást rögzít, ahol a <code class="literal">finger
+	doug</code> parancs futott le.  A paramétereket
+	tartalmazó token magában foglalja a shell
+	által a rendszermag felé jelzett parancsot
+	és annak paraméterét egyaránt.  A
+	<code class="literal">path</code> token tárolja a
+	végrehajtott állomány rendszermag
+	által feloldott elérési
+	útját.  A <code class="literal">attribute</code> token
+	erről a binárisról ad további
+	információkat, különösen az
+	állomány módjáról, amely
+	segít megállapítani, hogy az adott
+	alkalmazásnál be volt-e állítva a
+	setuid bit.  A <code class="literal">subject</code> token leírja az
+	érintett folyamatot és rendre megjegyzi a
+	vizsgált felhasználó
+	azonosítóját, az aktuálisan
+	érvényben levő felhasználó
+	és csoport azonosítóját, a
+	valós felhasználói és csoport
+	azonosítót, a folyamat
+	azonosítóját, a munkamenet
+	azonosítóját, a port
+	azonosítóját és a
+	bejelentkezéshez használt hálózati
+	címet.  Vegyük észre, hogy a vizsgált
+	felhasználó azonosítója és a
+	valódi azonosítója eltér
+	egymástól: a <code class="systemitem">robert</code> nevű
+	felhasználó a <code class="systemitem">root</code>
+	accountjára váltott a parancs futattása
+	előtt, de az eredetileg hitelesített
+	felhasználójaként lett vizsgálva.
+	Végezetül a <code class="literal">return</code> token jelzi a
+	sikeres végrehajtást, és a
+	<code class="literal">trailer</code> pedig zárja a rekordot.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89495888"></a>17.5.2. A vizsgálati nyomok
+	leszűkítése</h3></div></div></div><p>Mivel a vizsgálatokhoz tartozó naplók
+	akár egészen nagyok is lehetnek, ezért a
+	rendszergazdának minden bizonnyal szüksége
+	lehet a számára fontos, például egy
+	adott felhasználóhoz tartozó rekordok
+	kiválogatására:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>auditreduce -u trhodes /var/audit/AUDITFILE | praudit</code></strong></pre><p>Ezzel ki tudjuk szűrni a <code class="systemitem">trhodes</code>
+	nevű felhasználóhoz tartozó
+	összes vizsgálati rekordot az
+	<code class="filename">AUDITFILE</code>
+	állományból.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89503440"></a>17.5.3. A naplók megtekintéséhez
+	szükséges jogok továbbadása</h3></div></div></div><p>Az <code class="systemitem">audit</code> csoport tagjai
+	olvashatják a <code class="filename">/var/audit</code>
+	könyvtárban található
+	vizsgálati nyomokat.  Alapértelmezés
+	szerint ez a csoport üres, ezért csak a
+	<code class="systemitem">root</code> képes ekkor vizsgálni a
+	nyomokat.  A többi felhasználó
+	számára úgy tudunk olvasási jogot
+	biztosítani, ha felvesszük őket az
+	<code class="systemitem">audit</code> csoportba.  Mivel a
+	vizsgálati naplók tartalmának
+	figyelése jelentős rálátást
+	adhat a rendszerben jelenlevő felhasználók
+	és folyamatok viselkedésére,
+	ajánlott körültekintően kiosztani az
+	olvasási jogokat.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89506640"></a>17.5.4. Élő rendszerfelügyelet a vizsgálati
+	csövekkel</h3></div></div></div><p>A vizsgálati csövek az eszközök
+	állományabsztrakcióit
+	klónozzák le, és ezzel teszik
+	lehetővé az alkalmazások
+	számára, hogy menet közben
+	megcsapolhassák a megfigyelt eszközök adatait.
+	Ez az elsődleges célja a
+	különböző betörésfigyelő
+	és rendszerfelügyeleti eszközök
+	készítőinek.  A rendszergazda
+	számára azonban a vizsgálati csövek
+	megkönnyítik az élő megfigyelést,
+	mert itt nem merülnek fel a nyomok
+	jogosultságaiból vagy az archiválás
+	miatt megszakadó eseményfolyamokból
+	adódó problémák.  Az élő
+	eseményfolyamra az alábbi parancs
+	kiadásával lehet rácsatlakozni:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /dev/auditpipe</code></strong></pre><p>Alapértelmezés szerint a vizsgálati
+	csőhöz tartozó csomópontok
+	kizárólag csak a <code class="systemitem">root</code>
+	felhasználó részére
+	érhetőek el.  Az <code class="systemitem">audit</code>
+	csoport tagjai úgy tudnak majd hozzáférni,
+	ha felvesszük a következő
+	<code class="literal">devfs</code> szabályt a
+	<code class="filename">devfs.rules</code>
+	állományba:</p><pre class="programlisting">add path 'auditpipe*' mode 0440 group audit</pre><p>A devfs állományrendszer
+	beállításáről bővebben
+	lásd a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs.rules&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs.rules</span>(5)</span></a> oldalt.</p><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">Könnyen gerjedést lehet előidézni
+	  a vizsgált események
+	  megfigyelésével, amikor is az egyes
+	  események megtekintése újabb
+	  vizsgálandó események sorozatát
+	  indítják el.  Például, ha az
+	  összes hálózati forgalmat egyszerre
+	  vizsgáljuk és a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=praudit&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">praudit</span>(1)</span></a> egy
+	  SSH-munkameneten keresztül fut, akkor a vizsgálati
+	  események töméntelen áradata indul
+	  meg, mivel minden kiírandó esemény egy
+	  újabb eseményt indukál.  Ennek
+	  elkerülése érdekében ajánlott
+	  a <code class="command">praudit</code> parancsot részletes
+	  forgalmat nem figyelő vizsgálati csővel
+	  ellátott munkameneten keresztül
+	  elindítani.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89514448"></a>17.5.5. A vizsgálati nyomok
+	archiválása</h3></div></div></div><p>A vizsgálati nyomokat egyedül a rendszermag
+	képes írni, illetve csak a vizsgálati
+	démon, az <span class="application">auditd</span> képes
+	felügyelni.  A rendszergazdáknak ebben az esetben
+	tehát nem szabad használniuk a
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">newsyslog.conf</span>(5)</span></a> vagy a hozzá hasonló
+	eszközök használatát a vizsgálati
+	naplók archiválásához.
+	Helyettük a <code class="command">audit</code> segédprogramot
+	javasolt használni a vizsgálatok
+	leállítására, a vizsgálati
+	rendszer újrakonfigurálására vagy a
+	napló archiválásának
+	elvégzésére.  Az alábbi parancs
+	utasítja a vizsgálati démont, hogy hozzon
+	létre egy új vizsgálati naplót
+	és jelzi a rendszermagnak, hogy váltson erre az
+	új naplóra.  Az eddig használt
+	naplót lezárja és átnevezi, ami
+	ezután a rendszergazda által tetszőlegesen
+	feldolgozható.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>audit -n</code></strong></pre><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ha az <span class="application">auditd</span> démon a
+	  parancs kiadásánák pillanatában
+	  nem futna, akkor hiba történik és
+	  erről hibaüzenetet kapunk.</p></div><p>A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a> segítségével
+	tizenként óránként
+	kikényszeríthetjük a naplók
+	váltását, ha felvesszük a
+	<code class="filename">/etc/crontab</code> állományba az
+	alábbi sort:</p><pre class="programlisting">0     */12       *       *       *       root    /usr/sbin/audit -n</pre><p>Ez a változtatás akkor fog
+	érvénybe lépni, ha elmentjük az
+	új <code class="filename">/etc/crontab</code>
+	állományt.</p><p>A vizsgálati nyomok mérete szerinti
+	automatikus váltás is
+	megvalósítható az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=audit_control&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">audit_control</span>(5)</span></a>
+	állományban szereplő <code class="option">filesz</code>
+	opció beállításával, amit meg
+	is találhatunk ebben a fejezetben, a
+	konfigurációs állományok
+	beállításánál.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89544016"></a>17.5.6. A vizsgálati nyomok
+	tömörítése</h3></div></div></div><p>Mivel a vizsgálati nyomok óriásira is
+	megnőhetnek, sokszor felmerül az igény, hogy
+	lehessen őket tömöríteni vagy más
+	egyéb módon archiválni a vizsgálati
+	démon által lezárt nyomokat.  Az
+	<code class="filename">audit_warn</code> szkript
+	használható a különböző
+	vizsgálatokhoz kapcsolódó események
+	esetén elvégzendő műveletek
+	megadásához, beleértve ebbe a
+	vizsgálati nyomok váltásakor
+	elvégzett szabályos
+	lezárását.  Például a
+	következőket kell beleírnunk az
+	<code class="filename">audit_warn</code> szkriptbe a nyomok
+	lezárását követő
+	tömörítéséhez:</p><pre class="programlisting">#
+# Lezáráskor tömöríti a vizsgálati nyomot.
+#
+if [ "$1" = closefile ]; then
+        gzip -9 $2
+fi</pre><p>Egyéb archiválási
+	tevékenységek lehetnek még: a nyomok
+	felmásolása egy központi szerverre, a
+	régebbi nyomok törlése, vagy a meglevő
+	nyomok leszűkítése csak a fontos
+	információkra.  A szkript csak akkor fog lefutni,
+	ha a vizsgálati nyomot sikerült szabályosan
+	lezárni, így tehát a szabálytalan
+	leálláskor megmaradó nyomok esetén
+	nem.</p><p>A FreeBSD 6.3 és későbbi
+	verzióiban, a <code class="command">praudit</code> XML kimeneti
+	formátumot is támogat, amely az
+	<code class="option">-x</code> kapcsolóval érhető
+	el.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="audit-config.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="audit.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="disks.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">17.4. A vizsgálat beállítása </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 18. fejezet - Háttértárak</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

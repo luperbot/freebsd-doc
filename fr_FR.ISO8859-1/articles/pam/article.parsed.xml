@@ -1,0 +1,1773 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!--
+  - Copyright (c) 2001-2003 Networks Associates Technology, Inc.
+  - All rights reserved.
+  -
+  - This software was developed for the FreeBSD Project by ThinkSec AS and
+  - Network Associates Laboratories, the Security Research Division of
+  - Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+  - ("CBOSS"), as part of the DARPA CHATS research program.
+  -
+  - Redistribution and use in source and binary forms, with or without
+  - modification, are permitted provided that the following conditions
+  - are met:
+  - 1. Redistributions of source code must retain the above copyright
+  -    notice, this list of conditions and the following disclaimer.
+  - 2. Redistributions in binary form must reproduce the above copyright
+  -    notice, this list of conditions and the following disclaimer in the
+  -    documentation and/or other materials provided with the distribution.
+  - 3. The name of the author may not be used to endorse or promote
+  -    products derived from this software without specific prior written
+  -    permission.
+  -
+  - THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+  - ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  - IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  - ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+  - FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  - DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  - OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  - HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  - LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  - OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  - SUCH DAMAGE.
+  -->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="fr">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Pluggable Authentication Modules</title>
+    
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Cet  article  décrit  les  principes sous-jacent  et  les
+      mécanismes  de   la  bibliothèque  PAM,   il  explique  comment
+      configurer PAM,  l'intégrer dans  les applications, et
+      écrire ses propres modules PAM.</para>
+
+	  <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Version française de Clément Mathieu
+  <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">cykl@mAdchAt.org</email>.</emphasis></para>
+    </abstract>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2001</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2002</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2003</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">Networks Associates Technology, Inc.</holder>
+    </copyright>
+
+    <authorgroup xmlns:xlink="http://www.w3.org/1999/xlink">
+      <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Dag-Erling</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Smørgrav</surname></personname><contrib xmlns:xlink="http://www.w3.org/1999/xlink">Contributed by </contrib></author>
+    </authorgroup>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-legalnotice">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Cet  article  a  été  écrit  pour le  Projet  FreeBSD  par
+      ThinkSec  AS et  les laboratoires  de Networks  Associates,  la
+      division de  recherche en  sécurité de Networks  Associates, Inc.
+      sous      le      contrat     DARPA/SPAWAR      N66001-01-C-8035
+      (<quote xmlns:xlink="http://www.w3.org/1999/xlink">CBOSS</quote>),  en  tant  que  partie du  programme  de
+      recherche DARPA CHATS.</para>
+    </legalnotice>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+  </info>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-intro">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-intro.title">Introduction</title>
+
+	 <para xmlns:xlink="http://www.w3.org/1999/xlink">La  bibliothèque  PAM  est  une  API  généralisée  pour  les
+	 services   relevant  de   l'authentification  permettant   à  un
+	 administrateur    système   d'ajouter    une    nouvelle   méthode
+	 d'authentification en  ajoutant simplement un  nouveau module PAM,
+	 ainsi que de  modifier  les  règles d'authentification  en  éditant  les
+	 fichiers de configuration.</para>
+
+	 <para xmlns:xlink="http://www.w3.org/1999/xlink">PAM  a été conçu  et développé  en 1995  par Vipin  Samar et
+	 Charlie  Lai  de Sun  Microsystems,  et  n'a  pas beaucoup  évolué
+	 depuis. En  1997 l'Open Group publie  les premières spécifications
+	 XSSO  qui standardisent  l'API  PAM et  ajoute  des extensions  pour
+	 un simple (ou plutot intégré) "sign-on".  Lors  de l'écriture de  cet article, la  spécification n'a
+	 toujours pas été adoptée comme standard.</para>
+
+	 <para xmlns:xlink="http://www.w3.org/1999/xlink">Bien  que  cet  article  se  concentre  principalement  sur
+	 FreeBSD  5.x,  qui  utilise  OpenPAM, il  devrait  également  être
+	 applicable  à FreeBSD 4.x  qui utilise  Linux-PAM, ainsi qu'à d'autres
+	 systèmes d'exploitations tels que Linux ou Solaris.</para>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-trademarks">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-trademarks.title">Marques déposées</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Sun, Sun Microsystems, SunOS and Solaris are trademarks or
+	registered trademarks of Sun Microsystems, Inc.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">UNIX and The Open Group are trademarks or registered
+	trademarks of The Open Group.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">All other brand or product names mentioned in this
+	document may be trademarks or registered trademarks of their
+	respective owners.</para>
+    </section>
+  </section>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-terms">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-terms.title">Termes et conventions</title>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-definitions">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-definitions.title">Définitions</title>
+
+
+		<para xmlns:xlink="http://www.w3.org/1999/xlink">La  terminologie   de  PAM  est  plutôt   confuse.  Ni  la
+		publication originale  de Samar et Lai, ni  la spécification XSSO
+		n'ont essayé de définir formellement des termes pour les acteurs
+		et  les  entités intervenant  dans  PAM, les termes  qu'ils
+		utilisent (mais  ne définissent  pas) sont parfois  trompeurs et
+		ambigus.   Le   premier   essai  d'établir   une   terminologie
+		consistante  et  non ambiguë  fut  un  papier  écrit par  Andrew
+		G. Morgan (l'auteur de Linux-PAM) en 1999. Bien que les choix de
+		Morgan furent  un énorme  pas en avant,  ils ne sont  pas parfait
+		d'après  l'auteur de  ce  document.  Ce qui  suit,
+		largement  inspiré par  Morgan, est un  essai de  définir précisément  et sans
+		ambiguïté des termes pour  chaque acteur ou entité utilisé dans
+		PAM.</para>
+
+      <glosslist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">compte</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">L'ensemble  de  permissions  que  le demandeur  demande  a
+	 	l'arbitre.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">demandeur</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">L'utilisateur         ou        l'entité        demandant
+	    authentification.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">arbitre</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">L'utilisateur ou l'entité possédant les privilèges nécessaires
+	    pour   vérifier  la  requête   du  demandeur   ainsi que  l'autorité
+	    d'accorder ou de rejeter la requête.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">chaîne</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Une séquence de modules qui sera invoquée pour répondre à
+	    une requête  PAM. La chaîne comprend  les informations concernant
+	    l'ordre dans lequel invoquer  les modules, les arguments à leur
+	    passer et la façon d'interpréter les résultats.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">client</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">L'application      responsable     de      la     requête
+	    d'authentification   au   nom   du   demandeur   et   de recueillir
+	    l'information d'authentification nécessaire.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">mécanisme</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Il  s'agit  de  l'un  des  quatre  groupes  basiques  de
+	    fonctionnalités  fournit par PAM  : authentification,  gestion de
+	    compte,   gestion   de   session   et   mise à jour   du   jeton
+	    d'authentification.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">module</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Une collection d'une ou plusieurs fonctions implémentant
+	    un  service  d'authentification  particulier,  rassemblées  dans  un
+	    fichier binaire (normalement chargeable dynamiquement)
+	    et identifié par un nom unique.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">règles</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  jeu  complet  de  configuration  des règles  décrivant
+	    comment   traiter   les    requêtes   PAM   pour   un   service
+	    particulier. Une règle consiste normalement en quatre chaînes,
+	    une   pour  chaque   mécanisme,  bien   que   quelques  services
+	    n'utilisent pas les quatre mécanismes.</para>
+
+ </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">serveur</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">L'application agissant au nom de l'arbitre pour converser
+	    avec le client,  récupérer les informations d'authentification,
+	    vérifier les droits du demandeur et autoriser ou rejeter
+	    la requête.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">service</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Un  ensemble de  serveurs  fournissant des  fonctionnalités
+	    similaires  ou   liées  et  nécessitant   une  authentification
+	    similaire. Les règles  de PAM sont définies sur  un le principe
+	    de par-service;  ainsi tous les serveurs qui  demandent le même
+	    nom de service seront soumis aux mêmes règles.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">session</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  contexte  dans  lequel  le  service  est  délivré  au
+	    demandeur par le serveur. L'un  des quatre mécanismes de PAM, la
+	    gestion  de   session,  s'en occupe   exclusivement  par  la
+	    mise en place  et le relâchement  de ce contexte.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">jeton</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Un morceau d'information associé avec un compte tel qu'un
+	    mot de passe  ou une passphrase que le  demandeur doit fournir
+	    pour prouver son identité.</para>
+	  </glossdef>
+	</glossentry>
+
+	<glossentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <glossterm xmlns:xlink="http://www.w3.org/1999/xlink">transaction</glossterm>
+	  <glossdef xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Une séquence de requêtes depuis le même demandeur vers la
+	    même    instance    du    même   serveur,    commençant    avec
+	    l'authentification  et la  mise en  place de  la session  et se
+	    terminant avec le démontage de la session.</para>
+	  </glossdef>
+	</glossentry>
+      </glosslist>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-usage-examples">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-usage-examples.title"> Exemples d'utilisation</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Cette section  a pour but d'illustrer
+      quelques-uns des termes  définis précédemment  à l'aide
+      d'exemples basiques.</para>
+
+      <section xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Client et serveurs ne font qu'un</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Cet exemple  simple montre <literal xmlns:xlink="http://www.w3.org/1999/xlink">alice</literal> utilisant
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> pour devenir <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>.</para>
+
+
+<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">whoami</userinput>
+alice
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">ls -l `which su`</userinput>
+-r-sr-xr-x  1 root  wheel  10744 Dec  6 19:06 /usr/bin/su
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">su -</userinput>
+Password: <userinput xmlns:xlink="http://www.w3.org/1999/xlink">xi3kiune</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> whoami
+root
+</screen>
+
+	<itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le demandeur est <literal xmlns:xlink="http://www.w3.org/1999/xlink">alice</literal>.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le compte est <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le processus  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> est à la fois client et serveur.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le jeton d'authentification est
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">xi3kiune</literal>.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">L'arbitre  est <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>,  ce  qui explique
+		   pourquoi            <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>           est           setuid
+		   <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>.</para>
+	  </listitem>
+	</itemizedlist>
+      </section>
+
+      <section xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Client et serveur sont distincts.</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">L'exemple  suivant   montre  <literal xmlns:xlink="http://www.w3.org/1999/xlink">eve</literal>  essayant
+	d'initier        une       connexion        <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>       vers
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">login.exemple.com</literal>, en demandant  à se logguer en
+	tant que <literal xmlns:xlink="http://www.w3.org/1999/xlink">bob</literal>. La connexion réussit. Bob aurait du choisir
+	un meilleur mot de passe !</para>
+
+<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">whoami</userinput>
+eve
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">ssh bob@login.example.com</userinput>
+bob@login.example.com's password: <userinput xmlns:xlink="http://www.w3.org/1999/xlink">god</userinput>
+Last login: Thu Oct 11 09:52:57 2001 from 192.168.0.1
+Copyright (c) 1980, 1983, 1986, 1988, 1990, 1991, 1993, 1994
+	The Regents of the University of California.  All rights reserved.
+FreeBSD 4.4-STABLE (LOGIN) #4: Tue Nov 27 18:10:34 PST 2001
+
+Welcome to FreeBSD!
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">%</prompt></screen>
+
+	<itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le demandeur est  <literal xmlns:xlink="http://www.w3.org/1999/xlink">eve</literal>.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le client d'<literal xmlns:xlink="http://www.w3.org/1999/xlink">eve</literal> est représenté par les processus <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> </para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le serveur est le processus <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sshd</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> sur
+	      <literal xmlns:xlink="http://www.w3.org/1999/xlink">login.example.com</literal></para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le compte est <literal xmlns:xlink="http://www.w3.org/1999/xlink">bob</literal>.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le jeton d'identification est
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">god</literal>.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Bien  que  cela ne  soit  pas  montré  dans cet  exemple,
+	     l'arbitre est <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>.</para>
+	  </listitem>
+	</itemizedlist>
+      </section>
+
+      <section xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Exemple de règles</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Les  lignes  qui  suivent  sont  les  règles  par  défaut  de
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">sshd</literal>:</para>
+
+<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">
+sshd	auth		required	pam_nologin.so	no_warn
+sshd	auth		required	pam_unix.so	no_warn try_first_pass
+sshd	account		required	pam_login_access.so
+sshd	account		required	pam_unix.so
+sshd	session		required	pam_lastlog.so	no_fail
+sshd	password	required	pam_permit.so</programlisting>
+
+	<itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  	 <para xmlns:xlink="http://www.w3.org/1999/xlink">Cette      politique      s'applique      au      service
+	  	 <literal xmlns:xlink="http://www.w3.org/1999/xlink">sshd</literal> (qui n'est pas nécessairement restreint
+	  	 au serveur <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sshd</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>)</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">auth</literal>, <literal xmlns:xlink="http://www.w3.org/1999/xlink">account</literal>,
+	      <literal xmlns:xlink="http://www.w3.org/1999/xlink">session</literal> et
+	      <literal xmlns:xlink="http://www.w3.org/1999/xlink">password</literal> sont des mécanismes.</para>
+	  </listitem>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink"><filename xmlns:xlink="http://www.w3.org/1999/xlink">pam_nologin.so</filename>,
+	      <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam_unix.so</filename>,
+	      <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam_login_access.so</filename>,
+	      <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam_lastlog.so</filename>                         et
+	      <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam_permit.so</filename> sont  des modules.  Il est
+	      clair  dans cet exemple  que <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam_unix.so</filename>
+	      fournit  au  moins  deux  mécanismes (  authentification  et
+	      gestion de compte).</para>
+	  </listitem>
+	</itemizedlist>
+      </section>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-conventions">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-conventions.title">Conventions</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink"><!--XXX-->Cette section n'a pas encore été écrite.</para>
+    </section>
+  </section>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-essentials">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-essentials.title">Les bases de PAM</title>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-facilities-primitives">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-facilities-primitives.title">Mécanismes et primitives</title>
+
+		<para xmlns:xlink="http://www.w3.org/1999/xlink">L'API   PAM  fournit  six   primitives  d'authentification
+		différentes  regroupées dans quatre  mécanismes qui  seront décrits
+		dans la partie suivante.</para>
+
+
+      <variablelist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">auth</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Authentification.</emphasis>    Ce   mécanisme
+	      concerne  l'authentification  du  demandeur  et  établit  les
+	      droits du compte. Il fournit deux primitives :</para>
+
+
+	    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_authenticate</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>    authentifie    le   demandeur,
+		généralement  en demandant  un jeton  d'identification et  en le
+		comparant  a une  valeur stockée  dans une  base de  données ou
+		obtenue par le biais d'un serveur d'authentification.</para>
+	      </listitem>
+
+	      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_setcred</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  établi les  paramètres du  compte tel
+		que l'uid, les groupes dont  le compte fait parti ou les limites
+		sur l'utilisation des ressources.</para>
+	      </listitem>
+	    </itemizedlist>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">account</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Gestion  de  compte.</emphasis>  Ce  mécanisme
+	    concerne la  disponibilité du  compte pour des raisons autres que
+	    l'authentification.  Par exemple  les  restrictions basées  sur
+	    l'heure courante ou la charge  du serveur. Il fournit une seule
+	    primitive:</para>
+
+	    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_acct_mgmt</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  vérifie que  le compte  demandé est
+		disponible.</para>
+	</listitem>
+	    </itemizedlist>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">session</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Gestion  de  session.</emphasis> Ce  mécanisme
+	    concerne la mise en place de la session  et sa terminaison, par
+	    exemple l'enregistrement  de la  session dans les  journaux. Il
+	    fournit deux primitives:</para>
+	    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_open_session</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> accomplie  les tâches associées à
+		la mise  en place  d'une session :  ajouter une entrée  dans les
+		bases  <filename xmlns:xlink="http://www.w3.org/1999/xlink">utmp</filename>  et  <filename xmlns:xlink="http://www.w3.org/1999/xlink">wtmp</filename>,
+		démarrer un agent SSH...</para>
+	      </listitem>
+
+	      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_close_session</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> accomplie les tâches associées à
+		la terminaison d'une session : ajouter une entrée dans les bases
+		<filename xmlns:xlink="http://www.w3.org/1999/xlink">utmp</filename>  et <filename xmlns:xlink="http://www.w3.org/1999/xlink">wtmp</filename>, arrêter
+		l'agent SSH...</para>
+	      </listitem>
+	    </itemizedlist>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">password</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Gestion   des  mots  de   passe.</emphasis>  Ce
+	 mécanisme est  utilisé pour modifier  le jeton d'authentification
+	 associé à un  compte, soit parce qu'il a expiré,  soit parce que
+	 l'utilisateur   désire   le   changer.   Il  fournit   une   seule
+	 primitive:</para>
+	    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_chauthtok</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> modifie le jeton d'authentification,
+		et éventuellement vérifie que celui-ci est assez robuste pour ne
+		pas  être  deviné  facilement  ou  qu'il  n'a  pas  déjà utilisé.
+		</para>
+
+	      </listitem>
+	    </itemizedlist>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules.title">Modules</title>
+
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Les modules  sont le concept  clef de PAM; après  tout ils
+      constituent  le  <quote xmlns:xlink="http://www.w3.org/1999/xlink">M</quote>  de  PAM. Un  module  PAM  est
+      lui-même un  morceau de code qui implémente  les primitives d'un
+      ou   plusieurs   mécanismes    pour   une   forme   particulière
+      d'authentification; par  exemple, les bases de mots  de passe UNIX
+      que sont NIS, LDAP et Radius.</para>
+
+      <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-module-naming">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-module-naming.title">Nom des modules</title>
+
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD implémente chaque  mécanismes dans un module distinct
+	  nommé
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">pam_mécanisme.so</literal>
+	  (par  exemple  <literal xmlns:xlink="http://www.w3.org/1999/xlink">pam_unix.so</literal>  pour le  mécanisme
+	  Unix  .)   Les autres  implementations  possèdent  parfois des  modules
+	  séparés pour  des mécanismes séparés et incluent aussi  bien le
+	  nom du service  que celui du mécanisme dans le  nom du module. Un
+	  exemple  est le  module  <literal xmlns:xlink="http://www.w3.org/1999/xlink">pam_dial_auth.so.1</literal> de
+	  Solaris  qui  est  utilisé  pour  authentifier  les  utilisateurs
+	  dialup.</para>
+      </section>
+
+      <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-module-versioning">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-module-versioning.title">Gestion des versions de module </title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">L'implémentation  originale  de PAM  par  FreeBSD, basée  sur
+	Linux-PAM, n'utilisait  pas de numéro  de version pour  les modules
+	PAM. Ceci peut poser des  problèmes avec les applications tiers qui
+	peuvent être liées avec  d'anciennes bibliothèques systèmes, puisqu'il
+	n'y  a pas  possibilité  de charger  la  version correspondante  du
+	module désiré.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Pour  sa part,  OpenPAM cherche  les  modules qui  ont la  même
+	version que la bibliothèque PAM (pour le moment 2) et se rabat sur
+	un module  sans version si aucun  module avec version  n'a put être
+	chargé.  Ainsi les anciens  modules peuvent  être fournis  pour les
+	anciennes  applications,   tout  en  permettant   aux  nouvelles applications
+	(ou  bien nouvellement  compilées)  de  tirer parti  des
+	modules les plus récents.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Bien que les modules PAM de Solaris possèdent généralement un
+	numéro de version, ils ne sont pas réellement versionnés car
+	le numéro  correspond à une  partie du nom  du module et  doit être
+	inclus dans la configuration.</para>
+      </section>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-chains-policies">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-chains-policies.title">Chaînes et politiques</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Lorsqu'un   <!--XXX-->serveur  initie   une   transaction  PAM,   la
+      bibliothèque PAM essaie de  charger une politique pour le service
+      spécifié  dans  l'appel  a  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_start</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  .   La  politique
+      indique comment la requête d'authentification doit être traitée
+      et est définie dans un  fichier de configuration. Il  s'agit de
+      l'autre   concept    clef   de   PAM :    la   possibilité   pour
+      l'administrateur  de  configurer  la  politique de  sécurité  d'un
+      système en éditant simplement une fichier texte.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Une politique consiste en quatre chaînes, une pour chacune
+      des  quatre mécanismes  de PAM. Chaque  chaîne est  une  suite de
+      règles  de  configuration,  chacune  spécifiant un  module  à
+      invoquer, des paramètres, options,  à passer au module et un
+      drapeau de  contrôle qui décrit  comment interpréter le  code de
+      retour du module.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Comprendre  le  drapeau  de  contrôle est  essentiel  pour
+      comprendre  les  fichiers de  configuration  de  PAM. Il  existe
+      quatre drapeaux de contrôle différents :</para>
+
+      <variablelist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">binding</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Si le  module réussit et qu'aucun module  précédent de la
+	    chaîne n'a  échoué, la chaîne s'interrompt  immédiatement et la
+	    requête  est autorisée.  Si le  module échoue  le reste  de la
+	    chaîne   est  exécuté,   mais   la  requête   est  rejetée   au
+	    final.</para>
+
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Ce drapeau  de contrôle a  été introduit par  Sun Solaris
+	    dans la  version 9  (SunOS 5.9);  il est aussi  supporté par
+	    OpenPAM.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">required</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Si le module réussit, le  reste de la chaîne est exécuté,
+	    et  la  requête est  autorisée  si  aucun  des autres  modules
+	    n'échoue.  Si le  module  échoue,  le reste  de  la chaîne  est
+	    exécuté, mais au final la requête est rejetée.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">requisite</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Si le module  réussit le reste de la  chaîne est exécuté,
+	    et  la   requête  est   autorisée  sauf  si   d'autres  modules
+	    échoués.  Si  le  module  échoue la  chaîne  est  immédiatement
+	    terminée et la requête est rejetée.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">sufficient</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Si le  module réussit  et qu'aucun des  modules précédent
+	    n'a échoué  la chaîne est immédiatement terminée  et la requête
+	    est allouée. Si  le module échoue il est ignore  et le reste de
+	    la chaîne est exécuté.</para>
+
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Puisque  la sémantique  de  ce drapeau  peut  être un  peu
+	    confuse,  spécialement  lorsqu'il s'agit  de  celui du  dernier
+	    module de  la chaîne, il  est recommandé d'utiliser  le drapeau
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">binding</literal>   à   la   place  de   celui-ci   sous la condition que
+	    l'implémentation le supporte.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">optional</literal></term>
+	  <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  module est exécuté  mais le  résultat est  ignoré. Si
+	    tout    les    modules    de    la    chaîne    sont    marqués
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">optional</literal>,   toutes   les   requêtes   seront
+	    toujours acceptées.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Lorsqu'un  serveur invoque l'une  des six  primitives PAM,
+       PAM  récupère  la chaîne  du  mécanisme  à  laquelle la  requête
+      correspond et  invoque chaque module de la  chaîne dans l'ordre
+      indiqué,  jusqu'à  ce que  la  fin  soit  atteinte ou  qu'aucune
+      exécution  supplémentaire ne  soit nécessaire  (soit à  cause du
+      succès    d'un   module    en    <literal xmlns:xlink="http://www.w3.org/1999/xlink">binding</literal>   ou
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">sufficient</literal>,  soit  à  cause de  l'échec  d'un
+      module <literal xmlns:xlink="http://www.w3.org/1999/xlink">requisite</literal>). La requête est acceptée si
+      et seulement  si au moins un  module a été invoqué,  et que tout
+      les modules non optionnels ont réussi.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Notez qu'il est possible, bien que peu courant, d'avoir le
+      même  module  listé plusieurs  fois  dans  la  même chaîne.  Par
+      exemple un module qui détermine  le nom utilisateur et le mot de
+      passe  à  l'aide  d'un   serveur  directory  peut  être  invoqué
+      plusieurs  fois   avec  des  paramètres   spécifiant  différents
+      serveurs a contacter.  PAM considère les différentes occurrences
+      d'un  même  module  dans  une  même  chaîne  comme  des  modules
+      différents et non liés.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-transactions">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-transactions.title">Transactions</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le cycle  de vie d'une transaction PAM  typique est décrit
+      ci-dessous. Notez que si l'une  de ces étapes échoue, le serveur
+      devrait  reporter un message  d'erreur au  client et  arrêter la
+      transaction.</para>
+
+      <orderedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Si  nécessaire,  le   serveur  obtient  les  privilèges  de
+	  l'arbitre par le biais d'un mécanisme indépendant de PAM &#8212;
+	  généralement en ayant  été démarré par <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal> ou
+	  en étant setuid <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  serveur appel  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_start</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> afin  d'initialiser la
+	  bibliothèque PAM  et indique  le service et  le compte  cible, et
+	  enregistre une fonction de conversation appropriée.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  serveur  obtient  diverses informations  concernant  la
+	  transaction (tel que le nom  d'utilisateur du demandeur et le nom
+	  d'hôte de la machine sur  lequel le client tourne) et les soumet
+	  à PAM en utilisant la fonction <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_set_item</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Le serveur appel  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_authenticate</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> pour authentifier le demandeur.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  serveur  appel  la fonction  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_acct_mgmt</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  qui
+	  vérifie  que le compte  est valide  et disponible.  Si le  mot de
+	  passe est correct mais a expiré, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_acct_mgmt</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> retournera
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_NEW_AUTHTOK_REQD</literal>    à    la    place    de
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_SUCCESS</literal>.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Si        l'étape        précédente       a        retourné
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_NEW_AUTHTOK_REQD</literal>,    le    serveur   appel
+	  maintenant  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_chauthtok</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  pour  obliger l'utilisateur  à
+	  changer le jeton d'authentification du compte désiré.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Maintenant que le demandeur a été correctement authentifié,
+	  le serveur appelle  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_setcred</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> pour obtenir les privilèges
+	  du compte désiré. Il lui est  possible de faire ceci parce qu'il
+	  agit au nom de l'arbitre dont il possède les privilèges.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Lorsque les privilèges corrects  ont été établi le serveur
+	  appelle   <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_open_session</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>   pour   mettre  en   place   la
+	  session.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Maintenant le serveur effectue les services demandés par le
+	  client &#8212; par exemple fournir un shell au demandeur.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Lorsque le  serveur a  fini de servir  le client,  il appelle
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_close_session</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> afin de  terminer la session.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Pour finir, le  serveur appelle <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_end</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> afin signaler
+	  à la bibliothèque  PAM que la transaction se termine et qu'elle peut libérer
+	  les   ressources    qu'elle   a    alloué   au   cours    de   la
+	  transaction.</para>
+	</listitem>
+      </orderedlist>
+    </section>
+  </section>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-config">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-config.title">Configuration de PAM</title>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-config-file-locations">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-config-file-locations.title">Emplacement des fichiers de configuration</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le fichier de  configuration de PAM est traditionnellement
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.conf</filename>.  Ce fichier  contient toutes
+      les  politiques  de PAM  pour  votre  système.  Chaque ligne  du
+      fichier décrit une étape dans une chaîne, tel que nous allons le
+      voir ci-dessous:</para>
+
+<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">login   auth    required        pam_nologin.so  no_warn</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Les champs  sont respectivement, le service, le nom  du mécanisme, le
+      drapeau  de contrôle,  le nom  du  module et  les arguments  du
+      module. Tout  champ additionnel est considéré  comme argument du
+      module.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Une   chaîne  différente   est   construite  pour   chaque couple
+      service/mécanisme;  ainsi,  alors  que  l'ordre  des  lignes  est
+      important  lorsqu'il s'agit  des mêmes  services  ou mécanismes,
+      l'ordre  dans  lequel  les  différents  services  et  mécanismes
+      apparaissent  ne  l'est pas  &#8212;  excepté  l'entrée pour  le
+      service  <literal xmlns:xlink="http://www.w3.org/1999/xlink">other</literal>, qui  sert de  référence par défaut  et doit
+      être  placé à  la  fin.  L'exemple du  papier  original sur  PAM
+      regroupait  les lignes  de configurations  par mécanisme  et le
+      fichier   <filename xmlns:xlink="http://www.w3.org/1999/xlink">pam.conf</filename>  de   Solaris   le  fait
+      toujours, mais  FreeBSD groupe  les lignes de  configuration par
+      service. Toutefois il ne s'agit pas de la seule possibilité et les autres possèdent
+      aussi un sens.</para>
+
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">OpenPAM et Linux-PAM offrent un mécanisme de configuration
+      alternatif  où les  politiques  sont placées  dans des  fichiers
+      séparés portant  le nom du service auquel  ils s'appliquent. Ces
+      fichiers  sont situés dans  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d/</filename> et
+      ne contiennent que  quatre champs à la place  de cinq &#8212; le
+      champ contenant  le nom du service  est omis. Il  s'agit du mode
+      par  défaut   dans  FreeBSD  4.x.   Notez  que  si   le  fichier
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.conf</filename>   existe   et  contient   des
+      informations de configuration pour des services qui n'ont pas de
+      politique  spécifiée  dans <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d</filename>,  ils
+      seront utilisés pour ces services.</para>
+
+
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  gros avantage de  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d/</filename> sur
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.conf</filename>   est   qu'il  est   possible
+      d'utiliser  la même  politique pour  plusieurs services  en liant
+      chaque  nom  de service  à  un  fichier  de configuration.  Par
+      exemple  pour  utiliser  la  même politique  pour  les  services
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">su</literal>  et <literal xmlns:xlink="http://www.w3.org/1999/xlink">sudo</literal>,  nous pouvons
+      faire comme ceci :</para>
+
+<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd /etc/pam.d</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">ln -s su sudo</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ceci  fonctionne car  le nom  de service  est  déterminé a
+      partir  du nom  de fichier  plutôt qu'indiqué  à  l'intérieur du
+      fichier de configuration, ainsi le même fichier peut être utilisé
+      pour des services nommés différemment.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Un autre avantage est  qu'un logiciel tiers peu facilement
+      installer  les politiques  pour ses  services sans  avoir besoin
+      d'éditer  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.conf</filename>. Pour  continuer la
+      tradition     de     FreeBSD,     OpenPAM     regardera     dans
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/pam.d</filename>   pour   trouver   les
+      fichiers  de  configurations; puis si  aucun n'est  trouvé  pour  le
+      service   demandé,   il cherchera dans   <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d/</filename>   ou
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.conf</filename>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Finalement,   quelque   soit   le   mécanisme   que   vous
+      choisissiez,       la      politique      <quote xmlns:xlink="http://www.w3.org/1999/xlink">magique</quote>
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">other</literal> est  utilisée par défaut  pour tous les
+      services qui n'ont pas leur propre politique.</para>
+
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-config-breakdown">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-config-breakdown.title">Breakdown of a
+	configuration line</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Comme      expliqué     dans     <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="pam-config-file-locations"/>, chaque ligne de
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">pam.conf</filename> consiste en quatre champs ou plus: le
+	nom de service, le nom du mécanisme, le drapeau de contrôle, le nom
+	du module et la présence ou non d'arguments pour le module.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le nom du service  est généralement, mais pas toujours, le
+      nom  de  l'application auquelle  les  règles  s'appliquent. Si  vous
+      n'êtes pas sûr, référez vous à la documentation de l'application
+      pour déterminer quel nom de service elle utilise.</para>
+
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Notez         que         si         vous         utilisez
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.d/</filename>      à     la      place     de
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/pam.conf</filename>,   le  nom  du   service  est
+      spécifié par  le nom du  fichier de configuration et  n'est pas
+      indiqué  dans   les  lignes  de  configuration   qui,  dès  lors,
+      commencent par le nom du mécanisme.</para>
+
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le mécanisme est  l'un des quatre mots clef  décrit dans
+      <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="pam-facilities-primitives"/>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">De même, le  drapeau de contrôle est l'un  des quatre mots
+      clef décrits dans <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="pam-chains-policies"/> et  décrit comment
+      le   module   doit   interpréter    le   code   de   retour   du
+      module.  Linux-PAM  supporte une  syntaxe  alternative qui  vous
+      laisse  spécifier l'action à  associer à  chaque code  de retour
+      possible;  mais ceci  devrait être  évité puisque  ce  n'est pas
+      standard et étroitement lié à la façon dont Linux-PAM appelle les
+      services  (qui diffère  grandement  de la  façon  de Solaris  et
+      OpenPAM). C'est  sans étonnement que l'on  apprend qu'OpenPAM ne
+      supporte pas cette syntaxe.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-policies">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-policies.title">Politiques</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Pour  configurer  PAM correctement,  il  est essentiel  de
+      comprendre comment les politiques sont interprétées.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Lorsqu'une   application   appelle  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_start</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>   la
+      bibliothèque  PAM charge  la  politique du  service spécifié  et
+      construit  les  quatre  chaînes   de  module  (une  pour  chaque
+      mécanisme). Si  une ou plusieurs chaînes sont  vides, les chaînes
+      de  la   politique  du  service   <literal xmlns:xlink="http://www.w3.org/1999/xlink">other</literal>  sont
+      utilisées.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Plus  tard,  lorsque  l'application  appelle  l'une  des  six
+      primitives  PAM,  la  bibliothèque  PAM récupère  la  chaîne  du
+      mécanisme  correspondant et  appelle la  fonction  appropriée avec
+      chaque  module listé dans  la chaîne.  Après chaque  appel d'une
+      fonction  de service,  le type  du  module et  le code  d'erreur
+      sont retournés par  celle-ci pour  déterminer quoi faire.  À quelques
+      exceptions  près,  dont  nous  parlerons  plus  tard,  la  table
+      suivante s'applique:</para>
+
+      <table xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">Résumé de la chaîne d'exécution PAM </title>
+	<tgroup xmlns:xlink="http://www.w3.org/1999/xlink" cols="4">
+	  <colspec xmlns:xlink="http://www.w3.org/1999/xlink" colwidth="1*" colname="type"/>
+	  <colspec xmlns:xlink="http://www.w3.org/1999/xlink" colwidth="1*" colname="success"/>
+	  <colspec xmlns:xlink="http://www.w3.org/1999/xlink" colwidth="1*" colname="ignore"/>
+	  <colspec xmlns:xlink="http://www.w3.org/1999/xlink" colwidth="1*" colname="other"/>
+	  <thead xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="type"/>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="success"><literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_SUCCESS</literal></entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="ignore"><literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_IGNORE</literal></entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="other"><literal xmlns:xlink="http://www.w3.org/1999/xlink">other</literal></entry>
+	   </row>
+	  </thead>
+	  <tbody xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="type">binding</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="success">if (!fail) break;</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="ignore">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="other">fail = true;</entry>
+	    </row>
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="type">required</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="success">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="ignore">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="other">fail = true;</entry>
+	    </row>
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="type">requisite</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="success">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="ignore">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="other">fail = true; break;</entry>
+	    </row>
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="type">sufficient</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="success">if (!fail) break;</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="ignore">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="other">-</entry>
+	    </row>
+	    <row xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="type">optional</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="success">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="ignore">-</entry>
+	      <entry xmlns:xlink="http://www.w3.org/1999/xlink" colname="other">-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </table>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Si <varname xmlns:xlink="http://www.w3.org/1999/xlink">fail</varname> est vrai à la fin de la chaîne,
+      ou  lorsqu'un <quote xmlns:xlink="http://www.w3.org/1999/xlink">break</quote>  est atteint,  le dispatcheur
+      retourne le  code d'erreur renvoyé  par le premier module  qui a
+      échoué.     Autrement     <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_SUCCESS</literal>     est
+      retourné.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">La   première   exception  est   que   le  code   d'erreur
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_NEW_AUTHOK_REQD</literal>  soit considéré  comme un
+      succès, sauf si  aucun module n'échoue et qu'au  moins un module
+      retourne  <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_NEW_AUTHOK_REQD</literal>  le dispatcheur
+      retournera <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_NEW_AUTHOK_REQD</literal>.</para>
+
+     <para xmlns:xlink="http://www.w3.org/1999/xlink">La seconde exception  est que <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_setcred</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> considère
+     les         modules         <literal xmlns:xlink="http://www.w3.org/1999/xlink">binding</literal>         et
+     <literal xmlns:xlink="http://www.w3.org/1999/xlink">sufficient</literal>       comme      s'ils      étaient
+     <literal xmlns:xlink="http://www.w3.org/1999/xlink">required</literal>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">La    troisième   et    dernière    exception   est    que
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_chauthtok</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> exécute la totalité de la chaîne deux fois
+      (la première pour des vérifications préliminaires et la deuxième
+      pour mettre le  mot de passe) et lors  de la première exécution
+      il    considère   les   modules    <literal xmlns:xlink="http://www.w3.org/1999/xlink">binding</literal>   et
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">sufficient</literal>      comme      s'ils      étaient
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">required</literal>.</para>
+
+    </section>
+  </section>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-freebsd-modules">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-freebsd-modules.title">Les modules PAM de FreeBSD</title>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-deny">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-deny.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_deny</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_deny</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> est l'un des modules disponibles
+      les  plus simples;  il répond  à n'importe  qu'elle  requête par
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_AUTH_ERR</literal>.  Il est  utile  pour désactiver
+      rapidement un service (ajoutez-le au début de chaque chaîne), ou
+      pour       terminer      les       chaînes       de      modules
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">sufficient</literal>.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-echo">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-echo.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_echo</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_echo</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>  passe simplement ses arguments
+      à    la   fonction    de   conversation    comme    un   message
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_TEXT_INFO</literal>. Il est principalement utilisé
+      pour  le debogage  mais  il  peut aussi  servir  à afficher  un
+      message    tel   que    <quote xmlns:xlink="http://www.w3.org/1999/xlink">Les    accès   illégaux    seront
+      poursuivits</quote>    avant    de    commencer   la    procédure
+      d'authentification.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-exec">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-exec.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_exec</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_exec</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> prend comme premier argument le
+      nom  du programme  à exécuter, les arguments  restant étant
+      utilisés   comme  arguments   pour  ce   programme.   L'une  des
+      applications possibles est d'utiliser un programme  qui monte le
+      répertoire de l'utilisateur lors du login.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ftp">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ftp.title">pam_ftp(8)</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module pam_ftp(8)</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ftpusers">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ftpusers.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_ftpusers</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_ftpusers</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-group">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-group.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_group</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le   module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_group</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>   accepte  ou   rejette  le
+      demandeur à  partir de son appartenance à  un groupe particulier
+      (généralement  <literal xmlns:xlink="http://www.w3.org/1999/xlink">wheel</literal> pour  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>).  Il a
+      pour but  premier de  conserver le comportement  traditionnel de
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> mais possède  d'autres applications comme par exemple
+      exclure   un   certain   groupe   d'utilisateurs   d'un   service
+      particulier.</para>
+
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-krb5">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-krb5.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_krb5</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_krb5</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ksu">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ksu.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_ksu</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_ksu</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-lastlog">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-lastlog.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_lastlog</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_lastlog</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-login-access">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-login-access.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_login_access</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_login_access</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-nologin">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-nologin.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_nologin</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_nologin</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-opie">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-opie.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le   module   <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>   implémente   la   méthode
+      d'authentification <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry>. Le  système <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry> est un
+      mécanisme  de challenge-response où  la réponse  à chaque
+      challenge est une fonction directe  du challenge et une phrase de
+      passe, ainsi la réponse  peut facilement être calculée <quote xmlns:xlink="http://www.w3.org/1999/xlink">en
+      temps  voulu</quote> par  n'importe qui  possédant la  phrase de
+      passe ce qui élimine le besoin  d'une liste de mots de passe. De
+      plus, puisque  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry> ne réutilise  jamais un mot  de passe
+      qui a  reçu une  réponse correcte, il  n'est pas  vulnérable aux
+      attaques basée sur le rejouage.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-opieaccess">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-opieaccess.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opieaccess</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opieaccess</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>  est  un  compagnon  du
+      module   <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  Son   but  est   de   renforcer  les
+      restrictions  codifiées  dans  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">opieaccess</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>, il  régule  les
+      conditions  sous  lesquelles   un  utilisateur  qui  normalement
+      devrait s'authentifier  par <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry> est  amené à utiliser
+      d'autres méthodes. Ceci  est généralement utilisé pour interdire
+      l'authentification par  mot de passe depuis des  hôtes non digne
+      de confiance.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Pour     être    réellement     effectif,     le    module
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opieaccess</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>      doit      être      listé      comme
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">requisite</literal>  immédiatement   après  une  entrée
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">sufficient</literal>  pour  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_opie</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> et  avant
+      tout       autre        module,       dans       la       chaîne
+      <literal xmlns:xlink="http://www.w3.org/1999/xlink">auth</literal>.</para>
+
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-passwdqc">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-passwdqc.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_passwdqc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_passwdqc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-permit">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-permit.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_permit</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le   module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_permit</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>   est  l'un   des  modules
+      disponibles  les  plus simples;  il  répond  à n'importe  quelle
+      requête  par <literal xmlns:xlink="http://www.w3.org/1999/xlink">PAM_SUCCESS</literal>.  Il est  utile pour
+      les  services  où   une  ou  plusieurs  chaînes  auraient
+      autrement été vides.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-radius">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-radius.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_radius</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_radius</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-rhosts">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-rhosts.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_rhosts</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_rhosts</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-rootok">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-rootok.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_rootok</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_rootok</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> retourne  un  succès si  et
+      seulement  si  l'identifiant  d'utilisateur  réel  du  processus
+      appelant est 0. Ceci est utile pour les services non basés sur
+      le  réseau  tel   que  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>  ou  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">passwd</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>  où
+      l'utilisateur   <literal xmlns:xlink="http://www.w3.org/1999/xlink">root</literal>  doit  avoir   un  accès
+      automatique.</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-securetty">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-securetty.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_securetty</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_securetty</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-self">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-self.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_self</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_self</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>  retourne  un  succès  si  et
+      seulement si  le nom  du demandeur correspond  au nom  du compte
+      désiré. Il est  utile pour les services non  basés sur le réseau
+      tel que  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> où l'identité du  demandeur peut être
+      vérifiée facilement .</para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ssh">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-ssh.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-tacplus">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-tacplus.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_tacplus</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le module  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_tacplus</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> </para>
+    </section>
+
+    <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-unix">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-modules-unix.title"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_unix</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Le  module <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_unix</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>  implémente l'authentification
+      Unix   traditionnelle    par   mot   de    passe,   il   utilise
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">getpwnam</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> pour obtenir le mot  de passe du compte visé et
+      le compare avec celui fournit par le demandeur. Il fournit aussi
+      des services  de gestion de  compte (désactivation du  compte et
+      date d'expiration) ainsi que  des services pour le changement de
+      mot de passe. Il s'agit certainement du module le plus utile car
+      la plupart  des administrateurs désirent  garder le comportement
+      historique pour quelques services.</para>
+    </section>
+  </section>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-appl-prog">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-appl-prog.title">Programmation d'applications PAM </title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><!--XXX-->Cette section n'a pas encore été écrite.</para>
+
+    <!--
+
+      Note that while the original PAM paper includes a sample PAM
+      application that calls pam_open_session() before pam_setcred(),
+      the Linux-PAM documentation states that pam_setcred() must be
+      called first, which makes more sense.
+
+      Also note that the example in the paper calls setgid(),
+      initgroups() and setuid() itself rather than rely on
+      pam_setcred() to do it.
+
+      -->
+
+  </section>
+
+  <section xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-module-prog">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-module-prog.title">Programmation de modules PAM</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><!--XXX-->Cette section n'a pas été encore écrite.</para>
+  </section>
+
+  <appendix xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-sample-appl">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-sample-appl.title">Exemples d'application PAM </title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Ce qui suit est une implémentation minimale de <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">su</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> en
+    utilisant PAM.  Notez qu'elle utilise la  fonction de conversation
+    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">openpam_ttyconv</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  spécifique à  OpenPAM qui  est prototypée
+    dans                                                      <filename xmlns:xlink="http://www.w3.org/1999/xlink">security/openpam.h</filename>.  Si vous désirez
+    construire  cette   application  sur  un   système  utilisant  une
+    bibliothèque  PAM  différente  vous  devrez fournir  votre  propre
+    fonction de conversation. Une fonction de conversation robuste est
+    étonnamment   difficile  à   implémenter;  celle   présentée  dans
+    <xref xmlns:xlink="http://www.w3.org/1999/xlink" linkend="pam-sample-conv"/>
+    est  un  bon   point  de
+    départ, mais  ne devrait pas  être utilisée dans  des applications
+    réelles.</para>
+
+<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">
+/*-
+ * Copyright (c) 2002,2003 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $P4: //depot/projects/openpam/bin/su/su.c#10 $
+ * $FreeBSD$
+ */
+
+#include &lt;sys/param.h&gt;
+#include &lt;sys/wait.h&gt;
+
+#include &lt;err.h&gt;
+#include &lt;pwd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;syslog.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_appl.h&gt;
+#include &lt;security/openpam.h&gt;	/* for openpam_ttyconv() */
+
+extern char **environ;
+
+static pam_handle_t *pamh;
+static struct pam_conv pamc;
+
+static void
+usage(void)
+{
+
+	fprintf(stderr, "Usage: su [login [args]]\n");
+	exit(1);
+}
+
+int
+main(int argc, char *argv[])
+{
+	char hostname[MAXHOSTNAMELEN];
+	const char *user, *tty;
+	char **args, **pam_envlist, **pam_env;
+	struct passwd *pwd;
+	int o, pam_err, status;
+	pid_t pid;
+
+	while ((o = getopt(argc, argv, "h")) != -1)
+		switch (o) {
+		case 'h':
+		default:
+			usage();
+		}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc &gt; 0) {
+		user = *argv;
+		--argc;
+		++argv;
+	} else {
+		user = "root";
+	}
+
+	/* initialize PAM */
+	pamc.conv = &amp;openpam_ttyconv;
+	pam_start("su", user, &amp;pamc, &amp;pamh);
+
+	/* set some items */
+	gethostname(hostname, sizeof(hostname));
+	if ((pam_err = pam_set_item(pamh, PAM_RHOST, hostname)) != PAM_SUCCESS)
+		goto pamerr;
+	user = getlogin();
+	if ((pam_err = pam_set_item(pamh, PAM_RUSER, user)) != PAM_SUCCESS)
+		goto pamerr;
+	tty = ttyname(STDERR_FILENO);
+	if ((pam_err = pam_set_item(pamh, PAM_TTY, tty)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* authenticate the applicant */
+	if ((pam_err = pam_authenticate(pamh, 0)) != PAM_SUCCESS)
+		goto pamerr;
+	if ((pam_err = pam_acct_mgmt(pamh, 0)) == PAM_NEW_AUTHTOK_REQD)
+		pam_err = pam_chauthtok(pamh, PAM_CHANGE_EXPIRED_AUTHTOK);
+	if (pam_err != PAM_SUCCESS)
+		goto pamerr;
+
+	/* establish the requested credentials */
+	if ((pam_err = pam_setcred(pamh, PAM_ESTABLISH_CRED)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* authentication succeeded; open a session */
+	if ((pam_err = pam_open_session(pamh, 0)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* get mapped user name; PAM may have changed it */
+	pam_err = pam_get_item(pamh, PAM_USER, (const void **)&amp;user);
+	if (pam_err != PAM_SUCCESS || (pwd = getpwnam(user)) == NULL)
+		goto pamerr;
+
+	/* export PAM environment */
+	if ((pam_envlist = pam_getenvlist(pamh)) != NULL) {
+		for (pam_env = pam_envlist; *pam_env != NULL; ++pam_env) {
+			putenv(*pam_env);
+			free(*pam_env);
+		}
+		free(pam_envlist);
+	}
+
+	/* build argument list */
+	if ((args = calloc(argc + 2, sizeof *args)) == NULL) {
+		warn("calloc()");
+		goto err;
+	}
+	*args = pwd-&gt;pw_shell;
+	memcpy(args + 1, argv, argc * sizeof *args);
+
+	/* fork and exec */
+	switch ((pid = fork())) {
+	case -1:
+		warn("fork()");
+		goto err;
+	case 0:
+		/* child: give up privs and start a shell */
+
+		/* set uid and groups */
+		if (initgroups(pwd-&gt;pw_name, pwd-&gt;pw_gid) == -1) {
+			warn("initgroups()");
+			_exit(1);
+		}
+		if (setgid(pwd-&gt;pw_gid) == -1) {
+			warn("setgid()");
+			_exit(1);
+		}
+		if (setuid(pwd-&gt;pw_uid) == -1) {
+			warn("setuid()");
+			_exit(1);
+		}
+		execve(*args, args, environ);
+		warn("execve()");
+		_exit(1);
+	default:
+		/* parent: wait for child to exit */
+		waitpid(pid, &amp;status, 0);
+
+		/* close the session and release PAM resources */
+		pam_err = pam_close_session(pamh, 0);
+		pam_end(pamh, pam_err);
+
+		exit(WEXITSTATUS(status));
+	}
+
+pamerr:
+	fprintf(stderr, "Sorry\n");
+err:
+	pam_end(pamh, pam_err);
+	exit(1);
+}
+
+</programlisting>
+  </appendix>
+
+  <appendix xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-sample-module">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-sample-module.title">Exemple d'un module PAM</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Ce   qui   suit   est   une   implémentation   minimale   de
+    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_unix</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>      offrant     uniquement      les     services
+    d'authentification.  Elle  devrait  compiler  et tourner  avec  la
+    plupart  des implémentations  PAM, mais  tire parti  des extensions
+    d'OpenPAM  si  elles  sont  disponibles :  notez  l'utilisation  de
+    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">pam_get_authtok</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  qui simplifie  énormément  l'affichage de
+    l'invite pour demander le mot de passe à l'utilisateur.</para>
+
+
+<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">
+/*-
+ * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $P4: //depot/projects/openpam/modules/pam_unix/pam_unix.c#3 $
+ * $FreeBSD$
+ */
+
+#include &lt;sys/param.h&gt;
+
+#include &lt;pwd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_modules.h&gt;
+#include &lt;security/pam_appl.h&gt;
+
+#ifndef _OPENPAM
+static char password_prompt[] = "Password:";
+#endif
+
+#ifndef PAM_EXTERN
+#define PAM_EXTERN
+#endif
+
+PAM_EXTERN int
+pam_sm_authenticate(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+#ifndef _OPENPAM
+	struct pam_conv *conv;
+	struct pam_message msg;
+	const struct pam_message *msgp;
+	struct pam_response *resp;
+#endif
+	struct passwd *pwd;
+	const char *user;
+	char *crypt_password, *password;
+	int pam_err, retry;
+
+	/* identify user */
+	if ((pam_err = pam_get_user(pamh, &amp;user, NULL)) != PAM_SUCCESS)
+		return (pam_err);
+	if ((pwd = getpwnam(user)) == NULL)
+		return (PAM_USER_UNKNOWN);
+
+	/* get password */
+#ifndef _OPENPAM
+	pam_err = pam_get_item(pamh, PAM_CONV, (const void **)&amp;conv);
+	if (pam_err != PAM_SUCCESS)
+		return (PAM_SYSTEM_ERR);
+	msg.msg_style = PAM_PROMPT_ECHO_OFF;
+	msg.msg = password_prompt;
+	msgp = &amp;msg;
+#endif
+	for (retry = 0; retry &lt; 3; ++retry) {
+#ifdef _OPENPAM
+		pam_err = pam_get_authtok(pamh, PAM_AUTHTOK,
+		    (const char **)&amp;password, NULL);
+#else
+		resp = NULL;
+		pam_err = (*conv-&gt;conv)(1, &amp;msgp, &amp;resp, conv-&gt;appdata_ptr);
+		if (resp != NULL) {
+			if (pam_err == PAM_SUCCESS)
+				password = resp-&gt;resp;
+			else
+				free(resp-&gt;resp);
+			free(resp);
+		}
+#endif
+		if (pam_err == PAM_SUCCESS)
+			break;
+	}
+	if (pam_err == PAM_CONV_ERR)
+		return (pam_err);
+	if (pam_err != PAM_SUCCESS)
+		return (PAM_AUTH_ERR);
+
+	/* compare passwords */
+	if ((!pwd-&gt;pw_passwd[0] &amp;&amp; (flags &amp; PAM_DISALLOW_NULL_AUTHTOK)) ||
+	    (crypt_password = crypt(password, pwd-&gt;pw_passwd)) == NULL ||
+	    strcmp(crypt_password, pwd-&gt;pw_passwd) != 0)
+		pam_err = PAM_AUTH_ERR;
+	else
+		pam_err = PAM_SUCCESS;
+#ifndef _OPENPAM
+	free(password);
+#endif
+	return (pam_err);
+}
+
+PAM_EXTERN int
+pam_sm_setcred(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_open_session(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_close_session(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SUCCESS);
+}
+
+PAM_EXTERN int
+pam_sm_chauthtok(pam_handle_t *pamh, int flags,
+	int argc, const char *argv[])
+{
+
+	return (PAM_SERVICE_ERR);
+}
+
+#ifdef PAM_MODULE_ENTRY
+PAM_MODULE_ENTRY("pam_unix");
+#endif
+
+</programlisting>
+  </appendix>
+
+  <appendix xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-sample-conv">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-sample-conv.title">Exemple d'une fonction de conversation PAM</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">La  fonction  de conversation  présentée  ci-dessous est  une
+    version      grandement     simplifiée     de      la     fonction
+    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">openpam_ttyconv</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> d'OpenPAM. Elle est pleinement fonctionnelle
+    et devrait  donner au  lecteur une bonne  idée de comment  doit se
+    comporter une fonction de  conversation, mais elle est trop simple
+    pour une utilisation réelle.  Même si vous n'utilisez pas OpenPAM,
+    N'hésitez pas à  télécharger le  code  source et  d'adapter
+    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">openpam_ttyconv</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>  à vos besoins,  nous pensons  qu'elle est
+    raisonnablement  aussi  robuste  qu'une fonction  de  conversation
+    orientée tty peut l'être.</para>
+
+<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">
+/*-
+ * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_appl.h&gt;
+
+int
+converse(int n, const struct pam_message **msg,
+	struct pam_response **resp, void *data)
+{
+	struct pam_response *aresp;
+	char buf[PAM_MAX_RESP_SIZE];
+	int i;
+
+	data = data;
+	if (n &lt;= 0 || n &gt; PAM_MAX_NUM_MSG)
+		return (PAM_CONV_ERR);
+	if ((aresp = calloc(n, sizeof *aresp)) == NULL)
+		return (PAM_BUF_ERR);
+	for (i = 0; i &lt; n; ++i) {
+		aresp[i].resp_retcode = 0;
+		aresp[i].resp = NULL;
+		switch (msg[i]-&gt;msg_style) {
+		case PAM_PROMPT_ECHO_OFF:
+			aresp[i].resp = strdup(getpass(msg[i]-&gt;msg));
+			if (aresp[i].resp == NULL)
+				goto fail;
+			break;
+		case PAM_PROMPT_ECHO_ON:
+			fputs(msg[i]-&gt;msg, stderr);
+			if (fgets(buf, sizeof buf, stdin) == NULL)
+				goto fail;
+			aresp[i].resp = strdup(buf);
+			if (aresp[i].resp == NULL)
+				goto fail;
+			break;
+		case PAM_ERROR_MSG:
+			fputs(msg[i]-&gt;msg, stderr);
+			if (strlen(msg[i]-&gt;msg) &gt; 0 &amp;&amp;
+			    msg[i]-&gt;msg[strlen(msg[i]-&gt;msg) - 1] != '\n')
+				fputc('\n', stderr);
+			break;
+		case PAM_TEXT_INFO:
+			fputs(msg[i]-&gt;msg, stdout);
+			if (strlen(msg[i]-&gt;msg) &gt; 0 &amp;&amp;
+			    msg[i]-&gt;msg[strlen(msg[i]-&gt;msg) - 1] != '\n')
+				fputc('\n', stdout);
+			break;
+		default:
+			goto fail;
+		}
+	}
+	*resp = aresp;
+	return (PAM_SUCCESS);
+ fail:
+        for (i = 0; i &lt; n; ++i) {
+                if (aresp[i].resp != NULL) {
+                        memset(aresp[i].resp, 0, strlen(aresp[i].resp));
+                        free(aresp[i].resp);
+                }
+        }
+        memset(aresp, 0, n * sizeof *aresp);
+	*resp = NULL;
+	return (PAM_CONV_ERR);
+}
+
+</programlisting>
+  </appendix>
+
+  <bibliography xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-further">
+    <info><title xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="pam-further.title">Lectures complémentaires</title>
+    
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ceci  est une  liste  de documents  concernant  PAM et  les
+      domaines  gravitant autours.   Elle    n'a   pas   la   prétention   d'être
+      complète.</para>
+    </abstract>
+    </info>
+
+    <bibliodiv xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Publications</title>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.sun.com/software/solaris/pam/pam.external.pdf">
+	  Rendre les services de connexion indépendants des technologies d'authentification
+	  </link></citetitle>
+	<authorgroup xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><surname xmlns:xlink="http://www.w3.org/1999/xlink">Samar</surname><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Vipin</firstname></personname></author>
+	  <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><surname xmlns:xlink="http://www.w3.org/1999/xlink">Lai</surname><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Charlie</firstname></personname></author>
+	</authorgroup>
+	<orgname xmlns:xlink="http://www.w3.org/1999/xlink">Sun Microsystems</orgname>
+      </biblioentry>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.opengroup.org/pubs/catalog/p702.htm">X/Open
+	  Single Sign-on Preliminary Specification</link></citetitle>
+	<orgname xmlns:xlink="http://www.w3.org/1999/xlink">The Open Group</orgname>
+	<biblioid xmlns:xlink="http://www.w3.org/1999/xlink" class="isbn">1-85912-144-6</biblioid>
+	<pubdate xmlns:xlink="http://www.w3.org/1999/xlink">June 1997</pubdate>
+      </biblioentry>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.kernel.org/pub/linux/libs/pam/pre/doc/current-draft.txt">
+	  Pluggable Authentication Modules</link></citetitle>
+	<author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><surname xmlns:xlink="http://www.w3.org/1999/xlink">Morgan</surname><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Andrew</firstname><othername xmlns:xlink="http://www.w3.org/1999/xlink" role="mi">G.</othername></personname></author>
+	<pubdate xmlns:xlink="http://www.w3.org/1999/xlink">1999-10-06</pubdate>
+      </biblioentry>
+    </bibliodiv>
+
+    <bibliodiv xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Guides utilisateur</title>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.sun.com/software/solaris/pam/pam.admin.pdf">Administration de PAM
+	 </link></citetitle>
+	<orgname xmlns:xlink="http://www.w3.org/1999/xlink">Sun Microsystems</orgname>
+      </biblioentry>
+    </bibliodiv>
+
+    <bibliodiv xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Page internet liées</title>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://openpam.sourceforge.net/">La page d'OpenPAM</link></citetitle>
+	<author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><surname xmlns:xlink="http://www.w3.org/1999/xlink">Smørgrav</surname><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Dag-Erling</firstname></personname></author>
+	<orgname xmlns:xlink="http://www.w3.org/1999/xlink">ThinkSec AS</orgname>
+      </biblioentry>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.kernel.org/pub/linux/libs/pam/">La page de Linux-PAM</link></citetitle>
+	<author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><surname xmlns:xlink="http://www.w3.org/1999/xlink">Morgan</surname><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Andrew</firstname><othername xmlns:xlink="http://www.w3.org/1999/xlink" role="mi">G.</othername></personname></author>
+      </biblioentry>
+
+      <biblioentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	<citetitle xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://wwws.sun.com/software/solaris/pam/">La page de Solaris PAM</link></citetitle>
+	<orgname xmlns:xlink="http://www.w3.org/1999/xlink">Sun Microsystems</orgname>
+      </biblioentry>
+    </bibliodiv>
+  </bibliography>
+</article>

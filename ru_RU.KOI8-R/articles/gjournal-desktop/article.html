@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Настройка журналирования UFS для настольного компьютера.</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Журналируемая файловая система использует лог для записи всех транзакций, происходящих в файловой системе, который также сохраняет ее целостность в случае краха системы или пропадания питания. Несмотря на то, что всё еще возможна потеря несохранённых изменений файлов, журналирование почти полностью исключает возможность повреждения структуры файловой системы, вызванное непредвиденным остановом работы. Журналирование также сокращает до минимума время, необходимое для проверки файловой системы после отказа. Несмотря на то, что в используемой FreeBSD файловой системе UFS нет поддержки журналирования, новый класс системы GEOM в FreeBSD 7.X может быть использован для для ведения независимого от файловой системы журналирования. Эта статья объясняет, как реализовать журналирование UFS для типичного настольного компьютера." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="ru" class="article" lang="ru"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp69977168"></a>Настройка журналирования UFS для настольного компьютера.</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="author"><h3 class="author"><span class="firstname">Manolis</span> <span class="surname">Kiagias</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:manolis@FreeBSD.org">manolis@FreeBSD.org</a>&gt;</code></p></div></div></div></div><div>Издание: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Авторские права © 2008 Manolis Kiagias</p></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD это зарегистрированная торговая
+  марка FreeBSD Foundation.</p><p>Многие из обозначений, используемые
+  производителями и продавцами для обозначения своих продуктов, заявляются
+  в качестве торговых марок.  Когда такие обозначения появляются в этом
+  документе, и Проекту FreeBSD известно о торговой марке, к обозначению
+  добавляется знак <span class="quote"><<<span class="quote">TM</span>>></span> или
+  <span class="quote"><<<span class="quote">(R)</span>>></span>.</p></div></div><div>    .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Аннотация</div><p>Журналируемая файловая система использует лог для записи всех
+	транзакций, происходящих в файловой системе, который также
+	сохраняет ее целостность в случае краха системы или пропадания
+	питания. Несмотря на то, что всё еще возможна потеря несохранённых
+	изменений файлов, журналирование почти полностью исключает
+	возможность повреждения структуры файловой системы, вызванное
+	непредвиденным остановом работы. Журналирование также сокращает
+	до минимума время, необходимое для проверки файловой системы после
+	отказа. Несмотря на то, что в используемой FreeBSD файловой системе
+	UFS нет поддержки журналирования, новый класс системы GEOM
+	в FreeBSD 7.<em class="replaceable"><code>X</code></em> может быть использован
+	для для ведения независимого от файловой системы журналирования.
+	Эта статья объясняет, как реализовать журналирование UFS для
+	типичного настольного компьютера.</p></div></div></div><hr /></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="sect1"><a href="#introduction">1. Вступление</a></span></dt><dt><span class="sect1"><a href="#understanding-journaling">2. Реализация журналирования в FreeBSD</a></span></dt><dt><span class="sect1"><a href="#reserve-space">3. Действия, необходимые во время установки FreeBSD</a></span></dt><dt><span class="sect1"><a href="#configure-journal">4. Настройка журналирования</a></span></dt><dt><span class="sect1"><a href="#troubleshooting-gjournal">5. Устранение неполадок с журналированием</a></span></dt><dt><span class="sect1"><a href="#further-reading">6. Для дальнейшего ознакомления</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="introduction"></a>1. Вступление</h2></div></div></div><p>Серверное оборудование обычно хорошо защищено от потери питания.
+      Настольный компьютер часто подвержен неожиданным пропаданиям питания,
+      случайным нажатиям кнопки Reset и другим происшествиям (часто
+      связанным с неосторожностью пользователей), которые могут привести
+      к непредвиденным выключениям. Механизм Soft Updates, как правило,
+      достаточно эффективно защищает файловую систему в таких случаях, однако
+      в последствии требуется длительная фоновая проверка. В очень редких
+      случаях повреждения файловой системы достигают того уровня, при
+      котором становится необходимым вмешательство пользователя и данные
+      могут быть утерянными.</p><p>Новая возможность журналирования, предоставленная системой GEOM,
+      может существенно выручить в подобных случаях, исключая время,
+      необходимое для проверки файловых систем и удостовериваясь,
+      что файловая система быстро восстановлена в целостное состояние.</p><p>Эта статья описывает порядок действий, необходимых для
+      конфигурирования журналирования UFS на типичном настольном компьютере,
+      в котором один жесткий диск используется для размещения как
+      операционной системы, так и данных. В статье подразумевается
+      установка FreeBSD "с нуля". Шаги достаточно просты и не требуют
+      чрезмерно сложных манипуляций с командной строкой</p><p>После прочтения данной статьи вы будете знать:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Как зарезервировать место для журнала во время новой
+	  установки FreeBSD.</p></li><li class="listitem"><p>Как загрузить модуль <code class="literal">geom_journal</code> (или
+	  включить поддержку журналирования в специализированном ядре
+	  системы).</p></li><li class="listitem"><p>Как преобразовать существующую файловую систему, в систему,
+	  использующую журналирование, и какие опции монтирования
+	  использовать в <code class="filename">/etc/fstab</code>.</p></li><li class="listitem"><p>Как реализовать журналирование на новых (пустых) разделах.</p></li><li class="listitem"><p>Как диагностировать неполадки, связанные с журналированием.</p></li></ul></div><p>Перед прочтением этой статьи вам необходимо:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Понимать базовые концепции таких операционных систем,
+	  как <span class="trademark">UNIX</span>(R) и FreeBSD.</p></li><li class="listitem"><p>Быть знакомым с процедурой установки FreeBSD, а также с программой
+	  <span class="application">sysinstall</span>.</p></li></ul></div><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Процедура, описанная здесь, подразумевает подготовку к новой
+	установке, в которой на дисках еще нет пользовательских данных.
+	Так как эту процедуру можно модифицировать и расширить на системы,
+	которые уже используются, вам настоятельно рекомендуется сделать
+	<span class="emphasis"><em>резервную копию</em></span> всех ценных данных.
+	Путаница в низкоуровневых операциях с дисками и разделами может
+	привести к фатальным ошибкам и потере данных.</p></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="understanding-journaling"></a>2. Реализация журналирования в FreeBSD</h2></div></div></div><p>Журналирование, предоставляемое системой GEOM
+      в FreeBSD 7.<em class="replaceable"><code>X</code></em>, не является особенностью
+      файловой системы (в отличие от, например, файловой системы ext3
+      в <span class="trademark">Linux</span>(R)), оно функционирует на блочном уровне. А это значит,
+      что оно может быть применено к разным типам файловых систем,
+      однако для FreeBSD 7.0-RELEASE журналирование может быть применено
+      только для UFS2.</p><p>Возможность журналирования обеспечивается загрузкой модуля
+      <code class="filename">geom_journal.ko</code> в ядро (или сборкой собственного
+      ядра с активированием соответствующих опций) и использованием команды
+      <code class="command">gjournal</code> для конфигурирования файловой системы.
+      В общем, вы предпочтете журналировать файловые системы большого размера,
+      к примеру - <code class="filename">/usr</code>. Однако, вам придется
+      зарезервировать некоторое количество свободного места (см.
+      следующий раздел).</p><p>Когда файловая система журналируется, некоторая часть
+      дискового пространства требуется для хранения самого журнала.
+      Дисковое пространство, содержащее данные, называется
+      <span class="emphasis"><em>поставщиком данных (data provider)</em></span>,
+      а часть пространства, содержащая журнал, называется
+      <span class="emphasis"><em>поставщиком журнала (journal provider)</em></span>.
+      Поставщики данных и журнала должны быть на разных разделах,
+      если журналирование достраивается к содержащему данные разделу.
+      А если журналирование включается для нового раздела, у вас есть
+      возможность использовать один поставщик для данных и журнала.
+      В любом из двух вышеупомянутых случаев команда
+      <code class="command">gjournal</code> задействует поставщики и создаст
+      конечную журналируемую файловую систему. Например:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Вы намереваетесь журналировать файловую систему
+	  <code class="filename">/usr</code>, размещенную на
+	  <code class="filename">/dev/ad0s1f</code>,
+	  файловая система уже содержит данные.</p></li><li class="listitem"><p>Вы зарезервировали часть дискового пространства на разделе
+	  <code class="filename">/dev/ad0s1g</code>.</p></li><li class="listitem"><p>Используя команду <code class="command">gjournal</code>,
+	  создаем новый файл устройства
+	  <code class="filename">/dev/ad0s1f.journal</code>,
+	  для которого <code class="filename">/dev/ad0s1f</code>
+	  является поставщиком данных, а
+	  <code class="filename">/dev/ad0s1g</code> -
+	  поставщик журнала. Это новое устройство необходимо использовать
+	  во всех последующих операциях.</p></li></ul></div><p>Размер дискового пространства, отводимого под поставщик журнала,
+      зависит от нагруженности файловой системы, а не от размера самого
+      поставщика данных. Например, для типичного настольного компьютера
+      достаточно отвести 1 Гб под поставщик журнала для файловой
+      системы <code class="filename">/usr</code>, в то время как компьютеру,
+      имеющему интенсивный дисковый ввод/вывод (например, редактирование
+      видео) может потребоваться больше. Если свободное место на поставщике
+      журнала заканчивается раньше, чем происходит сброс журнала на
+      диск, - вы получите панику ядра.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Очень маловероятно то, что размеры журнала, предложенные здесь,
+	станут причиной проблем с обычным настольным компьютером (на котором
+	вы просматриваете веб-страницы, обрабатываете текст или проигрываете
+	мультимедийные файлы). Если работа вашего компьютера подразумевает
+	интенсивную дисковую активность, то для обеспечения стабильности
+	следует придерживаться следующего правила: размер ОЗУ должен
+	уместиться в 30% размера, отведенного под журнал. Например, если в
+	вашем компьютере установлен 1 Гб ОЗУ, создайте под поставщик
+	журнала раздел размером около 3.3 Гб. (Умножьте размер ОЗУ
+	в 3.3 раза, чтоб получить размер журнала).</p></div><p>Для получения дополнительной информации о журналировании, пожалуйста,
+      прочитайте страницу справочника, посвященную <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a>.</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="reserve-space"></a>3. Действия, необходимые во время установки FreeBSD</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70103888"></a>3.1. Выделение места под журналирование</h3></div></div></div><p>Типичный настольный компьютер обычно имеет один жесткий диск, на
+	котором хранится как операционная система, так и пользовательские
+	данные. Вероятно, что схема разбития винчестера (по умолчанию),
+	выбранная в меню <span class="application">sysinstall</span>, является
+	более или менее подходящей: настольному компьютеру не требуется большой
+	раздел <code class="filename">/var</code>, в то время, как для раздела
+	<code class="filename">/usr</code> выделяется значительный объем дискового
+	пространства, ввиду того, что пользовательские данные и множество
+	пэкэджей хранятся именно в поддиректориях <code class="filename">/usr</code>.
+	</p><p>Разбиение по умолчанию (получаемое при нажатии <span class="keycap"><strong>A</strong></span>
+	в редакторе разделов FreeBSD, называемом
+	<span class="application">Disklabel</span>) не оставляет свободного места.
+	Каждый подлежащий журналированию раздел требует отдельного раздела
+	для журнала. Ввиду того, что раздел <code class="filename">/usr</code> -
+	наибольший, есть смысл немного уменьшить его размер, чтобы получить
+	пространство, необходимое для журнала.</p><p>В нашем примере используется жесткий диск размером 80 Гб.
+	Следующий скриншот показывает результаты разбиения по умолчанию,
+	выполненного при помощи <span class="application">Disklabel</span>
+	в процессе установки операционной системы:</p><div class="mediaobject"><img src="disklabel1.png" /></div><p>Если это разбиение более или менее вас устраивает, то его легко
+	модифицировать для журналирования. Используйте клавиши со стрелками
+	для того, чтобы выделить раздел, отведенный под
+	<code class="filename">/usr</code>, потом нажмите <span class="keycap"><strong>D</strong></span>
+	чтобы удалить его.</p><p>Теперь переведите подсвечивание к имени диска, находящемуся вверху
+	экрана, и нажмите <span class="keycap"><strong>C</strong></span> - создайте новый раздел
+	<code class="filename">/usr</code>. Новый раздел должен быть меньше на 1 Гб
+	(если вы собираетесь журналировать только <code class="filename">/usr</code>)
+	или на 2 Гб (если журналированию подлежат как
+	<code class="filename">/usr</code>, так и <code class="filename">/var</code>).
+	Во всплывающем окне выберите "создать файловую систему" и укажите
+	<code class="filename">/usr</code> точкой монтирования.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Следует ли журналировать <code class="filename">/var</code> раздел?
+	  Обычно есть смысл журналировать большие разделы. Вы можете решить
+	  не журналировать <code class="filename">/var</code>, однако журналирование
+	  на обычном настольном компьютере не причинит вреда.  Если
+	  файловая система не нагружена (что типично для настольной системы),
+	  то можно выделить меньше дискового пространства под журнал.</p><p xmlns="http://www.w3.org/1999/xhtml">В этом примере подразумевается журналирование двух файловых
+	  систем: <code class="filename">/usr</code> и <code class="filename">/var</code>.
+	  Естественно, вы можете подкорректировать процедуру под свои
+	  задачи.</p></div><p>Чтобы не усложнять описываемую методику, для создания разделов,
+	необходимых для размещения журналов, мы будем использовать утилиту
+	<span class="application">sysinstall</span>. Однако, во время установки
+	утилита <span class="application">sysinstall</span> требует указания
+	точек монтирования для каждого созданного вами раздела. Но разделы,
+	содержащие журналы, вам никогда и никуда монтировать
+	не придется.</p><p>Чтобы избежать вопросов о точках монтирования, мы создадим разделы
+	под журналы и установим их тип в swap. Раздел, предназначенный для
+	свопа, никогда и никуда не монтируется, плюс к тому, утилита
+	<span class="application">sysinstall</span> позволяет создавать столько
+	разделов под своп, сколько необходимо. После первой перезагрузки
+	необходимо подредактировать файл <code class="filename">/etc/fstab</code>,
+	удалив в нём лишние записи о своп-разделах.</p><p>Для создания своп-раздела, используя клавиши со стрелками,
+	перемещайте подсвечивание к верхней части экрана в утилите
+	<span class="application">Disklabel</span> так, чтобы стало подсвеченным
+	имя диска. Потом, нажмите <span class="keycap"><strong>N</strong></span>, введите необходимый
+	размер раздела (<em class="replaceable"><code>1024M</code></em>), а после -
+	выберите во всплывшем окне <span class="quote"><<<span class="quote">swap space</span>>></span>. Повторите
+	эти шаги для всех оставшихся журналов. В этом примере мы создаем
+	два раздела, на которых будут размещаться журналы для
+	<code class="filename">/usr</code> и <code class="filename">/var</code>. Конечный
+	результат показан на следующем скриншоте:</p><div class="mediaobject"><img src="disklabel2.png" /></div><p>По завершении создания разделов мы рекомендуем вам записать
+	на бумагу названия разделов и их точек монтирования: с этой информацией
+	вы будете сверяться во время конфигурирования. Это также поможет
+	уменьшить количество ошибок, приводящих к повреждению установки.
+	Следующая табличка отображает наши заметки, сделанные для данного
+	примера:</p><div class="table"><a id="idp70177616"></a><div class="table-title">Таблица 1. Разделы и журналы</div><div class="table-contents"><table summary="Разделы и журналы" width="100%" border="1"><colgroup><col /><col /><col /></colgroup><thead><tr><th>Раздел</th><th>Точка монтирования</th><th>Журнал</th></tr></thead><tbody><tr><td>ad0s1d</td><td>/var</td><td>ad0s1h</td></tr><tr><td>ad0s1f</td><td>/usr</td><td>ad0s1g</td></tr></tbody></table></div></div><br class="table-break" /><p>Дальше продолжайте обычную установку. Однако, мы рекомендуем
+	вам отложить инсталляцию приложений сторонних разработчиков (пакетов)
+	до полной настройки журналирования.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="first-boot"></a>3.2. Первая загрузка</h3></div></div></div><p>Ваша система загрузится нормально, однако вам необходимо будет
+	подредактировать <code class="filename">/etc/fstab</code> и удалить те
+	лишние своп-разделы, которые вы создавали под журналы.
+	Как правило, в названии файла устройства, созданного автоматически
+	утилитой <span class="application">sysinstall</span>, присутствует
+	суффикс <span class="quote"><<<span class="quote">b</span>>></span> (в нашем примере это ad0s1b). Удалите
+	другие записи о своп-разделах и перезагрузите компьютер, после чего
+	FreeBSD перестанет их использовать.</p><p>После второй перезагрузки, компьютер будет готов к
+	конфигурированию журналирования.</p></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="configure-journal"></a>4. Настройка журналирования</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="running-gjournal"></a>4.1. Работа с командой <code class="command">gjournal</code></h3></div></div></div><p>Подготовив необходимые разделы, перейдем к конфигурированию
+	журналирования. Нам будет необходимо загрузиться в
+	однопользовательском режиме, для этого залогинимся пользователем
+	<code class="systemitem">root</code> и напечатаем:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown now</code></strong></pre><p>Нажмите <span class="keycap"><strong>Enter</strong></span> для получения приглашения
+	командного интерпретатора. Нам необходимо будет размонтировать
+	разделы, которые подлежат журналированию, в нашем примере это
+	<code class="filename">/usr</code> и <code class="filename">/var</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /usr /var</code></strong></pre><p>Загрузите модуль ядра, необходимый для журналирования:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong></pre><p>На данном этапе сверьтесь со своими записями и определите, какие
+	разделы будут использоваться под какой журнал. В нашем примере
+	<code class="filename">/usr</code> располагается на
+	<code class="filename">ad0s1f</code>, а его журнал
+	будет располагаться на <code class="filename">ad0s1g</code>,
+	и, по аналогии, для <code class="filename">/var</code>: файловая система
+	располагается на <code class="filename">ad0s1d</code>,
+	а ее журнал - на <code class="filename">ad0s1h</code>.
+	Наберите следующие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label ad0s1f ad0s1g</code></strong>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal label ad0s1d ad0s1h</code></strong>
+
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Если последний сектор любого из двух разделов (поставщиков
+	  данных) используется, команда <code class="command">gjournal</code>
+	  возвратит ошибку. Вам необходимо будет использовать флаг
+	  <code class="option">-f</code> для принудительной перезаписи, например:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label -f ad0s1d ad0s1h</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Так как это - новая установка, очень маловероятен факт,
+	  что что-нибудь будет действительно переписано.</p></div><p>На данном этапе созданы два устройства:
+	<code class="filename">ad0s1d.journal</code> и
+	<code class="filename">ad0s1f.journal</code>. Они
+	представляют <code class="filename">/var</code> и <code class="filename">/usr</code>
+	соответственно. Перед монтированием, нам необходимо установить флаг
+	журналирования и снять флаг механизма Soft Updates:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>tunefs -J enable -n disable ad0s1d.journal</code></strong>
+
+tunefs: gjournal set
+tunefs: soft updates cleared
+
+<code class="prompt">#</code> <strong class="userinput"><code>tunefs -J enable -n disable ad0s1f.journal</code></strong>
+
+tunefs: gjournal set
+tunefs: soft updates cleared</pre><p>Теперь, смонтируйте новые устройства в соответствующие места
+	файловой системы (обратите внимание на то, что мы можем использовать
+	опцию монтирования <code class="option">async</code>):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -o async /dev/ad0s1d.journal /var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount -o async /dev/ad0s1f.journal /usr</code></strong></pre><p>Откройте <code class="filename">/etc/fstab</code> и исправьте записи для
+	следующих файловых систем: <code class="filename">/usr</code> и
+	<code class="filename">/var</code>:</p><pre class="programlisting">/dev/ad0s1f.journal     /usr            ufs     rw,async      2       2
+/dev/ad0s1d.journal     /var            ufs     rw,async      2       2</pre><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Убедитесь, что упомянутые выше записи правильные, иначе старт
+	  системы будет проблематичным после перезагрузки!</p></div><p>И напоследок, подредактируйте
+	<code class="filename">/boot/loader.conf</code>: добавьте следующую строку
+	и модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> будет загружаться автоматически при старте
+	системы:</p><pre class="programlisting">geom_journal_load="YES"</pre><p>Поздравляем! Журналирование успешно сконфигурировано. Вам
+	необходимо лишь набрать <strong class="userinput"><code>exit</code></strong> для возвращения
+	в многопользовательский	режим или перезагрузить систему, чтобы полностью
+	проверить вашу конфигурацию (рекомендуется). Во время загрузки
+	вы увидите сообщения, подобные следующим:</p><pre class="screen">ad0: 76293MB XEC XE800JD-00HBC0 08.02D08 at ata0-master SATA150
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.</pre><p>После непредвиденного останова работы системы сообщения будут
+	немного отличаться, например:</p><pre class="screen">GEOM_JOURNAL: Journal ad0s1d consistent.</pre><p>Это обычно значит, что <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> воспользовался
+	информацией в журнале для возвращения файловой системы к целостному
+	состоянию.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="gjournal-new"></a>4.2. Журналирование новых разделов</h3></div></div></div><p>Процедура, описанная выше, необходима для подключения
+	журналирования разделов, содержащих данные. Журналирование пустых
+	разделов немного проще, ввиду того, что поставщик данных и поставщик
+	журнала могут быть размещены на одном и том же разделе. Например,
+	предположим, что был установлен новый жесткий диск и был создан новый
+	раздел <code class="filename">/dev/ad1s1d</code>. Создание
+	журнала не сложнее набора:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label ad1s1d</code></strong></pre><p>Размер журнала - 1 Гб по умолчанию. Однако, вы можете
+	изменить это значение используя ключ <code class="option">-s</code>. Значение
+	можно задавать в байтах, в килобайтах, мегабайтах или гигабайтах
+	(используя суффикс <code class="literal">K</code>, <code class="literal">M</code> или
+	<code class="literal">G</code>). Имейте ввиду, что команда
+	<code class="command">gjournal</code> не позволит вам создать журнал
+	недопустимо малого размера.</p><p>К примеру, чтобы создать журнал размером в 2Гб, можно использовать
+	следующую команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label -s 2G ad1s1d</code></strong></pre><p>Далее, вы можете создать файловую систему на новом разделе,
+	а также разрешить журналирование ключом <code class="option">-J</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -J /dev/ad1s1d.journal</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="configure-kernel"></a>4.3. Встраивание журналирования в специализированное ядро</h3></div></div></div><p>Если вы не желаете загружать <code class="literal">geom_journal</code>
+	как модуль, то можно встроить его функции прямо в ваше
+	специализированное ядро. Редактируя конфигурационный файл ядра,
+	убедитесь, что в нем находятся следующие две строки:</p><pre class="programlisting">options UFS_GJOURNAL # Прим.: Это включено в GENERIC
+
+options GEOM_JOURNAL # А эту строку необходимо добавить</pre><p>Соберите и установите новое ядро следуя указаниям
+	<a class="link" href="../../../../doc/ru_RU.KOI8-R/books/handbook/kernelconfig.html" target="_top">
+	Руководства FreeBSD .</a></p><p>И не забудьте удалить соответствующую строку загрузки модуля
+	(<span class="quote"><<<span class="quote">load</span>>></span>) из <code class="filename">/boot/loader.conf</code>
+	(если на предыдущем этапе она была туда внесена).</p></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="troubleshooting-gjournal"></a>5. Устранение неполадок с журналированием</h2></div></div></div><p>Этот раздел содержит часто задаваемые вопросы касательно неполадок,
+      связанных с журналированием.</p><div class="qandaset"><a id="idp70368464"></a><dl><dt>5.1. <a href="#idp70369104">Я получаю паники ядра во время высокой дисковой активности.
+	    Как это связано с журналированием?</a></dt><dt>5.2. <a href="#idp70383440">Я допустил некоторые ошибки во время конфигурирования,
+	    теперь система не загружается. Можно это как-нибудь
+	    исправить?</a></dt><dt>5.3. <a href="#idp70408272">Возможно ли отказаться от журналирования и вернуться
+	    к моей привычной файловой системе с механизмом Soft Updates?</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp70369104"></a><a id="kernel-panic"></a><p><strong>5.1.</strong></p></td><td align="left" valign="top"><p>Я получаю паники ядра во время высокой дисковой активности.
+	    Как это связано с журналированием?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Вероятно, что журнал заполняется раньше, чем происходит
+	    сброс его на диск. Помните, размер журнала зависит от
+	    загруженности диска, а не от размера поставщика данных.
+	    Если загрузка диска высокая, вам потребуется раздел большего
+	    размера для журнала. См. замечания в разделе
+	    <a class="link" href="#understanding-journaling" title="2. Реализация журналирования в FreeBSD">Реализация
+	    журналирования</a></p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70383440"></a><a id="unable-boot"></a><p><strong>5.2.</strong></p></td><td align="left" valign="top"><p>Я допустил некоторые ошибки во время конфигурирования,
+	    теперь система не загружается. Можно это как-нибудь
+	    исправить?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Вы либо забыли внести запись (опечатались) в
+	    <code class="filename">/boot/loader.conf</code>, либо есть ошибки в
+	    файле <code class="filename">/etc/fstab</code>. Это легко исправить.
+	    Нажмите <span class="keycap"><strong>Enter</strong></span>, чтобы получить приглашение
+	    командного интерпретатора в однопользовательском режиме.
+	    Потом, проверьте возможные варианты:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat /boot/loader.conf</code></strong></pre><p>Если отсутствует запись <code class="literal">geom_journal_load</code>,
+	    или она содержит ошибки, журналируемые устройства не создадутся.
+	    Загрузите модуль вручную, примонтируйте все разделы и
+	    переходите в многопользовательский режим (продолжайте
+	    загрузку).</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.
+
+<code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>exit</code></strong>
+<span class="emphasis"><em>(boot continues)</em></span></pre><p>Если же запись о <code class="literal">geom_journal_load</code>
+	    верна, то проверьте <code class="filename">/etc/fstab</code>.
+	    Вероятней всего, что вы обнаружите опечатку или отсутствие
+	    необходимой записи. В этом случае смонтируйте вручную
+	    оставшиеся разделы и продолжите загрузку в многопользовательский
+	    режим.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70408272"></a><a id="remove-journaling"></a><p><strong>5.3.</strong></p></td><td align="left" valign="top"><p>Возможно ли отказаться от журналирования и вернуться
+	    к моей привычной файловой системе с механизмом Soft Updates?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Несомненно. Используйте приведенную ниже последовательность
+	    действий, которая обращает изменения. Разделы, созданные для
+	    поставщиков журналов, могут позже быть использованы для других
+	    целей.</p><p>Залогиньтесь <code class="systemitem">root</code> и переведите систему
+	    в однопользовательский режим:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown now</code></strong></pre><p>Размонтируйте журналируемые разделы:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /usr /var</code></strong></pre><p>Синхронизируйте журналы:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal sync</code></strong></pre><p>Остановите поставщиков журналов:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal stop ad0s1d.journal</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal stop ad0s1f.journal</code></strong></pre><p>Удалите метаданные журналирования со всех задействованных
+	    устройств:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal clear ad0s1d</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal clear ad0s1f</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal clear ad0s1g</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal clear ad0s1h</code></strong></pre><p>Снимите флаг журналирования и установите флаг механизма Soft
+	    Updates:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>tunefs -J disable -n enable ad0s1d</code></strong>
+
+tunefs: gjournal cleared
+tunefs: soft updates set
+
+<code class="prompt">#</code> <strong class="userinput"><code>tunefs -J disable -n enable ad0s1f</code></strong>
+
+tunefs: gjournal cleared
+tunefs: soft updates set</pre><p>Смонтируйте вручную старые (первоначальные) устройства:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -o rw /dev/ad0s1d /var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount -o rw /dev/ad0s1f /usr</code></strong></pre><p>Откройте файл <code class="filename">/etc/fstab</code> и приведите
+	    его к изначальному виду:</p><pre class="programlisting">/dev/ad0s1f     /usr            ufs     rw      2       2
+/dev/ad0s1d     /var            ufs     rw      2       2</pre><p>И напоследок, удалите строку, загружающую модуль
+	    <code class="literal">geom_journal</code>, из файла
+	    <code class="filename">/boot/loader.conf</code> и перезагрузите
+	    операционную систему.</p></td></tr></tbody></table></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="further-reading"></a>6. Для дальнейшего ознакомления</h2></div></div></div><p>Журналирование - относительно новая функциональная возможность
+      FreeBSD, и как такова, она еще недостаточно документирована. Однако, вы
+      можете сочти полезными следующие источники:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Новый <a class="link" href="../../../../doc/ru_RU.KOI8-R/books/handbook/geom-gjournal.html" target="_top">раздел
+	  Руководства FreeBSD</a>, посвященный журналированию.</p></li><li class="listitem"><p><a class="link" href="http://lists.freebsd.org/pipermail/freebsd-current/2006-June/064043.html" target="_top">Этот пост</a>
+	  в списке рассылки <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current" target="_top">freebsd-current</a>, написанный Pawel Jakub Dawidek <code class="email">&lt;<a xmlns="" class="email" href="mailto:pjd@FreeBSD.org">pjd@FreeBSD.org</a>&gt;</code> -
+	  автором <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a>.</p></li><li class="listitem"><p><a class="link" href="http://lists.freebsd.org/pipermail/freebsd-questions/2008-April/173501.html" target="_top">Этот пост</a>
+	  от Ivan Voras <code class="email">&lt;<a xmlns="" class="email" href="mailto:ivoras@FreeBSD.org">ivoras@FreeBSD.org</a>&gt;</code> в списке рассылки <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-questions" target="_top">freebsd-questions</a>.</p></li><li class="listitem"><p>Страницы справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geom</span>(8)</span></a>.</p></li></ul></div></div></div></body></html>

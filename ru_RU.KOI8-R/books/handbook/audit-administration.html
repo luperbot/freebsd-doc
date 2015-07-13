@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>16.4. Работа с журналами аудита</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="audit.html" title="Глава 16. Аудит событий безопасности" /><link rel="prev" href="audit-config.html" title="16.3. Настройка системы аудита" /><link rel="next" href="disks.html" title="Глава 17. Устройства хранения" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">16.4. Работа с журналами аудита</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="audit-config.html">Пред.</a> </td><th width="60%" align="center">Глава 16. Аудит событий безопасности</th><td width="20%" align="right"> <a accesskey="n" href="disks.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="audit-administration"></a>16.4. Работа с журналами аудита</h2></div></div></div><p>Так как журнал аудита хранится в бинарном формате
+      <acronym class="acronym">BSM</acronym>, то для его изменения или перевода в
+      текстовый формат предоставляются встроенные утилиты.  Утилита
+      <code class="command">praudit</code> преобразует журнал аудита в
+      текстовый формат.  Утилита <code class="command">auditreduce</code>
+      применяется для фильтрации журнальных записей с целью анализа,
+      архивирования или распечатки.  Последняя утилита поддерживает
+      разнообразие параметров, позволяющих выбирать записи по типу
+      события, по классу события, по пользователю, по дате или
+      времени события, по пути к файлу или по объекту, над которым
+      производилось действие.</p><p>Например, для отображения всего содержимого журнала аудита
+      в текстовом формате выполните:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /var/audit/<em class="replaceable"><code>AUDITFILE</code></em></code></strong></pre><p>В данном примере <em class="replaceable"><code>AUDITFILE</code></em>
+      - журнал, который будет выведен в текстовом
+      формате.</p><p>Журнал аудита состоит из серии записей, которые, в свою
+      очередь состоят из элементов, которые команда
+      <code class="command">praudit</code> выводит последовательно - по одному
+      на строку.  Каждый элемент имеет определенный тип, например
+      <code class="literal">header</code> (содержит заголовок записи) или
+      <code class="literal">path</code> (полный путь к файлу).  Следующий
+      пример показывает запись для события
+      <code class="literal">execve</code>:</p><pre class="programlisting">header,133,10,execve(2),0,Mon Sep 25 15:58:03 2006, + 384 msec
+exec arg,finger,doug
+path,/usr/bin/finger
+attribute,555,root,wheel,90,24918,104944
+subject,robert,root,wheel,root,wheel,38439,38032,42086,128.232.9.100
+return,success,0
+trailer,133</pre><p>Эта запись отражает результат успешного выполнения
+      системного вызова <code class="literal">execve</code>, который стал
+      результатом выполнения команды <code class="literal">finger doug</code>.
+      В элементе записи <code class="literal">exec arg</code> есть командная
+      строка, которую оболочка передала ядру.  Элемент
+      <code class="literal">path</code> содержит путь к исполняемому файлу в
+      представлении ядра.  Элемент <code class="literal">attribute</code>
+      описывает исполняемый файл, а также права доступа файла.
+      Элемент <code class="literal">subject</code> описывает ID аудируемого
+      пользователя, исполняющие (effective) UID и GID, реальные ID
+      пользователя и группы, идентификатор процесса, идентификатор
+      сессии, порт и адрес, с которого был осуществлен вход в
+      систему.  Обратите внимание: идентификатор аудируемого
+      пользователя и реальный идентификатор пользователя отличаются,
+      так как пользователь <code class="systemitem">robert</code> повысил привилегии до
+      пользователя <code class="systemitem">root</code>
+      перед выполнением команды, но система аудита занесла его
+      действия в журнал используя изначальный идентификатор.  Элемент
+      <code class="literal">return</code> описывает успешное выполнение
+      операции, а элемент <code class="literal">trailer</code> завершает
+      запись.</p><p>Указав аргумент <code class="option">-x</code> можно получить вывод в
+      формате <acronym class="acronym">XML</acronym>.</p><p>Поскольку логи системы аудита могут иметь огромный размер,
+      возможно выделить только часть записей при помощи
+      <code class="command">auditreduce</code>.  В следующем примере из
+      <code class="filename">AUDITFILE</code> выбираются все записи,
+      касающиеся пользователя <code class="systemitem">trhodes</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>auditreduce -u <em class="replaceable"><code>trhodes</code></em> /var/audit/<em class="replaceable"><code>AUDITFILE</code></em> | praudit</code></strong></pre><p>Члены группы <code class="systemitem">audit</code> имеют доступ на чтение к
+      журналу аудита, находящемуся в <code class="filename">/var/audit</code>.
+      По умолчанию эта группа пуста, и только <code class="systemitem">root</code> имеет к ним доступ.  Для
+      того, чтобы дать пользователю права на чтение журнала, его
+      необходимо добавить в группу <code class="systemitem">audit</code>.  Право на чтение журнала
+      аудита позволяет получить множество информации о поведении
+      пользователей и процессов, поэтому рекомендуется делегировать
+      права на чтение журнала аудита с большой осторожностью.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90829776"></a>16.4.1. Мониторинг системы в реальном времени с использованием
+	потоков аудита</h3></div></div></div><p>Потоки системы аудита - клонирующиеся
+	псевдоустройства, позволяющие приложениям просматривать
+	в реальном времени поток событий аудита.  В первую очередь,
+	это должно заинтересовать авторов программ определения
+	вторжений и мониторинга системы.  Тем не менее, для
+	администратора поток системы аудита предоставляет возможность
+	организовать наблюдение за системой, избежав проблем с
+	правами доступа на журнал аудита или с прерыванием потока
+	событий из-за ротации журнала.  Для отслеживания потока
+	событий аудита в реальном времени, выполните:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /dev/auditpipe</code></strong></pre><p>По умолчанию, потоки доступны только пользователю
+	<code class="systemitem">root</code>.  Чтобы
+	сделать их доступными членам группы <code class="systemitem">audit</code>, добавьте правило
+	<code class="literal">devfs</code> в файл
+	<code class="filename">/etc/devfs.rules</code>:</p><pre class="programlisting">add path 'auditpipe*' mode 0440 group audit</pre><p>Обратитесь к <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs.rules&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs.rules</span>(5)</span></a> за более полной
+	информацией о настройке файловой системы
+	<code class="literal">devfs</code>.</p><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Довольно легко создать зацикленный поток событий
+	  аудита, в котором просмотр каждого события порождает
+	  несколько событий аудита.  Например, если аудиту
+	  подвергаются все операции сетевого ввода-вывода, и команда
+	  <code class="command">praudit</code> запущена во время
+	  <acronym class="acronym">SSH</acronym>-сессии, то будет сгенерирован
+	  интенсивный поток сообщений аудита, так как каждое
+	  печатаемое событие вызовет еще одно событие.  По этой
+	  причине рекомендуется запускать <code class="command">praudit</code>
+	  на устройстве потока только из сессий, для которых нет
+	  детального аудита ввода-вывода.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90858448"></a>16.4.2. Ротация и сжатие журнальных файлов аудита</h3></div></div></div><p>Журнал аудита пишется ядром и управляется демоном аудита
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=auditd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">auditd</span>(8)</span></a>.  Администраторам не следует пытаться
+	использовать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">newsyslog.conf</span>(5)</span></a> или другие инструменты
+	для прямой ротации логов.  Вместо этого, для прекращения
+	аудита, реконфигурации и ротации журнальных файлов должна
+	использоваться команда <code class="command">audit</code>.  Следующая
+	команда приведет к созданию нового журнального файла и даст
+	указание ядру переключиться на запись в этот файл.
+	Протоколирование в старый файл будет прекращено, а сам файл
+	- переименован, в результате чего с ним можно будет
+	работать администратору:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>audit -n</code></strong></pre><p>Если <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=auditd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">auditd</span>(8)</span></a> не запущен, то эта команда окончится
+	неудачей, и будет выведено сообщение об ошибке.</p><p>Добавление следующей строки в файл
+	<code class="filename">/etc/crontab</code> приведет к ротации каждые
+	двенадцать часов:</p><pre class="programlisting">0     */12       *       *       *       root    /usr/sbin/audit -n</pre><p>Изменения вступят в силу после сохранения файла
+	<code class="filename">/etc/crontab</code>.</p><p>Автоматическая ротация журнальных файлов на основании
+	их размера возможна при использовании опции
+	<code class="option">filesz</code> в файле
+	<code class="filename">audit_control</code>, которая описана в
+	<a class="xref" href="audit-config.html#audit-auditcontrol" title="16.3.2.1. Файл audit_control">Раздел 16.3.2.1, <<Файл <code class="filename">audit_control</code>>></a>.</p><p>Поскольку журнальные файлы могут достигать очень больших
+	размеров, может возникнуть необходимость сжимать их в целях
+	хранения сразу же после закрытия их демоном аудита.  Для
+	выполнения определенных пользователем действий,
+	соответствующих разнообразным событиям системы аудита,
+	включая нормальное завершение журналов аудита при их ротации,
+	может быть использован скрипт <code class="filename">audit_warn</code>.
+	Например, добавление следующих строк в файл
+	<code class="filename">/etc/security/audit_warn</code> приведет к
+	сжатию файла аудита после его закрытия:</p><pre class="programlisting">#
+# Compress audit trail files on close.
+#
+if [ "$1" = closefile ]; then
+	gzip -9 $2
+fi</pre><p>Примерами других действий могут быть копирование файлов
+	аудита на централизованный сервер, удаление старых журнальных
+	файлов, фильтрация журнальных файлов для удаления ненужных
+	записей.  Скрипт будет запущен только при корректном закрытии
+	журнала системой аудита и не запустится для журнальных файлов,
+	запись в которые была прекращена в результате некорректного
+	завершения.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="audit-config.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="audit.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="disks.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">16.3. Настройка системы аудита </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 17. Устройства хранения</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

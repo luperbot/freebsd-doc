@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.8. xxx_isa_probe</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver-dma.html" title="10.7. DMA" /><link rel="next" href="isa-driver-attach.html" title="10.9. xxx_isa_attach" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.8. xxx_isa_probe</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-dma.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-attach.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-probe"></a>10.8. xxx_isa_probe</h2></div></div></div><p>
+          这个函数探测设备是否存在。如果驱动程序支持自动侦测设备配置的
+          某些部分（如中断向量或内存地址），则自动侦测必须在此例程中完成。
+        </p><p>
+          对于任意其他总线，如果不能侦测到设备，或者侦测到但自检失败，
+          或者发生某些其他问题，则应当返回一个正值的错误。如果设备不
+          存在则必须返回值 <span class="errorname">ENXIO</span>。
+          其他错误值可能表示其他条件。零或负值
+          意味着成功。大多数驱动程序返回零表示成功。
+        </p><p>
+          当PnP设备支持多个接口时使用负返回值。例如，不同驱动程序支持
+          老的兼容接口和较新的高级接口。则两个驱动程序都将侦测设备。
+          在探测例程中返回较高值的驱动程序获得优先（换句话说，返回0的
+          驱动程序具有最高的优先级，返回-1的其次，返回-2的更后，等等）。
+          这样，仅支持老接口的设备将被老驱动程序处理（其应当从探测例程中
+          返回-1），而同时也支持新接口的设备将由新驱动程序处理（其应当从
+          探测例程中返回0）。
+        </p><p>
+          设备描述符结构xxx_softc由系统在调用探测例程之前分配。如果
+          探测例程返回错误，描述符会被系统自动取消分配。因此如果出现
+          探测错误，驱动程序必须保证取消分配探测期间它使用的所有资源，
+          且确保没有什么能够阻止描述符被安全地取消分配。如果探测成功
+          完成，描述符将由系统保存并在以后传递给例程
+          <code class="function">xxx_isa_attach()</code>。如果驱动程序返回负值，
+          就不能保证它将获得最高优先权且其连接例程会被调用。因此这种
+          情况下它也必须在返回前释放所有的资源，并在需要的时候在连接
+          例程中重新分配它们。当<code class="function">xxx_isa_probe()</code>
+          返回0时，在返回前释放资源也是一个好主意，而且中规中矩的驱动
+          程序应当这样做。但在释放资源会存在某些问题的情况下，允许驱动
+          程序在从探测例程返回0和连接例程的执行之间保持资源。
+        </p><p>
+          典型的探测例程以取得设备描述符和单元号开始：
+        </p><pre class="programlisting">         struct xxx_softc *sc = device_get_softc(dev);
+          int unit = device_get_unit(dev);
+          int pnperror;
+          int error = 0;
+
+          sc-&gt;dev = dev; /* 链接回来 */
+          sc-&gt;unit = unit;        </pre><p>
+          然后检查PnP设备。检查是通过一个包含PnP ID列表的表进行的。此表
+          包含这个驱动程序支持的PnP ID和以人工可读形式给出的对应这些ID的
+          设备型号的描述。
+        </p><pre class="programlisting">
+        pnperror=ISA_PNP_PROBE(device_get_parent(dev), dev,
+        xxx_pnp_ids); if(pnperror == ENXIO) return ENXIO;
+        </pre><p>
+          ISA_PNP_PROBE的逻辑如下：如果卡（设备单元）没有被作为PnP侦测到，
+          则返回ENOENT。如果被作为PnP侦测到，但侦测到的ID不匹配表中的
+          任一ID，则返回ENXIO。最后，如果设备能支持PnP且匹配表中的一个
+          ID，则返回0，并且由<code class="function">device_set_desc()</code>从
+          表中取得适当的描述进行设置。
+        </p><p>
+          如果设备驱动程序仅支持PnP设备，则情况看起来如下：
+        </p><pre class="programlisting">          if(pnperror != 0)
+              return pnperror;        </pre><p>
+          对于不支持PnP的驱动程序不需要特殊处理，因为驱动程序会传递空的
+          PnP ID表，且如果在PnP卡上调用会得到ENXIO。
+        </p><p>
+          探测例程通常至少需要某些最少量的资源，如I/O端口号，来发现并探测卡。
+          对于不同的硬件，驱动程序可能会自动发现其他必需的资源。PnP设备的
+          所有资源由PnP子系统预先设置，因此驱动程序不需要自己发现它们。</p><p>
+          通常访问设备所需要的最少信息就是端口号。然后某些设备允许从设备
+          配置寄存器中取得其余信息（尽管不是所有的设备都这样）。因此首先
+          我们尝试取得端口起始值：
+        </p><pre class="programlisting"> sc-&gt;port0 = bus_get_resource_start(dev,
+        SYS_RES_IOPORT, 0 /*rid*/); if(sc-&gt;port0 == 0) return ENXIO;
+        </pre><p>
+          基端口地址被保存在softc结构中，以便将来使用。如果需要经常使用
+          端口，则每次都调用资源函数将会慢的无法忍受。如果我们没有得到
+          端口，则返回错误即可。相反，一些设备驱动程序相当聪明，尝试探测
+          所有可能的端口，如下：
+        </p><pre class="programlisting">
+          /* 此设备所有可能的基I/O端口地址表 */
+          static struct xxx_allports {
+              u_short port; /* 端口地址 */
+              short used; /* 旗标：此端口是否已被其他单元使用 */
+          } xxx_allports = {
+              { 0x300, 0 },
+              { 0x320, 0 },
+              { 0x340, 0 },
+              { 0, 0 } /* 表结束 */
+          };
+
+          ...
+          int port, i;
+          ...
+
+          port =  bus_get_resource_start(dev, SYS_RES_IOPORT, 0 /*rid*/);
+          if(port !=0 ) {
+              for(i=0; xxx_allports[i].port!=0; i++) {
+                  if(xxx_allports[i].used || xxx_allports[i].port != port)
+                      continue;
+
+                  /* 找到了 */
+                  xxx_allports[i].used = 1;
+                  /* 在已知端口上探测 */
+                  return xxx_really_probe(dev, port);
+              }
+              return ENXIO; /* 端口无法识别或已经被使用 */
+          }
+
+          /* 仅在需要猜测端口的时候才会到达这儿 */
+          for(i=0; xxx_allports[i].port!=0; i++) {
+              if(xxx_allports[i].used)
+                  continue;
+
+              /* 标记为已被使用 - 即使我们在此端口什么也没有发现
+               * 至少我们以后不会再次探测
+               */
+               xxx_allports[i].used = 1;
+
+              error = xxx_really_probe(dev, xxx_allports[i].port);
+              if(error == 0) /* 在那个端口找到一个设备 */
+                  return 0;
+          }
+          /* 探测过所有可能的地址，但没有可用的 */
+          return ENXIO;</pre><p>
+          当然，做这些事情通常应该使用驱动程序的
+          <code class="function">identify()</code>例程。但可能有一个正当的理由来
+          说明为什么在函数<code class="function">probe()</code>中完成更好：如果
+          这种探测会让一些其他敏感设备发疯。探测例程按旗标
+          <code class="literal">sensitive</code>排序：敏感设备首先被探测，然后是
+          其他设备。但<code class="function">identify()</code>例程在所有探测之前
+          被调用，因此它们不会考虑敏感设备并可能扰乱这些设备。
+        </p><p>
+          现在，我们得到起始端口以后就需要设置端口数（PnP设备除外），因为
+          内核在配置文件中没有这个信息。
+        </p><pre class="programlisting">
+         if(pnperror /* 只对非PnP设备 */
+         &amp;&amp; bus_set_resource(dev, SYS_RES_IOPORT, 0, sc-&gt;port0,
+         XXX_PORT_COUNT)&lt;0)
+             return ENXIO;</pre><p>
+          最后分配并激活一片端口地址空间（特殊值start和end意思是说
+          <span class="quote">“<span class="quote">使用我们通过<code class="function">bus_set_resource()</code>
+          设置的那些值</span>”</span>）：
+        </p><pre class="programlisting">
+          sc-&gt;port0_rid = 0;
+          sc-&gt;port0_r = bus_alloc_resource(dev, SYS_RES_IOPORT,
+          &amp;sc-&gt;port0_rid,
+              /*start*/ 0, /*end*/ ~0, /*count*/ 0, RF_ACTIVE);
+
+          if(sc-&gt;port0_r == NULL)
+              return ENXIO;</pre><p>
+          现在可以访问端口映射的寄存器后，我们就可以以某种方式向设备写入
+          数据并检查设备是否如我们期望的那样作出反应。如果没有，则说明
+          可能其他的设备在这个地址上，或者这个地址上根本没有设备。
+        </p><p>
+          通常驱动程序直到连接例程才会设置中断处理函数。这之前我们替代以
+          轮询模式进行探测，超时则以<code class="function">DELAY()</code>实现。
+          探测例程必须确保不能永久挂起，设备上的所有等待必须在超时内完成。
+          如果设备不在这段时间内响应，则可能设备出故障或配置错误，驱动程序
+          必须返回错误，当确定超时间隔时，给设备一些额外时间以确保可靠：
+          尽管假定<code class="function">DELAY()</code>在任何机器上都延时相同数量的
+          时间，但随具体CPU的不同，此函数还是有一定的误差幅度。
+        </p><p>
+          如果探测例程真的想检查中断是否真的工作，它可以也配置和探测中断。
+          但不建议这样。
+        </p><pre class="programlisting">
+          /* 以严重依赖于具体设备的方式实现 */
+          if(error = xxx_probe_ports(sc))
+              goto bad; /* 返回前释放资源 */
+        </pre><p>
+          依赖于所发现设备的确切型号，函数
+          <code class="function">xxx_probe_ports()</code>也可能设置设备描述。但
+          如果只支持一种设备型号，则也可以硬编码的形式完成。当然，对于
+          PnP设备，PnP支持从表中自动设置描述。
+        </p><pre class="programlisting">          if(pnperror)
+              device_set_desc(dev, "Our device model 1234");
+        </pre><p>
+          探测例程应当或者通过读取设备配置寄存器来发现所有资源的范围，
+          或者确保由用户显式设置。我们将假定一个带板上内存的例子。
+          探测例程应当尽可能是非插入式的，这样分配和检查其余资源功能性
+          的工作就可以更好地留给连接例程来做。
+        </p><p>
+          内存地址可以在内核配置文件中指定，或者对应某些设备可以在非易失性
+          配置寄存器中预先配置。如果两种做法均可用却不同，那么应当用
+          哪个呢？可能用户厌烦在内核配置文件中明确设置地址，但他们知道
+          自己在干什么，则应当优先使用这个。一个实现的例子可能是这样的：
+        </p><pre class="programlisting">
+          /* 首先试图找出配置地址 */
+          sc-&gt;mem0_p = bus_get_resource_start(dev, SYS_RES_MEMORY, 0 /*rid*/);
+          if(sc-&gt;mem0_p == 0) { /* 没有，用户没指定 */
+              sc-&gt;mem0_p = xxx_read_mem0_from_device_config(sc);
+
+
+          if(sc-&gt;mem0_p == 0)
+                  /* 从设备配置寄存器也到不了这儿 */
+                  goto bad;
+          } else {
+              if(xxx_set_mem0_address_on_device(sc) &lt; 0)
+                  goto bad; /* 设备不支持那地址 */
+          }
+
+          /* 就像端口，设置内存大小，
+           * 对于某些设备，内存大小不是常数，
+           * 而应当从设备配置寄存器中读取，以适应设备的不同型号
+           * 另一个选择是让用户把内存大小设置为“msize”配置资源，
+           * 由ISA总线自动处理
+           */
+           if(pnperror) { /*仅对非PnP设备 */
+              sc-&gt;mem0_size = bus_get_resource_count(dev, SYS_RES_MEMORY, 0 /*rid*/);
+              if(sc-&gt;mem0_size == 0) /* 用户没有指定 */
+                  sc-&gt;mem0_size = xxx_read_mem0_size_from_device_config(sc);
+
+              if(sc-&gt;mem0_size == 0) {
+                  /* 假定这是设备非常老的一种型号，没有自动配置特性，
+                   * 用户也没有偏好设置，因此假定最低要求的情况
+                   * （当然，真实值将根据设备驱动程序而不同）
+                   */
+                  sc-&gt;mem0_size = 8*1024;
+              }
+
+              if(xxx_set_mem0_size_on_device(sc) &lt; 0)
+                  goto bad; /*设备不支持那个大小 */
+
+              if(bus_set_resource(dev, SYS_RES_MEMORY, /*rid*/0,
+                      sc-&gt;mem0_p, sc-&gt;mem0_size)&lt;0)
+                  goto bad;
+          } else {
+              sc-&gt;mem0_size = bus_get_resource_count(dev, SYS_RES_MEMORY, 0 /*rid*/);
+          }        </pre><p>
+          类似, 很容易检查IRQ和DRQ所用的资源。
+        </p><p>
+         如果一切进行正常，然后就可以释放所有资源并返回成功。
+        </p><pre class="programlisting">          xxx_free_resources(sc);
+          return 0;</pre><p>
+          最后，处理棘手情况。所有资源应当在返回前被释放。我们利用这样一个
+          事实：softc结构在传递给我们以前被零化，因此我们能够找出是否分配了
+          某些资源：如果分配则这些资源的描述符非零。
+        </p><pre class="programlisting">          bad:
+
+          xxx_free_resources(sc);
+          if(error)
+                return error;
+          else /* 确切错误未知 */
+              return ENXIO;</pre><p>
+          这是完整的探测例程。资源的释放从多个地方完成，因此将它挪到一个
+          函数中，看起来可能像下面的样子：
+        </p><pre class="programlisting">static void
+           xxx_free_resources(sc)
+              struct xxx_softc *sc;
+          {
+              /* 检查每个资源，如果非0则释放 */
+
+              /* 中断处理函数 */
+              if(sc-&gt;intr_r) {
+                  bus_teardown_intr(sc-&gt;dev, sc-&gt;intr_r, sc-&gt;intr_cookie);
+                  bus_release_resource(sc-&gt;dev, SYS_RES_IRQ, sc-&gt;intr_rid,
+                      sc-&gt;intr_r);
+                  sc-&gt;intr_r = 0;
+              }
+
+              /* 我们分配过的所有种类的内存 */
+              if(sc-&gt;data_p) {
+                  bus_dmamap_unload(sc-&gt;data_tag, sc-&gt;data_map);
+                  sc-&gt;data_p = 0;
+              }
+               if(sc-&gt;data) { /* sc-&gt;data_map等于0有可能合法 */
+                  /* the map will also be freed */
+                  bus_dmamem_free(sc-&gt;data_tag, sc-&gt;data, sc-&gt;data_map);
+                  sc-&gt;data = 0;
+              }
+              if(sc-&gt;data_tag) {
+                  bus_dma_tag_destroy(sc-&gt;data_tag);
+                  sc-&gt;data_tag = 0;
+              }
+
+              ... 如果有，释放其他的映射和标签 ...
+
+              if(sc-&gt;parent_tag) {
+                  bus_dma_tag_destroy(sc-&gt;parent_tag);
+                  sc-&gt;parent_tag = 0;
+              }
+
+              /* 释放所有总线资源 */
+              if(sc-&gt;mem0_r) {
+                  bus_release_resource(sc-&gt;dev, SYS_RES_MEMORY, sc-&gt;mem0_rid,
+                      sc-&gt;mem0_r);
+                  sc-&gt;mem0_r = 0;
+              }
+              ...
+              if(sc-&gt;port0_r) {
+                  bus_release_resource(sc-&gt;dev, SYS_RES_IOPORT, sc-&gt;port0_rid,
+                      sc-&gt;port0_r);
+                  sc-&gt;port0_r = 0;
+              }
+          }</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-dma.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-attach.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.7. DMA </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.9. xxx_isa_attach</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

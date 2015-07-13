@@ -1,0 +1,865 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>32.5. Die IPFILTER-Firewall (IPF)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="firewalls.html" title="Kapitel 32. Firewalls" /><link rel="prev" href="firewalls-pf.html" title="32.4. Paket Filter (PF) von OpenBSD und ALTQ" /><link rel="next" href="firewalls-ipfw.html" title="32.6. IPFW" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">32.5. Die IPFILTER-Firewall (IPF)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="firewalls-pf.html">Zurück</a> </td><th width="60%" align="center">Kapitel 32. Firewalls</th><td width="20%" align="right"> <a accesskey="n" href="firewalls-ipfw.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls-ipf"></a>32.5. Die IPFILTER-Firewall (IPF)</h2></div></div></div><a id="idp91227984" class="indexterm"></a><p>Geschrieben wurde IPFILTER von Darren Reed.  IPFILTER ist vom
+      Betriebssystem unabhängig: Es ist eine Open Source Anwendung,
+      die auf die Betriebssysteme FreeBSD, NetBSD, OpenBSD, <span class="trademark">SunOS</span>&#8482;, HP/UX
+      und <span class="trademark">Solaris</span>&#8482; portiert wurde.  IPFILTER wird aktiv betreut und
+      gepflegt.  Es werden regelmäßig neue Versionen
+      herausgegeben.</p><p>IPFILTER basiert auf einer kernelseitigen Firewall und einem
+      <acronym class="acronym">NAT</acronym> Mechanismus, der durch Anwenderprogramme
+      betreut und gesteuert werden kann.  Die Regeln der Firewall werden
+      mit dem Programm <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> gesetzt oder gelöscht.  Für
+      die Manipulation der <acronym class="acronym">NAT</acronym> Regeln verwendet man
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ipnat</span>(1)</span></a>.  Mit <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> werden Laufzeitstatistiken der
+      kernelseitigen Anteile von IPFILTER aufgelistet.  Und mit dem
+      Programm <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipmon&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipmon</span>(8)</span></a> kann man die Aktionen von IPFILTER in die
+      Protokolldateien des Systems speichern.</p><p>IPF funktionierte ursprünglich mit einer
+      Regel-Prozess-Logik à la <span class="quote">&#8222;<span class="quote">die letzte Regel, die
+      passt, entscheidet</span>&#8220;</span> und verwendete ausschließlich
+      Regeln ohne feste Zustände.  Inzwischen wurde die
+      Regel-Prozess-Logik drastisch modernisiert:  Es gibt eine
+      <code class="option">quick</code> und eine zustandsorientierte <code class="option">
+      keep-state</code> Option.  Die offizielle Dokumentation beinhaltet
+      leider nur die veralteten Parameter zur Regelerstellung - die neuen
+      Funktionen werden nur als Zusatzoptionen aufgelistet, was ihre
+      Vorteile beim Erstellen einer weit überlegenen und viel
+      sichereren Firewall völlig untergräbt.</p><p>Die Anweisungen in diesem Kapitel basieren darauf, Regeln mit
+      den Optionen <code class="option">quick</code> und <code class="option">keep-state</code>
+      zu erstellen.  Mit diesem Grundwissen wird man einen kompletten
+      einschließenden Regelsatz erstellen können.</p><p>Für eine ausführliche Erläuterung der alten Methode
+      zur Regelverarbeitung schauen Sie bitte auf <code class="uri"><a class="uri" href="http://www.obfuscation.org/ipf/ipf-howto.html#TOC_1" target="_top">http://www.obfuscation.org/ipf/ipf-howto.html#TOC_1</a></code>
+      oder <code class="uri"><a class="uri" href="http://coombs.anu.edu.au/~avalon/ip-filter.html" target="_top">http://coombs.anu.edu.au/~avalon/ip-filter.html</a></code>.</p><p>Antworten auf häufige Fragen finden Sie unter
+      <code class="uri"><a class="uri" href="http://www.phildev.net/ipf/index.html" target="_top">http://www.phildev.net/ipf/index.html</a></code>.</p><p>Und ein durchsuchbares Archiv der Mailingliste zu IPFILTER
+      gibt es unter <code class="uri"><a class="uri" href="http://marc.theaimsgroup.com/?l=ipfilter" target="_top">http://marc.theaimsgroup.com/?l=ipfilter</a></code>.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91249104"></a>32.5.1. Aktivieren von IPF</h3></div></div></div><a id="idp91249744" class="indexterm"></a><p>FreeBSD enthält IPF in der Standardversion als ladbares
+        Kernelmodul.  Dieses Modul wird vom System automatisch geladen,
+        wenn in der <code class="filename">rc.conf</code> der Eintrag<code class="literal">
+        ipfilter_enable="YES"</code> angelegt wird. In dieser
+        ursprünglichen Konfiguration ist die Protokollierung aktiv
+        und	die Option <code class="literal">default pass all</code> ("Pakete passieren
+        lassen") als Standard gesetzt.  Um die <code class="literal">block all</code>
+        ("alles Blockieren") Option zu setzen, muss man nicht gleich
+        einen neuen Kernel bauen - es reicht, <code class="literal">block all</code>
+        als letzte Position des Regelsatzes aufzulisten.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91253456"></a>32.5.2. Kernel-Optionen</h3></div></div></div><a id="idp91254096" class="indexterm"></a><a id="idp91255376" class="indexterm"></a><a id="idp91256528" class="indexterm"></a><a id="idp91257680" class="indexterm"></a><p>Es ist nicht unbedingt notwendig, IPF durch die folgenden
+        Optionen direkt in der Kernel einzubinden.  Diese Möglichkeit
+        der Verwendung von IPF wird hier mehr als Hintergrundwissen angeboten.
+        Man sollte nur wissen, dass dadurch nicht mehr das Kernelmodul geladen
+        wird - und dementsprechend auch nicht mehr entladen werden kann.</p><p>Die Beschreibung der einzelnen Optionen von IPF für die
+        Verwendung in der Kernelkonfiguration finden Sie auch in der Datei
+        <code class="filename">/usr/src/sys/conf/NOTES</code>.</p><pre class="programlisting">options IPFILTER
+options IPFILTER_LOG
+options IPFILTER_DEFAULT_BLOCK</pre><p><code class="literal">options IPFILTER</code> aktiviert die Verwendung
+	der <span class="quote">&#8222;<span class="quote">IPFILTER</span>&#8220;</span> Firewall.</p><p><code class="literal">options IPFILTER_LOG</code> aktiviert den
+        Logging-Mechanismus.  Das bedeutet, dass jedes Paket geloggt wird,
+        auf das eine Regel passt, die das Schlüsselwort
+        <code class="literal">log</code> enthält.  Dazu wird der
+        Pseudo&#8212;Device	<code class="filename">ipl</code> verwendet.</p><p><code class="literal">options IPFILTER_DEFAULT_BLOCK</code> ändert
+        das Verhalten der Firewall dahingehend, dass jedes Paket, dass nicht
+        explizit von einer <code class="literal">pass</code> Regel Zugang erhält,
+        abgewiesen, bzw. geblockt, wird.</p><p>Diese Einstellungen werden erst aktiv, wenn der Kernel, in den sie
+      	eingebunden wurden, kompiliert, installiert und gebootet wurde.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91268688"></a>32.5.3. Optionen in rc.conf</h3></div></div></div><p>Um IPF während des Bootvorgangs einzubinden, braucht man
+        lediglich die folgenden Zeilen der Datei
+        <code class="filename">/etc/rc.conf</code> anzufügen:</p><pre class="programlisting">ipfilter_enable="YES"             # Startet IPF
+ipfilter_rules="/etc/ipf.rules"   # liest den Regelsatz aus einer Datei
+ipmon_enable="YES"                # Startet das IP-Monitor Log
+ipmon_flags="-Ds"                 # D = Als Da:mon starten
+                                  # s = Protokollierung via syslog
+                                  # v = Protokollierung von tcp window, ack, seq
+                                  # n = Namen statt IP &amp; port ausgeben
+      </pre><p>Falls sich hinter der Firewall ein lokales Netzwerk befindet,
+        das den reservierten privaten Adressbereich verwendet, müssen
+        die folgenden Zeilen zur Aktivierung von <acronym class="acronym">NAT</acronym>
+        ebenfalls in <code class="filename">/etc/rc.conf</code> eingetragen
+        werden:</p><pre class="programlisting">gateway_enable="YES"              # Aktivierung des LAN-Gateways
+ipnat_enable="YES"                # Startet die ipnat Funktion
+ipnat_rules="/etc/ipnat.rules"    # Liest die ipnat-Regeldefinitionen aus einer Datei
+      </pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91272144"></a>32.5.4. Der Befehl ipf</h3></div></div></div><a id="idp91272784" class="indexterm"></a><p>Mit dem Befehl <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> liest man die Datei, die den Regelsatz
+      	enthält ein.  Mit dem folgenden Befehl können Sie Ihre
+      	eigenen, für Ihr System maßgeschneiderten Regeln einlesen
+      	und so in einem Schritt alle Regeln der laufenden Firewall
+      	ersetzen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipf -Fa -f /etc/ipf.rules</code></strong></pre><p><code class="option">-Fa</code> bedeutet, dass alle intern gespeicherten
+        Tabellen mit Regeln gelöscht werden.</p><p><code class="option">-f</code> gibt die Datei an, aus der die neuen Regeln
+        gelesen werden sollen.</p><p>Mit diesen beiden Optionen erhalten Sie die Möglichkeit,
+        Änderungen an der Datei mit Ihrem Regelsatz vorzunehmen und
+        gleich die Firewall mit den neuen Regeln zu bestücken, ohne
+        den Rechner neu starten zu müssen.  Da dieser Vorgang beliebig
+        wiederholt werden kann, ist es ein sehr bequemer Weg, neue Regeln
+        einzuarbeiten und zu testen.</p><p>Um mehr über diese und weitere Optionen von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a>
+        zu erfahren, konsultieren Sie bitte die Manpage.</p><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> erwartet, dass es sich bei der Datei mit dem Regelsatz
+        um eine Standard-Textdatei handelt.  Eine Datei, die ein Skript oder
+        Variablen enthält, wird nicht verarbeitet.</p><p>Es gibt allerdings doch einen Weg, IPF Regeln mit Hilfe von
+        Skripten und Variablen zu erstellen.  Weitere Informationen dazu
+        finden Sie unter <a class="xref" href="firewalls-ipf.html#firewalls-ipf-rules-script" title="32.5.9. Die Erstellung eines Regelsatzes mit Variablen">Abschnitt 32.5.9, &#8222;Die Erstellung eines Regelsatzes mit Variablen&#8220;</a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91284432"></a>32.5.5. IPFSTAT</h3></div></div></div><a id="idp91285072" class="indexterm"></a><a id="idp91285712" class="indexterm"></a><p>Das normale Verhalten von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> ist, die Zusammenfassung
+      	der angefallenen Statistiken, die als Resultat der Anwendung von
+      	nutzerspezifischen Regeln auf ein- und ausgehende Pakete seit dem
+      	letzten Start der Firewall oder seit dem letzten Zurücksetzen
+      	der Zähler auf Null durch das Kommando
+      	<code class="command">ipf -Z</code> angesammelt wurden, abzurufen und
+      	anzuzeigen.</p><p>Für weiterführende Informationen schauen Sie bitte
+        auf die Manpage von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a>!</p><p>Die Ausgabe von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a>, wenn keine Parameter
+        übergeben wurden, sieht etwa so aus:</p><pre class="screen">input packets: blocked 99286 passed 1255609 nomatch 14686 counted 0
+output packets: blocked 4200 passed 1284345 nomatch 14687 counted 0
+input packets logged: blocked 99286 passed 0
+output packets logged: blocked 0 passed 0
+packets logged: input 0 output 0
+log failures: input 3898 output 0
+fragment state(in): kept 0 lost 0
+fragment state(out): kept 0 lost 0
+packet state(in): kept 169364 lost 0
+packet state(out): kept 431395 lost 0
+ICMP replies: 0 <acronym class="acronym">TCP</acronym> RSTs sent: 0
+Result cache hits(in): 1215208 (out): 1098963
+IN Pullups succeeded: 2 failed: 0
+OUT Pullups succeeded: 0 failed: 0
+Fastroute successes: 0 failures: 0
+<acronym class="acronym">TCP</acronym> cksum fails(in): 0 (out): 0
+Packet log flags set: (0)</pre><p>Wenn die Option <code class="option">-i</code> für
+        <span class="quote">&#8222;<span class="quote">eingehend</span>&#8220;</span> oder <code class="option">-o</code> für
+        <span class="quote">&#8222;<span class="quote">ausgehend</span>&#8220;</span> übergeben wird, liefert das Kommando
+        eine entsprechende Liste von Filter-Regeln, die gerade installiert
+        sind und vom Kernel verwendet werden.</p><p><code class="command">ipfstat -in</code> zeigt alle aktive Regeln
+        für eingehende Verbindungen zusammen mit ihren Nummern.</p><p><code class="command">ipfstat -on</code> erledigt dasselbe für die
+      	ausgehenden Verbindungen.</p><p>Die Ausgabe sieht in etwa folgendermaßen aus:</p><pre class="screen">@1 pass out on xl0 from any to any
+@2 block out on dc0 from any to any
+@3 pass out quick on dc0 proto tcp/udp from any to any keep state</pre><p><code class="command">ipfstat -ih</code> zeigt die Tabelle der aktiven
+        Regeln für eingehende Verbindungen zusammen mit der Anzahl,
+        wie oft jeder einzelnen Regel entsprochen wurde.</p><p><code class="command">ipfstat -oh</code> zeigt das Gleiche für
+      	die ausgehenden Verbindungen.</p><p>Hier wird die Ausgabe so oder so ähnlich aussehen:</p><pre class="screen">2451423 pass out on xl0 from any to any
+354727 block out on dc0 from any to any
+430918 pass out quick on dc0 proto tcp/udp from any to any keep state</pre><p>Einer der wichtigsten Funktionen von <code class="command">ipfstat</code>
+        wird über die Option <code class="option">-t</code> bereitgestellt.  Mit
+        ihr wird eine Statustabelle vergleichbar der Prozess-Tabelle
+        von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=top&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">top</span>(1)</span></a> ausgegeben.  Mit dieser Funktion erhalten Sie im
+        Falle eines Angriffs die Möglichkeit, die angreifenden Pakete
+        zu identifizieren, abzufangen und auszuwerten.  Weitere Unteroptionen
+        eröffnen, die IP-Adresse, den Port oder das Protokoll, geteilt
+        nach Herkunft und Ziel, auszuwählen und dann in Echtzeit zu
+        beobachten. Lesen Sie dazu bitte auch die Manpage von
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91305296"></a>32.5.6. IPMON</h3></div></div></div><a id="idp91305936" class="indexterm"></a><a id="idp91306576" class="indexterm"></a><p>Damit der Befehl <code class="command">ipmon</code> korrekt arbeiten kann,
+        muss die Option <code class="literal">IPFILTER_LOG</code> in die
+        Kernelkonfiguration eingearbeitet werden.  Das Kommando selbst
+        arbeitet in zwei verschiedenen Modi.  Für den nativen Modus
+        startet man <code class="command">ipmon</code> auf der Kommandozeile ohne die
+        Option <code class="option">-D</code>.</p><p>Der Hintergrundmodus (<code class="literal">daemon mode</code>) dient der
+        Erstellung eines stetigen Systemprotokolls, so dass Einträge
+        vergangener Ereignisse inspiziert werden können. So sollen FreeBSD
+        und IPFILTER entsprechend ihrer Konfiguration zusammen arbeiten.
+        FreeBSD kann mit einem eingebauten Mechanismus Systemprotokolle
+        turnusmäßig abspeichern.  Aus diesem Grund sollte man
+        besser <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> verwenden anstatt die Protokollinformationen
+        in eine Datei zu schreiben, wie es als Standard vorgesehen ist.  In
+        der Standard-<code class="filename">rc.conf</code>-Datei (im Ordner
+        <code class="filename">/etc/defaults/</code>) wird dem Eintrag
+        <code class="literal">ipmon_flags</code> die Option <code class="option">-Ds</code>
+        übergeben:</p><pre class="programlisting">ipmon_flags="-Ds" # D = Als Da:mon starten
+# s = Protokollierung via syslog
+# v = Protokollierung von tcp window, ack, seq
+# n = Namen statt IP &amp; port ausgeben</pre><p>Die Vorteile des Protokollierens liegen auf der Hand:  Sie
+        versetzen den Administrator in die Lage, nach einem Vorfall
+        Informationen abzurufen, etwa welche Pakete aussortiert wurden,
+       	welche Adressen diese Pakete gesendet haben oder wohin sie gesendet
+       	werden sollten.  Alles in allem erhält er ein sehr gutes Werkzeug
+       	zum Aufspüren von Angreifern.</p><p>Jedoch, auch wenn die Protokollierung aktiviert ist, wird IPF
+        keine einzige Regel zum Protokollieren von alleine entwerfen und
+        umsetzen.  Der Administrator der Firewall entscheidet, welche Regeln
+        in seinem Regelsatz mitgeschrieben werden sollen und er muss
+        dementsprechend das Schlüsselword <code class="literal">log</code> in
+        dieser Regel angeben.  Normalerweise werden nur Treffer auf abweisende
+        Regeln protokolliert.</p><p>Es ist üblich, als letzte Regel eine alles blockierende
+        Regel mit dem Schlüsselwort <code class="literal">log</code> in den
+        Regelsatz einzutragen. Dadurch erkennt man alle Pakete, die keiner
+        Regel im Regelsatz entsprachen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91315536"></a>32.5.7. IPMON Logging</h3></div></div></div><p><span class="application">Syslogd</span> verwendet seine eigene Methode
+        zum Sortieren der gesammtelten Protokolldaten - spezielle Gruppierungen
+        namens <span class="quote">&#8222;<span class="quote">facility</span>&#8220;</span> und <span class="quote">&#8222;<span class="quote">level</span>&#8220;</span>.  IPMON
+        verwendet im <code class="literal">daemon</code>-Modus als
+        <span class="quote">&#8222;<span class="quote">facility</span>&#8220;</span> den Wert <code class="literal">security</code>.  Die
+        folgenden <span class="quote">&#8222;<span class="quote">level</span>&#8220;</span> können für eine genauere
+        Trennung der Protokolldaten verwendet werden:</p><pre class="screen">LOG_INFO - Alle zu protokollierenden Pakete
+LOG_NOTICE - Protokollierte Pakete, die passieren durften
+LOG_WARNING - Protokollierte Pakete, die blockiert wurden
+LOG_ERR - Protokollierte Pakete, deren Headerdaten nicht komplett vorlagen</pre><p>Damit IPFILTER angewiesen werden kann, alle Protokolldaten in
+        die Datei <code class="filename">/var/log/ipfilter.log</code> zu schreiben,
+        muss diese erst erstellt werden.  Folgendes Kommando
+        übernimmt diese Aufgabe:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/ipfilter.log</code></strong></pre><p>Die Funktionen von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> werden durch Definition in
+        der Datei <code class="filename">/etc/syslog.conf</code> gesteuert.  In dieser
+        Datei kann sehr weitläfig eingestellt werden, wie
+        <span class="application">syslog</span> mit den Systemnachrichten umgehen
+        soll, die ihm von Anwendungen wie IPF übergeben werden.</p><p>Fügen Sie folgende Definition in die Datei
+        <code class="filename">/etc/syslog.conf</code> ein, um die Protokollierung
+        für IPF via <code class="filename">syslog</code> zu aktivieren:</p><pre class="programlisting">security.* /var/log/ipfilter.log</pre><p><code class="literal">security.*</code> bedeutet, dass alle Nachrichten
+        der Klasse <code class="literal">security.*</code> am angegebenen Ort (hier
+        eine Datei) geschrieben werden sollen.</p><p>Um Änderungen an der Datei
+        <code class="filename">/etc/syslog.conf</code> zu aktivieren müssen Sie
+        den Rechner neu starten, oder den Befehl</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/syslogd reload</code></strong></pre><p>ausführen.</p><p>Vergessen Sie nicht, <code class="filename">/etc/newsyslog.conf</code>
+        anzupassen, damit die neuen Protokolldateien, die eben konfiguriert
+        wurden, auch in den Rotationsturnus eingefügt werden!</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91333072"></a>32.5.8. Die Formatierung der Logdatei</h3></div></div></div><p>Nachrichten, die durch <code class="command">ipmon</code> erzeugt werden,
+        bestehen aus durch Leerstellen getrennten Datenfeldern.  Folgende
+        Felder sind in allen Nachrichten enthalten:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Das Datum der Paketerstellung.</p></li><li class="listitem"><p>Die Uhrzeit der Paketerstellung in der Form
+		    <code class="literal">HH:MM:SS.F</code>, mit Stunden, Minuten, Sekunden
+		    und Sekundenbruchteilen, wobei letztere mehrere Stellen lang
+		    sein können.</p></li><li class="listitem"><p>Der Name der Schnittstelle, die das Paket verarbeitet hat,
+		    bspw. <code class="filename">dc0</code>.</p></li><li class="listitem"><p>Die Gruppe und die Nummer der angewandten Regel, bspw.
+		    <code class="literal">@0:17</code>.</p></li><li class="listitem"><p>Die ausgeführte Aktion: p für
+		    <code class="literal">passed</code> (zugelassen), b für blockiert,
+		    S für <code class="literal">short packet</code> (unvollständiger
+		    Header), n für <code class="literal">no match</code> (gar keine Regel
+		    wurde berührt) und L für Log-Regel.  Die Reihe, in der
+		    die Flags angezeigt werden ist:  S, p, b, n, L.  Ein groß
+		    geschriebenes P oder B bedeutet, dass das Paket aufgrund einer
+		    globalen Einstellung protokolliert wurde und nicht wegen einer
+		    einzelnen Regel.</p></li><li class="listitem"><p>Die Adressen.  Diese bestehen aus drei Feldern:  Der
+		    Quelladresse mit Port (getrennt durch ein Komma), dem Symbol
+		    <span class="quote">&#8222;<span class="quote">-&gt;</span>&#8220;</span> und der Zieladresse. Also bspw.
+		    <code class="literal">209.53.15.22,80 -&gt; 198.64.221.18,1722</code>.</p></li><li class="listitem"><p><code class="literal">PR</code> gefolgt vom Namen eines
+		    Netzwerk-Protokolls oder dessen Nummer.  Bspw.
+		    <code class="literal">PR tcp</code>.</p></li><li class="listitem"><p><code class="literal">len</code> gefolgt von der Länge des Headers
+		    und der Gesamtlänge des Paketes, beispielsweise
+		    <code class="literal">len 20 40</code>.</p></li></ol></div><p>Wenn es sich um ein <acronym class="acronym">TCP</acronym>-Paket handelt, wird
+        ein weiteres Feld, beginnend mit einem Querstrich und gefolgt von
+        Buchstaben, die den gesetzten Flags entsprechen, angezeigt.  Lesen
+        Sie bitte die Manpage <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipmon&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipmon</span>(8)</span></a> für eine Liste der Buchstaben
+        und deren Bedeutungen.</p><p>Falls das Paket ein ICMP-Paket ist, werden zwei Felder am Ende
+        hinzugefügt - das erstere ist immer <span class="quote">&#8222;<span class="quote">ICMP</span>&#8220;</span>, das
+        zweite enthält die ICMP-Nachricht und den Nachrichtentyp,
+        getrennt durch einen Schrägstrich.  <code class="literal">ICMP 3/3</code>
+        steht beispielsweise für <span class="quote">&#8222;<span class="quote">Port nicht
+        erreichbar</span>&#8220;</span>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipf-rules-script"></a>32.5.9. Die Erstellung eines Regelsatzes mit Variablen</h3></div></div></div><p>Erfahrenere IPF Anwender erstellen sich eine Datei, die die
+        Regeln enthält und gestalten diese als ein Skript, in dem
+        Variablen verwendet werden.  Der wichtigste Vorteil besteht darin,
+        dass man lediglich den Wert der Variablen anpassen muss und diese,
+        sobald das Skript gestartet wird, durch die entsprechenden Werte
+        ersetzt	und die Regeln entsprechend formuliert werden.  In Skripten
+        kann man so häufig verwendete Werte einfach als Variable in
+        mehreren Regeln zuweisen.  Am folgenden Beispiel soll das
+        verdeutlicht werden.</p><p>Die Syntax dieses Skriptes ist kompatibel mit den Shells
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> und <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcsh</span>(1)</span></a>.</p><p>Variablen beginnen mit einem Dollar-Zeichen:
+        <code class="literal">$Variablenname</code>.  Im Beispiel unten steht
+        <code class="literal">$oif</code> für die Variable, in der der Name
+        der Schnittstelle abgelegt wird, über die der Verkehr nach
+        außen erfolgt.</p><p>In Variablenzuweisungen fehlt das beginnende $-Zeichen.
+        Alleine der Name der Variable wird angegeben, gefolgt von einem
+        Gleichheitszeichen, und dem Wert, der der Variablen zugewiesen werden
+        soll.  Dieser muss in doppelten Anführungszeichen
+        (<code class="literal">""</code>) stehen.  Also folgt eine Zuweisung dem Schema
+        <code class="literal">Variablenname = "Wert"</code>.</p><pre class="programlisting">############# Start of IPF rules script ########################
+
+oif="dc0"            # Name der Internet-Schnittstelle
+odns="192.0.2.11"    # IP des DNS-Servers unseres ISPs
+myip="192.0.2.7"     # die statische IP, die uns der ISP zugeteilt hat
+ks="keep state"
+fks="flags S keep state"
+
+# Sie haben die Wahl, aus diesem Skript eine eigene
+# /etc/ipf.rules erstellen zu lassen oder es einfach
+# direkt als Skript laufen zu lassen.
+#
+# Entfernen Sie dazu das eine Kommentarzeichen
+# und kommentieren Sie die andere Zeile aus!
+#
+# 1) Diese Zeile verwenden Sie zur Erstellung von /etc/ipf.rules
+#cat &gt; /etc/ipf.rules &lt;&lt; EOF
+#
+# 2) Diese Zeile, wenn Sie direkt mit dem Skript arbeiten wollen
+/sbin/ipf -Fa -f - &lt;&lt; EOF
+
+# Erlaubnis ausgehenden Verkehrs an den Nameserver des ISPs
+pass out quick on $oif proto tcp from any to $odns port = 53 $fks
+pass out quick on $oif proto udp from any to $odns port = 53 $ks
+
+# Erlaubnis ausgehenden unsicheren www-Verkehrs
+pass out quick on $oif proto tcp from $myip to any port = 80 $fks
+
+# Erlaubnis ausgehenden sicheren www-Verkehrs https via TLS SSL
+pass out quick on $oif proto tcp from $myip to any port = 443 $fks
+EOF
+################## End of IPF rules script ########################</pre><p>Das ist schon alles.  Die Regeln selbst sind im Beispiel nicht
+        so wichtig - achten Sie auf die Anwendung der Variablenzuweisung
+        am Anfang und die Verwendung der Variablen im Skript.  Falls das
+        obige Beispiel in einer Datei namens
+        <code class="filename">/etc/ipf.rules.script</code> gespeichert wurde,
+        können die	Regeln mit folgenden Kommando neu geladen
+        werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /etc/ipf.rules.script</code></strong></pre><p>Es gibt ein Problem mit Regelsatz-Dateien, die Variablen
+        verwenden: IPF kann mit Variablen nichts anfangen - und kann derartige
+        Skripte	nicht direkt einlesen.</p><p>Unser kleines Skript kann daher nur auf eine der beiden folgenden
+        Weisen verwendet werden:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Entfernen Sie das Kommentarzeichen der Zeile, die mit
+		    <code class="literal">cat</code> beginnt.  Kommentieren Sie die Zeile aus,
+		    die mit <code class="literal">/sbin/ipf</code> beginnt.  Schreiben Sie die
+		    Zeile <code class="literal">ipfilter_enable="YES"</code> in die Datei
+		    <code class="filename">/etc/rc.conf</code> und rufen Sie dann das Skript
+		    auf, um <code class="filename">/etc/ipf.rules</code> zu erstellen oder
+		    zu erneuern.</p></li><li class="listitem"><p>Deaktivieren Sie IPFILTER in den Systemstart-Skripten, indem
+		    Sie die Zeile <code class="literal">ipfilter_enable="NO"</code> in die
+		    Datei <code class="filename">/etc/rc.conf</code> eintragen (was auch der
+		    Standard-Einstellung entspricht).</p><p>Fügen Sie ein Skript ähnlich dem folgenden in Ihr
+		    Verzeichnis <code class="filename">/usr/local/etc/rc.d/</code>.  Es
+		    sinnvoll, dem Skript einen offensichtlichen Namen zu geben, wie
+		    etwa <code class="filename">ipf.loadrules.sh</code>.  Die Endung
+		    <code class="filename">.sh</code> ist dabei verbindlich.</p><pre class="programlisting">#!/bin/sh
+sh /etc/ipf.rules.script</pre><p>Die Zugriffsrechte für die Datei, die das Skript
+		    enthält, müssen für den Eigentümer
+		    <code class="systemitem">root</code> auf Lesen, Schreiben und Ausführen
+		    gesetzt werden.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chmod 700 /usr/local/etc/rc.d/ipf.loadrules.sh</code></strong></pre></li></ul></div><p>Wenn nun Ihr System startet, werden Ihre IPF-Regeln geladen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91395920"></a>32.5.10. IPF Regelsätze</h3></div></div></div><p> Ein Regelsatz ist eine Gruppe von IPF-Regeln, die anhand der
+        Werte eines Netzwerkpaketes entscheiden, ob dieses Paket durchgelassen
+        oder blockiert wird.  Der Austausch von Paketen erfolgt immer
+        zweiseitig in Form einer sogenannten Session.  Der Regelsatz der
+        Firewall verarbeitet sowohl die eingehenden Pakete aus dem
+        öffentlichen Internet als auch die Pakete, die vom System als
+        Antwort auf die Ersteren gesendet werden.  Jeder Dienst, der via
+        <acronym class="acronym">TCP/IP</acronym> arbeitet, zum Beispiel
+        <code class="literal">telnet</code>, <code class="literal">www</code> oder
+        <code class="literal">mail</code>, ist vordefiniert durch sein Protokoll und
+        seinen privilegierten Port,	an dem er auf Anfragen wartet und
+        reagieren kann.  Pakete, die gezielt einen Dienst ansprechen sollen,
+        werden von einem unprivilegierten Port des Senders an einen konkreten
+        privilegierten Port des Zielsystems	geschickt.  Alle genannten
+        Parameter (Ports, Adressen usw.) können als Auswahlkriterien zum
+        erstellen von Regeln eingesetzt werden, die	Dienste erlauben oder
+        blockieren.</p><a id="idp91398480" class="indexterm"></a><p>IPF wurde ursprünglich mit einer Regel-Prozess-Logik
+        geschrieben, die ausschließlich statusfreie Regeln zuließ
+        und nach dem Prinzip <span class="quote">&#8222;<span class="quote">die letzte Regel, die passt,
+        entscheidet</span>&#8220;</span> arbeitete.  Mit der Zeit erhielt IPF eine
+        <code class="option">quick</code> Option sowie <code class="option">keep-state</code> Option
+        für die Anwendung von zustandsorientierten Regeln, was die
+        Regel-Prozess-Logik signifikant modernisierte.</p><p>Die Anweisungen in diesem Kapitel basieren auf der Verwendung
+        von Regeln, die diese beiden neuen Optionen verarbeiten.  Dies ist
+        das Framework zur Entwicklung eines Firewallregelsatzes.</p><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Wenn Sie mit einer Firewall arbeiten, seien Sie
+	<span class="emphasis"><em>sehr vorsichtig</em></span>.  Durch wenige Einstellungen
+	können Sie sich aus Ihrem System
+	<span class="emphasis"><em>aussperren</em></span>.  Wenn Sie auf der sicheren Seite
+	sein wollen, führen Sie die Firewall-Konfiguration direkt am
+	entsprechenden Gerät aus und nicht über eine
+	Netzwerkverbindung wie bspw. <span class="application">ssh</span>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91403728"></a>32.5.11. IPF Regel-Syntax</h3></div></div></div><a id="idp91404368" class="indexterm"></a><p>Die Syntax zur Erstellung der Regeln, die hier vorgestellt wird,
+        ist dahingehend vereinfacht worden, dass sie ausschliesslich auf
+        den modernen Regelkontext, mit statusbehafteten Regeln und einer
+        <span class="quote">&#8222;<span class="quote">die erste Regel, die passt, gewinnt</span>&#8220;</span>-Logik,
+        zurückgreift.  Um alles über die veraltete Syntax zu
+        erfahren, lesen Sie bitte die Man-Page von <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a>.</p><p>Ein <code class="literal">#</code>-Zeichen markiert den Beginn eines
+        Kommentars.  Es darf nach nach einer Regel stehen oder als erstes
+        Zeichen einer Zeile.  Leere Zeilen werden von der
+        Regel-Prozess-Logik ignoriert.</p><p>Regeln enthalten Schlüsselwörter.  Diese
+        Schlüsselwörter müssen in einer bestimmten Reihenfolge
+        von links nach rechts in einer Zeile erscheinen.  Als solche
+        identifizierte Schlüsselwörter werden fett wiedergegeben.
+        Einige Schlüsselwörter haben Unteroptionen, die wiederum
+        selbst Schlüsselwörter sein und ebenfalls weiter
+        Unteroptionen einschließen können.</p><p><em class="replaceable"><code>ACTION IN-OUT OPTIONS SELECTION STATEFUL PROTO
+        SRC_ADDR,DST_ADDR OBJECT PORT_NUM TCP_FLAG
+        STATEFUL</code></em></p><p><em class="replaceable"><code>ACTION</code></em> = block | pass</p><p><em class="replaceable"><code>IN-OUT</code></em> = in | out</p><p><em class="replaceable"><code>OPTIONS</code></em> = log | quick | on
+        interface-name</p><p><em class="replaceable"><code>SELECTION</code></em> = proto value |
+        source/destination IP | port = number | flags flag-value</p><p><em class="replaceable"><code>PROTO</code></em> = tcp/udp | udp | tcp |
+        icmp</p><p><em class="replaceable"><code>SRC_ADD,DST_ADDR</code></em> = all | from
+        object to object</p><p><em class="replaceable"><code>OBJECT</code></em> = IP address | any</p><p><em class="replaceable"><code>PORT_NUM</code></em> = port number</p><p><em class="replaceable"><code>TCP_FLAG</code></em> = S</p><p><em class="replaceable"><code>STATEFUL</code></em> = keep state</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91420112"></a>32.5.11.1. ACTION</h4></div></div></div><p>Die <span class="quote">&#8222;<span class="quote">ACTION</span>&#8220;</span> bestimmt, was mit dem Paket passieren
+		  soll, wenn der Rest der Regel zutrifft.  Dieser Teil muss
+		  für jede Regel angegeben werden.</p><p>Das Schlüsselwort <code class="literal">block</code> gibt an, dass
+		  das Paket verfallen soll, wenn die Auswahlparameter zutreffen.</p><p>Das Schlüsselwort <code class="literal">pass</code> gibt an, dass
+		  das Paket durch die Firewall durchgelassen werden soll, wenn die
+		  Auswahlparameter zutreffen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91423312"></a>32.5.11.2. IN-OUT</h4></div></div></div><p>Ebenfalls verbindlich ist die Angabe, welchen Teil der
+		  Verbindung, Ein- oder Ausgang, die Regel beeinflussen soll.  Das
+		  nächste Schlüsselwort muss daher entweder
+		  <code class="literal">in</code>, für eingehend, oder
+		  <code class="literal">out</code>, für ausgehend, lauten - oder die Regel
+		  wird aufgrund eines Syntaxfehlers nicht umgesetzt.</p><p><code class="literal">in</code> bedeutet, dass diese Regel auf eingehende
+		  Pakete angewendet wird, die gerade an der dem öffentlichen
+		  Internet zugewandten Schnittstelle empfangen wurden.</p><p><code class="literal">out</code> bedeutet, das diese Regel auf ausgehende
+		  Pakete angewendet wird, also Pakete die gerade gesendet werden und
+		  deren Zieladresse im öffentlichen Internet liegt.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91426512"></a>32.5.11.3. OPTIONS</h4></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Optionen müssen in der hier aufgeführten
+		    Reihenfolge verwendet werden.</p></div><p><code class="literal">log</code> bestimmt, dass die Kopfdaten des Paketes
+          an die Systemschnittstelle <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipl&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ipl</span>(4)</span></a> geschrieben werden sollen.
+          Genaueres dazu weiter unten im Abschnitt LOGGING.</p><p><code class="literal">quick</code> bestimmt, dass,
+		  <span class="emphasis"><em>wenn</em></span> die Auswahlkriterien der Regel auf das
+		  Paket zutreffen, keine weiteren Regeln ausgewertet werden.  So
+		  vermeidet man das Abarbeiten des gesamten Regelsatzes.  Diese Option
+		  ist eine verbindliche Vorraussetzung der modernen
+		  Regel-Prozess-Logik.</p><p><code class="literal">on</code> bestimmt den Namen der Schnittstelle,
+		  der als Auswahlkriterium hinzugefügt werden soll.  Die Namen
+		  aller verfügbaren Schnittstellen werden durch den Befehl
+		  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> angezeigt.  wenn man diese Option verwendet,
+		  passt die Regeln nur auf Pakete, die durch diese Schnittstelle
+		  empfangen (<code class="literal">in</code>) oder gesendet
+		  (<code class="literal">out</code>) wurden.  Für die modernisierte
+		  Regel-Prozess-Logik ist die Verwendung dieser Option
+		  verbindlich.</p><p>Wenn ein Paket protokolliert wird, werden die Kopfdaten in
+		  die Pseudo-Schnittstelle <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipl&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ipl</span>(4)</span></a> geschrieben.  Folgende Parameter
+		  können zusätzlich übergeben werden, müssen dazu
+		  aber direkt nach dem Schlüsselwort <code class="literal">log</code> und in
+		  gleicher Reihenfolge stehen:</p><p><code class="literal">body</code> bestimmt, dass die ersten 128 Bytes des
+		  Paketinhaltes zusätzlich zu den Kopfdaten protokolliert
+		  werden.</p><p><code class="literal">first</code> trifft nur zu, wenn das
+		  Schlüsselwort <code class="literal">log</code> zusammen mit
+		  <code class="literal">keep-state</code> verwendet wird.  Es bestimmt, dass nur
+		  das auslösende Paket protokolliert wird und nicht jedes weitere
+		   Paket, dass von der gespeicherten Status-Regel betroffen ist.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91444688"></a>32.5.11.4. SELECTION</h4></div></div></div><p>Die Schlüsselwörter, die in diesem Abschnitt
+		  vorgestellt werden, dienen zur Beschreibung von Attributen, anhand
+		  derer geprüft und entschieden wird, ob eine Regel zutrifft
+		  oder nicht.  Es gibt ein Schlüsselwort, und das hat mehrere
+		  Optionen, von denen eine ausgewählt werden muss.  Die
+		  folgenden allgemeinen Attribute können beliebig zum Erstellen
+		  einer Regel verwendet werden, allerdings nur in der vorgestellten
+		  Reihenfolge:</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91445840"></a>32.5.11.5. PROTO</h4></div></div></div><p><code class="literal">proto</code> ist das Schlüsselwort für
+		  das im Paket angewendete Protokoll.  Als Option ein Protokoll aus
+		  Auswahlkriterium übergeben.  Diese Option ist verbindlich, wenn
+		  man die moderne Regel-Prozess-Logik verwendet.</p><p><code class="literal">tcp/udp | udp | tcp | icmp</code> oder irgendein
+		  Protokollname, der in der Datei <code class="filename">/etc/protocols</code>
+		  zu finden ist, kann übergeben werden.  Außerdem kann das
+		  Schlüsselwort <code class="literal">tcp/udp</code> verwendet werden, wenn
+		  sowohl <acronym class="acronym">TCP</acronym> als auch <acronym class="acronym">UDP</acronym> von der
+		  Regel betroffen sein sollen.  Dieses Schlüsselwort wurde
+		  eingeführt, um Duplikate sonst identischer Regeln zu
+		  vermeiden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91449424"></a>32.5.11.6. SRC_ADDR/DST_ADDR</h4></div></div></div><p>Das Schlüsselwort <code class="literal">all</code> ist ein Synonym
+		  für <span class="quote">&#8222;<span class="quote">from any to any</span>&#8220;</span> ohne weitere
+		  Auswahlkriterien.</p><p><code class="literal">from src to dst</code>: Die Schlüsselwörter
+		  <code class="literal">from</code> und <code class="literal">to</code> dienen zur Angabe
+		  von Quelle und Ziel in Form von IP-Adressen oder -Bereichen.
+		  Innerhalb einer Regel muss immer beides angegeben werden.
+		  Statt einer Adresse kann auch das Schlüsselwort
+		  <code class="literal">any</code> übergeben werden, das für jede
+		  beliebige IP-Adresse steht.  Zum Beispiel:
+		  <code class="literal">from any to any</code> oder
+		  <code class="literal">from 0.0.0.0/0 to any</code> oder
+		  <code class="literal">from any to 0.0.0.0/0</code> oder
+		  <code class="literal">from 0.0.0.0 to any</code> oder
+		  <code class="literal">from any to 0.0.0.0</code> bedeuten alle das
+		  Gleiche.</p><p>IP-Bereiche können nur in der CIDR-Notation angegeben
+		  werden.  Der Port <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/ipcalc/pkg-descr">net-mgmt/ipcalc</a>
+		  hilft Ihnen bei der Berechnung der richtigen Angaben.
+		  Weiterführende Informationen zu CIDR finden Sie auf der Webseite
+		  von <a class="link" href="http://www.rfc-editor.org/rfc/rfc1519.txt" target="_top"><code class="literal">ipcalc</code></a>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91460688"></a>32.5.11.7. PORT</h4></div></div></div><p>Wenn ein Port als Auswahlkriterium übergeben wurde, bei
+		  Quelle und/oder Ziel, wird er nur bei <acronym class="acronym">TCP</acronym> und
+		  <acronym class="acronym">UDP</acronym> Paketen verwendet.  Angegeben werden kann
+		  entweder die Portnummer oder der Dienstname aus
+		  <code class="filename">/etc/services</code>.  Die Verwendung der
+		  Portoption mit dem <code class="literal">to</code>-Objekt ist verbindlich
+		  für die Verwendung der modernisierten Regel-Prozess-Logik.
+		  Ein Beispiel für die Filterung Paketen von allen Quell-IPs mit
+		  beliebiger Portnummer auf beliebige Ziel-IPs mit der Portnummer 80
+		  (dem <code class="literal">www</code>-Port):
+		  <code class="literal">from any to any port = 80</code>.</p><p>Einfache Portvergleiche können auf verschiedenen Wegen
+		  erfolgen.  Mehrere Vergleichsoperatoren stehen dafür zur
+		  Verfügung.  Genauso können Bereiche angegeben
+		  werden.</p><p>port "=" | "!=" | "&lt;" | "&gt;" | "&lt;=" | "&gt;=" | "eq"
+		  | "ne" | "lt" | "gt" | "le" | "ge".</p><p>Um einen Bereich anzugeben: port "&lt;&gt;" | "&gt;&lt;"</p><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Genau wie die Trefferspezifikation für Quelle und Ziel
+            sind auch die beiden folgenden Parameter obligatorisch bei der
+            Verwendung der modernen Regel-Prozess-Logik.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91466448"></a>32.5.11.8. <acronym class="acronym">TCP</acronym>_FLAG</h4></div></div></div><p>Flags spielen nur beim Filtern von <acronym class="acronym">TCP</acronym> eine
+		  Rolle.  Die Buchstaben entsprechen jeweils einem möglichen
+		  Flag, dass in den Kopfdaten der <acronym class="acronym">TCP</acronym>-Pakete
+		  geprueft werden soll.</p><p>Die moderne Regel-Prozess-Logik verwendet den Parameter
+		  <code class="literal">flags S</code> um eine Anfrage zum Start einer
+		  <acronym class="acronym">TCP</acronym>-Session zu identifizieren.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91469776"></a>32.5.11.9. STATEFUL</h4></div></div></div><p><code class="literal">keep state</code> zeigt bei einer Passage-Regel an,
+		  dass für alle Pakete, die die Selektion erfolgreich durchlaufen,
+		  <code class="literal">Stateful Filtering</code> eingerichtet werden
+		  soll.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Diese Option ist obligatorisch für die Verwendung der
+		    modernen Prozess-Regel-Logik.</p></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91472848"></a>32.5.12. Stateful Filtering</h3></div></div></div><a id="idp91473488" class="indexterm"></a><p>Stateful filtering treats traffic as a bi-directional
+	exchange of packets comprising a session conversation.  When
+	activated, keep-state dynamically generates internal rules for
+	each anticipated packet being exchanged during the
+	bi-directional session conversation.  It has sufficient matching
+	capabilities to determine if the session conversation between the
+	originating sender and the destination are following the valid
+	procedure of bi-directional packet exchange.  Any packets that
+	do not properly fit the session conversation template are
+	automatically rejected as impostors.</p><p>Keep state will also allow <acronym class="acronym">ICMP</acronym> packets related to a
+	<acronym class="acronym">TCP</acronym> or <acronym class="acronym">UDP</acronym> session through.  So if you get
+	<acronym class="acronym">ICMP</acronym> type 3 code 4 in response to some web surfing allowed out
+	by a keep state rule, they will be automatically allowed in.
+	Any packet that IPF can be certain is part of an active
+	session, even if it is a different protocol, will be let
+	in.</p><p>What happens is:</p><p>Packets destined to go out through the interface connected to the
+	public Internet are first checked against the dynamic state
+	table.  If the packet matches the next expected packet
+	comprising an active session conversation, then it exits the
+	firewall and the state of the session conversation flow is
+	updated in the dynamic state table.  Packets that do not belong to
+	an already active session, are simply checked against the outbound
+	ruleset.</p><p>Packets coming in from the interface connected to the public
+	Internet are first checked against the dynamic state table.  If
+	the packet matches the next expected packet comprising an
+	active session conversation, then it exits the firewall and
+	the state of the session conversation flow is updated in the
+	dynamic state table.  Packets that do not belong to an already active
+	session, are simply checked against the inbound ruleset.</p><p>When the conversation completes it is removed from the
+	dynamic state table.</p><p>Stateful filtering allows you to focus on blocking/passing
+	new sessions.  If the new session is passed, all its subsequent
+	packets will be allowed through automatically and any impostors
+	automatically rejected.  If a new session is blocked, none of
+	its subsequent packets will be allowed through.  Stateful
+	filtering has technically advanced matching abilities
+	capable of defending against the flood of different attack
+	methods currently employed by attackers.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91479248"></a>32.5.13. Inclusive Ruleset Example</h3></div></div></div><p>The following ruleset is an example of how to code a very
+	secure inclusive type of firewall.  An inclusive firewall only
+	allows services matching <code class="literal">pass</code> rules through, and blocks all
+	others by default.  Firewalls intended to protect other machines,
+	also called <span class="quote">&#8222;<span class="quote">network firewalls</span>&#8220;</span>, should have at least
+	two interfaces, which are generally configured to trust one side
+	(the <acronym class="acronym">LAN</acronym>) and not the other (the public Internet).  Alternatively,
+	a firewall might be configured to protect only the system it is
+	running on&#8212;this is called a
+	<span class="quote">&#8222;<span class="quote">host based firewall</span>&#8220;</span>, and is particularly appropriate
+	for servers on an untrusted network.</p><p>All <span class="trademark">UNIX</span>® flavored systems including FreeBSD are designed to
+	use interface <code class="filename">lo0</code> and IP address
+	<code class="systemitem">127.0.0.1</code> for internal
+	communication within the operating system.  The firewall rules
+	must contain rules to allow free unmolested movement of these
+	special internally used packets.</p><p>The interface which faces the public Internet is the one
+	to place the rules that authorize and control access of the outbound
+	and inbound connections.  This can be your user PPP
+	<code class="filename">tun0</code> interface or your NIC that is
+	connected to your DSL or cable modem.</p><p>In cases where one or more NICs are cabled to private network
+	segments, those interfaces may require rules to allow packets
+	originating from those LAN interfaces transit to each other and/or
+	to the outside (Internet).</p><p>The rules should be organized into three major
+	sections: first trusted interfaces, then the public
+	interface outbound, and last the public untrusted interface inbound.</p><p>The rules in each of the public interface sections should
+	have the most frequently matched rules placed before less
+	commonly matched rules, with the last rule in the section
+	blocking and logging all packets on that interface and
+	direction.</p><p>The Outbound section in the following ruleset only
+	contains <code class="literal">pass</code> rules which contain selection values that
+	uniquely identify the service that is authorized for public
+	Internet access.  All the rules have the <code class="literal">quick</code>, <code class="literal">on</code>,
+	<code class="literal">proto</code>, <code class="literal">port</code>, and <code class="literal">keep state</code> options set.  The <code class="literal">proto
+	tcp</code> rules have the <code class="literal">flag</code> option included to identify the
+	session start request as the triggering packet to activate the
+	stateful facility.</p><p>The Inbound section has all the blocking of undesirable
+	packets first, for two different reasons.  The first is that
+	malicious packets may be partial matches for legitimate traffic.
+	These packets have to be discarded rather than allowed in, based on
+	their partial matches against <code class="literal">allow</code> rules.
+	The second reason is that known and uninteresting rejects may be
+	blocked silently, rather than being caught and logged by the last
+	rules in the section.  The final rule in each section, blocks and
+	logs all packets and can be used to create the legal evidence needed
+	to prosecute the people who are attacking your system.</p><p>Another thing that should be taken care of, is to ensure there is no
+	response returned for any of the undesirable traffic.  Invalid
+	packets should just get dropped and vanish.  This way the attacker
+	has no knowledge if his packets have reached your system.  The
+	less the attackers can learn about your system, the more
+	time they must invest before actually doing something bad.
+	Rules that include a <code class="literal">log first</code> option, will only
+	log the event the first time they are triggered.  This option is
+	included in the sample <code class="literal">nmap OS fingerprint</code> rule.
+	The <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/nmap/pkg-descr">security/nmap</a> utility is
+	commonly used by attackers who attempt to identify the operating
+	system of your server.</p><p>Any time there are logged messages on a rule with
+	the <code class="literal">log first</code> option, an <code class="command">ipfstat -hio</code>
+	command should be executed to evaluate how many times the rule has
+	actually matched.  Large number of matches usually indicate that the
+	system is being flooded (i.e.: under attack).</p><p>The <code class="filename">/etc/services</code> file may be used to
+	lookup unknown port numbers.  Alternatively,
+	visit <code class="uri"><a class="uri" href="http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers" target="_top">http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers</a></code>
+	and do a port number lookup to find the purpose of a particular
+	port number.</p><p>Check out this link for port numbers used by Trojans <code class="uri"><a class="uri" href="http://www.sans.org/security-resources/idfaq/oddports.php" target="_top">http://www.sans.org/security-resources/idfaq/oddports.php</a></code>.</p><p>The following ruleset creates a complete and very secure
+	<code class="literal">inclusive</code> type of firewall ruleset that has been
+	tested on production systems.  It can be easily modified for your
+	own system.  Just comment out any <code class="literal">pass</code> rules for
+	services that should not be authorized.</p><p>To avoid logging unwanted messages,
+	just add a <code class="literal">block</code> rule in the inbound section.</p><p>The <code class="filename">dc0</code> interface name has to be changed
+	in every rule to the real interface name of the NIC
+	card that connects your system to the public Internet.  For
+	user PPP it would be <code class="filename">tun0</code>.</p><p>Add the following statements to
+	<code class="filename">/etc/ipf.rules</code>:</p><pre class="programlisting">#################################################################
+# No restrictions on Inside LAN Interface for private network
+# Not needed unless you have LAN
+#################################################################
+
+#pass out quick on xl0 all
+#pass in quick on xl0 all
+
+#################################################################
+# No restrictions on Loopback Interface
+#################################################################
+pass in quick on lo0 all
+pass out quick on lo0 all
+
+#################################################################
+# Interface facing Public Internet (Outbound Section)
+# Match session start requests originating from behind the
+# firewall on the private network
+# or from this gateway server destined for the public Internet.
+#################################################################
+
+# Allow out access to my ISP's Domain name server.
+# xxx must be the IP address of your ISP's DNS.
+# Dup these lines if your ISP has more than one DNS server
+# Get the IP addresses from /etc/resolv.conf file
+pass out quick on dc0 proto tcp from any to xxx port = 53 flags S keep state
+pass out quick on dc0 proto udp from any to xxx port = 53 keep state
+
+# Allow out access to my ISP's DHCP server for cable or DSL networks.
+# This rule is not needed for 'user ppp' type connection to the
+# public Internet, so you can delete this whole group.
+# Use the following rule and check log for IP address.
+# Then put IP address in commented out rule &amp; delete first rule
+pass out log quick on dc0 proto udp from any to any port = 67 keep state
+#pass out quick on dc0 proto udp from any to z.z.z.z port = 67 keep state
+
+
+# Allow out non-secure standard www function
+pass out quick on dc0 proto tcp from any to any port = 80 flags S keep state
+
+# Allow out secure www function https over TLS SSL
+pass out quick on dc0 proto tcp from any to any port = 443 flags S keep state
+
+# Allow out send &amp; get email function
+pass out quick on dc0 proto tcp from any to any port = 110 flags S keep state
+pass out quick on dc0 proto tcp from any to any port = 25 flags S keep state
+
+# Allow out Time
+pass out quick on dc0 proto tcp from any to any port = 37 flags S keep state
+
+# Allow out nntp news
+pass out quick on dc0 proto tcp from any to any port = 119 flags S keep state
+
+# Allow out gateway &amp; LAN users' non-secure FTP ( both passive &amp; active modes)
+# This function uses the IP<acronym class="acronym">NAT</acronym> built in FTP proxy function coded in
+# the nat rules file to make this single rule function correctly.
+# If you want to use the pkg_add command to install application packages
+# on your gateway system you need this rule.
+pass out quick on dc0 proto tcp from any to any port = 21 flags S keep state
+
+# Allow out ssh/sftp/scp (telnet/rlogin/FTP replacements)
+# This function is using SSH (secure shell)
+pass out quick on dc0 proto tcp from any to any port = 22 flags S keep state
+
+# Allow out insecure Telnet
+pass out quick on dc0 proto tcp from any to any port = 23 flags S keep state
+
+# Allow out FreeBSD CVSup
+pass out quick on dc0 proto tcp from any to any port = 5999 flags S keep state
+
+# Allow out ping to public Internet
+pass out quick on dc0 proto icmp from any to any icmp-type 8 keep state
+
+# Allow out whois from LAN to public Internet
+pass out quick on dc0 proto tcp from any to any port = 43 flags S keep state
+
+# Block and log only the first occurrence of everything
+# else that's trying to get out.
+# This rule implements the default block
+block out log first quick on dc0 all
+
+#################################################################
+# Interface facing Public Internet (Inbound Section)
+# Match packets originating from the public Internet
+# destined for this gateway server or the private network.
+#################################################################
+
+# Block all inbound traffic from non-routable or reserved address spaces
+block in quick on dc0 from 192.168.0.0/16 to any    #RFC 1918 private IP
+block in quick on dc0 from 172.16.0.0/12 to any     #RFC 1918 private IP
+block in quick on dc0 from 10.0.0.0/8 to any        #RFC 1918 private IP
+block in quick on dc0 from 127.0.0.0/8 to any       #loopback
+block in quick on dc0 from 0.0.0.0/8 to any         #loopback
+block in quick on dc0 from 169.254.0.0/16 to any    #DHCP auto-config
+block in quick on dc0 from 192.0.2.0/24 to any      #reserved for docs
+block in quick on dc0 from 204.152.64.0/23 to any   #Sun cluster interconnect
+block in quick on dc0 from 224.0.0.0/3 to any       #Class D &amp; E multicast
+
+##### Block a bunch of different nasty things. ############
+# That I do not want to see in the log
+
+# Block frags
+block in quick on dc0 all with frags
+
+# Block short tcp packets
+block in quick on dc0 proto tcp all with short
+
+# block source routed packets
+block in quick on dc0 all with opt lsrr
+block in quick on dc0 all with opt ssrr
+
+# Block nmap OS fingerprint attempts
+# Log first occurrence of these so I can get their IP address
+block in log first quick on dc0 proto tcp from any to any flags FUP
+
+# Block anything with special options
+block in quick on dc0 all with ipopts
+
+# Block public pings
+block in quick on dc0 proto icmp all icmp-type 8
+
+# Block ident
+block in quick on dc0 proto tcp from any to any port = 113
+
+# Block all Netbios service. 137=name, 138=datagram, 139=session
+# Netbios is MS/Windows sharing services.
+# Block MS/Windows hosts2 name server requests 81
+block in log first quick on dc0 proto tcp/udp from any to any port = 137
+block in log first quick on dc0 proto tcp/udp from any to any port = 138
+block in log first quick on dc0 proto tcp/udp from any to any port = 139
+block in log first quick on dc0 proto tcp/udp from any to any port = 81
+
+# Allow traffic in from ISP's DHCP server. This rule must contain
+# the IP address of your ISP's DHCP server as it's the only
+# authorized source to send this packet type. Only necessary for
+# cable or DSL configurations. This rule is not needed for
+# 'user ppp' type connection to the public Internet.
+# This is the same IP address you captured and
+# used in the outbound section.
+pass in quick on dc0 proto udp from z.z.z.z to any port = 68 keep state
+
+# Allow in standard www function because I have apache server
+pass in quick on dc0 proto tcp from any to any port = 80 flags S keep state
+
+# Allow in non-secure Telnet session from public Internet
+# labeled non-secure because ID/PW passed over public Internet as clear text.
+# Delete this sample group if you do not have telnet server enabled.
+#pass in quick on dc0 proto tcp from any to any port = 23 flags S keep state
+
+# Allow in secure FTP, Telnet, and SCP from public Internet
+# This function is using SSH (secure shell)
+pass in quick on dc0 proto tcp from any to any port = 22 flags S keep state
+
+# Block and log only first occurrence of all remaining traffic
+# coming into the firewall. The logging of only the first
+# occurrence avoids filling up disk with Denial of Service logs.
+# This rule implements the default block.
+block in log first quick on dc0 all
+################### End of rules file #####################################</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91508304"></a>32.5.14. <acronym class="acronym">NAT</acronym></h3></div></div></div><a id="idp91509072" class="indexterm"></a><a id="idp91509584" class="indexterm"></a><a id="idp91510736" class="indexterm"></a><p><acronym class="acronym">NAT</acronym> stands for <span class="emphasis"><em>Network Address
+	  Translation</em></span>.  To those familiar with <span class="trademark">Linux</span>®, this concept is
+	called IP Masquerading; <acronym class="acronym">NAT</acronym> and IP
+	Masquerading are the same thing.  One of the many things the
+	IPF <acronym class="acronym">NAT</acronym> function enables is the ability to
+	have a private Local Area Network (LAN) behind the firewall
+	sharing a single ISP assigned IP address on the public
+	Internet.</p><p>You may ask why would someone want to do this.  ISPs
+	normally assign a dynamic IP address to their non-commercial
+	users.  Dynamic means that the IP address can be different each
+	time you dial in and log on to your ISP, or for cable and DSL
+	modem users, when the modem is power cycled.  This dynamic IP
+	address is used to identify your system to the public Internet.</p><p>Now lets say you have five PCs at home and each one needs
+	Internet access.  You would have to pay your ISP for an
+	individual Internet account for each PC and have five phone
+	lines.</p><p>With <acronym class="acronym">NAT</acronym> only a single account is needed
+	with your ISP.  The other four PCs may then be cabled to a switch and
+	the switch to the NIC in your FreeBSD system which is going to
+	service your LAN as a gateway. <acronym class="acronym">NAT</acronym> will
+	automatically translate the private LAN IP address for each
+	separate PC on the LAN to the single public IP address as it
+	exits the firewall bound for the public Internet.  It also does
+	the reverse translation for returning packets.</p><p>There is a special range of IP addresses reserved for
+	<acronym class="acronym">NAT</acronym>ed private LANs.  According to
+	RFC 1918, the following IP ranges may be used for private nets
+	which will never be routed directly to the public
+	Internet:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /><col /></colgroup><tbody><tr><td>Start IP <code class="systemitem">10.0.0.0</code></td><td>-</td><td>Ending IP <code class="systemitem">10.255.255.255</code></td></tr><tr><td>Start IP <code class="systemitem">172.16.0.0</code></td><td>-</td><td>Ending IP <code class="systemitem">172.31.255.255</code></td></tr><tr><td>Start IP <code class="systemitem">192.168.0.0</code></td><td>-</td><td>Ending IP <code class="systemitem">192.168.255.255</code></td></tr></tbody></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91539152"></a>32.5.15. IP<acronym class="acronym">NAT</acronym></h3></div></div></div><a id="idp91540048" class="indexterm"></a><a id="idp91541200" class="indexterm"></a><p><acronym class="acronym">NAT</acronym> rules are loaded by using the
+	<code class="command">ipnat</code> command.  Typically the
+	<acronym class="acronym">NAT</acronym> rules are stored in
+	<code class="filename">/etc/ipnat.rules</code>.  See <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ipnat</span>(1)</span></a> for
+	details.</p><p>When changing the <acronym class="acronym">NAT</acronym> rules after
+	<acronym class="acronym">NAT</acronym> has been started, make your changes to
+	the file containing the NAT rules, then run the <code class="command">ipnat</code> command with
+	the <code class="option">-CF</code> flags to delete the internal in use
+	<acronym class="acronym">NAT</acronym> rules and flush the contents of the
+	translation table of all active entries.</p><p>To reload the <acronym class="acronym">NAT</acronym> rules issue a command
+	like this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -CF -f /etc/ipnat.rules</code></strong></pre><p>To display some statistics about your
+	<acronym class="acronym">NAT</acronym>, use this command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -s</code></strong></pre><p>To list the <acronym class="acronym">NAT</acronym> table's current
+	mappings, use this command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -l</code></strong></pre><p>To turn verbose mode on, and display information relating
+	to rule processing and active rules/table entries:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -v</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91561552"></a>32.5.16. IP<acronym class="acronym">NAT</acronym> Rules</h3></div></div></div><p><acronym class="acronym">NAT</acronym> rules are very flexible and can
+	accomplish many different things to fit the needs of commercial
+	and home users.</p><p>The rule syntax presented here has been simplified to what
+	is most commonly used in a non-commercial environment.  For a
+	complete rule syntax description see the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">ipnat</span>(5)</span></a> manual
+	page.</p><p>The syntax for a <acronym class="acronym">NAT</acronym> rule looks
+	something like this:</p><pre class="programlisting">map <em class="replaceable"><code>IF</code></em> <em class="replaceable"><code>LAN_IP_RANGE</code></em> -&gt; <em class="replaceable"><code>PUBLIC_ADDRESS</code></em></pre><p>The keyword <code class="literal">map</code> starts the rule.</p><p>Replace <em class="replaceable"><code>IF</code></em> with the external
+	interface.</p><p>The <em class="replaceable"><code>LAN_IP_RANGE</code></em> is what your
+	internal clients use for IP Addressing, usually this is
+	something like <code class="systemitem">192.168.1.0/24</code>.</p><p>The <em class="replaceable"><code>PUBLIC_ADDRESS</code></em> can either
+	be the external IP address or the special keyword
+	<code class="literal">0/32</code>, which means to use the IP address
+	assigned to <em class="replaceable"><code>IF</code></em>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91571280"></a>32.5.17. How <acronym class="acronym">NAT</acronym> works</h3></div></div></div><p>A packet arrives at the firewall from the LAN with a public
+	destination.  It passes through the outbound filter rules,
+	<acronym class="acronym">NAT</acronym> gets its turn at the packet and applies
+	its rules top down, first matching rule wins.
+	<acronym class="acronym">NAT</acronym> tests each of its rules against the
+	packet's interface name and source IP address.  When a packet's
+	interface name matches a <acronym class="acronym">NAT</acronym> rule then the
+	source IP address (i.e.: private LAN IP address) of the packet
+	is checked to see if it falls within the IP address range
+	specified to the left of the arrow symbol on the
+	<acronym class="acronym">NAT</acronym> rule.  On a match the packet has its
+	source IP address rewritten with the public IP address
+	obtained by the <code class="literal">0/32</code> keyword.
+	<acronym class="acronym">NAT</acronym> posts an entry in its internal
+	<acronym class="acronym">NAT</acronym> table so when the packet returns from
+	the public Internet it can be mapped back to its original
+	private IP address and then passed to the filter rules for
+	processing.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91579856"></a>32.5.18. Enabling IP<acronym class="acronym">NAT</acronym></h3></div></div></div><p>To enable IP<acronym class="acronym">NAT</acronym> add these statements to
+	<code class="filename">/etc/rc.conf</code>.</p><p>To enable your machine to route traffic between
+	interfaces:</p><pre class="programlisting">gateway_enable="YES"</pre><p>To start IP<acronym class="acronym">NAT</acronym> automatically each
+	time:</p><pre class="programlisting">ipnat_enable="YES"</pre><p>To specify where to load the IP<acronym class="acronym">NAT</acronym> rules
+	from:</p><pre class="programlisting">ipnat_rules="/etc/ipnat.rules"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91585104"></a>32.5.19. <acronym class="acronym">NAT</acronym> for a very large LAN</h3></div></div></div><p>For networks that have large numbers of PC's on the LAN or
+	networks with more than a single LAN, the process of funneling
+	all those private IP addresses into a single public IP address
+	becomes a resource problem that may cause problems with the
+	same port numbers being used many times across many
+	<acronym class="acronym">NAT</acronym>ed LAN PC's, causing collisions.  There
+	are two ways to relieve this resource problem.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91586768"></a>32.5.19.1. Assigning Ports to Use</h4></div></div></div><p>A normal NAT rule would look like:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 0/32</pre><p>In the above rule the packet's source port is unchanged
+	  as the packet passes through IP<acronym class="acronym">NAT</acronym>.  By
+	  adding the <code class="literal">portmap</code> keyword,
+	  IP<acronym class="acronym">NAT</acronym> can be directed to only use source ports in the specified range.
+	  For example the following rule will tell
+	  IP<acronym class="acronym">NAT</acronym> to modify the source port to be
+	  within the range shown:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 0/32 portmap tcp/udp 20000:60000</pre><p>Additionally we can make things even easier by using the
+	  <code class="literal">auto</code> keyword to tell
+	  IP<acronym class="acronym">NAT</acronym> to determine by itself which ports
+	  are available to use:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 0/32 portmap tcp/udp auto</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91597008"></a>32.5.19.2. Using a Pool of Public Addresses</h4></div></div></div><p>In very large LANs there comes a point where there are just too
+	  many LAN addresses to fit into a single public address.  If a block
+	  of public IP addresses is available, these addresses can be used as
+	  a <span class="quote">&#8222;<span class="quote">pool</span>&#8220;</span>, and IP<acronym class="acronym">NAT</acronym> may pick one of
+	  the public IP addresses as packet-addresses are mapped on their way
+	  out.</p><p>For example, instead of mapping all packets through a single
+	  public IP address, as in:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 204.134.75.1</pre><p>A range of public IP addresses can be specified either with a
+	  netmask:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 204.134.75.0/255.255.255.0</pre><p>or using CIDR notation:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 204.134.75.0/24</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91601488"></a>32.5.20. Port Redirection</h3></div></div></div><p>A very common practice is to have a web server, email
+	server, database server and DNS server each segregated to a
+	different PC on the LAN.  In this case the traffic from these
+	servers still have to be <acronym class="acronym">NAT</acronym>ed, but there
+	has to be some way to direct the inbound traffic to the
+	correct LAN PCs.  IP<acronym class="acronym">NAT</acronym> has the redirection
+	facilities of <acronym class="acronym">NAT</acronym> to solve this problem.
+	For example, assuming a web server operating on LAN address <code class="systemitem">10.0.10.25</code> and using a single public IP
+	address of <code class="systemitem">20.20.20.5</code> the rule would
+	be coded as follows:</p><pre class="programlisting">rdr dc0 20.20.20.5/32 port 80 -&gt; 10.0.10.25 port 80</pre><p>or:</p><pre class="programlisting">rdr dc0 0.0.0.0/0 port 80 -&gt; 10.0.10.25 port 80</pre><p>or for a LAN DNS Server on LAN address of <code class="systemitem">10.0.10.33</code> that needs to receive
+	  public DNS requests:</p><pre class="programlisting">rdr dc0 20.20.20.5/32 port 53 -&gt; 10.0.10.33 port 53 udp</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91607248"></a>32.5.21. FTP and <acronym class="acronym">NAT</acronym></h3></div></div></div><p>FTP is a dinosaur left over from the time before the
+	Internet as it is known today, when research universities were
+	leased lined together and FTP was used to share files among
+	research Scientists.  This was a time when data security was
+	not a consideration.  Over the years the FTP protocol became
+	buried into the backbone of the emerging Internet and its
+	username and password being sent in clear text was never
+	changed to address new security concerns.  FTP has two flavors,
+	it can run in active mode or passive mode.  The difference is
+	in how the data channel is acquired.  Passive mode is more
+	secure as the data channel is acquired by the ordinal ftp
+	session requester.  For a real good explanation of FTP and the
+	different modes see <code class="uri"><a class="uri" href="http://www.slacksite.com/other/ftp.html" target="_top">http://www.slacksite.com/other/ftp.html</a></code>.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91617360"></a>32.5.21.1. IP<acronym class="acronym">NAT</acronym> Rules</h4></div></div></div><p>IP<acronym class="acronym">NAT</acronym> has a special built in FTP proxy
+	  option which can be specified on the <acronym class="acronym">NAT</acronym>
+	  map rule.  It can monitor all outbound packet traffic for FTP
+	  active or passive start session requests and dynamically
+	  create temporary filter rules containing only the port number
+	  really in use for the data channel.  This eliminates the
+	  security risk FTP normally exposes the firewall to from
+	  having large ranges of high order port numbers open.</p><p>This rule will handle all the traffic for the internal
+	  LAN:</p><pre class="programlisting">map dc0 10.0.10.0/29 -&gt; 0/32 proxy port 21 ftp/tcp</pre><p>This rule handles the FTP traffic from the
+	  gateway:</p><pre class="programlisting">map dc0 0.0.0.0/0 -&gt; 0/32 proxy port 21 ftp/tcp</pre><p>This rule handles all non-FTP traffic from the internal
+	  LAN:</p><pre class="programlisting">map dc0 10.0.10.0/29 -&gt; 0/32</pre><p>The FTP map rule goes before our regular map rule.  All
+	  packets are tested against the first rule from the top.
+	  Matches on interface name, then private LAN source IP
+	  address, and then is it a FTP packet.  If all that matches
+	  then the special FTP proxy creates temp filter rules to let
+	  the FTP session packets pass in and out, in addition to also
+	  <acronym class="acronym">NAT</acronym>ing the FTP packets.  All LAN packets
+	  that are not FTP do not match the first rule and fall
+	  through to the third rule and are tested, matching on
+	  interface and source IP, then are
+	  <acronym class="acronym">NAT</acronym>ed.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91623120"></a>32.5.21.2. IP<acronym class="acronym">NAT</acronym> FTP Filter Rules</h4></div></div></div><p>Only one filter rule is needed for FTP if the
+	  <acronym class="acronym">NAT</acronym> FTP proxy is used.</p><p>Without the FTP Proxy, the following three rules will be
+	  needed:</p><pre class="programlisting"># Allow out LAN PC client FTP to public Internet
+# Active and passive modes
+pass out quick on rl0 proto tcp from any to any port = 21 flags S keep state
+
+# Allow out passive mode data channel high order port numbers
+pass out quick on rl0 proto tcp from any to any port &gt; 1024 flags S keep state
+
+# Active mode let data channel in from FTP server
+pass in quick on rl0 proto tcp from any to any port = 20 flags S keep state</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="firewalls-pf.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="firewalls.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="firewalls-ipfw.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">32.4. Paket Filter (PF) von OpenBSD und
+      <acronym class="acronym">ALTQ</acronym> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 32.6. IPFW</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

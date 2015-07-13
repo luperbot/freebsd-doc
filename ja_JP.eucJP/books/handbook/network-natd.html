@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>22.13. ネットワークアドレス変換 (NAT)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="advanced-networking.html" title="第22章 高度なネットワーク" /><link rel="prev" href="network-ntp.html" title="22.12. NTP" /><link rel="next" href="network-inetd.html" title="22.14. inetd 「スーパサーバ」" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">22.13. ネットワークアドレス変換 (NAT)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-ntp.html">戻る</a>〓</td><th width="60%" align="center">第22章 高度なネットワーク</th><td width="20%" align="right">〓<a accesskey="n" href="network-inetd.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-natd"></a>22.13. ネットワークアドレス変換 (NAT)</h2></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Lee</span> <span class="firstname">Chern</span> [FAMILY Given]</span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natoverview"></a>22.13.1. 概要</h3></div></div></div><a id="idp97218128" class="indexterm"></a><p>一般に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> として知られている FreeBSD
+	ネットワークアドレス変換デーモンは、
+	raw IP パケットを受信して、
+	ソースアドレスをローカルマシンに変更し、
+	そのパケットを外向きの IP パケットの流れに再注入するデーモンです。
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> は、
+	データが戻ってきたときに、データの本来の場所を判別し、
+	もともと要求した相手へデータを返すことができるようにソース IP
+	アドレスとポートを変更します。</p><a id="idp97220944" class="indexterm"></a><a id="idp97221456" class="indexterm"></a><p>NAT の最も一般的な使用法は、
+	一般的にはインターネット接続共有として知られているものを実行することです。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natsetup"></a>22.13.2. 設定</h3></div></div></div><p>IPv4 の IP 空間が足りなくなりつつあること、および、
+	ケーブルや DSL のような高速の加入者回線利用者の増加によって、
+	人々はますますインターネット接続を共有する手段を必要としています。
+	一つの接続および
+	IP アドレスを通していくつものコンピュータを回線に接続する能力がある
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> が合理的な選択になります。</p><p>もっともよくあるのは、ユーザが 1 つの
+	IP アドレスでケーブルまたは DSL 回線に接続されたマシンを持っており、
+	インターネットへのアクセスを
+	LAN 経由でいくつかのコンピュータに提供するのに、
+	この接続されたコンピュータを使用したいという場合です。</p><p>そのためには、インターネットに接続されている FreeBSD
+	マシンはゲートウェイとして動作しなければなりません。
+	このゲートウェイマシンは 2 つの NIC が必要です
+	(1 つはインターネットルータへ接続するためで、もう 1 つは
+	LAN に接続するためです)。
+	LAN 上のすべてのマシンはハブまたはスイッチを通して接続されます。</p><div class="mediaobject"><img src="advanced-networking/natd.png" alt="ネットワークレイアウト" /></div><p>インターネット接続を共有するために、
+	このような設定がよく使用されています。
+	<acronym class="acronym">LAN</acronym> 内のマシンの
+	1 台がインターネットに接続しています。
+	残りのマシンはその <span class="quote">「<span class="quote">ゲートウェイ</span>」</span>
+	マシンを通してインターネットにアクセスします。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdkernconfiguration"></a>22.13.3. 設定</h3></div></div></div><a id="idp97230288" class="indexterm"></a><p>次のオプションがカーネルコンフィギュレーションファイルに必要です。</p><pre class="programlisting">options IPFIREWALL
+options IPDIVERT</pre><p>さらに、次のオプションを入れてもよいでしょう。</p><pre class="programlisting">options IPFIREWALL_DEFAULT_TO_ACCEPT
+options IPFIREWALL_VERBOSE</pre><p>下記の設定を <code class="filename">/etc/rc.conf</code>
+	で行わなければなりません。</p><pre class="programlisting">gateway_enable="YES"
+firewall_enable="YES"
+firewall_type="OPEN"
+natd_enable="YES"
+natd_interface="<em class="replaceable"><code>fxp0</code></em>"
+natd_flags=""</pre><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>gateway_enable="YES"</td><td>マシンがゲートウェイとして動作するように設定します。
+		<code class="command">sysctl net.inet.ip.forwarding=1</code>
+		コマンドを実行しても同じ効果がえられます。</td></tr><tr><td>firewall_enable="YES"</td><td><code class="filename">/etc/rc.firewall</code>
+		にあるファイアウォールルールを起動時に有効にします。</td></tr><tr><td>firewall_type="OPEN"</td><td>これはあらかじめ定義されている、
+		すべてのパケットを通すファイアウォールルールセットを指定します。
+		他のタイプについては <code class="filename">/etc/rc.firewall</code>
+		を参照してください。</td></tr><tr><td>natd_interface="fxp0"</td><td>パケットを転送するインタフェースを指定します
+		(インターネットに接続されたインタフェース)。</td></tr><tr><td>natd_flags=""</td><td>起動時に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> に渡される追加の引数</td></tr></tbody></table></div><p><code class="filename">/etc/rc.conf</code>
+	に前述したオプションを定義すると、起動時に
+	<code class="command">natd -interface fxp0</code> が実行されます。
+	これは手動でも実行できます。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">オプションの定義に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>
+	  のコンフィグレーションファイルを使うこともできます。
+	  この場合には、<code class="filename">/etc/rc.conf</code> に以下の行を追加し、
+	  コンフィグレーションファイルを定義してください。</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">natd_flags="-f /etc/natd.conf"</pre><p xmlns="http://www.w3.org/1999/xhtml"><code class="filename">/etc/natd.conf</code>
+          ファイルでは、一行ごとにオプションを設定します。たとえば、
+	  次節の例では以下のような行を含むファイルを用意してください。</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">redirect_port tcp 192.168.0.2:6667 6667
+redirect_port tcp 192.168.0.3:80 80</pre><p xmlns="http://www.w3.org/1999/xhtml">コンフィグレーションファイルに関する、より詳細な情報については、
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> マニュアルページの <code class="option">-f</code>
+	  オプションを調べてください。</p></div><p>LAN にぶら下がっているマシンおよびインタフェースのそれぞれには
+	<a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1918.txt" target="_top">RFC 1918</a>
+	で定義されているプライベートネットワーク空間の
+	IP アドレス番号を割り当て、デフォルトゲートウェイアドレスを
+	<span class="application">natd</span> マシンの内側の
+	IP アドレスにすべきです。</p><p>たとえば LAN 側のクライアント
+	<code class="systemitem">A</code> および <code class="systemitem">B</code> は
+	IP アドレス <code class="systemitem">192.168.0.2</code> および
+	<code class="systemitem">192.168.0.3</code> を割り当てられており、
+	natd マシンの LAN インタフェースは IP アドレス
+	<code class="systemitem">192.168.0.1</code>
+	を割り当てられています。
+	クライアント <code class="systemitem">A</code> および <code class="systemitem">B</code>
+	のデフォルトゲートウェイは <span class="application">natd</span>
+	マシンの <code class="systemitem">192.168.0.1</code>
+	に設定されなければなりません。
+	<span class="application">natd</span> マシンの外部、
+	またはインターネットインタフェースは <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>
+	の動作に際して特別の修正を必要としません。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdport-redirection"></a>22.13.4. ポート転送</h3></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> の短所は、インターネットから
+	LAN 内のクライアントにアクセスできないということです。
+	LAN 内のクライアントは外部に向けて接続を行うことはできますが、
+	入って来るものを受け取ることができません。これは、LAN
+	クライアントのどれかでインターネットサービスを動かそうとした場合に、
+	問題になります。これを何とかする単純な方法は
+	<span class="application">natd</span> マシンから LAN クライアントへ、
+	選択したインターネットポートを転送することです。</p><p>たとえばクライアント <code class="systemitem">A</code> で実行されている
+	IRC サーバがあり、
+	クライアント <code class="systemitem">B</code> 上で実行されている
+	web サーバがあるとします。
+	これが正しく動作するには、ポート 6667 (IRC) および 80 (web)
+	への接続を対応するマシンに転送しなければなりません。</p><p><code class="option">-redirect_port</code> に適切なオプションを加えて
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> に渡さなければなりません。
+	書式は以下のとおりです。</p><pre class="programlisting">     -redirect_port proto targetIP:targetPORT[-targetPORT]
+                 [aliasIP:]aliasPORT[-aliasPORT]
+                 [remoteIP[:remotePORT[-remotePORT]]]</pre><p>上記の例では、引数は以下のようにします。</p><pre class="programlisting">    -redirect_port tcp 192.168.0.2:6667 6667
+    -redirect_port tcp 192.168.0.3:80 80</pre><p>これで適切な <span class="emphasis"><em>tcp</em></span> ポートが
+	LAN クライアントマシンに転送されます。</p><p><code class="option">-redirect_port</code>
+	引数は個々のポートを対応させるポート範囲を示すのに使えます。
+	たとえば <em class="replaceable"><code>tcp 192.168.0.2:2000-3000 2000-3000</code></em>
+	は 2000 番から 3000番ポートに受け取られたすべての接続を、
+	クライアント <code class="systemitem">A</code> 上の
+	2000 番から 3000 番に転送します。</p><p>これらのオプションは <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> を直接実行するか、
+	<code class="filename">/etc/rc.conf</code> 内の
+	<code class="literal">natd_flags=""</code> オプションで設定するか、
+	もしくはコンフィグレーションファイルから渡してください。</p><p>設定オプションの詳細については
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> をご覧ください。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdaddress-redirection"></a>22.13.5. アドレス転送</h3></div></div></div><a id="idp97297616" class="indexterm"></a><p>複数の IP アドレスが利用可能ですが、
+	それらが 1 台のマシン上になければならないときには、
+	アドレス転送が便利です。
+	これを用いれば <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> は LAN クライアントのそれぞれに外部
+	IP アドレスを割り当てることができます。
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> は LAN
+	クライアントから外部へ出て行くパケットを適切な外部の
+	IP アドレスで書き直し、
+	そして特定の IP アドレスに対してやって来るトラフィックのすべてを、
+	指定された LAN クライアントに転送します。
+	これは静的 NAT としても知られています。
+	たとえば <code class="systemitem">128.1.1.1</code>,
+	<code class="systemitem">128.1.1.2</code> および
+	<code class="systemitem">128.1.1.3</code> の IP アドレスが、
+	<span class="application">natd</span>
+	ゲートウェイマシンに属しているとします。
+	<code class="systemitem">128.1.1.2</code> および
+	<code class="systemitem">128.1.1.3</code> は
+	LAN クライアントの <code class="systemitem">A</code> および <code class="systemitem">B</code>
+	に転送される一方で、<code class="systemitem">128.1.1.1</code> は
+	<span class="application">natd</span> ゲートウェイマシンの外部
+	IP アドレスとして使用することができます。</p><p><code class="option">-redirect_address</code> の書式は以下のとおりです。</p><pre class="programlisting">-redirect_address localIP publicIP</pre><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>localIP</td><td>LAN クライアントの内部 IP アドレス</td></tr><tr><td>publicIP</td><td>LAN クライアントに対応する外部 IP アドレス</td></tr></tbody></table></div><p>上記の例では引数は以下のようになります。</p><pre class="programlisting">-redirect_address 192.168.0.2 128.1.1.2
+-redirect_address 192.168.0.3 128.1.1.3</pre><p><code class="option">-redirect_port</code> と同様に、これらの引数は
+	<code class="filename">/etc/rc.conf</code> 内の
+	<code class="literal">natd_flags=""</code> オプションで設定するか、
+	コンフィグレーションファイルから渡すことで指定できます。
+	アドレス転送では、
+	特定の IP アドレスで受け取られたデータはすべて転送されるので、
+	port 転送は必要ありません。</p><p><span class="application">natd</span> マシン上の外部 IP アドレスは、
+	アクティブで外部インタフェースにエイリアスされていなければなりません。
+	やりかたは <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> を参照してください。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-ntp.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="network-inetd.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">22.12. NTP〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓22.14. <span class="application">inetd</span> <span class="quote">「<span class="quote">スーパサーバ</span>」</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

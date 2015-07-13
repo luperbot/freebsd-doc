@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>17.15. Beispiel 1: Nagios in einer MAC Jail</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="mac.html" title="Kapitel 17. Verbindliche Zugriffskontrolle" /><link rel="prev" href="mac-lomac.html" title="17.14. Das MAC Modul LOMAC" /><link rel="next" href="mac-userlocked.html" title="17.16. Beispiel 2: User Lock Down" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">17.15. Beispiel 1: Nagios in einer MAC Jail</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-lomac.html">Zurück</a> </td><th width="60%" align="center">Kapitel 17. Verbindliche Zugriffskontrolle</th><td width="20%" align="right"> <a accesskey="n" href="mac-userlocked.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-implementing"></a>17.15. Beispiel 1: Nagios in einer MAC Jail</h2></div></div></div><a id="idp80358352" class="indexterm"></a><p>Die folgende Demonstration setzt eine sichere Umgebung mithilfe
+      verschiedener <acronym class="acronym">MAC</acronym> Module und sorgfältig
+      konfigurierter Richtlinien um.  Es handelt sich jedoch nur um einen Test
+      und sollte nicht als Antwort auf jedes Problem in Fragen Sicherheit
+      gesehen werden.  Eine Richtlinie nur umzusetzen und dann einfach laufen
+      zu lassen, funktioniert nie und kann eine echte Arbeitsumgebung in eine
+      Katastrophe stürzen.</p><p>Bevor es losgeht, muß jedes Dateisystem mit der Option
+      <code class="option">multilabel</code>, wie weiter oben beschrieben, markiert
+      werden.  Dies nicht zu tun, führt zu Fehlern.  Außerdem
+      müssen die Ports <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mngt/nagios-plugins/pkg-descr">net-mngt/nagios-plugins</a>, <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mngt/nagios/pkg-descr">net-mngt/nagios</a> und <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/www/apache22/pkg-descr">www/apache22</a> installiert und konfiguriert sein,
+      so dass sie ordentlich laufen.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80366160"></a>17.15.1. Erstellen einer Nutzerklasse <code class="literal">insecure</code></h3></div></div></div><p>Beginnen wir die Prozedur mit dem Hinzufügen einer
+        Nutzerklasse in der Datei <code class="filename">/etc/login.conf</code>:</p><pre class="programlisting">insecure:\
+:copyright=/etc/COPYRIGHT:\
+:welcome=/etc/motd:\
+:setenv=MAIL=/var/mail/$,BLOCKSIZE=K:\
+:path=~/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin--
+:manpath=/usr/share/man /usr/local/man:\
+:nologin=/usr/sbin/nologin:\
+:cputime=1h30m:\
+:datasize=8M:\
+:vmemoryuse=100M:\
+:stacksize=2M:\
+:memorylocked=4M:\
+:memoryuse=8M:\
+:filesize=8M:\
+:coredumpsize=8M:\
+:openfiles=24:\
+:maxproc=32:\
+:priority=0:\
+:requirehome:\
+:passwordtime=91d:\
+:umask=022:\
+:ignoretime@:\
+:label=biba/10(10-10):</pre><p>Zusätzlich fügen wir beim Standardnutzer folgende Zeile
+      	hinzu:</p><pre class="programlisting">:label=biba/high:</pre><p>Anschließend muß die Datenbank neu erstellt
+        werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80370512"></a>17.15.2. Boot-Konfiguration</h3></div></div></div><p>Starten Sie den Rechner noch nicht neu.  Fügen Sie
+        zunächst noch die folgenden Zeilen in die Datei
+        <code class="filename">/boot/loader.conf</code> ein, damit die benötigten
+        Module während des Systemstarts geladen werden:</p><pre class="programlisting">mac_biba_load="YES"
+mac_seeotheruids_load="YES"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80376656"></a>17.15.3. Nutzer einrichten</h3></div></div></div><p>Ordnen Sie den Superuser <code class="systemitem">root</code> der Klasse
+        <code class="literal">default</code> zu:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod root -L default</code></strong></pre><p>Alle Nutzerkonten, die weder <code class="systemitem">root</code> noch
+        Systemkonten sind, brauchen nun eine Loginklasse, da sie sonst keinen
+        Zugriff auf sonst übliche Befehle erhalten, wie bspw. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a>.
+        Das folgende <code class="command">sh</code> Skript wird diese Aufgabe
+        erledigen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>for x in `awk -F: '($3 &gt;= 1001) &amp;&amp; ($3 != 65534) { print $1 }' \</code></strong>
+      <strong class="userinput"><code>/etc/passwd`; do pw usermod $x -L default; done;</code></strong></pre><p>Verschieben Sie die Nutzer <code class="systemitem">nagios</code> und
+        <code class="systemitem">www</code> in die <code class="literal">insecure</code>
+        Klasse:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod nagios -L insecure</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod www -L insecure</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80386640"></a>17.15.4. Die Kontextdatei erstellen</h3></div></div></div><p>Nun muß eine Kontextdatei erstellt werden.  Die folgende
+        Beispieldatei soll dazu in <code class="filename">/etc/policy.contexts</code>
+	gespeichert werden:</p><pre class="programlisting"># This is the default BIBA policy for this system.
+
+# System:
+/var/run                        biba/equal
+/var/run/*                      biba/equal
+
+/dev                            biba/equal
+/dev/*                          biba/equal
+
+/var      			biba/equal
+/var/spool                      biba/equal
+/var/spool/*                    biba/equal
+
+/var/log                        biba/equal
+/var/log/*                      biba/equal
+
+/tmp      			biba/equal
+/tmp/*      			biba/equal
+/var/tmp   	    		biba/equal
+/var/tmp/*      		biba/equal
+
+/var/spool/mqueue      	        biba/equal
+/var/spool/clientmqueue     	biba/equal
+
+# For Nagios:
+/usr/local/etc/nagios
+/usr/local/etc/nagios/*         biba/10
+
+/var/spool/nagios               biba/10
+/var/spool/nagios/*             biba/10
+
+# For apache
+/usr/local/etc/apache           biba/10
+/usr/local/etc/apache/*         biba/10
+</pre><p>Die Richtlinie erzwingt Sicherheit, indem der
+        Informationsfluß Einschränkungen unterworfen wird.  In der
+        vorliegenden Konfiguration kann kein Nutzer, weder
+        <code class="systemitem">root</code> noch andere, auf
+        <span class="application">Nagios</span> zugreifen.  Konfigurationsdateien und
+        die Prozesse, die Teil von <span class="application">Nagios</span> sind,
+        werden durch unsere <acronym class="acronym">MAC</acronym> vollständig
+        abgegrenzt.</p><p>Die Kontextdatei kann nun vom System eingelesen werden, indem
+        folgender Befehl ausgeführt wird:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setfmac -ef /etc/policy.contexts /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfmac -ef /etc/policy.contexts /</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Das obenstehende Dateisystem-Layout kann, je nach Umgebung, sehr
+	  unterschiedlich aussehen.  Außerdem muß es auf jedem
+	  einzelnen Dateisystem ausgeführt werden.</p></div><p>In die Datei <code class="filename">/etc/mac.conf</code> müssen nun
+        noch diese Änderungen eingetragen werden:</p><pre class="programlisting">default_labels file ?biba
+default_labels ifnet ?biba
+default_labels process ?biba
+default_labels socket ?biba
+</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80394832"></a>17.15.5. Netzwerke einbinden</h3></div></div></div><p>Tragen Sie die folgende Zeile in die Datei
+        <code class="filename">/boot/loader.conf</code> ein:</p><pre class="programlisting">security.mac.biba.trust_all_interfaces=1</pre><p>Und das Folgende gehört in Datei <code class="filename">rc.conf</code>
+        zu den Optionen für die Netzwerkkarte.  Falls die
+        Netzwerkverbindung(-en) via <acronym class="acronym">DHCP</acronym>
+        konfiguriert werden, muß man dies nach jedem Systemstart
+        eigenhändig nachtragen:</p><pre class="programlisting">maclabel biba/equal</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80398288"></a>17.15.6. Testen der Konfiguration</h3></div></div></div><a id="idp80398928" class="indexterm"></a><p>Versichern Sie sich, dass der Webserver und
+        <span class="application">Nagios</span> nicht automatisch geladen werden und
+        starten Sie den Rechner neu.  Prüfen Sie nun, ob
+        <code class="systemitem">root</code> wirklich keinen Zugriff auf die Dateien im
+        Konfigurationsverzeichnis von <span class="application">Nagios</span> hat.
+        Wenn <code class="systemitem">root</code> den Befehl <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> auf
+        <code class="filename">/var/spool/nagios</code> ausführen kann, ist
+        irgendwas schief gelaufen.  Es sollte ein <span class="errorname">permission
+        denied</span> Fehler ausgegeben werden.</p><p>Wenn alles gut aussieht, können
+        <span class="application">Nagios</span>,
+        <span class="application">Apache</span> und
+	<span class="application">Sendmail</span> gestartet werden - allerdings auf
+	eine Weise, die unserer Richtlinie gerecht wird. Zum Beispiel durch die
+	folgenden Kommandos:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/mail &amp;&amp; make stop &amp;&amp; \
+setpmac biba/equal make start &amp;&amp; setpmac biba/10\(10-10\) apachectl start &amp;&amp; \
+setpmac biba/10\(10-10\) /usr/local/etc/rc.d/nagios.sh forcestart</code></strong></pre><p>Versichern Sie sich lieber doppelt, dass alles ordentlich
+        läuft.  Wenn nicht, prüfen Sie die Logs und Fehlermeldungen.
+        Verwenden Sie das <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> Werkzeug um die Sicherheitsrichtlinie
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> zu deaktivieren und versuchen Sie dann alles noch einmal
+        zu starten.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Der Superuser kann den Vollzug der Richtlinie schalten und die
+          Konfiguration ohne Furcht verändern.  Folgender Befehl stuft
+          eine neu gestartete Shell herunter:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac biba/10 csh</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Um dies zu vermeiden, werden die Nutzer durch <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=login.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">login.conf</span>(5)</span></a>
+	  eingeschränkt.  Wenn <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setpmac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setpmac</span>(8)</span></a> einen Befehl
+	  außerhalb der definierten Schranken ausführen soll, wird
+	  ein Fehler zurückgeliefert. In so einem Fall muß
+	  <code class="systemitem">root</code> auf <code class="literal">biba/high(high-high)</code>
+	  gesetzt werden.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-lomac.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-userlocked.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">17.14. Das MAC Modul LOMAC </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 17.16. Beispiel 2: User Lock Down</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

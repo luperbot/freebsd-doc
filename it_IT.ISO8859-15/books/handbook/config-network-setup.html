@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.8. Configurazione delle Interfacce di Rete</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="config-tuning.html" title="Capitolo 11. Configurazione e Messa a Punto" /><link rel="prev" href="configtuning-rcd.html" title="11.7. Usare rc con FreeBSD" /><link rel="next" href="configtuning-virtual-hosts.html" title="11.9. Host Virtuali" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.8. Configurazione delle Interfacce di Rete</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="configtuning-rcd.html">Indietro</a> </td><th width="60%" align="center">Capitolo 11. Configurazione e Messa a Punto</th><td width="20%" align="right"> <a accesskey="n" href="configtuning-virtual-hosts.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="config-network-setup"></a>11.8. Configurazione delle Interfacce di Rete</h2></div><div><span class="authorgroup">Contributo di <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Marc</span> <span class="surname">Fonvieille</span></span>. </span></div></div></div><a id="idp82529360" class="indexterm"></a><p>Al giorno d'oggi non riusciamo a pensare ad un computer senza pensare
+      ad una connessione di rete.  Aggiungere e configurare una scheda di rete
+      è un compito comune per ogni amministratore di FreeBSD.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82530896"></a>11.8.1. Individuazione del Driver Corretto</h3></div></div></div><a id="idp82531536" class="indexterm"></a><p>Prima di cominciare, dovresti conoscere il modello della scheda di
+        rete che possiedi, il chip che usa, e se si tratta di una scheda PCI o
+        ISA.  FreeBSD supporta un'ampia varietà sia di schede PCI che
+        ISA.  Verifica l'Hardware Compatibility List della tua release per
+        vedere se la scheda è supportata.</p><p>Una volta sicuro che la tua scheda sia supportata, hai bisogno di
+        determinare il driver appropriato per la scheda.  I file
+        <code class="filename">/usr/src/conf/NOTES</code> e
+        <code class="filename">/usr/src/sys/arch/conf/NOTES</code>
+        ti forniranno un elenco di driver per le interfacce di rete con alcune
+        informazioni su chipset/schede supportate.  Se hai dubbi su quale sia
+        il driver corretto, leggi la pagina man del driver.
+        La pagina man fornirà ulteriori informazioni sull'hardware
+        supportato ed anche sui possibili problemi che potrebbero
+        capitare.</p><p>Se sei in possesso di una scheda comune, la maggior parte delle
+        volte non dovrai cercare molto per trovare un driver.  I driver per le
+        schede di reti comuni sono presenti nel kernel
+        <code class="filename">GENERIC</code>, quindi la tua scheda dovrebbe presentarsi
+        durante l'avvio, in questo modo:</p><pre class="screen">dc0: &lt;82c169 PNIC 10/100BaseTX&gt; port 0xa000-0xa0ff mem 0xd3800000-0xd38
+000ff irq 15 at device 11.0 on pci0
+dc0: Ethernet address: 00:a0:cc:da:da:da
+miibus0: &lt;MII bus&gt; on dc0
+ukphy0: &lt;Generic IEEE 802.3u media interface&gt; on miibus0
+ukphy0:  10baseT, 10baseT-FDX, 100baseTX, 100baseTX-FDX, auto
+dc1: &lt;82c169 PNIC 10/100BaseTX&gt; port 0x9800-0x98ff mem 0xd3000000-0xd30
+000ff irq 11 at device 12.0 on pci0
+dc1: Ethernet address: 00:a0:cc:da:da:db
+miibus1: &lt;MII bus&gt; on dc1
+ukphy1: &lt;Generic IEEE 802.3u media interface&gt; on miibus1
+ukphy1:  10baseT, 10baseT-FDX, 100baseTX, 100baseTX-FDX, auto</pre><p>In questo esempio, vediamo che nel sistema sono presenti due schede
+        che usano il driver <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dc&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">dc</span>(4)</span></a>.</p><p>Se il driver per la tua NIC non è presente in
+        <code class="filename">GENERIC</code>, dovrai caricare i driver appropriati
+        per usare la tua NIC.  Questo dovrà essere fatto in
+        uno di questi due modi:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Il modo più semplice è caricare un modulo
+            del kernel con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kldload&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">kldload</span>(8)</span></a> o caricarlo automaticamente
+            al momento del boot aggiungendo le linee appropriate
+            a <code class="filename">/boot/loader.conf</code>.  Non tutti i driver NIC
+            sono disponibili come moduli; esempi notevoli di driver
+            per i quali non esistono moduli sono schede ISA.</p></li><li class="listitem"><p>Alternativamente, puoi compilare staticamente il supporto
+            per la tua scheda nel kernel.  Controlla
+            <code class="filename">/usr/src/sys/conf/NOTES</code>,
+            <code class="filename">/usr/src/sys/arch/conf/NOTES</code>
+            e la pagina di manuale del driver per sapere cosa aggiungere
+            nel tuo file di configurazione del kernel.  Per maggiori
+            informazioni sul modo di ricompilare il kernel, per favore consulta il
+            <a class="xref" href="kernelconfig.html" title="Capitolo 8. Configurazione del Kernel di FreeBSD">Capitolo 8, <em>Configurazione del Kernel di FreeBSD</em></a>.  Se la tua scheda era riconosciuta
+            al boot dal tuo kernel (<code class="filename">GENERIC</code>) non devi
+            ricompilare un nuovo kernel.</p></li></ul></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="config-network-ndis"></a>11.8.1.1. Usare driver NDIS <span class="trademark">Windows</span>®</h4></div></div></div><a id="idp82592592" class="indexterm"></a><a id="idp82593104" class="indexterm"></a><a id="idp82593616" class="indexterm"></a><a id="idp82594512" class="indexterm"></a><a id="idp82595024" class="indexterm"></a><a id="idp82595920" class="indexterm"></a><p>Sfortunatamente, ci sono ancora molti venditori
+          di hardware che non forniscono specifiche dei loro
+          driver alla comunità open source perchè
+          ritengono che tale informazione sia un segreto commerciale.
+          Conseguentemente, gli sviluppatori di FreeBSD e di altri sistemi
+          operativi hanno due scelte: sviluppare i driver con un lungo
+          ed arduo processo di reverse engineering o usare i driver binari
+          disponibili per le piattaforme <span class="trademark">Microsoft</span>® <span class="trademark">Windows</span>®.  La maggior
+          parte degli sviluppatori, inclusi quelli coinvolti in FreeBSD, ha preso
+          la seconda strada.</p><p>Grazie al contributo di Bill Paul (wpaul), a partire
+          da FreeBSD 5.3-RELEASE c'è supporto <span class="quote">«<span class="quote">nativo</span>»</span>
+          per Network Driver Interface Specification (NDIS).
+          Il NDISulator di FreeBSD (anche noto come Progetto Evil)
+          prende un driver binario per <span class="trademark">Windows</span>® e sostanzialmente
+          crea un inganno fingendo di eseguirlo in <span class="trademark">Windows</span>®.  Poichè
+          il driver <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndis&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ndis</span>(4)</span></a> sta usando un binario <span class="trademark">Windows</span>®, è
+          usabile solo su sistemi <span class="trademark">i386</span>&#8482; e amd64.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Il driver <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndis&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ndis</span>(4)</span></a> è designato per supportare
+            principalmente device PCI, CardBus e PCMCIA, i device USB non
+            sono ancora supportati.</p></div><p>Per usare il NDISulator, hai bisogno sostanzialmente
+          di tre cose:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Sorgenti del kernel</p></li><li class="listitem"><p>binari dei driver di <span class="trademark">Windows</span>® XP
+      (estensione <code class="filename">.SYS</code>)</p></li><li class="listitem"><p>file di configurazione dei driver per <span class="trademark">Windows</span>® XP
+      (estensione <code class="filename">.INF</code>)</p></li></ol></div><p>Localizza i file per la tua carta specifica.
+          Generalmente, posso essere trovati nel CD incluso o sui siti web
+          dei venditori.  Nei seguenti esempi, useremo
+    <code class="filename">W32DRIVER.SYS</code> e
+    <code class="filename">W32DRIVER.INF</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Non puoi usare un driver <span class="trademark">Windows</span>®/i386
+            con FreeBSD/amd64, devi trovare un driver <span class="trademark">Windows</span>®/amd64
+            per farlo funzionare correttamente.</p></div><p>Il prossimo passo è compilare il binario
+          del driver in un modulo caricabile dal kernel.
+          Per fare questo, come <code class="systemitem">root</code>, usa
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndisgen&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ndisgen</span>(8)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ndisgen /path/to/W32DRIVER.INF /path/to/W32DRIVER.SYS</code></strong></pre><p>L'utility <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndisgen&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ndisgen</span>(8)</span></a> è interattiva e chiederà
+          altre informazioni di cui necessita; produrrà un modulo
+          del kernel nella presente directory che può essere caricato
+          in questo modo:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload ./W32DRIVER.ko</code></strong></pre><p>In aggiunta al modulo del kernel generato,
+          devi caricare i moduli <code class="filename">ndis.ko</code> e
+          <code class="filename">if_ndis.ko</code>.
+          Questo dovrebbe avvenire automaticamente quando uno carica
+          un modulo che dipende da <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndis&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ndis</span>(4)</span></a>.  Se vuoi caricarli
+          manualmente, usa il seguente comando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload ndis</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>kldload if_ndis</code></strong></pre><p>Il primo comando carica il wrapper del driver
+          miniport NDIS, il secondo carica l'interfaccia di rete
+          in questione.</p><p>Ora controlla <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dmesg&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dmesg</span>(8)</span></a> per vedere se c'era qualche errore
+          durante il caricamento.  Se tutto è andato bene,
+          dovresti ottenere dell'output che somiglia a questo:</p><pre class="screen">ndis0: &lt;Wireless-G PCI Adapter&gt; mem 0xf4100000-0xf4101fff irq 3 at device 8.0 on pci1
+ndis0: NDIS API version: 5.0
+ndis0: Ethernet address: 0a:b1:2c:d3:4e:f5
+ndis0: 11b rates: 1Mbps 2Mbps 5.5Mbps 11Mbps
+ndis0: 11g rates: 6Mbps 9Mbps 12Mbps 18Mbps 36Mbps 48Mbps 54Mbps</pre><p>D'ora in poi, puoi trattare il device
+          <code class="filename">ndis0</code> come ogni altra
+          scheda di rete (ad esempio <code class="filename">dc0</code>).</p><p>Puoi configurare il sistema perché carichi
+          il modulo NDIS al momento del boot nello stesso modo
+          di ogni altro modulo.  Per prima cosa, copia il modulo generato
+          <code class="filename">W32DRIVER.ko</code>, nella directory
+          <code class="filename">/boot/modules</code>.
+          Quindi, aggiungi le seguenti linee a <code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">W32DRIVER_load="YES"</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82637136"></a>11.8.2. Configurazione della Scheda di Rete</h3></div></div></div><a id="idp82637904" class="indexterm"></a><p>Una volta che il driver giusto per la scheda di rete è stato
+        caricato, la scheda ha bisogno di essere configurata.  Come molte altre
+        cose, la scheda di rete potrebbe essere già stata configurata al
+        momento dell'installazione tramite
+        <span class="application">sysinstall</span>.</p><p>Per mostrare la configurazione delle interfacce di rete sul tuo
+        sistema, immetti il seguente comando:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ifconfig</code></strong>
+dc0: flags=8843&lt;UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST&gt; mtu 1500
+        inet 192.168.1.3 netmask 0xffffff00 broadcast 192.168.1.255
+        ether 00:a0:cc:da:da:da
+        media: Ethernet autoselect (100baseTX &lt;full-duplex&gt;)
+        status: active
+dc1: flags=8843&lt;UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST&gt; mtu 1500
+        inet 10.0.0.1 netmask 0xffffff00 broadcast 10.0.0.255
+        ether 00:a0:cc:da:da:db
+        media: Ethernet 10baseT/UTP
+        status: no carrier
+lp0: flags=8810&lt;POINTOPOINT,SIMPLEX,MULTICAST&gt; mtu 1500
+lo0: flags=8049&lt;UP,LOOPBACK,RUNNING,MULTICAST&gt; mtu 16384
+        inet 127.0.0.1 netmask 0xff000000
+tun0: flags=8010&lt;POINTOPOINT,MULTICAST&gt; mtu 1500</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Vecchie versioni di FreeBSD potrebbero richiedere l'opzione
+          <code class="option">-a</code> dopo <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>, per maggiori
+          dettagli sulla sintassi corretta di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>, fai riferimento
+          alla pagina man.  Nota anche che le voci relative all'IPv6
+          (<code class="literal">inet6</code> ecc.) sono state omesse in questo
+          esempio.</p></div><p>In questo esempio, vengono mostrati i seguenti dispositivi:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="filename">dc0</code>: La prima interfaccia
+            Ethernet</p></li><li class="listitem"><p><code class="filename">dc1</code>: La seconda interfaccia
+            Ethernet</p></li><li class="listitem"><p><code class="filename">lp0</code>: L'interfaccia della porta
+            parallela</p></li><li class="listitem"><p><code class="filename">lo0</code>: Il dispositivo di loopback</p></li><li class="listitem"><p><code class="filename">tun0</code>: Il dispositivo tunnel usato da
+            <span class="application">ppp</span></p></li></ul></div><p>FreeBSD usa il nome del driver seguito dall'ordine nel quale
+        la scheda è stata rilevata all'avvio del kernel per dare un nome
+        alla scheda di rete.  Ad esempio <code class="filename">sis2</code> sarebbe
+        la terza scheda di rete nel sistema che usa il driver
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sis&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">sis</span>(4)</span></a>.</p><p>In questo esempio, il dispositivo <code class="filename">dc0</code>
+        è attivo.  Gli indicatori chiave sono:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p><code class="literal">UP</code> significa che la scheda è pronta e
+            configurata.</p></li><li class="listitem"><p>La scheda ha un indirizzo Internet (<code class="literal">inet</code>)
+            (in questo caso <code class="systemitem">192.168.1.3</code>).</p></li><li class="listitem"><p>Ha una maschera di sotto-rete valida
+            (<code class="literal">netmask</code>; <code class="systemitem">0xffffff00</code> è lo stesso di
+              <code class="systemitem">255.255.255.0</code>).</p></li><li class="listitem"><p>Ha un indirizzo di broadcast valido (in questo caso,
+            <code class="systemitem">192.168.1.255</code>).</p></li><li class="listitem"><p>L'indirizzo MAC della scheda (<code class="literal">ether</code>)
+            è <code class="systemitem">00:a0:cc:da:da:da</code>.</p></li><li class="listitem"><p>La selezione del mezzo fisico è in modalità
+            auto selezione (<code class="literal">media: Ethernet autoselect (100baseTX
+            &lt;full-duplex&gt;)</code>).  Vediamo che
+            <code class="filename">dc1</code> è stata configurata con un mezzo
+            fisico <code class="literal">10baseT/UTP</code>.  Per ulteriori informazioni
+            sui tipi di mezzi disponibili per un driver, fai riferimento alla
+            sua pagina man.</p></li><li class="listitem"><p>Lo stato del collegamento (<code class="literal">status</code>)
+            è <code class="literal">active</code>, ovvero è stata rilevata
+            la portante.  Per <code class="filename">dc1</code>, vediamo
+            <code class="literal">status: no carrier</code>.  Questo è normale
+            quando un cavo Ethernet non è stato inserito nella
+            scheda.</p></li></ol></div><p>Se l'output di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> avesse mostrato qualcosa di simile
+        a:</p><pre class="screen">dc0: flags=8843&lt;BROADCAST,SIMPLEX,MULTICAST&gt; mtu 1500
+                ether 00:a0:cc:da:da:da</pre><p>ciò avrebbe indicato che la scheda non era stata ben
+        configurata.</p><p>Per configurare la tua scheda, avrai bisogno dei privilegi
+        di <code class="systemitem">root</code>.  La configurazione della scheda di rete
+        può essere effettuata da riga di comando con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>, ma
+        avresti bisogno di farlo ad ogni riavvio del sistema.  Il file
+        <code class="filename">/etc/rc.conf</code> è il posto giusto dove scrivere
+        la configurazione della scheda di rete.</p><p>Apri <code class="filename">/etc/rc.conf</code> con il tuo editor preferito.
+        Avrai bisogno di aggiungere una riga per ogni scheda di rete presente
+        nel sistema, ad esempio nel nostro caso, abbiamo aggiunto queste
+        linee:</p><pre class="programlisting">ifconfig_dc0="inet 192.168.1.3 netmask 255.255.255.0"
+ifconfig_dc1="inet 10.0.0.1 netmask 255.255.255.0 media 10baseT/UTP"</pre><p>Dovrai sostituire <code class="filename">dc0</code>,
+        <code class="filename">dc1</code>, e così via, con i dispositivi
+        corretti per la tua scheda, e gli indirizzi con quelli appropriati.
+        Dovresti leggere le pagine man del driver e di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> per
+        maggiori dettagli sulle opzioni permesse ed anche la pagina man di
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> per maggiori informazioni sulla sintassi di
+        <code class="filename">/etc/rc.conf</code>.</p><p>Se hai configurato la rete durante l'installazione, alcune
+        linee relative alle schede di rete potrebbero essere già
+        presenti.  Controlla due volte <code class="filename">/etc/rc.conf</code> prima
+        di aggiungere ogni linea.</p><p>Avrai anche bisogno di modificare il file
+        <code class="filename">/etc/hosts</code> per aggiungere i nomi e gli IP
+        delle varie macchine della LAN, se non sono già lì.
+        Per maggiori informazioni, fai riferimento a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts</span>(5)</span></a>
+        ed a <code class="filename">/usr/share/examples/etc/hosts</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82685392"></a>11.8.3. Verifica e Risoluzione dei Problemi</h3></div></div></div><p>Una volta che hai effettuato i cambiamenti necessari a
+        <code class="filename">/etc/rc.conf</code>, dovresti riavviare la macchina.
+        Ciò farà sì che i cambiamenti alle interfacce
+        vengano applicati, e verificherà che il sistema si riavvii senza
+        nessun errore di configurazione.</p><p>Una volta che il sistema è stato riavviato, dovresti testare
+        le interfacce di rete.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82687312"></a>11.8.3.1. Test della Scheda Ethernet</h4></div></div></div><a id="idp82687952" class="indexterm"></a><p>Per verificare che una scheda Ethernet sia configurata
+          correttamente, si devono provare due cose.  Prima, effettuare un ping
+          verso l'interfaccia stessa, e poi un ping verso un'altra macchina
+          sulla LAN.</p><p>Prima proviamo l'interfaccia:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ping -c5 192.168.1.3</code></strong>
+PING 192.168.1.3 (192.168.1.3): 56 data bytes
+64 bytes from 192.168.1.3: icmp_seq=0 ttl=64 time=0.082 ms
+64 bytes from 192.168.1.3: icmp_seq=1 ttl=64 time=0.074 ms
+64 bytes from 192.168.1.3: icmp_seq=2 ttl=64 time=0.076 ms
+64 bytes from 192.168.1.3: icmp_seq=3 ttl=64 time=0.108 ms
+64 bytes from 192.168.1.3: icmp_seq=4 ttl=64 time=0.076 ms
+
+--- 192.168.1.3 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.074/0.083/0.108/0.013 ms</pre><p>Ora dobbiamo effettuare un ping verso un'altra macchina della
+          LAN:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ping -c5 192.168.1.2</code></strong>
+PING 192.168.1.2 (192.168.1.2): 56 data bytes
+64 bytes from 192.168.1.2: icmp_seq=0 ttl=64 time=0.726 ms
+64 bytes from 192.168.1.2: icmp_seq=1 ttl=64 time=0.766 ms
+64 bytes from 192.168.1.2: icmp_seq=2 ttl=64 time=0.700 ms
+64 bytes from 192.168.1.2: icmp_seq=3 ttl=64 time=0.747 ms
+64 bytes from 192.168.1.2: icmp_seq=4 ttl=64 time=0.704 ms
+
+--- 192.168.1.2 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.700/0.729/0.766/0.025 ms</pre><p>Puoi usare il nome della macchina invece di
+          <code class="systemitem">192.168.1.2</code> se hai sistemato il file
+          <code class="filename">/etc/hosts</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82693712"></a>11.8.3.2. Risoluzione dei Problemi</h4></div></div></div><a id="idp82694352" class="indexterm"></a><p>Risolvere i problemi delle varie configurazioni hardware e
+          software è sempre una faticaccia, ma è una fatica che
+          può essere diminuita controllando da subito le cose semplici.
+          Avete collegato il cavo di rete?  Avete configurato i servizi di rete?
+          Avete configurato il firewall correttamente?
+          La scheda di rete che state usando è supportata da FreeBSD?
+          Controllate sempre le note sul vostro hardware prima di
+          inviare un bug report.  Aggiornate la vostra versione di FreeBSD
+          all'ultima versione STABLE disponibile.  Controllate
+          gli archivi delle mailing list, o magari cercate su Internet.</p><p>Se la scheda funziona, ma le prestazioni sono scadenti, potrebbe
+          esservi utile la lettura della pagina man <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tuning&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">tuning</span>(7)</span></a>.  Potreste
+          anche verificare la vostra configurazione della rete,
+          poichè una configurazione
+          scorretta può essere la causa di connessioni lente.</p><p>Alcuni utenti riscontrano dei <span class="errorname">device
+            timeouts</span>, il che è normale per alcune
+          schede.  Se questi continuano, o se sono fastidiosi,
+          potreste voler ricontrollare che non ci
+          siano conflitti con altri dispositivi.  Controllate due volte
+          la connessione di rete.  Forse dovreste procurarvi un'altra
+          scheda.</p><p>Alcune volte, gli utenti notano alcuni errori
+          <span class="errorname">watchdog timeout</span>.
+          La prima cosa da fare è controllare il cavo di rete.
+          Alcune schede di rete richiedono uno slot PCI che supporti il Bus
+          Mastering.  Su alcune vecchie schede madri, ciò è
+          permesso solo per uno slot PCI (tipicamente lo slot 0).  Controllate
+          la documentazione della scheda di rete  e della scheda madre
+          per determinare se possa essere quello il problema.</p><p>Messaggi <span class="errorname">No route to host</span> vengono generati
+          se il sistema non è in grado di effettuare il routing
+          di un pacchetto verso una certa destinazione.
+          Ciò può accadere se non è specificata
+          una route di default, o se il cavo è
+          scollegato.  Controllate l'output di <code class="command">netstat
+            -rn</code> ed assicuratevi che ci sia una route valida per l'host
+          che state cercando di raggiungere.  Se non c'è, leggete il <a class="xref" href="advanced-networking.html" title="Capitolo 29. Networking Avanzato">Capitolo 29, <em>Networking Avanzato</em></a>.</p><p>I messaggi d'errore <span class="errorname">ping: sendto:
+            Permission denied</span>
+          sono spessi causati da un firewall mal configurato.
+          Se <code class="command">ipfw</code> è abilitato nel kernel ma
+          non ci sono regole definite, allora la politica di default è di
+          negare tutto il traffico,
+          comprese le richieste di ping!  Leggete il <a class="xref" href="firewalls.html" title="Capitolo 28. Firewall">Capitolo 28, <em>Firewall</em></a> per maggiori informazioni.</p><p>Talvolta le prestazioni della scheda di rete sono
+          scadenti, o sotto la media.
+          In questi casi è preferibile cambiare la selezione
+          del media da <code class="literal">autoselect</code> ad una
+          selezione corretta.
+          Anche se questo sistema funziona con la maggior parte dell'hardware,
+          potrebbe non risolvere il problema per tutti.
+          Ancora una volta, controllate tutte le impostazioni di rete,
+          e leggete la pagina man <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tuning&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">tuning</span>(7)</span></a> .</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="configtuning-rcd.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="config-tuning.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="configtuning-virtual-hosts.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">11.7. Usare rc con FreeBSD </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 11.9. Host Virtuali</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

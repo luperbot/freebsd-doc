@@ -1,0 +1,1371 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Practical rc.d scripting in BSD</title>
+    
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Yar</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Tikhiy</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">yar@FreeBSD.org</email></address>
+      </affiliation></author>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2005</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2006</year>
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2012</year>
+
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD Project</holder>
+    </copyright>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">NetBSD is a registered trademark of
+  the NetBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <quote xmlns:xlink="http://www.w3.org/1999/xlink">&#8482;</quote> or the
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">®</quote> symbol.</para>
+    </legalnotice>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Beginners may find it difficult to relate the
+	facts from the formal documentation on the BSD
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> framework with the practical tasks
+	of <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripting.  In this article,
+	we consider a few typical cases of increasing complexity,
+	show <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> features suited for each
+	case, and discuss how they work.  Such an examination should
+	provide reference points for further study of the design
+	and efficient application of <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-intro">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Introduction</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The historical BSD had a monolithic startup script,
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename>.  It was invoked by
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">init</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> at system boot time and performed all userland
+      tasks required for multi-user operation: checking and
+      mounting file systems, setting up the network, starting
+      daemons, and so on.  The precise list of tasks was not the
+      same in every system; admins needed to customize it.  With
+      few exceptions, <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> had to be modified,
+      and true hackers liked it.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The real problem with the monolithic approach was that
+      it provided no control over the individual components started
+      from <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename>.  For instance,
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> could not restart a single daemon.
+      The system admin had to find the daemon process by hand, kill it,
+      wait until it actually exited, then browse through
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> for the flags, and finally type
+      the full command line to start the daemon again.  The task
+      would become even more difficult and prone to errors if the
+      service to restart consisted of more than one daemon or
+      demanded additional actions.  In a few words, the single
+      script failed to fulfil what scripts are for: to make the
+      system admin's life easier.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Later there was an attempt to split out some parts of
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> for the sake of starting the
+      most important subsystems separately.  The notorious example
+      was <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/netstart</filename> to bring up networking.
+      It did allow for accessing the network from single-user
+      mode, but it did not integrate well into the automatic startup
+      process because parts of its code needed to interleave with
+      actions essentially unrelated to networking.  That was why
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/netstart</filename> mutated into
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.network</filename>.  The latter was no
+      longer an ordinary script; it comprised of large, tangled
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> functions called from <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename>
+      at different stages of system startup.  However, as the startup
+      tasks grew diverse and sophisticated, the
+      <quote xmlns:xlink="http://www.w3.org/1999/xlink">quasi-modular</quote> approach became even more of a
+      drag than the monolithic <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> had
+      been.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Without a clean and well-designed framework, the startup
+      scripts had to bend over backwards to satisfy the needs of
+      rapidly developing BSD-based operating systems.  It became
+      obvious at last that more steps are necessary on the way to
+      a fine-grained and extensible <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc</filename> system.
+      Thus BSD <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> was born.  Its acknowledged
+      fathers were Luke Mewburn and the NetBSD community.  Later
+      it was imported into FreeBSD.  Its name refers to the location
+      of system scripts for individual services, which is in
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d</filename>.  Soon we
+      will learn about more components of the <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+      system and see how the individual scripts are invoked.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The basic ideas behind BSD <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> are
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">fine modularity</emphasis> and <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">code
+      reuse</emphasis>.  <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Fine modularity</emphasis> means
+      that each basic <quote xmlns:xlink="http://www.w3.org/1999/xlink">service</quote> such as a system daemon
+      or primitive startup task gets its own <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> script able
+      to start the service, stop it, reload it, check its status.
+      A particular action is chosen by the command-line argument
+      to the script.  The <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> script still
+      drives system startup, but now it merely invokes the smaller
+      scripts one by one with the <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option> argument.
+      It is easy to perform shutdown tasks as well by running the
+      same set of scripts with the <option xmlns:xlink="http://www.w3.org/1999/xlink">stop</option> argument,
+      which is done by <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename>.  Note
+      how closely this follows the Unix way of having a set of small
+      specialized tools, each fulfilling its task as well as possible.
+      <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Code reuse</emphasis> means that common operations
+      are implemented as <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> functions and collected in
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.subr</filename>.  Now a typical script can
+      be just a few lines' worth of <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> code.  Finally, an
+      important part of the <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> framework is
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>, which helps <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> to
+      run the small scripts orderly with respect to dependencies
+      between them.  It can help <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename>,
+      too, because the proper order for the shutdown sequence is
+      opposite to that of startup.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The BSD <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> design is described in
+      <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="lukem">the original article by Luke Mewburn</link>,
+      and the <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> components are documented
+      in great detail in <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="manpages">the respective
+      manual pages</link>.  However, it might not appear obvious
+      to an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> newbie how to tie the numerous
+      bits and pieces together in order to create a well-styled
+      script for a particular task.  Therefore this article will
+      try a different approach to describe <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>.
+      It will show which features should be used in a number of
+      typical cases, and why.  Note that this is not a how-to
+      document because our aim is not at giving ready-made recipes,
+      but at showing a few easy entrances into the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> realm.  Neither is this article a
+      replacement for the relevant manual pages.  Do not hesitate
+      to refer to them for more formal and complete documentation
+      while reading this article.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There are prerequisites to understanding this article.
+      First of all, you should be familiar with the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>
+      scripting language in order to master <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>.
+      In addition, you should know how the system performs
+      userland startup and shutdown tasks, which is described in
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This article focuses on the FreeBSD branch of
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>.  Nevertheless, it may be useful
+      to NetBSD developers, too, because the two branches of BSD
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> not only share the same design
+      but also stay similar in their aspects visible to script
+      authors.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-task">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Outlining the task</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">A little consideration before starting
+      <envar xmlns:xlink="http://www.w3.org/1999/xlink">$EDITOR</envar> will not hurt.  In order to write a
+      well-tempered <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script for a system
+      service, we should be able to answer the following questions
+      first:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Is the service mandatory or optional?</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Will the script serve a single program, e.g.,
+	  a daemon, or perform more complex actions?</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Which other services will our service depend on,
+	  and vice versa?</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">From the examples that follow we will see why it is
+      important to know the answers to these questions.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-dummy">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">A dummy script</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The following script just emits a message each time the
+      system boots up:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">#!/bin/sh<co xml:id="rcng-dummy-shebang"/>
+
+. /etc/rc.subr<co xml:id="rcng-dummy-include"/>
+
+name="dummy"<co xml:id="rcng-dummy-name"/>
+start_cmd="${name}_start"<co xml:id="rcng-dummy-startcmd"/>
+stop_cmd=":"<co xml:id="rcng-dummy-stopcmd"/>
+
+dummy_start()<co xml:id="rcng-dummy-startfn"/>
+{
+	echo "Nothing started."
+}
+
+load_rc_config $name<co xml:id="rcng-dummy-loadconfig"/>
+run_rc_command "$1"<co xml:id="rcng-dummy-runcommand"/></programlisting>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Things to note are:</para>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="rcng-dummy-shebang">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">An interpreted script should begin with the magic
+	  <quote xmlns:xlink="http://www.w3.org/1999/xlink">shebang</quote> line.  That line specifies the
+	  interpreter program for the script.  Due to the shebang
+	  line, the script can be invoked exactly like a binary
+	  program provided that it has the execute bit set.
+	  (See <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">chmod</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>.)
+	  For example, a system admin can run our script manually,
+	  from the command line:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/dummy start</userinput></screen>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">In order to be properly managed by the
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> framework, its scripts need
+	    to be written in the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> language.  If you have
+	    a service or port that uses a binary control utility
+	    or a startup routine written in another language,
+	    install that element in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/sbin</filename>
+	    (for the system) or <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/sbin</filename>
+	    (for ports) and call it from a <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> script in the
+	    appropriate <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> directory.</para>
+	</note>
+
+	<tip xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">If you would like to learn the details of why
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts must be written in
+	    the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> language, see how <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename>
+	    invokes them by means of <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_script</function>,
+	    then study the implementation of
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_script</function> in
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.subr</filename>.</para>
+	</tip>
+      </callout>
+
+      <callout arearefs="rcng-dummy-include">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">In <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.subr</filename>, a number of
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> functions are defined for an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+	  script to use.  The functions are documented in
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  While it is theoretically possible to
+	  write an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script without ever
+	  using <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>, its functions prove extremely handy
+	  and make the job an order of magnitude easier.  So it is
+	  no surprise that everybody resorts to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts.  We are not going to
+	  be an exception.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">An <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script must
+	  <quote xmlns:xlink="http://www.w3.org/1999/xlink">source</quote> <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.subr</filename>
+	  (include it using <quote xmlns:xlink="http://www.w3.org/1999/xlink"><command xmlns:xlink="http://www.w3.org/1999/xlink">.</command></quote>)
+	  <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">before</emphasis> it calls <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	  functions so that <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> has an opportunity to learn
+	  the functions.  The preferred style is to source
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.subr</filename> first of all.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Some useful functions related to networking
+	    are provided by another include file,
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/network.subr</filename>.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-dummy-name">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><anchor xml:id="name-var"/>The mandatory variable
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">name</envar> specifies the name of our script.  It
+	  is required by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  That is, each
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">must</emphasis>
+	  set <envar xmlns:xlink="http://www.w3.org/1999/xlink">name</envar> before it calls <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	  functions.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Now it is the right time to choose a unique name for
+	  our script once and for all.  We will use it in a number
+	  of places while developing the script.  For a start, let
+	  us give the same name to the script file, too.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The current style of <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+	    scripting is to enclose values assigned to variables
+	    in double quotes.  Keep in mind that it is just a style
+	    issue that may not always be applicable.  You can
+	    safely omit quotes from around simple words without
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> metacharacters in them, while in certain
+	    cases you will need single quotes to prevent any
+	    interpretation of the value by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>.  A programmer
+	    should be able to tell the language syntax from style
+	    conventions and use both of them wisely.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-dummy-startcmd">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The main idea behind <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> is that an
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script provides handlers, or
+	  methods, for <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> to invoke.  In particular,
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option>, <option xmlns:xlink="http://www.w3.org/1999/xlink">stop</option>, and other
+	  arguments to an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script are
+	  handled this way.  A method is a <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> expression
+	  stored in a variable named
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_cmd</envar>,
+	  where <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable> corresponds to
+	  what can be specified on the script's command line.  We
+	  will see later how <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> provides default methods
+	  for the standard arguments.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">To make the code in <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> more
+	    uniform, it is common to use <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}</envar>
+	    wherever appropriate.  Thus a number of lines can be just
+	    copied from one script to another.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-dummy-stopcmd">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">We should keep in mind that <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> provides
+	  default methods for the standard arguments.  Consequently,
+	  we must override a standard method with a no-op <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>
+	  expression if we want it to do nothing.</para>
+      </callout>
+
+      <callout arearefs="rcng-dummy-startfn">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The body of a sophisticated method can be implemented
+	  as a function.  It is a good idea to make the function
+	  name meaningful.</para>
+
+	<important xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">It is strongly recommended to add the prefix
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}</envar> to the names of all functions
+	    defined in our script so they never clash with the
+	    functions from <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> or another common include
+	    file.</para>
+	</important>
+      </callout>
+
+      <callout arearefs="rcng-dummy-loadconfig">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">This call to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> loads <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>
+	  variables.  Our script makes no use of them yet, but it
+	  still is recommended to load <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> because there
+	  can be <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variables controlling <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	  itself.</para>
+      </callout>
+
+      <callout arearefs="rcng-dummy-runcommand">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Usually this is the last command in an
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script.  It invokes the
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> machinery to perform the requested action
+	  using the variables and methods our script has provided.</para>
+      </callout>
+    </calloutlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-confdummy">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">A configurable dummy script</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Now let us add some controls to our dummy script.  As you
+      may know, <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts are controlled
+      with <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>.  Fortunately, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> hides all
+      the complications from us.  The following script uses
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> via <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> to see whether it is
+      enabled in the first place, and to fetch a message to show
+      at boot time.  These two tasks in fact are independent.  On
+      the one hand, an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script can just
+      support enabling and disabling its service.  On the other
+      hand, a mandatory <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script can have
+      configuration variables.  We will do both things in the same
+      script though:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">#!/bin/sh
+
+. /etc/rc.subr
+
+name=dummy
+rcvar=dummy_enable<co xml:id="rcng-confdummy-rcvar"/>
+
+start_cmd="${name}_start"
+stop_cmd=":"
+
+load_rc_config $name<co xml:id="rcng-confdummy-loadconfig"/>
+: ${dummy_enable:=no} <co xml:id="rcng-confdummy-enable"/>
+: ${dummy_msg="Nothing started."}<co xml:id="rcng-confdummy-opt"/>
+
+dummy_start()
+{
+	echo "$dummy_msg"<co xml:id="rcng-confdummy-msg"/>
+}
+
+run_rc_command "$1"</programlisting>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">What changed in this example?</para>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="rcng-confdummy-rcvar">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The variable <envar xmlns:xlink="http://www.w3.org/1999/xlink">rcvar</envar> specifies
+	  the name of the ON/OFF knob variable.</para>
+      </callout>
+
+      <callout arearefs="rcng-confdummy-loadconfig">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Now <function xmlns:xlink="http://www.w3.org/1999/xlink">load_rc_config</function> is invoked
+	  earlier in the script, before any <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variables
+	  are accessed.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">While examining <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts,
+	    keep in mind that <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> defers the evaluation of
+	    expressions in a function until the latter is called.
+	    Therefore it is not an error to invoke
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">load_rc_config</function> as late as just
+	    before <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function> and still
+	    access <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variables from the method functions
+	    exported to <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function>.  This
+	    is because the method functions are to be called by
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function>, which is invoked
+	    <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">after</emphasis>
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">load_rc_config</function>.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-confdummy-enable">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A warning will be emitted by
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function> if <envar xmlns:xlink="http://www.w3.org/1999/xlink">rcvar</envar>
+	  itself is set, but the indicated knob variable is unset.
+	  If your <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script is for the base
+	  system, you should add a default setting for the knob to
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/defaults/rc.conf</filename> and document
+	  it in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>.  Otherwise it is your script that
+	  should provide a default setting for the knob.  The canonical
+	  approach to the latter case is shown in the example.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">You can make <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> act as though the knob
+	    is set to <literal xmlns:xlink="http://www.w3.org/1999/xlink">ON</literal>, irrespective of its
+	    current setting, by prefixing the argument to the script
+	    with <literal xmlns:xlink="http://www.w3.org/1999/xlink">one</literal> or <literal xmlns:xlink="http://www.w3.org/1999/xlink">force</literal>,
+	    as in <option xmlns:xlink="http://www.w3.org/1999/xlink">onestart</option> or <option xmlns:xlink="http://www.w3.org/1999/xlink">forcestop</option>.
+	    Keep in mind though that <literal xmlns:xlink="http://www.w3.org/1999/xlink">force</literal> has
+	    other dangerous effects we will touch upon below, while
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">one</literal> just overrides the ON/OFF knob.
+	    E.g., assume that <envar xmlns:xlink="http://www.w3.org/1999/xlink">dummy_enable</envar> is
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">OFF</literal>.  The following command will run
+	    the <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option> method in spite of the
+	    setting:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/dummy onestart</userinput></screen>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-confdummy-opt">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Now the message to be shown at boot time is no
+	  longer hard-coded in the script.  It is specified by an
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variable named <envar xmlns:xlink="http://www.w3.org/1999/xlink">dummy_msg</envar>.
+	  This is a trivial example of how <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variables
+	  can control an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script.</para>
+
+	<important xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The names of all <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variables used
+	    exclusively by our script <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">must</emphasis>
+	    have the same prefix: <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_</envar>.  For
+	    example: <envar xmlns:xlink="http://www.w3.org/1999/xlink">dummy_mode</envar>,
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">dummy_state_file</envar>, and so on.</para>
+	</important>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">While it is possible to use a shorter name internally,
+	    e.g., just <envar xmlns:xlink="http://www.w3.org/1999/xlink">msg</envar>, adding the unique prefix
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_</envar> to all global names introduced by
+	    our script will save us from possible
+	    collisions with the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> namespace.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">As a rule, <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts of the
+	    base system need not provide defaults for their
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variables because the defaults should
+	    be set in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/defaults/rc.conf</filename>
+	    instead.  On the other hand, <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+	    scripts for ports should provide the defaults as shown
+	    in the example.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-confdummy-msg">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Here we use <envar xmlns:xlink="http://www.w3.org/1999/xlink">dummy_msg</envar> to actually
+	  control our script, i.e., to emit a variable message.
+	  Use of a shell function is overkill here, since it only
+	  runs a single command; an equally valid alternative is:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">start_cmd="echo \"$dummy_msg\""</programlisting>
+      </callout>
+    </calloutlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-daemon">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Startup and shutdown of a simple daemon</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">We said earlier that <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> could provide default
+      methods.  Obviously, such defaults cannot be too general.
+      They are suited for the common case of starting and shutting
+      down a simple daemon program.  Let us assume now that we need
+      to write an <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script for such a daemon
+      called <command xmlns:xlink="http://www.w3.org/1999/xlink">mumbled</command>.  Here it is:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">#!/bin/sh
+
+. /etc/rc.subr
+
+name=mumbled
+rcvar=mumbled_enable
+
+command="/usr/sbin/${name}"<co xml:id="rcng-daemon-basic-cmd"/>
+
+load_rc_config $name
+run_rc_command "$1"</programlisting>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Pleasingly simple, isn't it?  Let us examine our little
+      script.  The only new thing to note is as follows:</para>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="rcng-daemon-basic-cmd">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar> variable is meaningful to
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  If it is set, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> will act
+	  according to the scenario of serving a conventional daemon.
+	  In particular, the default methods will be provided for
+	  such arguments: <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option>, <option xmlns:xlink="http://www.w3.org/1999/xlink">stop</option>,
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">restart</option>, <option xmlns:xlink="http://www.w3.org/1999/xlink">poll</option>, and
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">status</option>.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The daemon will be started by running
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">$command</envar> with command-line flags specified
+	  by <envar xmlns:xlink="http://www.w3.org/1999/xlink">$mumbled_flags</envar>.  Thus all the input
+	  data for the default <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option> method are
+	  available in the variables set by our script.  Unlike
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option>, other methods may require additional
+	  information about the process started.  For instance,
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">stop</option> must know the PID of the process
+	  to terminate it.  In the present case, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	  will scan through the list of all processes, looking for
+	  a process with its name equal to <envar xmlns:xlink="http://www.w3.org/1999/xlink">$procname</envar>.
+	  The latter is another variable of meaning to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>,
+	  and its value defaults to that of <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar>.
+	  In other words, when we set <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar>,
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">procname</envar> is effectively set to the same
+	  value.  This enables our script to kill the daemon and
+	  to check if it is running in the first place.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Some programs are in fact executable scripts.  The
+	    system runs such a script by starting its interpreter
+	    and passing the name of the script to it as a command-line
+	    argument.  This is reflected in the list of processes,
+	    which can confuse <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  You should additionally
+	    set <envar xmlns:xlink="http://www.w3.org/1999/xlink">command_interpreter</envar> to let <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	    know the actual name of the process if <envar xmlns:xlink="http://www.w3.org/1999/xlink">$command</envar>
+	    is a script.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">For each <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script, there
+	    is an optional <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> variable that takes
+	    precedence over <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar>.  Its name is
+	    constructed as follows: <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_program</envar>,
+	    where <envar xmlns:xlink="http://www.w3.org/1999/xlink">name</envar> is the mandatory variable we
+	    discussed <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="name-var">earlier</link>.
+	    E.g., in this case it will be <envar xmlns:xlink="http://www.w3.org/1999/xlink">mumbled_program</envar>.
+	    It is <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> that arranges
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_program</envar> to override
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar>.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Of course, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> will permit you to set
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_program</envar> from <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> or
+	    the script itself even if <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar> is
+	    unset.  In that case, the special properties of
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_program</envar> are lost, and it becomes
+	    an ordinary variable your script can use for its own
+	    purposes.  However, the sole use of
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_program</envar> is discouraged because
+	    using it together with <envar xmlns:xlink="http://www.w3.org/1999/xlink">command</envar> became
+	    an idiom of <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripting.</para>
+	</note>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">For more detailed information on default methods,
+	  refer to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+      </callout>
+    </calloutlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-daemon-adv">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Startup and shutdown of an advanced daemon</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Let us add some meat onto the bones of the previous
+      script and make it more complex and featureful.  The default
+      methods can do a good job for us, but we may need some of
+      their aspects tweaked.  Now we will learn how to tune the
+      default methods to our needs.</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">#!/bin/sh
+
+. /etc/rc.subr
+
+name=mumbled
+rcvar=mumbled_enable
+
+command="/usr/sbin/${name}"
+command_args="mock arguments &gt; /dev/null 2&gt;&amp;1"<co xml:id="rcng-daemon-adv-args"/>
+
+pidfile="/var/run/${name}.pid"<co xml:id="rcng-daemon-adv-pid"/>
+
+required_files="/etc/${name}.conf /usr/share/misc/${name}.rules"<co xml:id="rcng-daemon-adv-reqfiles"/>
+
+sig_reload="USR1"<co xml:id="rcng-daemon-adv-sig"/>
+
+start_precmd="${name}_prestart"<co xml:id="rcng-daemon-adv-precmd"/>
+stop_postcmd="echo Bye-bye"<co xml:id="rcng-daemon-adv-postcmd"/>
+
+extra_commands="reload plugh xyzzy"<co xml:id="rcng-daemon-adv-extra"/>
+
+plugh_cmd="mumbled_plugh"<co xml:id="rcng-daemon-adv-methods"/>
+xyzzy_cmd="echo 'Nothing happens.'"
+
+mumbled_prestart()
+{
+	if checkyesno mumbled_smart; then<co xml:id="rcng-daemon-adv-yn"/>
+		rc_flags="-o smart ${rc_flags}"<co xml:id="rcng-daemon-adv-rcflags"/>
+	fi
+	case "$mumbled_mode" in
+	foo)
+		rc_flags="-frotz ${rc_flags}"
+		;;
+	bar)
+		rc_flags="-baz ${rc_flags}"
+		;;
+	*)
+		warn "Invalid value for mumbled_mode"<co xml:id="rcng-daemon-adv-warn"/>
+		return 1<co xml:id="rcng-daemon-adv-preret"/>
+		;;
+	esac
+	run_rc_command xyzzy<co xml:id="rcng-daemon-adv-run"/>
+	return 0
+}
+
+mumbled_plugh()<co xml:id="rcng-daemon-adv-plugh"/>
+{
+	echo 'A hollow voice says "plugh".'
+}
+
+load_rc_config $name
+run_rc_command "$1"</programlisting>
+    </informalexample>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="rcng-daemon-adv-args">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Additional arguments to <envar xmlns:xlink="http://www.w3.org/1999/xlink">$command</envar> can
+	  be passed in <envar xmlns:xlink="http://www.w3.org/1999/xlink">command_args</envar>.  They will be
+	  added to the command line after <envar xmlns:xlink="http://www.w3.org/1999/xlink">$mumbled_flags</envar>.
+	  Since the final command line is passed to <command xmlns:xlink="http://www.w3.org/1999/xlink">eval</command>
+	  for its actual execution, input and output redirections
+	  can be specified in <envar xmlns:xlink="http://www.w3.org/1999/xlink">command_args</envar>.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Never</emphasis> include dashed options,
+	    like <option xmlns:xlink="http://www.w3.org/1999/xlink">-X</option> or <option xmlns:xlink="http://www.w3.org/1999/xlink">--foo</option>, in
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">command_args</envar>.
+	    The contents of <envar xmlns:xlink="http://www.w3.org/1999/xlink">command_args</envar> will
+	    appear at the end of the final command line, hence
+	    they are likely to follow arguments present in
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_flags</envar>; but most commands will
+	    not recognize dashed options after ordinary arguments.
+	    A better way of passing additional options
+	    to <envar xmlns:xlink="http://www.w3.org/1999/xlink">$command</envar> is to add them
+	    to the beginning of <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}_flags</envar>.
+	    Another way is to modify <envar xmlns:xlink="http://www.w3.org/1999/xlink">rc_flags</envar> <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="rc-flags">as shown later</link>.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-pid">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A good-mannered daemon should create a
+	  <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">pidfile</emphasis> so that its process can be
+	  found more easily and reliably.  The variable
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">pidfile</envar>, if set, tells <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	  where it can find the pidfile for its default methods to
+	  use.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">In fact, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> will also use the pidfile
+	    to see if the daemon is already running before starting
+	    it.  This check can be skipped by using the
+	    <option xmlns:xlink="http://www.w3.org/1999/xlink">faststart</option> argument.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-reqfiles">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">If the daemon cannot run unless certain files exist,
+	  just list them in <envar xmlns:xlink="http://www.w3.org/1999/xlink">required_files</envar>, and
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> will check that those files do exist
+	  before starting the daemon.  There also are
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">required_dirs</envar> and <envar xmlns:xlink="http://www.w3.org/1999/xlink">required_vars</envar>
+	  for directories and environment variables, respectively.
+	  They all are described in detail in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The default method from <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> can be
+	    forced to skip the prerequisite checks by using
+	    <option xmlns:xlink="http://www.w3.org/1999/xlink">forcestart</option> as the argument to the
+	    script.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-sig">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">We can customize signals to send to the daemon in
+	  case they differ from the well-known ones.  In particular,
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">sig_reload</envar> specifies the signal that makes
+	  the daemon reload its configuration; it is
+	  <symbol xmlns:xlink="http://www.w3.org/1999/xlink">SIGHUP</symbol> by default.  Another signal is
+	  sent to stop the daemon process; the default is
+	  <symbol xmlns:xlink="http://www.w3.org/1999/xlink">SIGTERM</symbol>, but this can be changed by
+	  setting <envar xmlns:xlink="http://www.w3.org/1999/xlink">sig_stop</envar> appropriately.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The signal names should be specified to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	    without the <literal xmlns:xlink="http://www.w3.org/1999/xlink">SIG</literal> prefix, as it is
+	    shown in the example.  The FreeBSD version of <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">kill</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>
+	    can recognize the <literal xmlns:xlink="http://www.w3.org/1999/xlink">SIG</literal> prefix, but
+	    the versions from other OS types may not.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-precmd rcng-daemon-adv-postcmd">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Performing additional tasks before or after the default
+	  methods is easy.  For each command-argument supported by
+	  our script, we can define
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_precmd</envar> and
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_postcmd</envar>.
+	  These <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> commands are invoked before and after
+	  the respective method, as it is evident from their
+	  names.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Overriding a default method with a custom
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_cmd</envar>
+	    still does not prevent us from making use of
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_precmd</envar> or
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_postcmd</envar>
+	    if we need to.  In particular, the former is good for
+	    checking custom, sophisticated conditions that should
+	    be met before performing the command itself.  Using
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_precmd</envar> along
+	    with <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_cmd</envar>
+	    lets us logically separate the checks from the
+	    action.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Do not forget that you can cram any valid <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>
+	    expressions into the methods, pre-, and post-commands
+	    you define.  Just invoking a function that makes the
+	    real job is a good style in most cases, but never let
+	    style limit your understanding of what is going on
+	    behind the curtain.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-extra">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">If we would like to implement custom arguments, which
+	  can also be thought of as <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">commands</emphasis>
+	  to our script, we need to list them in
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">extra_commands</envar> and provide methods to
+	  handle them.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The <option xmlns:xlink="http://www.w3.org/1999/xlink">reload</option> command is special.  On
+	    the one hand, it has a preset method in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.
+	    On the other hand, <option xmlns:xlink="http://www.w3.org/1999/xlink">reload</option> is not offered
+	    by default.  The reason is that not all daemons use the
+	    same reload mechanism and some have nothing to reload
+	    at all.  So we need to ask explicitly that the builtin
+	    functionality be provided.  We can do so via
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">extra_commands</envar>.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">What do we get from the default method for
+	    <option xmlns:xlink="http://www.w3.org/1999/xlink">reload</option>?  Quite often daemons reload
+	    their configuration upon reception of a signal &#8212;
+	    typically, <symbol xmlns:xlink="http://www.w3.org/1999/xlink">SIGHUP</symbol>.  Therefore
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> attempts to reload the daemon by sending
+	    a signal to it.  The signal is preset to
+	    <symbol xmlns:xlink="http://www.w3.org/1999/xlink">SIGHUP</symbol> but can be customized via
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">sig_reload</envar> if necessary.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-methods rcng-daemon-adv-plugh">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Our script supports two non-standard commands,
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">plugh</option> and <option xmlns:xlink="http://www.w3.org/1999/xlink">xyzzy</option>.  We
+	  saw them listed in <envar xmlns:xlink="http://www.w3.org/1999/xlink">extra_commands</envar>, and now
+	  it is time to provide methods for them.  The method for
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">xyzzy</option> is just inlined while that for
+	  <option xmlns:xlink="http://www.w3.org/1999/xlink">plugh</option> is implemented as the
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">mumbled_plugh</function> function.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Non-standard commands are not invoked during startup
+	  or shutdown.  Usually they are for the system admin's
+	  convenience.  They can also be used from other subsystems,
+	  e.g., <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">devd</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> if specified in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">devd.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The full list of available commands can be found in
+	  the usage line printed by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> when the script
+	  is invoked without arguments.  For example, here is the
+	  usage line from the script under study:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/mumbled</userinput>
+Usage: /etc/rc.d/mumbled [fast|force|one](start|stop|restart|rcvar|reload|plugh|xyzzy|status|poll)</screen>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-run">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A script can invoke its own standard or non-standard
+	  commands if needed.  This may look similar to calling
+	  functions, but we know that commands and shell functions
+	  are not always the same thing.  For instance,
+	  <command xmlns:xlink="http://www.w3.org/1999/xlink">xyzzy</command> is not implemented as a function
+	  here.  In addition, there can be a pre-command and
+	  post-command, which should be invoked orderly.  So the
+	  proper way for a script to run its own command is by means
+	  of <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>, as shown in the example.</para>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-yn">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">A handy function named <function xmlns:xlink="http://www.w3.org/1999/xlink">checkyesno</function>
+	  is provided by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  It takes a variable name
+	  as its argument and returns a zero exit code if and only
+	  if the variable is set to <literal xmlns:xlink="http://www.w3.org/1999/xlink">YES</literal>, or
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">TRUE</literal>, or <literal xmlns:xlink="http://www.w3.org/1999/xlink">ON</literal>, or
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">1</literal>, case insensitive; a non-zero exit
+	  code is returned otherwise.  In the latter case, the
+	  function tests the variable for being set to
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">NO</literal>, <literal xmlns:xlink="http://www.w3.org/1999/xlink">FALSE</literal>,
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">OFF</literal>, or <literal xmlns:xlink="http://www.w3.org/1999/xlink">0</literal>, case
+	  insensitive; it prints a warning message if the variable
+	  contains anything else, i.e., junk.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Keep in mind that for <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> a zero exit code
+	  means true and a non-zero exit code means false.</para>
+
+	<important xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The <function xmlns:xlink="http://www.w3.org/1999/xlink">checkyesno</function> function takes
+	    a <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">variable name</emphasis>.  Do not pass the
+	    expanded <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">value</emphasis> of a variable to
+	    it; it will not work as expected.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The following is the correct usage of
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">checkyesno</function>:</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">if checkyesno mumbled_enable; then
+        foo
+fi</programlisting>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">On the contrary, calling <function xmlns:xlink="http://www.w3.org/1999/xlink">checkyesno</function>
+	    as shown below will not work &#8212; at least not as
+	    expected:</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">if checkyesno "${mumbled_enable}"; then
+        foo
+fi</programlisting>
+	</important>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-rcflags">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><anchor xml:id="rc-flags"/>We can affect the flags to be
+	  passed to <envar xmlns:xlink="http://www.w3.org/1999/xlink">$command</envar> by modifying
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink">rc_flags</envar> in <envar xmlns:xlink="http://www.w3.org/1999/xlink">$start_precmd</envar>.</para>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-warn">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">In certain cases we may need to emit an important
+	  message that should go to <application xmlns:xlink="http://www.w3.org/1999/xlink">syslog</application>
+	  as well.  This can be done easily with the following
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> functions: <function xmlns:xlink="http://www.w3.org/1999/xlink">debug</function>,
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">info</function>, <function xmlns:xlink="http://www.w3.org/1999/xlink">warn</function>, and
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">err</function>.  The latter function then exits
+	  the script with the code specified.</para>
+      </callout>
+
+      <callout arearefs="rcng-daemon-adv-preret">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The exit codes from methods and their pre-commands
+	  are not just ignored by default.  If
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_precmd</envar> returns
+	  a non-zero exit code, the main method will not be performed.
+	  In turn,
+	  <envar xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">argument</replaceable>_postcmd</envar> will
+	  not be invoked unless the main method returns a zero exit
+	  code.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">However, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> can be instructed from the
+	    command line to ignore those exit codes and invoke all
+	    commands anyway by prefixing an argument with
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">force</literal>, as in
+	    <option xmlns:xlink="http://www.w3.org/1999/xlink">forcestart</option>.</para>
+	</note>
+      </callout>
+    </calloutlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-hookup">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Connecting a script to the rc.d framework</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">After a script has been written, it needs to be integrated
+      into <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>.  The crucial step is to install
+      the script in <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d</filename> (for the base
+      system) or <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/local/etc/rc.d</filename> (for
+      ports).  Both &lt;<filename xmlns:xlink="http://www.w3.org/1999/xlink">bsd.prog.mk</filename>&gt; and
+      &lt;<filename xmlns:xlink="http://www.w3.org/1999/xlink">bsd.port.mk</filename>&gt; provide convenient
+      hooks for that, and usually you do not have to worry about
+      the proper ownership and mode.  System scripts should be
+      installed from <filename xmlns:xlink="http://www.w3.org/1999/xlink">src/etc/rc.d</filename> through the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename> found there.  Port scripts can
+      be installed using <varname xmlns:xlink="http://www.w3.org/1999/xlink">USE_RC_SUBR</varname> as described
+      <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/porters-handbook/rc-scripts.html">in
+      the Porter's Handbook</link>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">However, we should consider beforehand the place of
+      our script in the system startup sequence.  The service handled
+      by our script is likely to depend on other services.  For
+      instance, a network daemon cannot function without the network
+      interfaces and routing up and running.  Even if a service
+      seems to demand nothing, it can hardly start before the basic
+      filesystems have been checked and mounted.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">We mentioned <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> already.  Now it is time to
+      have a close look at it.  In a nutshell, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> takes
+      a set of files, examines their contents, and prints a
+      dependency-ordered list of files from the set to
+      <varname xmlns:xlink="http://www.w3.org/1999/xlink">stdout</varname>.  The point is to keep dependency
+      information <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">inside</emphasis> the files so that
+      each file can speak for itself only.  A file can specify the
+      following information:</para>
+
+    <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">the names of the <quote xmlns:xlink="http://www.w3.org/1999/xlink">conditions</quote> (which means
+	  services to us) it <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">provides</emphasis>;</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">the names of the <quote xmlns:xlink="http://www.w3.org/1999/xlink">conditions</quote>
+	  it <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">requires</emphasis>;</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">the names of the <quote xmlns:xlink="http://www.w3.org/1999/xlink">conditions</quote> this file
+	  should run <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">before</emphasis>;</para>
+      </listitem>
+
+      <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">additional <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">keywords</emphasis> that can be
+	  used to select a subset from the whole set of files
+	  (<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> can be instructed via options to include
+	  or omit the files having particular keywords listed.)</para>
+      </listitem>
+    </itemizedlist>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">It is no surprise that <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> can handle only
+      text files with a syntax close to that of <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>.  That
+      is, special lines understood by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> look like
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> comments.  The syntax of such special lines is
+      rather rigid to simplify their processing.  See <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+      for details.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Besides using <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> special lines, a script can
+      insist on its dependency upon another service by just starting
+      it forcibly.  This can be needed when the other service is
+      optional and will not start by itself because the system admin
+      has disabled it mistakenly in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">With this general knowledge in mind, let us consider the
+      simple daemon script enhanced with dependency stuff:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">#!/bin/sh
+
+# PROVIDE: mumbled oldmumble <co xml:id="rcng-hookup-provide"/>
+# REQUIRE: DAEMON cleanvar frotz<co xml:id="rcng-hookup-require"/>
+# BEFORE:  LOGIN<co xml:id="rcng-hookup-before"/>
+# KEYWORD: nojail shutdown<co xml:id="rcng-hookup-keyword"/>
+
+. /etc/rc.subr
+
+name=mumbled
+rcvar=mumbled_enable
+
+command="/usr/sbin/${name}"
+start_precmd="${name}_prestart"
+
+mumbled_prestart()
+{
+	if ! checkyesno frotz_enable &amp;&amp; \
+	    ! /etc/rc.d/frotz forcestatus 1&gt;/dev/null 2&gt;&amp;1; then
+		force_depend frotz || return 1<co xml:id="rcng-hookup-force"/>
+	fi
+	return 0
+}
+
+load_rc_config $name
+run_rc_command "$1"</programlisting>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">As before, detailed analysis follows:</para>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="rcng-hookup-provide">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">That line declares the names of <quote xmlns:xlink="http://www.w3.org/1999/xlink">conditions</quote>
+	  our script provides.  Now other scripts can record a
+	  dependency on our script by those names.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Usually a script specifies a single condition
+	    provided.  However, nothing prevents us from listing
+	    several conditions there, e.g., for compatibility
+	    reasons.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">In any case, the name of the main, or the only,
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">PROVIDE:</literal> condition should be the
+	    same as <envar xmlns:xlink="http://www.w3.org/1999/xlink">${name}</envar>.</para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-hookup-require rcng-hookup-before">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">So our script indicates which <quote xmlns:xlink="http://www.w3.org/1999/xlink">conditions</quote>
+	  provided by other scripts it depends on.  According to
+	  the lines, our script asks <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> to put it after
+	  the script(s) providing <filename xmlns:xlink="http://www.w3.org/1999/xlink">DAEMON</filename> and
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">cleanvar</filename>, but before that providing
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">LOGIN</filename>.</para>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">The <literal xmlns:xlink="http://www.w3.org/1999/xlink">BEFORE:</literal> line should not be
+	    abused to work around an incomplete dependency list in
+	    the other script.  The appropriate case for using
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">BEFORE:</literal> is when the other script
+	    does not care about ours, but our script can do its
+	    task better if run before the other one.  A typical
+	    real-life example is the network interfaces vs. the
+	    firewall: While the interfaces do not depend on the
+	    firewall in doing their job, the system security will
+	    benefit from the firewall being ready before there is
+	    any network traffic.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Besides conditions corresponding to a single service
+	    each, there are meta-conditions and their
+	    <quote xmlns:xlink="http://www.w3.org/1999/xlink">placeholder</quote> scripts used to ensure that
+	    certain groups of operations are performed before others.
+	    These are denoted by
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink"><replaceable xmlns:xlink="http://www.w3.org/1999/xlink">UPPERCASE</replaceable></filename>
+	    names.  Their list and purposes can be found in
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Keep in mind that putting a service name in the
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">REQUIRE:</literal> line does not guarantee
+	    that the service will actually be running by the time
+	    our script starts.  The required service may fail to
+	    start or just be disabled in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>.  Obviously,
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> cannot track such details, and <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>
+	    will not do that either.  Consequently, the application
+	    started by our script should be able to cope with any
+	    required services being unavailable.  In certain cases,
+	    we can help it as discussed <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="forcedep">below.</link></para>
+	</note>
+      </callout>
+
+      <callout arearefs="rcng-hookup-keyword">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><anchor xml:id="keywords"/>As we remember from the above text,
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> keywords can be used to select or leave
+	  out some scripts.  Namely any <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> consumer
+	  can specify through <option xmlns:xlink="http://www.w3.org/1999/xlink">-k</option> and <option xmlns:xlink="http://www.w3.org/1999/xlink">-s</option>
+	  options which keywords are on the <quote xmlns:xlink="http://www.w3.org/1999/xlink">keep list</quote> and
+	  <quote xmlns:xlink="http://www.w3.org/1999/xlink">skip list</quote>, respectively.  From all the
+	  files to be dependency sorted, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> will pick
+	  only those having a keyword from the keep list (unless empty)
+	  and not having a keyword from the skip list.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">In FreeBSD, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> is used by
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc</filename> and
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename>.  These two scripts
+	  define the standard list of FreeBSD <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+	  keywords and their meanings as follows:</para>
+
+	<variablelist xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">nojail</literal></term>
+
+	    <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <para xmlns:xlink="http://www.w3.org/1999/xlink">The service is not for <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">jail</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> environment.
+		The automatic startup and shutdown procedures will
+		ignore the script if inside a jail.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">nostart</literal></term>
+
+	    <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <para xmlns:xlink="http://www.w3.org/1999/xlink">The service is to be started manually or not
+		started at all.  The automatic startup procedure
+		will ignore the script.  In conjunction with the
+		<literal xmlns:xlink="http://www.w3.org/1999/xlink">shutdown</literal> keyword, this can be
+		used to write scripts that do something only at
+		system shutdown.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry xmlns:xlink="http://www.w3.org/1999/xlink">
+	    <term xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">shutdown</literal></term>
+
+	    <listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	      <para xmlns:xlink="http://www.w3.org/1999/xlink">This keyword is to be listed
+		<emphasis xmlns:xlink="http://www.w3.org/1999/xlink">explicitly</emphasis> if the service needs
+		to be stopped before system shutdown.</para>
+
+	      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+		<para xmlns:xlink="http://www.w3.org/1999/xlink">When the system is going to shut down,
+		  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename> runs.  It
+		  assumes that most <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts
+		  have nothing to do at that time.  Therefore
+		  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename>
+		  selectively invokes <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+		  scripts with the <literal xmlns:xlink="http://www.w3.org/1999/xlink">shutdown</literal>
+		  keyword, effectively ignoring the
+		  rest of the scripts.  For even faster shutdown,
+		  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename> passes
+		  the <option xmlns:xlink="http://www.w3.org/1999/xlink">faststop</option> command to the scripts
+		  it runs so that they skip preliminary checks, e.g.,
+		  the pidfile check.  As dependent services should be
+		  stopped before their prerequisites,
+		  <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.shutdown</filename> runs the scripts
+		  in reverse dependency order.</para>
+
+		<para xmlns:xlink="http://www.w3.org/1999/xlink">If writing a real
+		  <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script, you should
+		  consider whether it is relevant at system shutdown
+		  time.  E.g., if your script does its work in
+		  response to the <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option> command
+		  only, then you need not include this keyword.
+		  However, if your script manages a service, it is
+		  probably a good idea to stop it before the system
+		  proceeds to the final stage of its shutdown
+		  sequence described in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">halt</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  In particular,
+		  a service should be stopped explicitly if it needs
+		  considerable time or special actions to shut down
+		  cleanly.  A typical example of such a service is
+		  a database engine.</para>
+	      </note>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </callout>
+
+      <callout arearefs="rcng-hookup-force">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink"><anchor xml:id="forcedep"/>To begin with,
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">force_depend</function> should be used with
+	  much care.  It is generally better to revise the hierarchy
+	  of configuration variables for your <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+	  scripts if they are interdependent.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">If you still cannot do without
+	  <function xmlns:xlink="http://www.w3.org/1999/xlink">force_depend</function>, the example offers an
+	  idiom of how to invoke it conditionally.  In the example,
+	  our <command xmlns:xlink="http://www.w3.org/1999/xlink">mumbled</command> daemon requires that another
+	  one, <command xmlns:xlink="http://www.w3.org/1999/xlink">frotz</command>, be started in advance.
+	  However, <command xmlns:xlink="http://www.w3.org/1999/xlink">frotz</command> is optional, too; and
+	  <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> knows nothing about such details.
+	  Fortunately, our script has access to all <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>
+	  variables.  If <envar xmlns:xlink="http://www.w3.org/1999/xlink">frotz_enable</envar> is true, we
+	  hope for the best and rely on <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename>
+	  to have started <command xmlns:xlink="http://www.w3.org/1999/xlink">frotz</command>.  Otherwise we
+	  forcibly check the status of <command xmlns:xlink="http://www.w3.org/1999/xlink">frotz</command>.
+	  Finally, we enforce our dependency on <command xmlns:xlink="http://www.w3.org/1999/xlink">frotz</command>
+	  if it is found to be not running.  A warning message will
+	  be emitted by <function xmlns:xlink="http://www.w3.org/1999/xlink">force_depend</function> because
+	  it should be invoked only if a misconfiguration has been
+	  detected.</para>
+      </callout>
+    </calloutlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-args">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Giving more flexibility to an rc.d script</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">When invoked during startup or shutdown, an
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script is supposed to act on the
+      entire subsystem it is responsible for.  E.g.,
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/netif</filename> should start or stop all
+      network interfaces described by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry>.  Either task
+      can be uniquely indicated by a single command argument such
+      as <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option> or <option xmlns:xlink="http://www.w3.org/1999/xlink">stop</option>.  Between
+      startup and shutdown, <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> scripts help
+      the admin to control the running system, and it is when the
+      need for more flexibility and precision arises.  For instance,
+      the admin may want to add the settings of a new network
+      interface to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> and then to start it without
+      interfering with the operation of the existing interfaces.
+      Next time the admin may need to shut down a single network
+      interface.  In the spirit of the command line, the respective
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> script calls for an extra argument,
+      the interface name.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Fortunately, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> allows for passing any number
+      of arguments to script's methods (within the system limits).
+      Due to that, the changes in the script itself can be minimal.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">How can <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> gain
+      access to the extra command-line arguments.  Should it just
+      grab them directly?  Not by any means.  Firstly, an <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>
+      function has no access to the positional parameters of
+      its caller, but <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> is just a sack of such
+      functions.  Secondly, the good manner of
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> dictates that it is for the
+      main script to decide which arguments are to be passed
+      to its methods.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">So the approach adopted by <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> is as follows:
+      <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function> passes on all its
+      arguments but the first one to the respective method verbatim.
+      The first, omitted, argument is the name of the method itself:
+      <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option>, <option xmlns:xlink="http://www.w3.org/1999/xlink">stop</option>, etc.  It will
+      be shifted out by <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function>,
+      so what is <envar xmlns:xlink="http://www.w3.org/1999/xlink">$2</envar> in the original command line will
+      be presented as <envar xmlns:xlink="http://www.w3.org/1999/xlink">$1</envar> to the method, and so on.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">To illustrate this opportunity, let us modify the primitive
+      dummy script so that its messages depend on the additional
+      arguments supplied.  Here we go:</para>
+
+    <informalexample xmlns:xlink="http://www.w3.org/1999/xlink">
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">#!/bin/sh
+
+. /etc/rc.subr
+
+name="dummy"
+start_cmd="${name}_start"
+stop_cmd=":"
+kiss_cmd="${name}_kiss"
+extra_commands="kiss"
+
+dummy_start()
+{
+        if [ $# -gt 0 ]; then<co xml:id="rcng-args-start"/>
+                echo "Greeting message: $*"
+        else
+                echo "Nothing started."
+        fi
+}
+
+dummy_kiss()
+{
+        echo -n "A ghost gives you a kiss"
+        if [ $# -gt 0 ]; then<co xml:id="rcng-args-kiss"/>
+                echo -n " and whispers: $*"
+        fi
+        case "$*" in
+        *[.!?])
+                echo
+                ;;
+        *)
+                echo .
+                ;;
+        esac
+}
+
+load_rc_config $name
+run_rc_command "$@"<co xml:id="rcng-args-all"/></programlisting>
+    </informalexample>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">What essential changes can we notice in the script?</para>
+
+    <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+      <callout arearefs="rcng-args-start">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">All arguments you type after <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option>
+	  can end up as positional parameters to the respective
+	  method.  We can use them in any way according to our
+	  task, skills, and fancy.  In the current example, we just
+	  pass all of them to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">echo</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> as one string in the
+	  next line &#8212; note <envar xmlns:xlink="http://www.w3.org/1999/xlink">$*</envar> within the double
+	  quotes.  Here is how the script can be invoked now:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/dummy start</userinput>
+Nothing started.
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/dummy start Hello world!</userinput>
+Greeting message: Hello world!</screen>
+      </callout>
+
+      <callout arearefs="rcng-args-kiss">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The same applies to any method our script provides,
+	  not only to a standard one.  We have added a custom method
+	  named <option xmlns:xlink="http://www.w3.org/1999/xlink">kiss</option>, and it can take advantage of
+	  the extra arguments not less than <option xmlns:xlink="http://www.w3.org/1999/xlink">start</option>
+	  does.  E.g.:</para>
+
+	<screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/dummy kiss</userinput>
+A ghost gives you a kiss.
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d/dummy kiss Once I was Etaoin Shrdlu...</userinput>
+A ghost gives you a kiss and whispers: Once I was Etaoin Shrdlu...</screen>
+      </callout>
+
+      <callout arearefs="rcng-args-all">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">If we want just to pass all extra arguments to
+	  any method, we can merely substitute <literal xmlns:xlink="http://www.w3.org/1999/xlink">"$@"</literal>
+	  for <literal xmlns:xlink="http://www.w3.org/1999/xlink">"$1"</literal> in the last line of our script,
+	  where we invoke <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function>.</para>
+
+	<important xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">An <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> programmer ought to understand the
+	    subtle difference between <envar xmlns:xlink="http://www.w3.org/1999/xlink">$*</envar> and
+	    <envar xmlns:xlink="http://www.w3.org/1999/xlink">$@</envar> as the ways to designate all positional
+	    parameters.  For its in-depth discussion, refer to a
+	    good handbook on <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> scripting.  <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">Do
+	    not</emphasis> use the expressions until you fully
+	    understand them because their misuse will result in
+	    buggy and insecure scripts.</para>
+	</important>
+
+	<note xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Currently <function xmlns:xlink="http://www.w3.org/1999/xlink">run_rc_command</function> may
+	    have a bug that prevents it from keeping the original
+	    boundaries between arguments.  That is, arguments with
+	    embedded whitespace may not be processed correctly.
+	    The bug stems from <envar xmlns:xlink="http://www.w3.org/1999/xlink">$*</envar> misuse.</para>
+	</note>
+      </callout>
+    </calloutlist>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="rcng-furthur">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Further reading</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><anchor xml:id="lukem"/><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.mewburn.net/luke/papers/rc.d.pdf">The original
+      article by Luke Mewburn</link> offers a general overview of
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> and detailed rationale for its
+      design decisions.  It provides insight on the whole
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> framework and its place in a modern
+      BSD operating system.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink"><anchor xml:id="manpages"/>The manual pages <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>,
+      <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>, and <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rcorder</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> document the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> components in great detail.  You
+      cannot fully use the <filename xmlns:xlink="http://www.w3.org/1999/xlink">rc.d</filename> power without
+      studying the manual pages and referring to them while writing
+      your own scripts.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The major source of working, real-life examples is
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d</filename> in a live system.  Its contents
+      are easy and pleasant to read because most rough corners are
+      hidden deep in <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.subr</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  Keep in mind though that the
+      <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.d</filename> scripts were not written by
+      angels, so they might suffer from bugs and suboptimal design
+      decisions.  Now you can improve them!</para>
+  </sect1>
+</article>

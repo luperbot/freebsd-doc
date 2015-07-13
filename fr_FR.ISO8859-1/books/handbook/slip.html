@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>27.6. Utiliser SLIP</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="ppp-and-slip.html" title="Chapitre 27. PPP et SLIP" /><link rel="prev" href="pppoa.html" title="27.5. Utiliser PPP sur ATM (PPPoA)" /><link rel="next" href="mail.html" title="Chapitre 28. Courrier électronique" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.6. Utiliser SLIP</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pppoa.html">Précédent</a> </td><th width="60%" align="center">Chapitre 27. PPP et SLIP</th><td width="20%" align="right"> <a accesskey="n" href="mail.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slip"></a>27.6. Utiliser SLIP</h2></div><div><span class="authorgroup">Contribution originale de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Satoshi</span> <span class="surname">Asami</span></span>. </span></div><div><span class="authorgroup">Avec la participation de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Guy</span> <span class="surname">Helmer</span></span> et <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Piero</span> <span class="surname">Serini</span></span>. </span></div></div></div><a id="idp83651920" class="indexterm"></a><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slipc"></a>27.6.1. Configurer un client SLIP</h3></div></div></div><a id="idp83653200" class="indexterm"></a><p>Ce qui suit décrit une manière de configurer
+	une machine FreeBSD pour utiliser SLIP sur un réseau
+	où les noms de machine sont statiques.  Si le nom de
+	machine est affecté dynamiquement (votre adresse change
+	à chaque connexion), vous devrez probablement utiliser
+	une méthode plus sophistiquée.</p><p>Tout d'abord, déterminez sur quel port série
+	votre modem est connecté.  De nombreuses personnes
+	utilisent un lien symbolique, comme
+	<code class="filename">/dev/modem</code>, pour pointer vers le nom
+	réel du périphérique,
+	<code class="filename">/dev/cuaaN</code> (ou
+	<code class="filename">/dev/cuadN</code> sous FreeBSD 6.X).  Ceci
+	vous permet de faire abstraction du véritable nom du
+	périphérique même si vous déplacez
+	le modem vers un autre port.  Cela évite le
+	côté pénible de devoir modifier un certain
+	nombre de fichiers dans le répertoire <code class="filename">/etc</code> et les fichiers
+	<code class="filename">.kermrc</code> pour l'ensemble du
+	système!</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="filename">/dev/cuaa0</code> (ou
+	  <code class="filename">/dev/cuad0</code> sous FreeBSD 6.X)
+	  représente <code class="filename">COM1</code>,
+	  <code class="filename">cuaa1</code> (ou
+	  <code class="filename">/dev/cuad1</code>)
+	  <code class="filename">COM2</code>, etc.</p></div><p>Assurez-vous d'avoir dans votre fichier de configuration
+	du noyau ce qui suit:</p><pre class="programlisting">device   sl</pre><p>Sous FreeBSD 4.X, utilisez à la place la ligne
+	suivante:</p><pre class="programlisting">pseudo-device   sl      1</pre><p>Cette configuration fait partie du noyau
+	<code class="filename">GENERIC</code>, aussi cela ne devrait pas
+	être un problème à moins que vous ne
+	l'ayez effacée.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83662160"></a>27.6.1.1. Ce que vous n'aurez à faire qu'une seule
+	  fois</h4></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Ajoutez votre machine, la passerelle et les serveurs
+	      de noms de domaines à votre fichier
+	      <code class="filename">/etc/hosts</code>.  Le notre ressemble
+	      à ceci:</p><pre class="programlisting">127.0.0.1               localhost loghost
+136.152.64.181          water.CS.Example.EDU water.CS water
+136.152.64.1            inr-3.CS.Example.EDU inr-3 slip-gateway
+128.32.136.9            ns1.Example.EDU ns1
+128.32.136.12           ns2.Example.EDU ns2</pre></li><li class="step"><p>Assurez-vous que <code class="literal">hosts</code>
+	      apparaît avant <code class="literal">bind</code> dans votre
+	      fichier <code class="filename">/etc/host.conf</code> sous les
+	      versions de FreeBSD antérieures à 5.0.  Depuis
+	      FreeBSD 5.0, le système utilise à la place
+	      le fichier <code class="filename">/etc/nsswitch.conf</code>,
+	      vérifiez que <code class="literal">files</code> est avant
+	      <code class="literal">dns</code> dans la ligne
+	      <code class="literal">hosts</code> de ce fichier.  Sans ces
+	      paramètres, il peut se passer des choses
+	      bizarres.</p></li><li class="step"><p>Editez le fichier
+	      <code class="filename">/etc/rc.conf</code>.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Définissez votre nom de machine en
+		  éditant la ligne:</p><pre class="programlisting">hostname="myname.my.domain"</pre><p>Le nom Internet complet de la machine doit
+		  être utilisé ici.</p></li><li class="listitem"><p>Ajoutez <code class="filename">sl0</code> à la
+		  liste des interfaces réseau en modifiant la
+		  ligne:</p><pre class="programlisting">network_interfaces="lo0"</pre><p>en:</p><pre class="programlisting">network_interfaces="lo0 sl0"</pre></li><li class="listitem"><p>Définissez les paramètres de
+		  configuration de <code class="filename">sl0</code> en
+		  ajoutant une ligne:</p><pre class="programlisting">ifconfig_sl0="inet ${hostname} slip-gateway netmask 0xffffff00 up"</pre></li><li class="listitem"><a id="idp83679440" class="indexterm"></a><p>Indiquez la passerelle par défaut en
+		  modifiant la ligne:</p><pre class="programlisting">defaultrouter="NO"</pre><p>en:</p><pre class="programlisting">defaultrouter="slip-gateway"</pre></li></ol></div></li><li class="step"><p>Créez un fichier
+	      <code class="filename">/etc/resolv.conf</code> qui contient:</p><pre class="programlisting">domain CS.Example.EDU
+nameserver 128.32.136.9
+nameserver 128.32.136.12</pre><a id="idp83683408" class="indexterm"></a><a id="idp83683920" class="indexterm"></a><p>Comme vous pouvez le voir, ceci définit les
+	      serveurs de noms de domaines.  Bien entendu, les noms de
+	      domaines et les adresses dépendront de votre
+	      environnement.</p></li><li class="step"><p>Donnez des mots de passe pour les utilisateurs
+	      <code class="systemitem">root</code> et <code class="systemitem">toor</code>
+	      (et à tous les autres comptes qui n'auraient pas
+	      de mot de passe).</p></li><li class="step"><p>Redémarrez votre machine et vérifiez
+	      qu'elle a bien le nom voulu.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83691984"></a>27.6.1.2. Etablir une connexion SLIP </h4></div></div></div><a id="idp83692624" class="indexterm"></a><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Téléphonez, tapez
+	      <code class="command">slip</code> à l'invite, puis entrez
+	      votre nom de machine et votre mot de passe.  Ce que vous
+	      devez entrer dépend de votre environnement.  Si
+	      vous utilisez <span class="application">Kermit</span>, vous
+	      pouvez essayer une procédure comme celle-ci:</p><pre class="programlisting"># configuration kermit
+set modem hayes
+set line /dev/modem
+set speed 115200
+set parity none
+set flow rts/cts
+set terminal bytesize 8
+set file type binary
+# The next macro will dial up and login
+define slip dial 643-9600, input 10 =&gt;, if failure stop, -
+output slip\x0d, input 10 Username:, if failure stop, -
+output silvia\x0d, input 10 Password:, if failure stop, -
+output ***\x0d, echo \x0aCONNECTED\x0a</pre><p>Vous devez, bien évidemment, remplacer le nom
+	      d'utilisateur et le mot de passe par les votre.
+	      Après cela vous pouvez alors entrer simplement
+	      <code class="command">slip</code> à l'invite de
+	      <span class="application">Kermit</span> pour vous
+	      connecter.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Conserver votre mot de passe en clair dans un
+		fichier quelconque est en général une
+		<span class="emphasis"><em>mauvaise</em></span> idée.  Faites-le
+		à vos risques et périls.</p></div></li><li class="step"><p>Laissez ensuite <span class="application">Kermit</span>
+	      tel quel (vous pouvez le mettre en arrière-plan
+	      avec
+	      <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>z</strong></span>) et en tant que <code class="systemitem">root</code>,
+	      tapez:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>slattach -h -c -s 115200 /dev/modem</code></strong></pre><p>Si vous êtes en mesure d'envoyer un
+	      <code class="command">ping</code> vers des machines situées
+	      de l'autre côté du routeur, c'est que vous
+	      êtes connecté!  Si cela ne fonctionne pas,
+	      vous pouvez essayer l'option <code class="option">-a</code> au lieu
+	      de <code class="option">-c</code> en argument de
+	      <code class="command">slattach</code>.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83704400"></a>27.6.1.3. Comment couper la connexion</h4></div></div></div><p>Effectuez ceci:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kill -INT `cat /var/run/slattach.modem.pid`</code></strong></pre><p>pour tuer <code class="command">slattach</code>.  Gardez à
+	  l'esprit que vous devez avoir les droits du
+	  super-utilisateur pour faire cela.  Revenez ensuite sous
+	  <code class="command">kermit</code> (en tapant <code class="command">fg</code>
+	  si l'avez mis en tâche de fond) et quittez-le
+	  (<span class="keycap"><strong>q</strong></span>).</p><p>La page de manuel de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=slattach&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">slattach</span>(8)</span></a> dit que vous devez
+	  employer la commande <code class="command">ifconfig sl0 down</code>
+	  pour indiquer que l'interface n'est plus active, mais cela
+	  ne change apparemment rien (les diagnostics donnés
+	  par la commande <code class="command">ifconfig sl0</code> restent
+	  identiques).</p><p>Il arrive que parfois que votre modem refuse de
+	  raccrocher.  Dans ce cas, relancez <code class="command">kermit</code>
+	  et quittez-le de nouveau.  Cela fonctionne en
+	  général à la seconde tentative.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83715280"></a>27.6.1.4. Dépannage</h4></div></div></div><p>Si cela ne fonctionne pas, n'hésitez pas à
+	  contacter la liste de diffusion <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-net" target="_top">freebsd-net</a>.  Voici les
+	  problèmes que certains ont rencontré
+	  jusqu'ici:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Ne pas utiliser l'option <code class="option">-c</code> ou
+	      <code class="option">-a</code> avec <code class="command">slattach</code> (Cela
+	      ne devrait pas poser de problème, mais des
+	      utilisateurs ont signalé que l'utilisation de cet
+	      indicateur a résolu leur problème).</p></li><li class="listitem"><p>Utiliser <code class="option">s10</code> au lieu de
+	      <code class="option">sl0</code> (avec certaines polices de
+	      caractères, il est parfois difficile de faire la
+	      différence).</p></li><li class="listitem"><p>Essayez <code class="command">ifconfig sl0</code> pour
+	      connaître la configuration de votre interface.
+	      Vous obtiendrez, par exemple:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig sl0</code></strong>
+sl0: flags=10&lt;POINTOPOINT&gt;
+        inet 136.152.64.181 --&gt; 136.152.64.1 netmask ffffff00</pre></li><li class="listitem"><p>Si vous obtenez le message d'erreur <span class="errorname">no
+	      route to host</span> lors de l'utilisation de
+	      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a>, il se peut qu'il y ait un problème
+	      avec votre table de routage.  Vous pouvez utiliser la
+	      commande <code class="command">netstat -r</code> pour afficher les
+	      routes actives:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>netstat -r</code></strong>
+Routing tables
+Destination      Gateway            Flags     Refs     Use  IfaceMTU    Rtt    Netmasks:
+
+(root node)
+(root node)
+
+Route Tree for Protocol Family inet:
+(root node) =&gt;
+default          inr-3.Example.EDU  UG          8   224515  sl0 -      -
+localhost.Exampl localhost.Example. UH          5    42127  lo0 -       0.438
+inr-3.Example.ED water.CS.Example.E UH          1        0  sl0 -      -
+water.CS.Example localhost.Example. UGH        34 47641234  lo0 -       0.438
+(root node)</pre><p>Les exemples précédents proviennent
+	      d'un système relativement chargé.  La
+	      valeurs sur votre système varieront en fonction
+	      de l'activité réseau.</p></li></ul></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slips"></a>27.6.2. Configurer un serveur SLIP</h3></div></div></div><a id="idp83740240" class="indexterm"></a><p>Ce document donne des indications pour la mise en oeuvre
+	d'un serveur SLIP sur un système FreeBSD, ce qui signifie
+	généralement configurer votre système
+	pour ouvrir automatiquement une connexion à l'ouverture
+	d'une session depuis un client SLIP distant.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slips-prereqs"></a>27.6.2.1. Prérequis</h4></div></div></div><a id="idp83742544" class="indexterm"></a><p>Cette section est très technique, il vous faut
+	  donc quelques connaissances de base.  On supposera que vous
+	  connaissez le protocole réseau TCP/IP et, en
+	  particulier, l'adressage des réseaux et des noeuds,
+	  les masques de sous-réseau, les sous-réseaux,
+	  le routage et les protocoles de routage tels que RIP.  Ce
+	  sont les concepts que vous devez maîtriser pour
+	  configurer les services SLIP sur un serveur de connexions,
+	  et si ce n'est pas le cas, veuillez lire <span class="emphasis"><em>TCP/IP
+	  Network Administration</em></span> de Craig Hunt chez
+	  O'Reilly &amp; Associates, Inc. (ISBN 0-937175-82-X), ou les
+	  ouvrages de Douglas Comer sur le protocole TCP/IP.</p><a id="idp83743824" class="indexterm"></a><p>On suppose également que vous avez
+	  déjà installé vos modems et
+	  configuré les fichiers systèmes
+	  appropriés pour permettre l'ouverture de session via
+	  vos modems.  Si vous ne l'avez pas encore fait reportez-vous
+	  à la <a class="xref" href="dialup.html" title="26.4. Dial-in Service">Section 26.4, « Dial-in Service »</a> pour des informations sur
+	  la configuration des connexions entrantes.  Vous pouvez aussi
+	  consulter les pages de manuel de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sio&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">sio</span>(4)</span></a> pour plus
+	  d'information sur le pilote du port série et
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ttys&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">ttys</span>(5)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gettytab&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">gettytab</span>(5)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=getty&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">getty</span>(8)</span></a>, &amp; et
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> en ce qui concerne la configuration du
+	  système pour qu'il autorise les connexions en
+	  provenance de modems, et peut-être la page de manuel
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=stty&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">stty</span>(1)</span></a> pour des informations sur le paramétrage
+	  des ports série (comme <code class="literal">clocal</code> pour
+	  les interfaces série directement
+	  connectées).</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83754704"></a>27.6.2.2. Rapide vue d'ensemble</h4></div></div></div><p>Une configuration typique d'utilisation de FreeBSD comme
+	  serveur SLIP fonctionne de la manière suivante: un
+	  utilisateur SLIP appelle votre serveur SLIP FreeBSD et ouvre
+	  une session sous un identifiant utilisateur SLIP particulier
+	  qui lance <code class="filename">/usr/sbin/sliplogin</code> comme
+	  interpréteur de commandes.  Le programme
+	  <code class="command">sliplogin</code> consulte le fichier
+	  <code class="filename">/etc/sliphome/slip.hosts</code> à la
+	  recherche d'une ligne correspondant à cet utilisateur
+	  particulier, et s'il la trouve, connecte la ligne
+	  série à une interface SLIP disponible et lance
+	  ensuite la procédure
+	  <code class="filename">/etc/sliphome/slip.login</code> pour
+	  configurer cette interface SLIP.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83757264"></a>27.6.2.2.1. Un exemple d'ouverture de session sur un serveur
+	    SLIP</h5></div></div></div><p>Par exemple, si <code class="systemitem">Shelmerg</code>
+	    était un identifiant utilisateur SLIP,
+	    l'entrée pour <code class="systemitem">Shelmerg</code>
+	    ressemblerait à ceci:</p><pre class="programlisting">Shelmerg:password:1964:89::0:0:Guy Helmer - SLIP:/usr/users/Shelmerg:/usr/sbin/sliplogin</pre><p>Quand <code class="systemitem">Shelmerg</code> ouvre une session,
+	    <code class="command">sliplogin</code> consulte
+	    <code class="filename">/etc/sliphome/slip.hosts</code> à la
+	    recherche d'une ligne correspondant à l'identifiant
+	    de l'utilisateur correspondant; par exemple, il peut y
+	    avoir dans le fichier
+	    <code class="filename">/etc/sliphome/slip.hosts</code> la
+	    ligne:</p><pre class="programlisting">Shelmerg        dc-slip sl-helmer       0xfffffc00		  autocomp</pre><p><code class="command">sliplogin</code> trouvera alors cette
+	    ligne, affectera la ligne série à
+	    l'interface SLIP suivante,et ensuite exécutera
+	    <code class="filename">/etc/sliphome/slip.login</code> avec les
+	    arguments suivants:</p><pre class="programlisting">/etc/sliphome/slip.login 0 19200 Shelmerg dc-slip sl-helmer 0xfffffc00 autocomp</pre><p>Si tous se passe bien,
+	    <code class="filename">/etc/sliphome/slip.login</code>
+	    exécutera un <code class="command">ifconfig</code> sur
+	    l'interface SLIP que s'est attribué
+	    <code class="command">sliplogin</code> (l'interface SLIP 0, dans
+	    l'exemple ci-dessus, qui est le premier paramètre
+	    passé à <code class="filename">slip.login</code>)
+	    pour définir l'adresse IP locale
+	    (<code class="systemitem">dc-slip</code>), l'adresse IP de la machine
+	    distante (<code class="systemitem">sl-helmer</code>), le masque de
+	    sous-réseau de l'interface SLIP (<code class="systemitem">0xfffffc00</code>), et tout autre
+	    indicateur supplémentaire
+	    (<code class="literal">autocomp</code>).  Si quelque chose se passe
+	    mal, <code class="command">sliplogin</code> fournit en
+	    général des messages d'information via la
+	    fonctionnalité de trace du
+	    <span class="quote">« <span class="quote">démon</span> »</span>
+	    <span class="application">syslogd</span>, qui les enregistre
+	    habituellement dans le fichier
+	    <code class="filename">/var/log/messages</code> (reportez-vous au
+	    pages de manuel de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> et <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">syslog.conf</span>(5)</span></a>
+	    et consultez peut-être aussi le fichier
+	    <code class="filename">/etc/syslog.conf</code> pour voir ce que
+	    trace <span class="application">syslogd</span> et où il
+	    enregistre ces messages.).</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83771472"></a>27.6.2.3. Configuration du noyau</h4></div></div></div><a id="idp83772112" class="indexterm"></a><a id="idp83773264" class="indexterm"></a><p>Le noyau par défaut de FreeBSD
+	  (<code class="filename">GENERIC</code>) fourni le support SLIP
+	  (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sl&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">sl</span>(4)</span></a>); dans le cas d'un noyau personnalisé,
+	  vous devez ajouter la ligne suivante à votre fichier
+	  de configuration du noyau:</p><pre class="programlisting">device   sl</pre><p>Sous FreeBSD 4.X, utilisez la ligne suivante:</p><pre class="programlisting">pseudo-device   sl      2</pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Le chiffre en fin de ligne représente le nombre
+	    maximum de connexions SLIP qui peuvent cohexister.  Depuis
+	    FreeBSD 5.0, le pilote <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sl&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">sl</span>(4)</span></a> est capable
+	    d'<span class="quote">« <span class="quote">auto-clonage</span> »</span>.</p></div><p>Par défaut, votre machine FreeBSD ne transmettra pas
+	  les paquets.  Si vous désirez que votre serveur SLIP
+	  FreeBSD agisse en routeur, vous devez éditer le fichier
+	  <code class="filename">/etc/rc.conf</code> et positionner la variable
+	  <code class="literal">gateway_enable</code> à
+	  <code class="option">YES</code>.</p><p>Vous devrez ensuite redémarrer pour que les
+	  nouveaux paramètres prennent effet.</p><p>Veuillez vous référer à la <a class="xref" href="kernelconfig.html" title="Chapitre 9. Configurer le noyau de FreeBSD">Chapitre 9, <em>Configurer le noyau de FreeBSD</em></a> sur la configuration du noyau pour
+	  de l'aide sur ce sujet.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83785424"></a>27.6.2.4. Configuration de sliplogin</h4></div></div></div><p>Comme indiqué plus haut, il y a trois fichiers
+	  dans le répertoire <code class="filename">/etc/sliphome</code> qui servent
+	  à la configuration de
+	  <code class="filename">/usr/sbin/sliplogin</code> (voyez
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sliplogin&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sliplogin</span>(8)</span></a> pour avoir la page de manuel de
+	  <code class="command">sliplogin</code>):
+	  <code class="filename">slip.hosts</code>, définit les
+	  utilisateurs SLIP et les adresses IP qui leur sont
+	  associées, <code class="filename">slip.login</code>, qui ne
+	  fait en général que configurer l'interface
+	  SLIP, et (facultatif) <code class="filename">slip.logout</code>, qui
+	  effectue le travail inverse de
+	  <code class="filename">slip.login</code> quand la connexion
+	  série est terminée.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83794128"></a>27.6.2.4.1. Configuration de <code class="filename">slip.hosts</code></h5></div></div></div><p><code class="filename">/etc/sliphome/slip.hosts</code> contient
+	    des lignes avec au moins quatre champs
+	    séparés par des espaces:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>L'identifiant (ID) d'utilisateur SLIP;</p></li><li class="listitem"><p>L'adresse locale (locale au serveur SLIP) de la
+		liaison SLIP;</p></li><li class="listitem"><p>L'adresse de l'autre extrémité de la
+		liaison SLIP;</p></li><li class="listitem"><p>Le masque de sous-réseau.</p></li></ul></div><p>Les adresses locales et distantes peuvent être
+	    des noms de machines (qui seront convertis en adresses IP
+	    via <code class="filename">/etc/hosts</code> ou par le service de
+	    noms de domaines, en fonction de ce que contient le
+	    fichier <code class="filename">/etc/nsswitch.conf</code>, ou
+	    <code class="filename">/etc/host.conf</code> si vous utilisez
+	    FreeBSD 4.X), et le masque de sous-réseau peut
+	    être un nom qui sera converti en consultant le
+	    fichier <code class="filename">/etc/networks</code>.  Par exemple,
+	    <code class="filename">/etc/sliphome/slip.hosts</code>
+	    contiendra:</p><pre class="programlisting">#
+# login local-addr      remote-addr     mask            opt1    opt2
+#                                               (normal,compress,noicmp)
+#
+Shelmerg  dc-slip       sl-helmerg      0xfffffc00      autocomp</pre><p>La ligne se termine par une ou plusieurs
+	    options:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="option">normal</code> &#8212; pas de compression
+		des en-têtes;</p></li><li class="listitem"><p><code class="option">compress</code> &#8212; compression des
+		en-têtes;</p></li><li class="listitem"><p><code class="option">autocomp</code> &#8212; compression des
+		en-têtes si la machine distante l'autorise;</p></li><li class="listitem"><p><code class="option">noicmp</code> &#8212; interdit les
+		paquets ICMP (de sorte que les paquets
+		<span class="quote">« <span class="quote">ping</span> »</span> seront ignorés au lieu de
+		consommer votre bande passante).</p></li></ul></div><a id="idp83807312" class="indexterm"></a><a id="idp83807824" class="indexterm"></a><p>Le choix des adresses pour les deux
+	    extrémités des liaisons SLIP dépend du
+	    fait que vous leur dédiez un sous-réseau
+	    TCP/IP ou que vous comptiez utiliser un <span class="quote">« <span class="quote">proxy
+	    ARP</span> »</span> sur votre serveur SLIP (ce n'est pas un
+	    <span class="quote">« <span class="quote">vrai</span> »</span> proxy ARP, mais c'est la terminologie
+	    que nous utiliserons dans ce document pour le
+	    désigner).  Si vous n'êtes pas sûr de la
+	    méthode à choisir ou de la façon
+	    d'assigner les adresses IP, référez-vous aux
+	    ouvrages sur le TCP/IP mentionnés à section
+	    sur les prérequis (<a class="xref" href="slip.html#slips-prereqs" title="27.6.2.1. Prérequis">Section 27.6.2.1, « Prérequis »</a>)
+	    et/ou consultez l'administrateur de votre réseau
+	    IP.</p><p>Si vous comptez utiliser un sous-réseau IP
+	    séparé pour vos clients SLIP, vous devrez
+	    définir l'adresse de sous-réseau à
+	    partir de votre réseau IP et attribuer à
+	    chacun de vos clients SLIP une adresse IP sur ce
+	    sous-réseau.  Ensuite, vous devrez probablement
+	    configurer sur votre routeur IP le plus proche une route
+	    statique vers votre sous-réseau SLIP via votre
+	    serveur SLIP.</p><a id="idp83822672" class="indexterm"></a><p>Sinon, si vous avez l'intention d'utiliser la
+	    méthode du <span class="quote">« <span class="quote">proxy ARP</span> »</span>, vous devrez
+	    assigner à vos clients SLIP des adresses IP en
+	    provenance du sous-réseau Ethernet de votre serveur
+	    SLIP, et vous devrez également adapter vos
+	    procédures
+	    <code class="filename">/etc/sliphome/slip.login</code> et
+	    <code class="filename">/etc/sliphome/slip.logout</code> pour qu'elles
+	    utilisent <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=arp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">arp</span>(8)</span></a> pour gérer les entrées
+	    proxy ARP dans la table ARP de votre serveur SLIP.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83825744"></a>27.6.2.4.2. Configuration de <code class="filename">slip.login</code></h5></div></div></div><p>Le fichier
+	    <code class="filename">/etc/sliphome/slip.login</code> ressemble
+	    généralement à ceci:</p><pre class="programlisting">#!/bin/sh -
+#
+#       @(#)slip.login  5.1 (Berkeley) 7/1/90
+
+#
+# procédure générique d'ouverture de session pour
+# une liaison SLIP.  sliplogin l'appelle avec les paramètres:
+#      1        2         3        4          5         6     7-n
+# interface vitesse nom adresse-locale adresse-distante masque arg-optionnels
+#
+/sbin/ifconfig sl$1 inet $4 $5 netmask $6</pre><p>Ce fichier <code class="filename">slip.login</code> ne fait
+	    qu'exécuter <code class="command">ifconfig</code> sur
+	    l'interface SLIP appropriée avec comme
+	    paramètres les adresses locales et distantes et le
+	    masque de sous-réseau de l'interface SLIP.</p><p>Si vous avez choisi d'utiliser la méthode du
+	    <span class="quote">« <span class="quote">proxy ARP</span> »</span> (au lieu d'affecter un
+	    sous-réseau distinct à vos clients SLIP),
+	    votre fichier
+	    <code class="filename">/etc/sliphome/slip.login</code> devra
+	    ressembler à ceci:</p><pre class="programlisting">#!/bin/sh -
+#
+#       @(#)slip.login  5.1 (Berkeley) 7/1/90
+
+#
+# procédure générique d'ouverture de session pour
+# une liaison SLIP.  sliplogin l'appelle avec les paramètres:
+#     1         2    3         4              5           6     7-n
+# interface vitesse nom adresse-locale adresse-distante masque arg-optionnels
+#
+/sbin/ifconfig sl$1 inet $4 $5 netmask $6
+# répondre aux requêtes ARP concernant le client SLIP avec notre
+# adresse Ethernet
+/usr/sbin/arp -s $5 00:11:22:33:44:55 pub</pre><p>La ligne supplémentaire dans ce fichier
+	    <code class="filename">slip.login</code>, <code class="command">arp -s $5
+	    00:11:22:33:44:55 pub</code>, crée une
+	    entrée ARP dans la table ARP du serveur SLIP.
+	    Cette entrée ARP fait que le serveur SLIP
+	    répond avec sa propre adresse MAC lorsqu'un autre
+	    noeud IP du réseau Ethernet demande à
+	    dialoguer avec le client SLIP qui possède cette
+	    adresse IP.</p><a id="idp83835856" class="indexterm"></a><p>Dans l'exemple donné ci-dessus, remplacez
+	    l'adresse MAC Ethernet (<code class="systemitem">00:11:22:33:44:55</code>) avec l'adresse MAC de
+	    la carte Ethernet de votre système, ou sinon votre
+	    <span class="quote">« <span class="quote">proxy ARP</span> »</span> ne fonctionnera jamais!  Vous
+	    pouvez déterminer l'adresse MAC de votre serveur SLIP
+	    en examinant le résultat de la commande
+	    <code class="command">netstat -i</code>; la seconde ligne doit
+	    ressembler à ce qui suit:</p><pre class="screen">ed0   1500  &lt;Link&gt;0.2.c1.28.5f.4a         191923	0   129457     0   116</pre><p>Cela indique que l'adresse MAC Ethernet de ce
+	    système est <code class="systemitem">00:02:c1:28:5f:4a</code> &#8212; les points
+	    dans les adresses MAC que donne <code class="command">netstat
+	    -i</code> doivent être remplacés par des
+	    <span class="quote">« <span class="quote">:</span> »</span> et il faut ajouter un zéro devant
+	    chaque valeur hexadécimale donnée sur un
+	    seul digit pour obtenir des adresses dans le format requis
+	    par <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=arp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">arp</span>(8)</span></a>; consultez la page de manuel d'<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=arp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">arp</span>(8)</span></a>
+	    pour avoir des informations complètes sur ces
+	    conventions.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Quand vous créez les fichiers
+	      <code class="filename">/etc/sliphome/slip.login</code> et
+	      <code class="filename">/etc/sliphome/slip.logout</code>, le bit
+	      <span class="quote">« <span class="quote">exécutable</span> »</span> (i.e., <code class="command">chmod
+	      755 /etc/sliphome/slip.login
+	      /etc/sliphome/slip.logout</code>) doit être
+	      positionné, ou sinon <code class="command">sliplogin</code>
+	      sera incapable d'exécuter la
+	      procédure.</p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83849552"></a>27.6.2.4.3. Configuration de
+	    <code class="filename">slip.logout</code></h5></div></div></div><p><code class="filename">/etc/sliphome/slip.logout</code>
+	    n'est pas strictement indispensable (à moins que
+	    vous n'implémentiez un <span class="quote">« <span class="quote">proxy ARP</span> »</span>),
+	    mais si vous décidez de la créer, voici un
+	    exemple de procédure
+	    <code class="filename">slip.logout</code>
+	    élémentaire:</p><pre class="programlisting">#!/bin/sh -
+#
+#       slip.logout
+
+#
+# procédure générique de fermeture de session pour
+# une liaison SLIP.  sliplogin l'appelle avec les paramètres:
+#     1         2    3         4              5           6     7-n
+# interface vitesse nom adresse-locale adresse-distante masque arg-optionnels
+#
+/sbin/ifconfig sl$1 down</pre><p>Si vous utilisez la méthode <span class="quote">« <span class="quote">proxy
+	    ARP</span> »</span>, vous voudrez que
+	    <code class="filename">/etc/sliphome/slip.logout</code> supprime
+	    l'entrée ARP pour le client SLIP:</p><pre class="programlisting">#!/bin/sh -
+#
+#       @(#)slip.logout
+
+#
+# procédure générique de fermeture de session pour
+# une liaison SLIP.  sliplogin l'appelle avec les paramètres:
+#     1         2    3         4              5           6     7-n
+# interface vitesse nom adresse-locale adresse-distante masque arg-optionnels
+#
+/sbin/ifconfig sl$1 down
+# Cesser de répondre aux requêtes ARP concernant le client SLIP
+/usr/sbin/arp -d $5</pre><p>La commande <code class="command">arp -d $5</code> supprime
+	    l'entrée ARP que la procédure
+	    <code class="filename">slip.login</code> pour le <span class="quote">« <span class="quote">proxy
+	    ARP</span> »</span> a ajouté quand le client SLIP a ouvert
+	    la session.</p><p>Il n'est pas inutile de répéter:
+	    assurez-vous que le bit <span class="quote">« <span class="quote">exécutable</span> »</span>
+	    de la procédure
+	    <code class="filename">/etc/sliphome/slip.logout</code> a
+	    été positionné après que vous
+	    l'ayez créée (i.e., <code class="command">chmod 755
+	    /etc/sliphome/slip.logout</code>).</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83861456"></a>27.6.2.5. A propos du routage</h4></div></div></div><a id="idp83862096" class="indexterm"></a><p>Si vous n'utilisez pas <span class="quote">« <span class="quote">proxy ARP</span> »</span> pour
+	  router les paquets entre vos clients SLIP et le reste de
+	  votre réseau (et peut-être l'Internet), vous
+	  devrez probablement ajouter des routes statiques vers le(s)
+	  routeur(s) par défaut le(s) plus proche(s) pour
+	  router le sous-réseau de vos clients SLIP via votre
+	  serveur SLIP.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83864016"></a>27.6.2.5.1. Routes statiques</h5></div></div></div><a id="idp83864656" class="indexterm"></a><p>Ajouter des routes statiques vers vos routeurs
+	    les plus proches peut être problématique
+	    (voire impossible si vous n'avez pas les autorisations
+	    pour...).  Si vous avez un réseau avec plusieurs
+	    routeurs, certains d'entre eux, tels que les Cisco et les
+	    Proteon, devront non seulement être
+	    configurés pour la route statique vers le
+	    sous-réseau SLIP, mais devront aussi savoir quelles
+	    routes statiques ils doivent annoncer aux autres routeurs,
+	    donc quelques compétences, un peu de
+	    dépannage ou de <span class="quote">« <span class="quote">bidouille</span> »</span> pourront
+	    être nécessaire pour que vos routes statiques
+	    fonctionnent.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83870288"></a>27.6.2.5.2. Utiliser <span class="application"><span class="trademark">GateD</span>®</span></h5></div></div></div><a id="idp83871440" class="indexterm"></a><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="application"><span class="trademark">GateD</span>®</span> est
+	    désormais un logiciel propriétaire et les
+	    sources ne seront donc plus disponibles (plus d'information
+	    sur le site Web de <a class="link" href="http://www.gated.org/" target="_top"><span class="trademark">GateD</span>®</a>).  Cette section
+	    existe uniquement pour des raisons de compatibilité
+	    pour ceux qui utilisent encore une ancienne version.</p></div><p>Une alternative aux maux de tête que provoquent
+	    les routes statiques est d'installer
+	    <span class="application"><span class="trademark">GateD</span>®</span> sur votre serveur SLIP
+	    FreeBSD et de le configurer pour qu'il utilise les protocoles
+	    de routage appropriés (RIP/OSPF/BGP/EGP) pour
+	    annoncer aux autres routeurs votre sous-réseau
+	    SLIP.  Vous aurez besoin de créer un fichier
+	    <code class="filename">/etc/gated.conf</code> pour configurer
+	    <span class="application"><span class="trademark">GateD</span>®</span>; voici un exemple,
+	    semblable à celui que l'auteur a utilisé sur
+	    un serveur SLIP FreeBSD:</p><pre class="programlisting">#
+# fichier de configuration de gated dc.dsu.edu; pour la version
+# 3.5alpha5
+# diffusion des informations RIP pour xxx.xxx.yy via l'interface
+# Ethernet "ed"
+#
+#
+# options de trace
+#
+traceoptions "/var/tmp/gated.output" replace size 100k files 2 general ;
+
+rip yes {
+  interface sl noripout noripin ;
+  interface ed ripin ripout version 1 ;
+  traceoptions route ;
+} ;
+
+#
+# Activer un certain nombre d'informations de trace sur l'interface
+# au noyau:
+kernel {
+  traceoptions remnants request routes info interface ;
+} ;
+
+#
+# Propager la route vers xxx.xxx.yy via l'Ethernet interface et RIP
+#
+
+export proto rip interface ed {
+  proto direct {
+      <em class="replaceable"><code>xxx.xxx.yy</code></em> mask 255.255.252.0 metric 1; # SLIP connections
+  } ;
+} ;
+
+#
+# Accepter les routes de RIP via les interfaces Ethernet "ed"
+
+import proto rip interface ed {
+  all ;
+} ;</pre><a id="idp83877456" class="indexterm"></a><p>L'exemple de fichier <code class="filename">gated.conf</code>
+	    ci-dessus diffuse l'information de routage concernant le
+	    sous-réseau SLIP
+	    <em class="replaceable"><code>xxx.xxx.yy</code></em> via RIP sur
+	    l'interface Ethernet; si vous utilisez un pilote de
+	    périphérique Ethernet différent du
+	    pilote <code class="filename">ed</code>, vous devrez modifier en
+	    conséquence les références à
+	    l'interface <code class="filename">ed</code>.  Ce fichier
+	    d'exemple active également les journaux sur
+	    <code class="filename">/var/tmp/gated.output</code> pour pouvoir
+	    déboguer le fonctionnement de
+	    <span class="application"><span class="trademark">GateD</span>®</span>; vous pouvez
+	    désactiver ces options de trace si
+	    <span class="application"><span class="trademark">GateD</span>®</span> fonctionne correctement
+	    pour vous.  Vous devrez remplacer
+	    <em class="replaceable"><code>xxx.xxx.yy</code></em> par l'adresse
+	    réseau de votre propre sous-réseau SLIP
+	    (assurez-vous de remplacer également le masque de
+	    sous-réseau dans la clause <code class="literal">proto
+	    direct</code>).</p><p>Une fois que vous avez installé et
+	    configuré <span class="application"><span class="trademark">GateD</span>®</span> sur
+	    votre système, vous devrez indiquer aux
+	    procédures de démarrage de FreeBSD de lancer
+	    <span class="application"><span class="trademark">GateD</span>®</span> à la place de
+	    <span class="application">routed</span>.  La manière la
+	    plus simple de faire cela est de positionner les variables
+	    <code class="varname">router</code> et
+	    <code class="varname">router_flags</code> dans le fichier
+	    <code class="filename">/etc/rc.conf</code>.  Veuillez consulter la
+	    page de manuel de <span class="application"><span class="trademark">GateD</span>®</span> pour
+	    des informations sur les paramètres en ligne de
+	    commande.</p></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pppoa.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="ppp-and-slip.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="mail.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">27.5. Utiliser <span class="application">PPP</span> sur ATM (PPPoA) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Chapitre 28. Courrier électronique</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

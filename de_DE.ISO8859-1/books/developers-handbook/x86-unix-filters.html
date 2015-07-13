@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.7. UNIX®-Filter schreiben</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="x86.html" title="Kapitel 11. x86-Assembler-Programmierung" /><link rel="prev" href="x86-first-program.html" title="11.6. Unser erstes Programm" /><link rel="next" href="x86-buffered-io.html" title="11.8. Gepufferte Eingabe und Ausgabe" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.7. <span class="trademark">UNIX</span>®-Filter schreiben</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="x86-first-program.html">Zurück</a> </td><th width="60%" align="center">Kapitel 11. x86-Assembler-Programmierung</th><td width="20%" align="right"> <a accesskey="n" href="x86-buffered-io.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="x86-unix-filters"></a>11.7. <span class="trademark">UNIX</span>®-Filter schreiben</h2></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Hagen</span> <span class="surname">Kühl</span></span>. </span></div></div></div><p>Ein häufiger Typ von <span class="trademark">UNIX</span>®-Anwendungen ist ein Filter
+      &#8212; ein Programm, das Eingaben von
+      <code class="filename">stdin</code> liest, sie verarbeitet und das
+      Ergebnis nach <code class="filename">stdout</code> schreibt.</p><p>In diesem Kapitel möchten wir einen einfachen Filter
+      entwickeln und lernen, wie wir von <code class="filename">stdin</code>
+      lesen und nach <code class="filename">stdout</code> schreiben. Dieser
+      Filter soll jedes Byte seiner Eingabe in eine hexadezimale Zahl
+      gefolgt von einem Leerzeichen umwandeln.</p><pre class="programlisting">%include	'system.inc'
+
+section	.data
+hex	db	'0123456789ABCDEF'
+buffer	db	0, 0, ' '
+
+section	.text
+global	_start
+_start:
+	; read a byte from stdin
+	push	dword 1
+	push	dword buffer
+	push	dword stdin
+	sys.read
+	add	esp, byte 12
+	or	eax, eax
+	je	.done
+
+	; convert it to hex
+	movzx	eax, byte [buffer]
+	mov	edx, eax
+	shr	dl, 4
+	mov	dl, [hex+edx]
+	mov	[buffer], dl
+	and	al, 0Fh
+	mov	al, [hex+eax]
+	mov	[buffer+1], al
+
+	; print it
+	push	dword 3
+	push	dword buffer
+	push	dword stdout
+	sys.write
+	add	esp, byte 12
+	jmp	short _start
+
+.done:
+	push	dword 0
+	sys.exit</pre><p>Im Datenabschnitt erzeugen wir ein Array mit Namen
+      <code class="varname">hex</code>. Es enthält die 16 hexadezimalen
+      Ziffern in aufsteigender Reihenfolge. Diesem Array folgt ein
+      Puffer, den wir sowohl für die Ein- als auch für die
+      Ausgabe verwenden. Die ersten beiden Bytes dieses Puffers werden
+      am Anfang auf <code class="constant">0</code> gesetzt. Dorthin schreiben
+      wir die beiden hexadezimalen Ziffern (das erste Byte ist auch
+      die Stelle an die wir die Eingabe lesen). Das dritte Byte ist
+      ein Leerzeichen.</p><p>Der Code-Abschnitt besteht aus vier Teilen: Das Byte lesen,
+      es in eine hexadezimale Zahl umwandeln, das Ergebnis schreiben
+      und letztendlich das Programm verlassen.</p><p>Um das Byte zu lesen, bitten wir das System ein Byte von
+      <code class="filename">stdin</code> zu lesen und speichern es im ersten
+      Byte von <code class="varname">buffer</code>. Das System gibt die Anzahl
+      an Bytes, die gelesen wurden, in <code class="varname">EAX</code> zurück. Diese wird
+      <code class="constant">1</code> sein, wenn eine Eingabe empfangen wird
+      und <code class="constant">0</code>, wenn keine Eingabedaten mehr
+      verfügbar sind. Deshalb überprüfen wir den Wert
+      von <code class="varname">EAX</code>. Wenn dieser
+      <code class="constant">0</code> ist, springen wir zu
+      <code class="varname">.done</code>, ansonsten fahren wir fort.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Zu Gunsten der Einfachheit ignorieren wir hier die
+	Möglichkeit eines Fehlers.</p></div><p>Die Umwandlungsroutine in eine Hexadezimalzahl liest das
+      Byte aus <code class="varname">buffer</code> in <code class="varname">EAX</code>, oder genaugenommen nur in
+      <code class="varname">AL</code>, wobei die übrigen
+      Bits von <code class="varname">EAX</code> auf null gesetzt
+      werden. Außerdem kopieren wir das Byte nach <code class="varname">EDX</code>, da wir die oberen vier Bits
+      (Nibble) getrennt von den unteren vier Bits umwandeln
+      müssen. Das Ergebnis speichern wir in den ersten beiden
+      Bytes des Puffers.</p><p>Als Nächstes bitten wir das System die drei Bytes in
+      den Puffer zu schreiben, also die zwei hexadezimalen Ziffern und
+      das Leerzeichen nach <code class="filename">stdout</code>. Danach
+      springen wir wieder an den Anfang des Programms und verarbeiten
+      das nächste Byte.</p><p>Wenn die gesamte Eingabe verarbeitet ist, bitten wie das
+      System unser Programm zu beenden und null zurückzuliefern,
+      welches traditionell die Bedeutung hat, dass unser Programm
+      erfolgreich war.</p><p>Fahren Sie fort und speichern Sie den Code in eine Datei
+      namens <code class="filename">hex.asm</code>. Geben Sie danach folgendes
+      ein (<strong class="userinput"><code>^D</code></strong> bedeutet, dass Sie die
+      Steuerungstaste drücken und dann <strong class="userinput"><code>D</code></strong>
+      eingeben, während Sie Steuerung gedrückt
+      halten):</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>nasm -f elf hex.asm</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ld -s -o hex hex.o</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>./hex</code></strong>
+<strong class="userinput"><code>Hello, World!</code></strong>
+48 65 6C 6C 6F 2C 20 57 6F 72 6C 64 21 0A <strong class="userinput"><code>Here I come!</code></strong>
+48 65 72 65 20 49 20 63 6F 6D 65 21 0A <strong class="userinput"><code>^D</code></strong> <code class="prompt">%</code></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Wenn Sie von <acronym class="acronym"><span class="trademark">MS-DOS</span>®</acronym> zu <span class="trademark">UNIX</span>®
+	wechseln, wundern Sie sich vielleicht, warum jede Zeile mit
+	<code class="constant">0A</code> an Stelle von <code class="constant">0D
+	0A</code> endet. Das liegt daran, dass <span class="trademark">UNIX</span>® nicht die
+	CR/LF-Konvention, sondern die "new line"-Konvention verwendet,
+	welches hexadezimal als <code class="constant">0A</code> dargestellt
+	wird.</p></div><p>Können wir das Programm verbessern? Nun, einerseits ist
+      es etwas verwirrend, dass die Eingabe, nachdem wir eine Zeile
+      verarbeitet haben, nicht wieder am Anfang der Zeile beginnt.
+      Deshalb können wir unser Programm anpassen um einen
+      Zeilenumbruch an Stelle eines Leerzeichens nach jedem
+      <code class="constant">0A</code> auszugeben:</p><pre class="programlisting">%include	'system.inc'
+
+section	.data
+hex	db	'0123456789ABCDEF'
+buffer	db	0, 0, ' '
+
+section	.text
+global	_start
+_start:
+	mov	cl, ' '
+
+.loop:
+	; read a byte from stdin
+	push	dword 1
+	push	dword buffer
+	push	dword stdin
+	sys.read
+	add	esp, byte 12
+	or	eax, eax
+	je	.done
+
+	; convert it to hex
+	movzx	eax, byte [buffer]
+	mov	[buffer+2], cl
+	cmp	al, 0Ah
+	jne	.hex
+	mov	[buffer+2], al
+
+.hex:
+	mov	edx, eax
+	shr	dl, 4
+	mov	dl, [hex+edx]
+	mov	[buffer], dl
+	and	al, 0Fh
+	mov	al, [hex+eax]
+	mov	[buffer+1], al
+
+	; print it
+	push	dword 3
+	push	dword buffer
+	push	dword stdout
+	sys.write
+	add	esp, byte 12
+	jmp	short .loop
+
+.done:
+	push	dword 0
+	sys.exit</pre><p>Wir haben das Leerzeichen im Register <code class="varname">CL</code> abgelegt. Das können wir
+      bedenkenlos tun, da <span class="trademark">UNIX</span>®-Systemaufrufe im Gegensatz zu denen
+      von <span class="trademark">Microsoft</span>® <span class="trademark">Windows</span>® keine Werte von Registern ändern in
+      denen sie keine Werte zurückliefern.</p><p>Das bedeutet, dass wir <code class="varname">CL</code>
+      nur einmal setzen müssen. Dafür haben wir ein neues
+      Label <code class="varname">.loop</code> eingefügt, zu dem wir an
+      Stelle von <code class="varname">_start</code> springen, um das
+      nächste Byte einzulesen. Außerdem haben wir das Label
+      <code class="varname">.hex</code> eingefügt, somit können wir
+      wahlweise ein Leerzeichen oder einen Zeilenumbruch im dritten
+      Byte von <code class="varname">buffer</code> ablegen.</p><p>Nachdem Sie <code class="filename">hex.asm</code> entsprechend der
+      Neuerungen geändert haben, geben Sie Folgendes ein:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>nasm -f elf hex.asm</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ld -s -o hex hex.o</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>./hex</code></strong>
+<strong class="userinput"><code>Hello, World!</code></strong>
+48 65 6C 6C 6F 2C 20 57 6F 72 6C 64 21 0A
+<strong class="userinput"><code>Here I come!</code></strong>
+48 65 72 65 20 49 20 63 6F 6D 65 21 0A
+<strong class="userinput"><code>^D</code></strong> <code class="prompt">%</code></pre><p>Das sieht doch schon besser aus. Aber der Code ist ziemlich
+      ineffizient! Wir führen für jeden einzelne Byte
+      zweimal einen Systemaufruf aus (einen zum Lesen und einen um es
+      in die Ausgabe zu schreiben).</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="x86-first-program.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="x86.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="x86-buffered-io.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">11.6. Unser erstes Programm </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 11.8. Gepufferte Eingabe und Ausgabe</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

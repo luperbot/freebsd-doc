@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>22.2. ゲートウェイと経路</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="advanced-networking.html" title="第22章 高度なネットワーク" /><link rel="prev" href="advanced-networking.html" title="第22章 高度なネットワーク" /><link rel="next" href="network-wireless.html" title="22.3. 無線ネットワーク" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">22.2. ゲートウェイと経路</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="advanced-networking.html">戻る</a>〓</td><th width="60%" align="center">第22章 高度なネットワーク</th><td width="20%" align="right">〓<a accesskey="n" href="network-wireless.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-routing"></a>22.2. ゲートウェイと経路</h2></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Gryphon</span> <span class="firstname">Coranth</span> [FAMILY Given]</span>. </span></div></div></div><a id="idp95270992" class="indexterm"></a><a id="idp95271504" class="indexterm"></a><a id="idp95272016" class="indexterm"></a><p>あるマシンがネットワーク上で他のマシンをみつけることができるようにするには、
+      あるマシンから他のマシンへどのようにたどり着くかを記述する適切な仕組みが必要です。
+      この仕組みを<em class="firstterm">ルーティング</em>と呼びます。
+      <span class="quote">「<span class="quote">経路</span>」</span> (route) は <span class="quote">「<span class="quote">送信先</span>」</span>
+      (destination) と <span class="quote">「<span class="quote">ゲートウェイ</span>」</span> の
+      2 つのアドレスの組で定義します。この組合せは、この
+      <span class="emphasis"><em>送信先</em></span> へたどり着こうとする場合は、その
+      <span class="emphasis"><em>ゲートウェイ</em></span>
+      を通じて通信することを示しています。
+      送信先には個々のホスト、サブネット、<span class="quote">「<span class="quote">デフォルト</span>」</span>
+      の 3 つの型があります。
+      <span class="quote">「<span class="quote">デフォルトルート</span>」</span>
+      は他のどの経路も適用できない場合に使われます。
+      デフォルトルートについてはのちほどもう少し詳しく述べます。
+      また、ゲートウェイには、個々のホスト、インタフェース
+      (<span class="quote">「<span class="quote">リンク</span>」</span> とも呼ばれます)、
+      イーサネットハードウェアアドレス (MAC アドレス)
+      の 3 つの型があります。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95280720"></a>22.2.1. 例</h3></div></div></div><p>以下に示す <code class="command">netstat</code>
+	の例を使って、ルーティングのさまざまな状態を説明します。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>netstat -r</code></strong>
+Routing tables
+
+Destination      Gateway            Flags     Refs     Use     Netif Expire
+
+default          outside-gw         UGSc       37      418      ppp0
+localhost        localhost          UH          0      181       lo0
+test0            0:e0:b5:36:cf:4f   UHLW        5    63288       ed0     77
+10.20.30.255     link#1             UHLW        1     2421
+example.com      link#1             UC          0        0
+host1            0:e0:a8:37:8:1e    UHLW        3     4601       lo0
+host2            0:e0:a8:37:8:1e    UHLW        0        5       lo0 =&gt;
+host2.example.com link#1             UC          0        0
+224              link#1             UC          0        0</pre><a id="idp95283152" class="indexterm"></a><p>最初の 2 行はデフォルトルート
+	(<a class="link" href="network-routing.html#network-routing-default" title="22.2.2. デフォルトルート">次節</a>で扱います) と、
+	<code class="systemitem">localhost</code> への経路を示しています。</p><a id="idp95284944" class="indexterm"></a><p><code class="literal">localhost</code> に割り当てるインタフェース
+	(<code class="literal">Netif</code> 欄)
+	としてこのルーティングテーブルが指定しているのは
+	<code class="filename">lo0</code>
+	で、これはループバックデバイスともいいます。
+	これは結局のところ出たところに戻るだけなので、
+	この送信先あてのトラフィックは、LAN
+	に送られずに、すべて内部的に処理されます。</p><a id="idp95291088" class="indexterm"></a><p>次の行では
+	<code class="systemitem">0:e0:</code> から始まるアドレスに注目しましょう。
+	これはイーサネットハードウェアアドレスで、MAC アドレスともいいます。
+	FreeBSD はローカルなイーサネット上の任意のホスト
+	(この例では <code class="systemitem">test0</code>) を自動的に認識し、
+	イーサネットインタフェース <code class="filename">ed0</code>
+	にそのホストへの直接の経路をつけ加えます。
+	この種の経路には、タイムアウト時間 (<code class="literal">Expire</code> 欄)
+	も結びつけられており、
+	指定された時間内にホストからの応答がないことを判断するのに用いられます。
+	その場合、そのホストへの経路情報は自動的に削除されます。
+	これらのホストは
+	RIP (Routing Information Protocol) という、
+	最短パス判定に基づいてローカルなホストへの経路を決定する仕組みを利用して認識されます。</p><a id="idp95294288" class="indexterm"></a><p>さらに FreeBSD
+	ではローカルサブネットへの経路情報も加えることができます
+	(<code class="systemitem">10.20.30.255</code> は
+	<code class="systemitem">10.20.30</code>
+	というサブネットに対するブロードキャストアドレスで、
+	<code class="systemitem">example.com</code>
+	はこのサブネットに結びつけられているドメイン名)。
+	<code class="literal">link#1</code> という名称は、
+	このマシンの一つ目のイーサネットカードのことをさします。
+	これらについては、
+	何も追加インタフェースが指定されていないことがわかります。</p><p>これら 2 つのグループ
+	(ローカルネットワークホストとローカルサブネット)
+	は、両方とも <span class="application">routed</span>
+	というデーモンによって自動的に経路が設定されます。
+	<span class="application">routed</span> を動かさなければ、静的に定義した
+	(つまり明示的に設定した) 経路のみが存在することになります。</p><p><code class="literal">host1</code> の行は私たちのホストのことで、
+	イーサネットアドレスで示されています。送信側のホストの場合、
+	FreeBSDはイーサネットインタフェースへ送るのではなく、
+	ループバックインタフェース (<code class="filename">lo0</code>)
+	を使います。</p><p>2 つある <code class="literal">host2</code> の行は、
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> のエイリアスを使ったときにどのようになるかを示す例です
+	(このようなことをする理由については
+	Ethernet の節を参照してください)。
+	<code class="filename">lo0</code> の後にある <code class="literal">=&gt;</code> は、
+	インタフェースが (このアドレスがローカルなホストを参照しているので)
+	ループバックを使っているというだけでなく、
+	エイリアスになっていることも示しています。
+	このような経路はエイリアスに対応しているホストにのみ現れます。
+	ローカルネットワーク上の他のすべてのホストでは、
+	それぞれの経路に対して単に<code class="literal">link#1</code> となります。</p><p>最後の行 (送信先サブネット <code class="systemitem">224</code>)
+	はマルチキャストで扱うものですが、これは他の節で説明します。</p><p>最後に <code class="literal">Flags</code> (フラグ)
+	欄にそれぞれの経路のさまざまな属性が表示されます。
+	以下にフラグの一部と、それが何を意味しているかを示します。
+      </p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>U</td><td>Up: この経路はアクティブです。</td></tr><tr><td>H</td><td>Host: 経路の送信先が単一のホストです。</td></tr><tr><td>G</td><td>Gateway: この送信先へ送られると、
+		どこへ送ればよいかを明らかにして、
+		そのリモートシステムへ送られます。</td></tr><tr><td>S</td><td>Static:
+		この経路はシステムによって自動的に生成されたのではなく、
+		手動で作成されました。</td></tr><tr><td>C</td><td>Clone:
+		マシンに接続したときにこの経路に基づく新しい経路が作られます。
+		この型の経路は通常はローカルネットワークで使われます。</td></tr><tr><td>W</td><td>WasCloned:
+		ローカルエリアネットワーク (LAN) の (Clone)
+		経路に基づいて自動的に生成された経路であることを示します。</td></tr><tr><td>L</td><td>Link:
+		イーサネットハードウェアへの参照を含む経路です。</td></tr></tbody></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-routing-default"></a>22.2.2. デフォルトルート</h3></div></div></div><a id="idp95322704" class="indexterm"></a><p>ローカルシステムからリモートホストにコネクションを張る必要がある場合、
+	既知の経路が存在するかどうかを確認するためにルーティングテーブルをチェックします。
+	到達するための経路を知っているサブネットの内部にリモートホストがある場合
+	(Cloned routes)、
+	システムはそのインタフェースから接続できるかどうか確認します。</p><p>知っているパスがすべて駄目だった場合でも、
+	システムには最後の手段として <span class="quote">「<span class="quote">デフォルト</span>」</span>
+	ルートがあります。このルートはゲートウェイルート
+	(普通はシステムに 1 つしかありません) の特別なものです。そして、
+	フラグ欄には必ず <code class="literal">c</code>
+	が表示されています。このゲートウェイは、LAN
+	内のホストにとって、どのマシンでも外部へ
+	(PPP リンク、DSL、ケーブルモデム、T1、
+	またはその他のネットワークインタフェースのいずれかを経由して)
+	直接接続するために設定されるものです。</p><p>外部に対するゲートウェイとして機能するマシンでデフォルトルートを設定する場合、
+	デフォルトルートはインターネットサービスプロバイダ (ISP)
+	のサイトのゲートウェイマシンになるでしょう。</p><p>それではデフォルトルートの一例を見てみましょう。
+	一般的な構成を示します。</p><div class="mediaobject"><img src="advanced-networking/net-routing.png" /></div><p>ホスト <code class="systemitem">Local1</code> とホスト <code class="systemitem">Local2</code>
+	はあなたのサイト内にあります。<code class="systemitem">Local1</code>
+	はダイアルアップ PPP 接続経由で ISP に接続されています。
+	この PPP サーバコンピュータは、その ISP
+	のインターネットへの接続点に向けた外部インタフェースを備えた他のゲートウェイコンピュータへ
+	LAN を通じて接続しています。</p><p>あなたのマシンのデフォルトルートはそれぞれ次のようになります。</p><div class="informaltable"><table border="0"><colgroup><col /><col /><col /></colgroup><thead><tr><th>ホスト</th><th>デフォルトゲートウェイ</th><th>インタフェース</th></tr></thead><tbody><tr><td>Local2</td><td>Local1</td><td>Ethernet</td></tr><tr><td>Local1</td><td>T1-GW</td><td>PPP</td></tr></tbody></table></div><p><span class="quote">「<span class="quote">なぜ (あるいは、どうやって)
+	デフォルトゲートウェイを、<code class="systemitem">Local1</code> が接続されている
+	ISP のサーバではなく、<code class="systemitem">T1-GW</code> に設定するのか</span>」</span>
+	という質問がよくあります。</p><p>PPP 接続で、あなたのサイト側の PPP インタフェースは、
+	ISP のローカルネットワーク上のアドレスを用いているため、
+	ISP のローカルネットワーク上のすべてのマシンへの経路は
+	自動的に生成されています。
+	つまりあなたのマシンは、どのようにして <code class="systemitem">T1-GW</code>
+	に到達するかという経路を既に知っていることになりますから、
+	ISP サーバにトラフィックを送るのに、
+	中間的な段階を踏む必要はありません。</p><p>一般的にローカルネットワークでは
+	<code class="systemitem">X.X.X.1</code>
+	というアドレスをゲートウェイアドレスとして使います。ですから
+	(同じ例を用います)、あなたの class-C のアドレス空間が
+	<code class="systemitem">10.20.30</code> で ISP が
+	<code class="systemitem">10.9.9</code> を用いている場合、
+	デフォルトルートは次のようになります。</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><thead><tr><th>ホスト</th><th>デフォルトルート</th></tr></thead><tbody><tr><td>Local2 (10.20.30.2)</td><td>Local1 (10.20.30.1)</td></tr><tr><td>Local1 (10.20.30.1, 10.9.9.30)</td><td>T1-GW (10.9.9.1)</td></tr></tbody></table></div><p>デフォルトルートは <code class="filename">/etc/rc.conf</code>
+	ファイルで簡単に定義できます。この例では、
+	<code class="systemitem">Local2</code> マシンで <code class="filename">/etc/rc.conf</code>
+	に次の行を追加しています。</p><pre class="programlisting">defaultrouter="10.20.30.1"</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a>
+	コマンドを使ってコマンドラインから直接実行することもできます。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>route add default 10.20.30.1</code></strong></pre><p>経路情報を手動で操作する方法について詳しいことは
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a> のマニュアルページをご覧ください。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95350864"></a>22.2.3. デュアルホームホスト</h3></div></div></div><a id="idp95351504" class="indexterm"></a><p>ここで扱うべき種類の設定がもう一つあります。
+	それは 2 つの異なるネットワークにまたがるホストです。
+	技術的にはゲートウェイとして機能するマシン (上の例では
+	PPP コネクションを用いています) はすべてデュアルホームホストです。
+	しかし実際にはこの言葉は、2 つの
+	LAN 上のサイトであるマシンを指す言葉としてのみ使われます。</p><p>2 枚のイーサネットカードを持つマシンが、
+	別のサブネット上にそれぞれアドレスを持っている場合があります。
+	あるいは、イーサネットカードが 1 枚しかないマシンで、
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> のエイリアスを使っているかもしれません。
+	物理的に分かれている
+	2 つのイーサネットのネットワークが使われているならば前者が用いられます。
+	後者は、物理的には 1 つのネットワークセグメントで、
+	論理的には 2 つのサブネットに分かれている場合に用いられます。</p><p>どちらにしても、
+	このマシンがお互いのサブネットへのゲートウェイ (inbound	route)
+	として定義されていることが分かるように、
+	おのおののサブネットでルーティングテーブルを設定します。このマシンが
+	2 つのサブネットの間のルータとして動作するという構成は、
+	パケットのフィルタリングを実装する必要がある場合や、
+	一方向または双方向のファイアウォールを利用したセキュリティを構築する場合によく用いられます。</p><p>このマシンが二つのインタフェース間で実際にパケットを受け渡すようにしたい場合は、
+      FreeBSD でこの機能を有効にしないといけません。
+      くわしい手順については次の節をご覧ください。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-dedicated-router"></a>22.2.4. ルータの構築</h3></div></div></div><a id="idp95355216" class="indexterm"></a><p>ネットワークルータは単にあるインタフェースから別のインタフェースへパケットを転送するシステムです。
+	インターネット標準およびすぐれた技術的な慣習から、
+	FreeBSD プロジェクトは
+	FreeBSD においてこの機能をデフォルトでは有効にしていません。
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 内で次の変数を <code class="literal">YES</code>
+	に変更することでこの機能を有効にできます。</p><pre class="programlisting">gateway_enable=YES          # Set to YES if this host will be a gateway</pre><p>このオプションは <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> 変数の
+	<code class="varname">net.inet.ip.forwarding</code> を
+	<code class="literal">1</code> に設定します。
+	一時的にルーティングを停止する必要があるときには、
+	この変数を一時的に <code class="literal">0</code> に設定しなおせます。</p><p>次に、トラフィックの宛先を決めるために、
+	そのルータには経路情報が必要になります。
+	ネットワークが十分簡素なら、静的経路が利用できます。
+	また、FreeBSD は BSD の標準ルーティングデーモンである
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=routed&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">routed</span>(8)</span></a> を備えています。これは RIP
+	(バージョン 1 および 2)	および IRDP を扱えます。
+	BGP バージョン 4、OSPF バージョン2、
+	その他洗練されたルーティングプロトコルは
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/zebra/pkg-descr">net/zebra</a>
+	package を用いれば対応できます。
+	また、より複雑なネットワークルーティングソリューションには、
+	<span class="application"><span class="trademark">GateD</span>®</span>
+	のような商用製品も利用可能です。</p><a id="idp95366352" class="indexterm"></a><a id="idp95366864" class="indexterm"></a><a id="idp95367376" class="indexterm"></a><p>このように FreeBSD を設定したとしても、
+	ルータに対するインターネット標準要求を完全に満たすわけではありません。
+	しかし、通常利用に関しては十分といえます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95372624"></a>22.2.5. 静的な経路の設定</h3></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Hoang</span> <span class="firstname">Al</span> [FAMILY Given]</span>. </span></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95375312"></a>22.2.5.1. 手動による経路の設定</h4></div></div></div><p>以下のようなネットワークが存在すると仮定します。</p><pre class="literallayout">
+    INTERNET
+      | (10.0.0.1/24) Default Router to Internet
+      |
+      |Interface xl0
+      |10.0.0.10/24
+   +------+
+   |      | RouterA
+   |      | (FreeBSD gateway)
+   +------+
+      | Interface xl1
+      | 192.168.1.1/24
+      |
+  +--------------------------------+
+   Internal Net 1      | 192.168.1.2/24
+                       |
+                   +------+
+                   |      | RouterB
+                   |      |
+                   +------+
+                       | 192.168.2.1/24
+                       |
+                     Internal Net 2
+	</pre><p>このシナリオでは、FreeBSD マシンの <code class="systemitem">RouterA</code>
+	  がインターネットに向けられたルータとして動作します。
+	  ルータは外側のネットワークへ接続できるように
+	  <code class="systemitem">10.0.0.1</code>
+	  へ向けたデフォルトルートを保持しています。
+	  <code class="systemitem">RouterB</code> はすでに適切に設定されており、
+	  どこへ向かう必要があるか、
+	  行き着く方法を知っていると仮定します
+	  (この例では、図のように簡単です。
+	  <code class="systemitem">192.168.1.1</code>
+	  をゲートウェイとして <code class="systemitem">RouterB</code>
+	  にデフォルトルートを追加するだけです)。</p><p><code class="systemitem">RouterA</code>
+	  のルーティングテーブルを確認すると、
+	  以下のような出力を得ます。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>netstat -nr</code></strong>
+Routing tables
+
+Internet:
+Destination        Gateway            Flags    Refs      Use  Netif  Expire
+default            10.0.0.1           UGS         0    49378    xl0
+127.0.0.1          127.0.0.1          UH          0        6    lo0
+10.0.0/24          link#1             UC          0        0    xl0
+192.168.1/24       link#2             UC          0        0    xl1</pre><p>現在のルーティングテーブルでは、<code class="systemitem">RouterA</code>
+	  はまだ Internal Net 2 には到達できないでしょう。
+	  <code class="systemitem">192.168.2.0/24</code>
+	  の経路を保持していないからです。
+	  解決するための一つの方法は、経路を手動で追加することです。
+	  以下のコマンドで <code class="systemitem">RouterA</code>
+	  のルーティングテーブルに <code class="systemitem">192.168.1.2</code>
+	  を送り先として、Internal Net 2 ネットワークを追加します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>route add -net 192.168.2.0/24 192.168.1.2</code></strong></pre><p>これにより、<code class="systemitem">RouterA</code> は、 
+	  <code class="systemitem">192.168.2.0/24</code>
+	  ネットワーク上のホストに到達出来ます。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95390032"></a>22.2.5.2. 永続的な設定</h4></div></div></div><p>上記の例は、
+	  起動しているシステム上に静的な経路を設定する方法としては完全です。
+	  しかしながら、FreeBSD
+	  マシンを再起動した際にルーティング情報が残らないという問題が一つあります。
+	  静的な経路を追加するには、<code class="filename">/etc/rc.conf</code>
+	  ファイルにルートを追加してください。</p><pre class="programlisting"># Add Internal Net 2 as a static route
+static_routes="internalnet2"
+route_internalnet2="-net 192.168.2.0/24 192.168.1.2"</pre><p><code class="literal">static_routes</code> の設定変数は、
+	  スペースによって分離される文字列のリストです。
+	  それぞれの文字列は経路名として参照されます。
+	  上記の例では <code class="literal">static_routes</code> 
+	  は一つの文字列のみを持ちます。
+	  その文字列は <em class="replaceable"><code>internalnet2</code></em> です。その後、
+	  <code class="literal">route_internalnet2</code>
+	  という設定変数を追加し、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a> コマンドに与えるすべての設定パラメータを指定しています。
+	  前節の例では、以下のコマンド</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>route add -net 192.168.2.0/24 192.168.1.2</code></strong></pre><p>を用いたので、
+	  <code class="literal">"-net 192.168.2.0/24 192.168.1.2"</code>
+	  が必要になります。</p><p>上記のように <code class="literal">static_routes</code> 
+	  は一つ以上の文字列を持つことが出来るので、
+	  多数の静的な経路を作ることができます。
+	  以下の行は <code class="systemitem">192.168.0.0/24</code>
+	  および <code class="systemitem">192.168.1.0/24</code>
+	  ネットワークを、
+	  仮想ルータ上に静的な経路として追加する例です。</p><pre class="programlisting">static_routes="net1 net2"
+route_net1="-net 192.168.0.0/24 192.168.0.1"
+route_net2="-net 192.168.1.0/24 192.168.1.1"</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95403088"></a>22.2.6. ルーティングの伝搬</h3></div></div></div><a id="idp95403728" class="indexterm"></a><p>外部との経路をどのように定義したらよいかはすでに説明しました。
+	しかし外部から私たちのマシンをどのようにして見つけるのかについては説明していません。</p><p>ある特定のアドレス空間 (この例では class-C のサブネット)
+	におけるすべてのトラフィックが、
+	到着したパケットを内部で転送するネットワーク上の特定のホストに送られるようにルーティングテーブルを設定することができるのは分かっています。</p><p>あなたのサイトにアドレス空間を割り当てる場合、
+	あなたのサブネットへのすべてのトラフィックがすべて
+	PPP リンクを通じてサイトに送ってくるようにサービスプロバイダはルーティングテーブルを設定します。
+	しかし、国境の向こう側のサイトはどのようにしてあなたの
+	ISP へ送ることを知るのでしょうか?</p><p>割り当てられているすべてのアドレス空間の経路を維持する
+	(分散している DNS 情報とよく似た) システムがあり、
+	そのインターネットバックボーンへの接続点を定義しています。
+	<span class="quote">「<span class="quote">バックボーン</span>」</span> とは国を越え、
+	世界中のインターネットのトラフィックを運ぶ主要な信用できる幹線のことです。
+	どのバックボーンマシンも、
+	あるネットワークから特定のバックボーンのマシンへ向かうトラフィックと、
+	そのバックボーンのマシンからあなたのネットワークに届くサービスプロバイダまでのチェーンのマスタテーブルのコピーを持っています。</p><p>あなたのサイトが接続
+	(プロバイダからみて内側にあることになります) したということを、
+	プロバイダからバックボーンサイトへ通知することはプロバイダの仕事です。
+	これが経路の伝搬です。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95406800"></a>22.2.7. トラブルシューティング</h3></div></div></div><a id="idp95407440" class="indexterm"></a><p>経路の伝搬に問題が生じて、
+	いくつかのサイトが接続をおこなうことができなくなることがあります。
+	ルーティングがどこでおかしくなっているかを明らかにするのに最も有効なコマンドはおそらく
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a> コマンドでしょう。
+	このコマンドは、あなたがリモートマシンに対して接続をおこなうことができない
+	(たとえば <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> に失敗するような)
+	場合も、同じように有効です。</p><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a> コマンドは、
+	接続を試みているリモートホストを引数にして実行します。
+	試みている経路が経由するゲートウェイホストを表示し、
+	最終的には目的のホストにたどり着くか、
+	コネクションの欠如によって終ってしまうかのどちらかになります。</p><p>より詳しい情報は、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a>
+	のマニュアルページをみてください。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp95412560"></a>22.2.8. マルチキャストルーティング</h3></div></div></div><a id="idp95417424" class="indexterm"></a><p>FreeBSD はマルチキャストアプリケーションとマルチキャストルーティングの両方にネイティブ対応しています。
+	マルチキャストアプリケーションを動かすのに FreeBSD
+	で特別な設定をする必要は一切ありません。
+	アプリケーションは普通はそのままで動くでしょう。
+	マルチキャストルーティングに対応するには、
+	下のオプションを追加してカーネルをコンパイルする必要があります。</p><pre class="programlisting">options MROUTING</pre><p>さらに、<code class="filename">/etc/mrouted.conf</code>
+	を編集してルーティングデーモン <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrouted&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrouted</span>(8)</span></a>
+	を設定し、トンネルと DVMRP を設置する必要があります。
+	マルチキャスト設定についての詳細は <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrouted&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrouted</span>(8)</span></a>
+	のマニュアルページを参照してください。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="advanced-networking.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="network-wireless.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">第22章 高度なネットワーク〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓22.3. 無線ネットワーク</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

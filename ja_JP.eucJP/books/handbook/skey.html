@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>15.5. S/Key</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="security.html" title="第15章 セキュリティ" /><link rel="prev" href="crypt.html" title="15.4. DES, MD5 と Crypt" /><link rel="next" href="kerberos.html" title="15.6. Kerberos" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.5. S/Key</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="crypt.html">戻る</a>〓</td><th width="60%" align="center">第15章 セキュリティ</th><td width="20%" align="right">〓<a accesskey="n" href="kerberos.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="skey"></a>15.5. S/Key</h2></div></div></div><a id="idp89778768" class="indexterm"></a><a id="idp89779280" class="indexterm"></a><p>S/Key は一方向ハッシュ関数を基にしたワンタイムパスワード方式
+      です。FreeBSD では、互換性のために MD4 ハッシュを用いていますが
+      他のシステムでは MD5 や DES-MAC を用いてます。S/Key は、バージョ
+      ン1.1.5 以降のすべての FreeBSD に含まれていますし、FreeBSD 以外
+      の数多くのシステムの上でも利用されています。S/Key は Bell
+      Communications Research, Inc. の登録商標です。</p><p>FreeBSD バージョン 5.0 以降では、S/Key
+      は機能的に同等な OPIE (Onetime Passwords In Everything)
+      で置き換えられました。OPIE はデフォルトでは
+      MD5 ハッシュを使用します。</p><p>以下の説明では、三種類の異なる「パスワード」が使われます。
+      まず一つ目は、あなたが普段使っている普通の
+      Unix スタイルの、もしくは Kerberos
+      のパスワードです。ここではこれを
+      <span class="quote">「<span class="quote">Unix パスワード</span>」</span> と呼ぶことにします。二つ目は、S/Key
+      の <code class="command">key</code> プログラム、または
+      OPIE の <code class="command">opiekey</code> プログラムによって生成され、
+      <code class="command">keyinit</code> または <code class="command">opiepasswd</code>
+      プログラムとログインプロンプトが受け付けるパスワードです。
+      ここではこれを <span class="quote">「<span class="quote">ワンタイムパスワード</span>」</span>
+      と呼ぶことにします。三つ目のパスワードは、
+      <code class="command">key</code>/<code class="command">opiekey</code> (と場合により
+      <code class="command">keyinit</code>/<code class="command">opiepasswd</code>)
+      プログラムに対してユーザが入力する秘密のパスワードで、
+      ワンタイムパスワードを生成するのに使われます。ここではこれを
+      <span class="quote">「<span class="quote">秘密のパスフレーズ</span>」</span> もしくは単に
+      <span class="quote">「<span class="quote">パスフレーズ</span>」</span> と呼ぶことにします。
+      (訳注: ユーザが頭の中だけにしまっておくべきものが、
+      この秘密のパスフレーズです。なお、原文ではこれを
+      <span class="quote">「<span class="quote">password</span>」</span> と表記していますが、
+      混乱を避けるために訳文ではすべて
+      <span class="quote">「<span class="quote">秘密のパスフレーズ</span>」</span> に統一しています)。</p><p>秘密のパスフレーズは、Unix
+      パスワードと何の関連性もありません。
+      両者を同一に設定することは可能ですが、お奨めしません。Unix
+      パスワードは長さが 8 文字に制限されています (訳注: FreeBSD で
+      DES を導入していない場合はもっと長いパスワードも認識されます)。
+      これに対し、S/Key や OPIE
+      では秘密のパスフレーズを好きなだけ長くすることができます
+      (訳注: 実装上、<code class="command">key</code> コマンドなどの
+      バッファ長で制限されてしまう可能性があります。200 文字程度に押
+      えておいた方がよいでしょう :-)。
+      6 語から 7 語からなるパスフレーズがふつうです。ほとんどの部分で、
+      S/Key や OPIE システムは Unix
+      のパスワードシステムと完全に独立して動作するようになっています。</p><p>パスフレーズに加え、S/Key や OPIE
+      システムにとって重要な 2 種類のデータがあります。一つは
+      <span class="quote">「<span class="quote">シード (seed: 種)</span>」</span> または
+      <span class="quote">「<span class="quote">キー (key: 鍵)</span>」</span> と呼ばれるもので、2 つの文字と
+      5 つの数字で構成されます。もう一つは <span class="quote">「<span class="quote">シーケンス番号 (iteration
+      count)</span>」</span> で、1 から 100 までの整数です。S/Key はここまで
+      に述べたデータを利用してワンタイムパスワードを生成します。その方
+      法は、まずシードと秘密のパスフレーズを連結し、それに対してシーケ
+      ンス番号の回数だけ MD4/MD5 ハッシュを繰り返し計算します。
+      そしてその結果を 6 つの短い英単語に変換します。
+      認証システム (一次的には PAM)
+      は、前回最後に受け付けたワンタイムパスワードを記録しています。
+      そして、その前回
+      のワンタイムパスワードと、ユーザが入力したワンタイムパスワードを
+      1 回ハッシュ関数にかけた結果とが一致した場合に、このユーザは認証
+      されます。一方向ハッシュ関数を使っているので、もし正しく認証され
+      たワンタイムパスワードが一回盗聴されたとしても、次回以降に使われ
+      る複数のワンタイムパスワードを生成することは不可能です。シーケ
+      ンス番号はログインが成功するたびに一つずつ減らされて、ユーザとロ
+      グインプログラムの間で同期が取られます。シーケンス番号が 1 まで
+      減ったら、S/Key や OPIE を再度初期化する必要があります。</p><p>次に、それぞれのシステムで関連する
+      3 つのプログラムについて説明します。
+      <code class="command">key</code> と <code class="command">opiekey</code>
+      プログラムは、シーケンス番号と、シードと、
+      秘密のパスフレーズを受け付けて、ワンタイムパスワード 1 つ、
+      または一連のワンタイムパスワードの一覧を生成します。
+      <code class="command">keyinit</code> と <code class="command">opiepasswd</code>
+      プログラムは、それぞれ S/Key と OPIE
+      を初期化するのに使用され、また秘密のパスフレーズ、
+      シーケンス番号やシードを変更するためにも使用されます。
+      それぞれのプログラムを実行するには、秘密のパスフレーズか、
+      または、シーケンス番号とシードとワンタイムパスワードの
+      1 組かの、どちらかを与えます。
+      <code class="command">keyinfo</code> と <code class="command">opieinfo</code> プログラムは、
+      それぞれに対応する認証ファイル (<code class="filename">/etc/skeykeys</code>
+      または <code class="filename">/etc/opiekeys</code>)
+      を調べて、プログラムを起動したユーザの現在のシーケンス番号とシードを表示します。</p><p>この文書では、4 種類の異なる操作について説明します。
+      1 つ目は、<code class="command">keyinit</code> または
+      <code class="command">opiepasswd</code> を信頼できる通信路上で利用して、
+      最初にワンタイムパスワードを設定したり、
+      秘密のパスフレーズやシードを変更する操作です。
+      2 つ目は、同じことを行うために <code class="command">keyinit</code>
+      または <code class="command">opiepasswd</code>
+      を信頼できない通信路上で利用する操作です。
+      この場合は信頼できる通信路経由の
+      <code class="command">key</code> または <code class="command">opiekey</code>
+      を併用します。3 つ目は、<code class="command">key</code> または
+      <code class="command">opiekey</code>
+      を使い、信頼できない通信路を通じてログインする操作です。
+      4 番目は、<code class="command">key</code> または <code class="command">opiekey</code>
+      を使って複数のワンタイムパスワードを一気に生成する操作です。
+      ここで生成した複数のワンタイムパスワードは、
+      メモしたり印刷したりして携帯し、
+      信頼できる通信路が一切ないところで利用することができます。
+      (訳注: ワンタイムパスワードを記録した紙をなくさないこと!
+       電話番号や
+       IP アドレス、ユーザ名を一緒にメモしていたら最悪です!!)</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89834320"></a>15.5.1. 信頼できる通信路での初期化</h3></div></div></div><p>信頼できる通信路 (たとえばあるマシンのコンソール画面や、ssh
+	を使っている時など) を利用しているときに、S/Key を初めて初期化
+	すること、S/Key の秘密のパスフレーズを変更すること、またはシー
+	ドを変更すること、をおこなうことができます。そのためには、まず
+	あなた自身がログインし、<code class="command">keyinit</code> コマンドを
+	以下のようにパラメータなしで実行します。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>keyinit</code></strong>
+Adding unfurl:
+Reminder - Only use this method if you are directly connected.
+If you are using telnet or rlogin exit with no password and use keyinit -s.
+        ) `keyinit' コマンドが出力する注意です。訳すと、
+        ) 注意 - この動作モードはマシンに直接入力しているときのみ利用
+        ) すること。もし今 telnet や rlogin を使っているなら、秘密のパ
+        ) スフレーズを入力せずにこのままコマンドを終了し、かわりに
+        ) keyinit -s を実行すること。
+Enter secret password:
+Again secret password:
+
+ID unfurl s/key is 99 to17757
+DEFY CLUB PRO NASH LACE SOFT</pre><p>OPIE では <code class="command">opiepasswd</code>
+	が代わりに使われます。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>opiepasswd -c</code></strong>
+[grimreaper] ~ $ opiepasswd -f -c
+Adding unfurl:
+Only use this method from the console; NEVER from remote. If you are using
+telnet, xterm, or a dial-in, type ^C now or exit with no password.
+Then run opiepasswd without the -c parameter.
+        ) `opiepasswd' コマンドが出力する注意です。訳すと、
+        ) この手順はコンソール以外では利用しないでください。リモートからは
+        ) 絶対に利用してはいけません。telnet, xterm またはダイアルアップで
+        ) 利用している場合は、^C を入力するかパスワードを入れずに終了してく
+        ) ださい。その後、opiepasswd を -c オプションなしで実行してください。
+Using MD5 to compute responses.
+Enter new secret pass phrase:
+Again new secret pass phrase:
+ID unfurl OTP key is 499 to4268
+MOS MALL GOAT ARM AVID COED
+</pre><p><code class="prompt">Enter new secret pass phrase:</code>
+	または <code class="prompt">Enter secret password:</code>
+	というプロンプトに対して、
+	あなたが考えた秘密のパスフレーズを入力します。このパスフ
+	レーズはログインするときに使うものではなく、ログインするときに
+	使うワンタイムパスワードを生成するために使うものであることを覚
+	えておいてください。<span class="quote">「<span class="quote">ID</span>」</span> から始まる行は、
+	1 回分のパラメータで、
+	あなたのログイン名とシーケンス番号とシードです。
+	(訳注: <code class="command">keyinit</code> コマンドは
+	次回にログインするときに使えるパラメータを参考のためにここで表示します)。
+	システムにログインするときには、
+	システム側が自動的にこれらのパラメータを表示してくれますから、
+	これらのパラメータを
+	覚えておく必要はありません。最後の行が、今述べたパラメータと入力
+	された秘密のパスフレーズから計算されたワンタイムパスワードです。
+	この例を実行した後、次にログインするときに打ち込むべきワンタイ
+	ムパスワードがこれです。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89852880"></a>15.5.2. 信頼できない通信路での初期化</h3></div></div></div><p>信頼できない通信路を使って秘密のパスフレーズを初期化または変更するためには、
+	それとは別に <code class="command">key</code> または <code class="command">opiekey</code>
+	プログラムを実行するための信頼できる通信路を用意しておく必要があります。
+	たとえばそれは、あなたが信頼できる Macintosh
+	のデスクアクセサリや信頼できるマシンのシェルプロンプトだったり
+	するでしょう。(訳注: ここでの通信路とはマシンそのものになりま
+	す。信頼できるマシンとは、信頼できる人がしっかり管理しているマ
+	シンということです)。他に準備しておくものとして、シーケンス番
+	号 (100 は適切な値といえるでしょう) と、場合によっては自分で考
+	えた、またはランダムに生成されたシードがあります。(あなたが
+	S/Key を初期化しようとしているマシンへの) 信頼できない通信路を
+	使うときには、<code class="command">keyinit -s</code> コマンドを以下のよ
+	うに使用します。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>keyinit -s</code></strong>
+Updating unfurl:
+Old key: to17758
+Reminder you need the 6 English words from the key command.
+	) `keyinit' コマンドが出力する注意です。訳すと、
+	) 注意 - skey コマンドの出力する 6 英単語が必要になります。
+Enter sequence count from 1 to 9999: <strong class="userinput"><code>100</code></strong>
+Enter new key [default to17759]:
+s/key 100 to 17759
+s/key access password:
+s/key access password:<strong class="userinput"><code>CURE MIKE BANE HIM RACY GORE</code></strong>
+</pre><p>OPIE では、<code class="command">opiepasswd</code>
+	を使います。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>opiepasswd</code></strong>
+
+Updating unfurl:
+You need the response from an OTP generator.
+	) `opiepasswd' コマンドが出力する注意です。訳すと、
+	) OTP 生成器の返す出力が必要になります。
+Old secret pass phrase:
+        otp-md5 498 to4268 ext
+        Response: GAME GAG WELT OUT DOWN CHAT
+New secret pass phrase:
+        otp-md5 499 to4269
+        Response: LINE PAP MILK NELL BUOY TROY
+
+ID mark OTP key is 499 gr4269
+LINE PAP MILK NELL BUOY TROY
+</pre><p>デフォルトのシード (<code class="command">keyinit</code> プログラム
+	は困ったことにこれを <code class="literal">key</code>
+	と呼んでいるのですが、混乱しないよう注意してください)
+	で構わなければ、<span class="keycap"><strong>Return</strong></span>
+	を押してください。次に、アクセスパスワードを入れる前に、あらか
+	じめ用意しておいた信頼できる通信路(信頼できるマシンや信頼でき
+	る S/Key デスクアクセサリなど) へ移って、先ほどと同じパラメータ
+	を入力します。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>key 100 to17759</code></strong>
+Reminder - Do not use this program while logged in via telnet or rlogin.
+Enter secret password: <strong class="userinput"><code>&lt;秘密のパスフレーズ&gt;</code></strong>
+CURE MIKE BANE HIM RACY GORE</pre><p>OPIE では、</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>opiekey 498 to4268</code></strong>
+Using the MD5 algorithm to compute response.
+Reminder: Don't use opiekey from telnet or dial-in sessions.
+Enter secret pass phrase:
+GAME GAG WELT OUT DOWN CHAT
+</pre><p>ここで信頼できない通信路の方に戻って、
+	生成されたワンタイムパスワードをコピーして対応するプログラムに入力します。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89867728"></a>15.5.3. ワンタイムパスワードを一つ生成する</h3></div></div></div><p>S/Key または OPIE を初期化したら、
+	ログイン時には以下のようなプロンプトが出てくるでしょう。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>telnet example.com</code></strong>
+Trying 10.0.0.1...
+Connected to example.com
+Escape character is '^]'.
+
+FreeBSD/i386 (example.com) (ttypa)
+
+login: <strong class="userinput"><code>&lt;ユーザ名&gt;</code></strong>
+s/key 97 fw13894
+Password: </pre><p>OPIE については、</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>telnet example.com</code></strong>
+Trying 10.0.0.1...
+Connected to example.com
+Escape character is '^]'.
+
+FreeBSD/i386 (example.com) (ttypa)
+
+login: <strong class="userinput"><code>&lt;username&gt;</code></strong>
+otp-md5 498 gr4269 ext
+Password: </pre><p>ここでは表示していませんが、S/Key と OPIE
+	のプロンプトには便利な機能が備わっています。
+	パスワードプロンプトに対して、何も入力せずに
+	<span class="keycap"><strong>Return</strong></span> を押すとエコーモードに切り替わります。
+	つまりタイプした文字がそのまま見えるようになるのです。
+	これは、紙に印刷していたりするワンタイムパスワードを
+	手で入力しなければならない場合に特に役立つ機能です。</p><a id="idp89877200" class="indexterm"></a><a id="idp89877712" class="indexterm"></a><a id="idp89878224" class="indexterm"></a><p>次に、
+	このログインプロンプトに対して入力するワンタイムパスワードを生成しなければなりません。
+	これは、<code class="command">key</code> または <code class="command">opiekey</code>
+	プログラムを使える信頼できるマシン上で行わなければなりません。
+	(これらのプログラムには DOS や Windows, MacOS 版があります)。
+	どちらも、コマンドラインからシーケンス番号とシードを指定しなければなりません。
+	ログインしようとしているマシンのログインプロンプトから直接カットアンドペーストすると楽でしょう。</p><p>信頼できるシステムで</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>key 97 fw13894</code></strong>
+Reminder - Do not use this program while logged in via telnet or rlogin.
+Enter secret password:
+WELD LIP ACTS ENDS ME HAAG</pre><p>OPIE では</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>opiekey 498 to4268</code></strong>
+Using the MD5 algorithm to compute response.
+Reminder: Don't use opiekey from telnet or dial-in sessions.
+Enter secret pass phrase:
+GAME GAG WELT OUT DOWN CHAT</pre><p>ここでワンタイムパスワードが得られました。
+	ログインを続けましょう。</p><pre class="screen">login: <strong class="userinput"><code>&lt;username&gt;</code></strong>
+s/key 97 fw13894
+Password: <strong class="userinput"><code>&lt;return to enable echo&gt;</code></strong>
+s/key 97 fw13894
+Password [echo on]: WELD LIP ACTS ENDS ME HAAG
+Last login: Tue Mar 21 11:56:41 from 10.0.0.2 ...</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89884752"></a>15.5.4. 複数のワンタイムパスワードを生成する</h3></div></div></div><p>都合によっては、信頼できるマシンや信頼できる通信路が一切確
+	保できないようなところで S/Key を使う必要があるでしょう。この
+	ような場合には、<code class="command">key</code> コマンドを使って複数の
+	ワンタイムパスワードをあらかじめ一気に生成し、紙に印刷して携帯
+	していくことができます。たとえば</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>key -n 5 30 zz99999</code></strong>
+Reminder - Do not use this program while logged in via telnet or rlogin.
+Enter secret password: <strong class="userinput"><code>&lt;秘密のパスフレーズ&gt;</code></strong>
+26: SODA RUDE LEA LIND BUDD SILT
+27: JILT SPY DUTY GLOW COWL ROT
+28: THEM OW COLA RUNT BONG SCOT
+29: COT MASH BARR BRIM NAN FLAG
+30: CAN KNEE CAST NAME FOLK BILK</pre><p><code class="option">-n 5</code> という引数によって 5 個のワンタイム
+	パスワードを順に生成します。ここで <code class="option">30</code> は、最
+	後のシーケンス番号となるべき数字です。出力は普通に使う順番とは
+	<span class="emphasis"><em>逆</em></span>に出力されていることに注意してください
+	(訳注: 一番最初に使うワンタイムパスワードは一番最後に出力され
+	たものです)。この結果をカットアンドペーストして
+	<code class="command">lpr</code> コマンドを使って印刷すると よいでしょう。
+	もしあなたがセキュリティに偏執するなら、この結果を紙と鉛筆を使っ
+	て手で書き移した方がよいかもしれません。ここで、出力の各行はシー
+	ケンス番号とそれに対応する一回分のワンタイムパスワードです。
+	消費済みの ワンタイムパスワードの行をペンで消していくと便利で
+	しょう。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89889488"></a>15.5.5. Unix パスワードの利用を制限する</h3></div></div></div><p>設定ファイル <code class="filename">/etc/skey.access</code>
+	を使って Unix パスワードの利用を制限することができます。
+	この場合の判
+	断基準として、ログインを受け付ける際のホスト名、ユーザ名、端末
+	のポート、IP アドレスなどが利用できます。この設定ファイルの詳
+	細に関してはマニュアル <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=skey.access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">skey.access</span>(5)</span></a> をご覧ください。マ
+	ニュアルにはこの機能に関わるセキュリティについて、いくつかの警
+	告が記述してあります。この機能を使ってセキュリティを高めようと
+	するのならば絶対にこのマニュアルを読んでください。</p><p>もし <code class="filename">/etc/skey.access</code> ファイルが存在
+	しないならば (FreeBSD のデフォルト状態ではそうです)、すべての
+	ユーザが Unix パスワードを利用することができます。逆に、もし
+	ファイルが存在するならば、<code class="filename">skey.access</code> ファ
+	イルに明示的に記述されていない限り、すべてのユーザは S/Key の
+	利用を要求されます。どちらの場合においても、そのマシンのコンソー
+	ルからはいつでも Unix パスワードを使ってログインすることが可能
+	です。</p><p>以下によく使われるであろう三種類の設定を含む設定ファイルの
+	例を示します。</p><pre class="programlisting">permit internet 192.168.0.0 255.255.0.0
+permit user fnord
+permit port ttyd0</pre><p>はじめの行 (<code class="literal">permit internet</code>) で、telnet
+	などで接続するときの IP のソースアドレス (注意: これは偽造され
+	るおそれがあります) が特定の値とマスクに一致している場合に、
+	Unix パスワードの利用を許可することを指定しています。
+	この設定自体はセキュリティを高めるための機能ではありません。そうでは
+	なく、ログインの権利を持つ許可されたユーザに対して、現在そのユー
+	ザが使っているネットワークが信頼できないと考えられるので S/Key
+	を使うべきである、ということを気づかせるための機能であると考え
+	てください。</p><p>二行目 (<code class="literal">permit user</code>)
+	によって、ある特定のユーザ、この場合は
+	<code class="systemitem">fnord</code>、に対して、いつでも Unix
+	パスワードの利用を許可するように指定しています。
+	一般的にはこの設定をおこなうべきではありません。
+	<code class="command">key</code> プログラムがどうしても使えない環境にい
+	る人や、ダム端末しかない環境にいる人、または何度教えても聞く耳
+	を持たないような人をサポートする必要がある場合にのみ設定をおこ
+	なってください。</p><p>三行目 (<code class="literal">permit port</code>) によって、ある特定
+	の端末ポートからログインしようとするすべてのユーザに対して
+	Unix パスワードの利用を許可するように指定しています。この設定
+	はダイヤルアップ回線に対する設定として利用できるでしょう。
+	</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="crypt.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="security.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="kerberos.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">15.4. DES, MD5 と Crypt〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓15.6. Kerberos</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

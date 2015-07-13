@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>2.2. Shell Commands</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="basics.html" title="Chapter 2. The Basics of PMake" /><link rel="prev" href="basics.html" title="Chapter 2. The Basics of PMake" /><link rel="next" href="variables.html" title="2.3. Variables" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.2. Shell Commands</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="basics.html">Prev</a> </td><th width="60%" align="center">Chapter 2. The Basics of PMake</th><td width="20%" align="right"> <a accesskey="n" href="variables.html">Next</a></td></tr></table><hr /></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="shellcmds"></a>2.2. Shell Commands</h2></div></div></div><p><span class="quote">&#8220;<span class="quote">Is not that nice,</span>&#8221;</span> you say to yourself,
+      <span class="quote">&#8220;<span class="quote">but how are files actually ``re-created'', as he likes to
+	spell it?</span>&#8221;</span>
+      The re-creation is accomplished by commands you place in the
+      makefile.  These commands are passed to the Bourne shell (better
+      known as <code class="filename">/bin/sh</code>) to be executed and are
+      expected to do what is necessary to update the target file
+      (<span class="application">PMake</span> does not actually check to see
+      if the target was created.  It just assumes it is there).</p><p>Shell commands in a makefile look a lot like shell commands
+      you would type at a terminal, with one important exception: each
+      command in a makefile must be preceded by at least one
+      tab.</p><p>Each target has associated with it a shell script made up of
+      one or more of these shell commands.  The creation script for a
+      target should immediately follow the dependency line for that
+      target.  While any given target may appear on more than one
+      dependency line, only one of these dependency lines  may be
+      followed  by a creation script, unless the <code class="literal">::</code>
+      operator was used on the dependency line.</p><p>If the double-colon was used, each dependency line for the
+      target may be followed by a shell script.  That script will only
+      be executed if the target on the associated dependency line is
+      out-of-date with respect to the sources on that line, according
+      to the rules I gave earlier.  I'll give you a good example of
+      this later on.</p><p>To expand on the earlier makefile, you might add commands
+      as follows:</p><pre class="programlisting">program         : a.o b.o c.o
+        cc a.o b.o c.o -o program
+
+a.o b.o c.o     : defs.h
+a.o             : a.c
+       cc -c a.c
+
+b.o             : b.c
+       cc -c b.c
+
+c.o             : c.c
+       cc -c c.c</pre><p>Something you should remember when writing a makefile is,
+      the commands will be executed if the target on the dependency
+      line is out-of-date, not the sources.  In this example, the
+      command <code class="command">cc -c a.c</code> will be executed if
+      <code class="filename">a.o</code> is out-of-date.  Because of the
+      <code class="literal">:</code> operator, this means that should
+      <code class="filename">a.c</code> or <code class="filename">defs.h</code> have
+      been modified more recently than <code class="filename">a.o</code>, the
+      command will be executed (<code class="filename">a.o</code> will be
+      considered out-of-date).</p><p>Remember how I said the only difference between a makefile
+      shell command and a regular shell command was the leading tab?
+      I lied.  There is another way in which makefile commands differ
+      from regular ones.  The first two characters after the initial
+      whitespace are treated specially.  If they are any combination
+      of <code class="filename">@</code> and <code class="literal">-</code>, they cause
+      <span class="application">PMake</span> to do different things.</p><p>In most cases, shell commands are printed before they are
+      actually executed.  This is to keep you informed of what is
+      going on.  If an <code class="literal">@</code> appears, however, this
+      echoing is suppressed.  In the case of an echo command,
+      say</p><pre class="programlisting">echo Linking index</pre><p>it would be rather silly to see</p><pre class="screen">echo Linking index
+Linking index</pre><p>so <span class="application">PMake</span> allows you to place an
+      <code class="literal">@</code> before the command to prevent the command
+      from being printed:</p><pre class="programlisting">@echo Linking index</pre><p>The other special character is the <code class="literal">-</code>.
+      In case you did not know, shell commands finish with a certain
+      <span class="quote">&#8220;<span class="quote">exit status</span>&#8221;</span>.  This status is made available by
+      the operating system to whatever program invoked the command.
+      Normally this status will be <code class="literal">0</code> if everything
+      went ok and non-zero if something went wrong.  For this reason,
+      <span class="application">PMake</span> will consider an error to have
+      occurred if one of the shells it invokes returns a non-zero
+      status.  When it detects an error,
+      <span class="application">PMake</span>'s usual action is to abort
+      whatever it is doing and exit with a non-zero status itself (any
+      other targets that were being created will continue being made,
+      but nothing new will be started.
+      <span class="application">PMake</span> will exit after the last job
+      finishes).  This behavior can be altered, however, by placing a
+      <code class="literal">-</code> at the front of a command
+      (e.g. <code class="command">-mv index index.old</code>), certain
+      command-line arguments, or doing other things, to be detailed
+      later.  In such a case, the non-zero status is simply ignored
+      and <span class="application">PMake</span> keeps chugging
+      along.</p><p>Because all the commands are given to a single shell to
+      execute, such things as setting shell variables, changing
+      directories, etc., last beyond the command in which they are
+      found.  This also allows shell compound commands (like for
+      loops) to be entered in a natural manner.  Since this could
+      cause problems for some makefiles that depend on each command
+      being executed by a single shell,
+      <span class="application">PMake</span> has a <code class="option">-B</code> flag
+      (it stands for backwards-compatible) that forces each command to
+      be given to a separate shell.  It also does several other
+      things, all of which I discourage since they are now
+      old-fashioned.</p><p>A target's shell script is fed to the shell on its (the
+      shell's) input stream. This means that any commands, such as
+      <span class="application">ci</span> that need to get input from the
+      terminal will not work right &#8211; they will get the shell's
+      input, something they probably will not find to their liking.
+      A simple way around this is to give a command like this:</p><pre class="screen"><code class="command">ci $(SRCS) &lt; /dev/tty</code></pre><p>This would force the program's input to come from the
+      terminal.  If you cannot do this for some reason, your only
+      other alternative is to use <span class="application">PMake</span> in
+      its fullest compatibility mode.
+      See <span class="quote">&#8220;<span class="quote">Compatibility</span>&#8221;</span> in <a class="xref" href="gods.html" title="Chapter 4. PMake for Gods">Chapter 4, <em>PMake for Gods</em></a>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="basics.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="basics.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="variables.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 2. The Basics of PMake </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 2.3. Variables</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

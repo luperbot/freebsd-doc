@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>20.5. SLIP の利用</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="ppp-and-slip.html" title="第20章 PPP と SLIP" /><link rel="prev" href="pppoe.html" title="20.4. PPP オーバイーサネット (PPPoE) の利用" /><link rel="next" href="mail.html" title="第21章 電子メール" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.5. SLIP の利用</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pppoe.html">戻る</a>〓</td><th width="60%" align="center">第20章 PPP と SLIP</th><td width="20%" align="right">〓<a accesskey="n" href="mail.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slip"></a>20.5. SLIP の利用</h2></div></div></div><p><span class="emphasis"><em>原作: 浅見 賢 <code class="email">&lt;<a xmlns="" class="email" href="mailto:asami@FreeBSD.org">asami@FreeBSD.org</a>&gt;</code>,Guy Helmer, 協力: Wilko Bulte,
+      Piero Serini.</em></span></p><p><span class="emphasis"><em>訳: 花井 浩之 <code class="email">&lt;<a xmlns="" class="email" href="mailto:hanai@FreeBSD.org">hanai@FreeBSD.org</a>&gt;</code>
+        1996 年 8 月 8 日.</em></span></p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slipc"></a>20.5.1. SLIPクライアントのセットアップ</h3></div></div></div><p>ここには FreeBSD
+        マシンを静的アドレスのネットワークにつなげる場合の
+        SLIPのセットアップの一つの方法を書いてあります.
+        ホスト名を動的に割り当てる(つまり,
+        ダイヤルアップするたびにアドレスが かわる)ためには,
+        おそらくもっと凝ったことが必要です.</p><p>まず,
+        モデムがどのシリアルポートにつながっているか決めましょう. 私は
+        <code class="filename">/dev/cuaa1</code> から
+        <code class="filename">/dev/modem</code>へというシンボリックリンクを張り,
+        コンフィグレーションではその名前だけを使っています.
+        <code class="filename">/etc</code> や<code class="filename">.kermrc</code>
+        など, システム全体に散らばっているファイルを修正する
+        必要がでるとまったく煩わしいのです!</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">ここで, <code class="filename">/dev/cuaa0</code>は
+          <code class="filename">COM1</code>であり,
+          <code class="filename">cuaa1</code>は<code class="filename">COM2</code>です.</p></div><p>カーネルのコンフィグレーションファイルに
+
+        </p><pre class="programlisting">pseudo-device   sl      1</pre><p>
+
+        という記述があるのを確認してください.
+        これは <code class="filename">GENERIC</code> カーネルに含まれている
+        ので削除していない限り大丈夫でしょう.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94416976"></a>20.5.1.1. 最初の設定</h4></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p><code class="filename">/etc/hosts</code>
+              ファイルにあなたのマシンのゲートウェイとネームサーバ
+              を加えてください.  私のは以下のようになっています.</p><pre class="programlisting">127.0.0.1               localhost loghost
+136.152.64.181          silvia.HIP.Berkeley.EDU silvia.HIP silvia
+136.152.64.1            inr-3.Berkeley.EDU inr-3 slip-gateway
+128.32.136.9            ns1.Berkeley.edu ns1
+128.32.136.12           ns2.Berkeley.edu ns2</pre></li><li class="step"><p><code class="filename">/etc/host.conf</code> ファイル中で
+              <code class="option">hosts</code>が<code class="option">bind</code>
+              よりも前にあること を確認してください.
+              さもないとヘンなことが起こるかもしれません.</p></li><li class="step"><p><code class="filename">/etc/rc.conf</code>
+              ファイルを編集してください. なお, お使いの  FreeBSD が
+              2.2.2 よりも前のバージョンのものの場合は,
+              <code class="filename">/etc/sysconfig</code>
+              を編集してください.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>行</p><pre class="programlisting"><span class="quote">「<span class="quote">hostname=myname.my.domain</span>」</span></pre><p>を編集してホスト名をセットしてください.
+                  完全なInternetホスト名を与えるべきです.</p></li><li class="listitem"><p>行</p><pre class="programlisting"><span class="quote">「<span class="quote">network_interfaces="lo0"</span>」</span></pre><p>を</p><pre class="programlisting"><span class="quote">「<span class="quote">network_interfaces="lo0 sl0"</span>」</span></pre><p>へ変更することにより
+                  ネットワークインタフェースのリストに sl0
+                  を加えてください.</p></li><li class="listitem"><p>行</p><pre class="programlisting">ifconfig_sl0="inet ${hostname} slip-gateway netmask 0xffffff00 up"</pre><p>を加えて sl0
+                  のスタートアップフラグをセットしてください.</p></li><li class="listitem"><p>行</p><pre class="programlisting"><span class="quote">「<span class="quote">defaultrouter=NO</span>」</span></pre><p>を</p><pre class="programlisting"><span class="quote">「<span class="quote">defaultrouter=slip-gateway</span>」</span></pre><p>へ変更してデフォルトのルータを
+                  指定してください.</p></li></ol></div></li><li class="step"><p>次の</p><pre class="programlisting">domain HIP.Berkeley.EDU
+nameserver 128.32.136.9
+nameserver 128.32.136.12</pre><p>という内容を含むファイル
+              <code class="filename">/etc/resolv.conf</code> を作ってください.
+              見ればわかるように,
+              これらはネームサーバホストを設定しています. もちろん,
+              実際のドメイン名やアドレスは
+              あなたの環境に依存します.</p></li><li class="step"><p>root と toor
+              (及びパスワードを持っていない他のアカウントすべて)
+              のパスワード を設定してください.
+              passwdコマンドを使いましょう.
+              <code class="filename">/etc/passwd</code> や
+              <code class="filename">/etc/master.passwd</code>
+              といったファイルを編集してはいけません!</p></li><li class="step"><p>マシンを再起動して正しいホスト名で
+              立ち上がることを確認してください.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94452560"></a>20.5.1.2. SLIP接続をおこなう</h4></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>モデムを起動, つながったらプロンプトで
+              <code class="command">slip</code>とタイプし, マシン名と
+              パスワードを入力してください.
+              入力する必要があるものは環境に よって異なります.
+              私は次のようなスクリプトでkermitを使っています.</p><pre class="programlisting"># kermit setup
+set modem hayes
+set line /dev/modem
+set speed 115200
+set parity none
+set flow rts/cts
+set terminal bytesize 8
+set file type binary
+# The next macro will dial up and login
+define slip dial 643-9600, input 10 =&gt;, if failure stop, -
+output slip\x0d, input 10 Username:, if failure stop, -
+output silvia\x0d, input 10 Password:, if failure stop, -
+output ***\x0d, echo \x0aCONNECTED\x0a</pre><p>(もちろん,
+              ホスト名とパスワードは変える必要があります).
+              接続するためには kermit のプロンプトで
+              <code class="command">slip</code>とタイプするだけです.</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">ファイルシステムのどんなところにもプレインテキスト
+                にパスワードを書いておくのは一般的にはよくありません.
+                覚悟の上で やってください.
+                私は単に不精なだけです.</p></div></li><li class="step"><p>ここでkermitから抜け出し
+              (<code class="command">z</code>でkermitをサスペンドできます), root
+              で</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>slattach -h -c -s 115200 /dev/modem</code></strong></pre><p>と入力しましょう. もしルータの向う側のホストへ
+              <code class="command">ping</code> できるなら接続成功です! もしうまく
+              いかなければslattachへの引数として <code class="option">-c</code>
+              の代わりに<code class="option">-a</code>とやってみてください.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94464592"></a>20.5.1.3. 接続の切り方</h4></div></div></div><p>slattachを殺すためにrootで
+
+          </p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kill -INT `cat /var/run/slattach.modem.pid`</code></strong></pre><p>
+
+          とタイプしてください. そして kermit に戻り
+          (もしkermitをサスペンドしていたなら
+          <code class="command">fg</code>), kermitから抜けてください
+          (<code class="command">q</code>).</p><p>slattachのマニュアルページにはインタフェースを落すために
+          <code class="command">ifconfig sl0
+            down</code>をしなければいけないと書いていますが,
+          私には差がないように見えます. (<code class="command">ifconfig
+            sl0</code>とやっても同じ結果が得られる.)</p><p>時にはモデムがキャリアを落すのを
+          拒絶するかもしれません(私のは よくそうなります).
+          その時は単にkermitをスタートしてまた終了 してください.
+          普通は2回目で落ちます.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94468944"></a>20.5.1.4. トラブルシューティング</h4></div></div></div><p>もし動かなければ自由に私に質問してください.
+          今までいろんな人がつまずいた のは次のようなことです.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>slattach で <code class="option">-c</code> や <code class="option">-a</code>
+              を使わなかった(私はなぜこれが致命的になり得るのか
+              わかりませんが, このフラグを付けることで少なくとも一人の
+              問題は解決しました.)</p></li><li class="listitem"><p><code class="option">sl0</code> の代わりに <code class="option">s10</code>
+              を使った(いくつかのフォントでは見分けるのは難しい
+              かもしれません).</p></li><li class="listitem"><p>インタフェースの状態を見るために <code class="command">ifconfig
+                sl0</code> をやってみてください. 私は,</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig sl0</code></strong>
+sl0: flags=10&lt;POINTOPOINT&gt;
+        inet 136.152.64.181 --&gt; 136.152.64.1 netmask ffffff00</pre><p>となります.</p></li><li class="listitem"><p>また, pingが <span class="quote">「<span class="quote">no route to host</span>」</span>
+              というメッセージを返す時には <code class="command">netstat
+                -r</code>でルーティングテーブルを確認しましょう.
+              私のは,</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>netstat -r</code></strong>
+Routing tables
+Destination      Gateway            Flags     Refs     Use  IfaceMTU    Rtt
+Netmasks:
+(root node)
+(root node)
+
+Route Tree for Protocol Family inet:
+(root node) =&gt;
+default          inr-3.Berkeley.EDU UG          8   224515  sl0 -      -
+localhost.Berkel localhost.Berkeley UH          5    42127  lo0 -       0.438
+inr-3.Berkeley.E silvia.HIP.Berkele UH          1        0  sl0 -      -
+silvia.HIP.Berke localhost.Berkeley UGH        34 47641234  lo0 -       0.438
+(root node)</pre><p>となります.
+              (これはたくさんのファイルを転送した後でのもので,
+              あなたの見る数字はもっと小さいかも
+              しれません).</p></li></ul></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slips"></a>20.5.2. SLIPサーバのセットアップ方法</h3></div></div></div><p><span class="emphasis"><em>訳: 冨田 重成 <code class="email">&lt;<a xmlns="" class="email" href="mailto:ts@icu.ac.jp">ts@icu.ac.jp</a>&gt;</code>.
+          1996 年 9 月 6 日.</em></span></p><p>この文書の目的は, SLIPサーバ機能を
+        FreeBSDシステムのもとで設定するため の助言を提供することです.
+        SLIPサーバ機能を設定するということは, リモー トの
+        SLIPクライアントがログインできるようにするために, 自動的に接続処
+        理をおこなうようにすることです.
+        この文書は著者の経験に基づいておりますが,
+        実際のシステム構成や要望は異なりますから,
+        すべての疑問にこの文書が答え ることはできません. なお,
+        ここでの助言を試みた結果, あなたのシステムへ
+        の悪影響やデータの損失が生じたとしても,
+        著者が責任を持つことはできませ
+        んのでご了解をお願いします.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slips-prereqs"></a>20.5.2.1. 前提</h4></div></div></div><p>この文書の内容はテクニカルなものなので,
+          前提知識が必要です. すなわち,
+          TCP/IPネットワークプロトコルについての知識, 特に,
+          ネットワークとノード のアドレス指定をはじめ,
+          ネットワークアドレスマスク, サブネット化, ルー ティング,
+          および RIPなどのルーティングプロトコルなどに関する知識を前提
+          としています. ダイヤルアップサーバで
+          SLIP機能を設定するためには, これ
+          らの概念についての知識が必要ですから,
+          もし不案内であると思われる方は, O'Reilly &amp; Associates,
+          Inc.から出版されている Craig Hunt氏の  <span class="emphasis"><em>TCP/IP
+            Network Administration</em></span> (ISBN 0-937175-82-X)か,
+          または  Douglas Comer氏の
+          TCP/IPプロトコルに関する一連の書籍をお読みください.</p><p>前提知識に加え, さらに, モデムの設定が完了しており,
+          そのモデムを経由し てログインできるように,
+          システムファイル群が適切に記述できているものと 仮定しています.
+          もしモデムの準備ができていないときには, あらかじめダイヤ
+          ルアップ機能の設定についてのチュートリアルをお読みください.
+          Webブラ ウザが使えるのであれば
+          <a class="link" href="http://www.FreeBSD.org/" target="_top"> http://www.FreeBSD.org/
+          </a> におけるチュー トリアルの一覧を調べてください.
+          あるいは, この文書を見つけた場所を調べ て,
+          <code class="filename">dialup.txt</code>
+          やそれに類似した名前の文書をお読みください. 関連す
+          るマニュアルページとしては,
+          シリアルポート向けデバイスドライバについて
+          の <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sio&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">sio</span>(4)</span></a> をはじめ, モデムからのログインを
+          受理できるようにシステ
+          ムを設定するための <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ttys&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">ttys</span>(5)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gettytab&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">gettytab</span>(5)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=getty&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">getty</span>(8)</span></a>,
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> など, さらには, シリアルポート関連パラメータ ( たと
+          えば直接接続シリアルインタフェースの
+          <code class="literal">clocal</code> ) についての
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=stty&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">stty</span>(1)</span></a>  なども助けになるかもしれません.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94559568"></a>20.5.2.2. 概要</h4></div></div></div><p>一般的な設定内容で FreeBSDを SLIPサーバとして利用すると,
+          その動作は次 のようになります. まず, SLIPユーザが FreeBSD
+          による SLIPサーバへ電話し て, SLIP専用IDでログインします.
+          なお, このIDを持ったユーザはシェルとし て
+          <code class="filename">/usr/sbin/sliplogin</code> を使います. この
+          <code class="command">sliplogin</code> は, ファイル
+          <code class="filename">/etc/sliphome/slip.hosts</code> の中から,
+          ログインIDと一致する 記述行を探します. もし一致する行があれば,
+          ログインしたシリアル回線を,  利用可能な
+          SLIPインタフェースへ接続し, その後にシェルスクリプト
+          <code class="filename">/etc/sliphome/slip.login</code> で
+          SLIPインタフェースを設定します.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94562256"></a>20.5.2.2.1. SLIPサーバへのログイン例</h5></div></div></div><p>仮に SLIPユーザIDが <code class="systemitem">Shelmerg</code>
+            とします. すると, <code class="filename">/etc/master.passwd</code>
+            における <code class="systemitem">Shelmerg</code> のエントリは次のよ
+            うなものになります (実際には一つの行に続いている) .</p><pre class="programlisting">Shelmerg:password:1964:89::0:0:Guy Helmer - SLIP:/usr/users/Shelmerg:/usr/sbin/sliplogin</pre><p><code class="systemitem">Shelmerg</code> がログインすると,
+            <code class="command">sliplogin</code> は, ファイル
+            <code class="filename">/etc/sliphome/slip.hosts</code>
+            からユーザIDと一致する行を探しま す. いま仮に,
+            <code class="filename">/etc/sliphome/slip.hosts</code>
+            に次のような記述がなされていたとします.</p><pre class="programlisting">Shelmerg        dc-slip sl-helmer       0xfffffc00      autocomp</pre><p><code class="command">sliplogin</code>
+            が上記のエントリを見つけると,
+            <span class="emphasis"><em>Shelmerg</em></span> が使用して
+            いるシリアル回線を, 利用可能な
+            SLIPインタフェースのなかの最初のものへ 接続し, 次の内容の
+            <code class="filename">/etc/sliphome/slip.login</code>
+            を実行します.</p><pre class="programlisting">/etc/sliphome/slip.login 0 19200 Shelmerg dc-slip sl-helmer 0xfffffc00 autocomp</pre><p>もし上記の手順が正常に処理されると,
+            <code class="filename">/etc/sliphome/slip.login</code>  は,
+            <code class="command">sliplogin</code> が割り当てた SLIPインタフェース
+            (この例では  <code class="filename">slip.login</code>
+            で与えられたパラメータのうちで最初の値である SLIP
+            インタフェース0である) に対して <code class="command">ifconfig</code>
+            を実行し, ローカル  IPアドレス
+            (<code class="systemitem">dc-slip</code>)をはじめ, リモート IPアドレス
+            (<code class="systemitem">sl-helmer</code>),
+            SLIPインタフェースへのネットワークマスク
+            (<code class="systemitem">0xfffffc00</code>), およびその他のフラグ
+            (<code class="literal">autocomp</code>)を設定 します. 逆に,
+            さきほどの手順が正常に終了しなかった場合, 通常は
+            <code class="command">sliplogin</code> は十分な情報を syslog の
+            <code class="literal">daemon</code> 機能経由で  
+            <code class="filename">/var/log/messages</code> へ記録します
+            ( <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> や
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">syslog.conf</span>(5)</span></a> のマニュアルページを参照のうえ, さらに
+            <code class="filename">/etc/syslog.conf</code> を調べて
+            <code class="command">syslogd</code> がどのファイルへ記
+            録するかを確認のこと) .</p><p>例はこのくらいにして,
+            さっそくシステムのセットアップを始めてみましょう.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94581840"></a>20.5.2.3. カーネルのコンフィグレーション</h4></div></div></div><p>FreeBSD のデフォルトのカーネルには, 通常, 二つの
+          SLIPインタフェースが 準備されています
+          (<code class="filename">sl0</code> と <code class="filename">sl1</code>)
+          . これらのインタフェー
+          スが使用中のカーネルに準備されているかどうかを調べるには,
+          <code class="command">netstat -i</code> を実行してください.</p><p><code class="command">netstat -i</code> の出力例</p><pre class="screen">Name  Mtu   Network     Address            Ipkts Ierrs    Opkts Oerrs  Coll
+ed0   1500  &lt;Link&gt;0.0.c0.2c.5f.4a         291311     0   174209     0   133
+ed0   1500  138.247.224 ivory             291311     0   174209     0   133
+lo0   65535 &lt;Link&gt;                            79     0       79     0     0
+lo0   65535 loop        localhost             79     0       79     0     0
+sl0*  296   &lt;Link&gt;                             0     0        0     0     0
+sl1*  296   &lt;Link&gt;                             0     0        0     0     0</pre><p><code class="command">netstat -i</code> の出力に
+          <code class="filename">sl0</code> と <code class="filename">sl1</code>
+          のインタフェー スが含まれているということから,
+          カーネルには二つの SLIPインタフェー
+          スが組み込まれているということを示しています.
+          (<code class="literal">sl0</code> と  <code class="literal">sl1</code>
+          に付いたアスタリスクは, <code class="command">netstat -i</code>
+          の実行時点で はインタフェースが <span class="quote">「<span class="quote">ダウン</span>」</span>
+          していることを表しています. )</p><p>なお, パケットのフォワード機能は FreeBSD
+          のデフォルトのカーネルでは設定 されていません
+          (すなわちルータとしては動作しない) . もしインターネット
+          接続ホストについての RFC要件 ( RFC 1009 [Requirements for
+          Internet Gateways] と 1122 [Requirements for Internet Hosts
+          ― Communication Layers], おそらく 1127 [A Perspective on
+          the Host Requirements RFCs] も ) に準拠して, FreeBSDによる
+          SLIPサー バをルータとして動作させたいときには,
+          <code class="filename">/etc/rc.conf</code> (バージョ ン 2.2.2 より前の
+          FreeBSD では <code class="filename">/etc/sysconfig</code>) ファイル の
+          <code class="literal">gateway_enable</code> 変数を <code class="option">YES</code>
+          としてください. もし古いシステ ムで
+          <code class="filename">/etc/sysconfig</code> ファイルすらないときには,
+          次のコマン ドを <code class="filename">/etc/rc.local</code>
+          へ追加してください.</p><pre class="programlisting">sysctl -w net.inet.ip.forwarding = 1</pre><p>この新しい設定を有効とするには,
+          リブートする必要があります.</p><p>デフォルトのカーネルコンフィグレーションファイル
+          (<code class="filename">/sys/i386/conf/GENERIC</code>) の最後の部分に,
+          次のような行がありま す.</p><pre class="programlisting">pseudo-device sl 2</pre><p>この行によって, 使用可能な SLIPデバイスの総数が決まります.
+          すなわち, 行 末の数値が, 同時に動作可能な
+          SLIP接続の最大数となります.</p><p>カーネルの再構築については,
+          <a class="link" href="kernelconfig.html" title="第9章 FreeBSD カーネルのコンフィグレーション">FreeBSDカー
+            ネルのコンフィグレーション</a> を参照ください.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94598608"></a>20.5.2.4. Sliploginのコンフィグレーション</h4></div></div></div><p>すでにご説明したように,
+          <code class="filename">/usr/sbin/sliplogin</code> のコンフィグレー
+          ションのために,
+          3種類のファイルが<code class="filename">/etc/sliphome</code>
+          ディレクトリに あります (<code class="command">sliplogin</code>
+          についての実際のマニュアルページとしては
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sliplogin&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sliplogin</span>(8)</span></a> を参照のこと) .
+          ファイル <code class="filename">slip.hosts</code> は
+          SLIPユーザおよびその IPアドレスを決めます. 通常, ファイル
+          <code class="filename">slip.login</code> は,
+          SLIPインタフェースを設定することだけに使
+          用します. <code class="filename">slip.logout</code>
+          はオプションのファイルで,
+          <code class="filename">slip.login</code> で設定した内容を,
+          シリアル接続が終了した時点で解除
+          するときに使用します.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94603216"></a>20.5.2.4.1. <code class="filename">slip.hosts</code>
+	  のコンフィグレーション</h5></div></div></div><p><code class="filename">/etc/sliphome/slip.hosts</code> には,
+            少なくとも 4 つの項目をホワイ トスペース (スペースやタブ)
+            で区切って指定します.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>SLIPユーザのログインID</p></li><li class="listitem"><p>SLIPリンクのローカル (SLIPサーバ側) アドレス</p></li><li class="listitem"><p>SLIPリンクのリモートアドレス</p></li><li class="listitem"><p>ネットワークマスク</p></li></ul></div><p>ホスト名をローカルおよびリモートのアドレスとして
+            記述できます (IPアドレ スの決定は,
+            <code class="filename">/etc/host.conf</code> の指定内容に応じて,
+            <code class="filename">/etc/hosts</code> か
+            DNSのいずれかによって決定される) . また, ネット
+            ワークマスクも <code class="filename">/etc/networks</code>
+            ファイルに記述された名前を参照す ることで,
+            指定することもできると思います. これまでの例としてあげたシス
+            テムでの <code class="filename">/etc/sliphome/slip.hosts</code>
+            は次のようになります.</p><pre class="programlisting">#
+# login local-addr      remote-addr     mask            opt1    opt2
+#                                               (normal,compress,noicmp)
+#
+Shelmerg  dc-slip       sl-helmerg      0xfffffc00      autocomp</pre><p>それぞれの行の最後には,
+            次に示すオプションを一つ以上指定できます.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="option">normal</code> ― ヘッダを圧縮しない</p></li><li class="listitem"><p><code class="option">compress</code> ― ヘッダを圧縮する</p></li><li class="listitem"><p><code class="option">autocomp</code> ―
+                リモートの設定に応じて, ヘッダを圧縮する</p></li><li class="listitem"><p><code class="option">noicmp</code> ―
+                ICMPパケットを禁止する
+                ( <span class="quote">「<span class="quote">ping</span>」</span> パケットは送出されず,
+                バンド幅を占有しない)</p></li></ul></div><p>なお, FreeBSDバージョン2の初期リリースの
+            <code class="command">sliplogin</code> は, 旧  FreeBSD
+            1.xでは有効であった上記のオプションを無視していましたので,
+            <code class="option">normal</code>, <code class="option">compress</code>,
+            <code class="option">autocomp</code>, そして <code class="option">noicmp</code>
+            などのオプションは FreeBSD
+            2.2でサポートされるまでは効果がありませんでした (た
+            だしこれらのフラグを使うためには
+            <code class="filename">slip.login</code> スクリプトへ記述する
+            必要がある) .</p><p>SLIPリンクでのローカルとリモート向けのアドレスの
+            選び方は, TCP/IPサブネッ トを専用に割り当てるか,
+            または <span class="quote">「<span class="quote">プロキシ ARP</span>」</span> を
+            SLIPサーバへ用いるかによって違います ( <span class="quote">「<span class="quote">プロキシ
+              ARP</span>」</span> という用語のここでの使い方は本来のものではないが,
+            説明のためにこの用語を使う) . もし,
+            どちらの方式を選ぶべきか判らなかったり,
+            IPアドレスの割り当て方が不明のときには, 上述の
+            <a class="link" href="slip.html#slips-prereqs" title="20.5.2.1. 前提">前提</a> の節で紹介した
+            TCP/IP関連書籍を参考になさるか,  またはあなたの
+            IPネットワークを管理している方に相談なさると
+            よいでしょう.</p><p>独立したサブネットを SLIPクライアントへ適用するときには,
+            すでに割り当てられている
+            IPネットワーク番号の範囲からサブネット番号を割り当て, 同
+            時にそのサブネットの範囲内で有効な IPアドレスを
+            SLIPクライアントの IP 番号として割り当てる必要があります.
+            さらに, この SLIPサブネットから SLIPサーバを経由して最も近い
+            IPルータへの経路を静的に設定するか, または
+            <code class="command">gated</code> を FreeBSDによる
+            SLIPサーバへインストールして, 適当
+            なルーティングプロトコルを使って,
+            SLIPサーバ経由のサブネットへの経路情
+            報をルータ群へ通知できるように設定するか,
+            のいずれかをおこなう必要があります.</p><p><span class="quote">「<span class="quote">プロキシ ARP</span>」</span> 方式を採用するときには,
+            SLIPクライアント向けの IPアドレス
+            として, SLIPサーバのサブネットの範囲から
+            選んで割り当てるとともに,
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=arp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">arp</span>(8)</span></a> コマンドを使うために
+            <code class="filename">/etc/sliphome/slip.login</code>
+            と<code class="filename">/etc/sliphome/slip.logout</code>
+            のスクリプトを修正して, SLIPサー
+            バにおける ARPテーブル内のプロキシ ARPエントリへ
+            反映させる必要がありま
+            す.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94693456"></a>20.5.2.4.2. <code class="filename">slip.login</code>
+            のコンフィグレーション</h5></div></div></div><p>ファイル <code class="filename">/etc/sliphome/slip.login</code>
+            の一般的な内容は次にようになります.</p><pre class="programlisting">#!/bin/sh -
+#
+#	@(#)slip.login  5.1 (Berkeley) 7/1/90
+
+#
+# generic login file for a slip line.  sliplogin invokes this with
+# the parameters:
+#      1        2         3        4          5         6     7-n
+#   slipunit ttyspeed loginname local-addr remote-addr mask opt-args
+#
+/sbin/ifconfig sl$1 inet $4 $5 netmask $6</pre><p>この <code class="filename">slip.login</code>
+            ファイルの役目は単に, SLIPインタフェースにつ
+            いてのローカルとリモートのアドレス,
+            およびそのネットワークマスクを  <code class="command">ifconfig</code>
+            コマンドで設定することです.</p><p>もし <span class="quote">「<span class="quote">プロキシ ARP</span>」</span> 方式を採用する
+            (SLIPクライアントへ独立したサブネットを使わない) ときには,
+            ファイル <code class="filename">/etc/sliphome/slip.login</code>
+            は次のような内容になります.</p><pre class="programlisting">#!/bin/sh -
+#
+#	@(#)slip.login  5.1 (Berkeley) 7/1/90
+
+#
+# generic login file for a slip line.  sliplogin invokes this with
+# the parameters:
+#      1        2         3        4          5         6     7-n
+#   slipunit ttyspeed loginname local-addr remote-addr mask opt-args
+#
+/sbin/ifconfig sl$1 inet $4 $5 netmask $6
+# Answer ARP requests for the SLIP client with our Ethernet addr
+/usr/sbin/arp -s $5 00:11:22:33:44:55 pub</pre><p>この <code class="filename">slip.login</code> で追加された行
+            <code class="command">arp -s $5 00:11:22:33:44:55 pub</code> は,
+            SLIPサーバにおける ARPテーブルへ新たなエントリを作ります.
+            SLIPサーバ は, この ARPエントリが作られると,
+            SLIPクライアントの IPアドレスと話し たい他の
+            IPノードが要求してきたときにはいつも, SLIPサーバ の Ethernet
+            MACアドレスを返すようになります.</p><p>上記の例を実際に流用なさるときには, 例にある Ethernet
+            MACアドレス  (<code class="systemitem">00:11:22:33:44:55</code>)
+            を, あなたのシステムの実際のEthernetカー ドの
+            MACアドレスと置き換えなければ <span class="quote">「<span class="quote">プロキシ
+              ARP</span>」</span> はうまく動作しません!  SLIPサーバの Ethernet
+            MACアドレスを調べるには <code class="command">netstat -i</code> コマ
+            ンドを利用してください.
+            実行結果の第2行は次のようなものになるはずです.</p><pre class="screen">ed0   1500  &lt;Link&gt;0.2.c1.28.5f.4a         191923     0   129457     0   116</pre><p>この例での Ethernet MACアドレスは
+            <code class="systemitem">00:02:c1:28:5f:4a</code> であると
+            読みます. なお <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=arp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">arp</span>(8)</span></a> における MAC
+            アドレスの指定に際しては,
+            コマンド <code class="command">netstat -i</code> が付けた
+            Ethernet MACアドレスのピリオド記
+            号をコロン記号と置き換え, かつ単一桁の 16
+            進数にはゼロを先頭に加える必
+            要があります. この指定についての正確な情報は <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=arp&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">arp</span>(8)</span></a>
+            を参照く
+            ださい.</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="filename">/etc/sliphome/slip.login</code> と
+              <code class="filename">/etc/sliphome/slip.logout</code>
+              を作成したならば, ファイル属性の <span class="quote">「<span class="quote">実行</span>」</span> ビット
+              (すなわち  <code class="command">chmod 755 /etc/sliphome/slip.login
+                /etc/sliphome/slip.logout</code>) を
+              設定しなければなりません. さもなければ
+              <code class="command">sliplogin</code> が
+              うまく実行されません.</p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94707152"></a>20.5.2.4.3. <code class="filename">slip.logout</code>
+            のコンフィグレーション</h5></div></div></div><p>ファイル <code class="filename">/etc/sliphome/slip.logout</code>
+            は必ずしも必要なものではあ りません (ただし <span class="quote">「<span class="quote">プロキシ
+              ARP</span>」</span> を利用する場合を除く) . もしこのファイルを
+            作成するときには, 次に示す標準的な
+            <code class="filename">slip.logout</code> スクリプト例を
+            参考にしてください.</p><pre class="programlisting">#!/bin/sh -
+#
+#	slip.logout
+
+#
+# logout file for a slip line.  sliplogin invokes this with
+# the parameters:
+#      1        2         3        4          5         6     7-n
+#   slipunit ttyspeed loginname local-addr remote-addr mask opt-args
+#
+/sbin/ifconfig sl$1 down</pre><p><span class="quote">「<span class="quote">プロキシ ARP</span>」</span> を利用する場合, この
+            <code class="filename">/etc/sliphome/slip.logout</code> を 使って,
+            特定の SLIPクライアント向けの
+            ARPエントリを削除したくなるようなときがあります.</p><pre class="programlisting">#!/bin/sh -
+#
+#       @(#)slip.logout
+
+#
+# logout file for a slip line.  sliplogin invokes this with
+# the parameters:
+#      1        2         3        4          5         6     7-n
+#   slipunit ttyspeed loginname local-addr remote-addr mask opt-args
+#
+/sbin/ifconfig sl$1 down
+# Quit answering ARP requests for the SLIP client
+/usr/sbin/arp -d $5</pre><p>コマンド <code class="command">arp -d $5</code> は,
+            SLIPクライアントがログインした 際に, <span class="quote">「<span class="quote">プロキシ
+              ARP</span>」</span> を使った <code class="filename">slip.login</code>
+            によって追加され た ARPエントリを削除します.</p><p>これによって, 繰り返して利用することができるわけです.
+            必ず, <code class="filename">/etc/sliphome/slip.logout</code>
+            を作成した後に, 実行ビットを設定し てください (
+            <code class="command">chmod 755 /etc/sliphome/slip.logout</code> )
+            .</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94726864"></a>20.5.2.5. ルーティングについての考慮点</h4></div></div></div><p><span class="quote">「<span class="quote">プロキシ ARP</span>」</span> 方式を利用せずに
+          SLIPクライアントとその他のネットワーク  (Internetも含む)
+          の構成要素との間でパケットをルーティングするときには,
+          SLIPサーバ経由で
+          SLIPクライアントが属するサブネットまでの経路を, 最も
+          近いデフォルトのルータ群へ静的な経路情報として
+          追加しなければならないか,  または <code class="command">gated</code> を
+          FreeBSDによる SLIPサーバへインストールして, SLIP
+          サブネットについての経路情報を,
+          適当なルーティングプロトコルでルー
+          タ群へ通知できるように設定するか,
+          のどちらかをおこなわなければなりません.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94728528"></a>20.5.2.5.1. 静的な経路</h5></div></div></div><p>静的な経路を最も近いデフォルトの
+            ルータ群へ追加することが困難なことがあ ります
+            (経路情報を追加できる権限がなければそもそも不可能となる).
+            もし あなたの組織に複数のルータで構成された
+            ネットワークがあるならば, ある種 のルータ (たとえば Ciscoや
+            Proteonなど) は, 静的な経路を SLIPサブネッ
+            トへ使うようにルータを設定しなければならないだけでなく,
+            その静的経路を 他のどのルータへ知らせるのかもあらかじめ
+            指定しておく必要がありますから,
+            静的経路に基づくルーティングを軌道に乗せるには
+            それなりの専門的技術やト
+            ラブルシューティングやコツが必要だと思います.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94738000"></a>20.5.2.5.2. <code class="command">gated</code>の稼働</h5></div></div></div><p>静的経路についての頭痛への代替手段は,
+            <code class="command">gated</code> を FreeBSDによる SLIPサー
+            バへインストールして, 適切なルーティングプロトコル
+            (RIP/OSPF/BGP/EGP)  を使って
+            SLIPサブネットについての経路情報を他のルータへ知らせるように
+            設定することです. <a class="link" href="ports.html" title="第5章 アプリケーションのインストール - packages と ports">ports
+              コレクション</a>から  <code class="command">gated</code>
+            を用いることもできますし,
+            <a class="link" href="ftp://ftp.gated.merit.edu/research.and.development/gated/" target="_top">
+              GateD 匿名 FTP サイト</a>
+            から探して自分自身で構築することもで きます.
+            この文章を執筆時点の最新バージョンは
+            <code class="filename">gated-R3_5Alpha_8.tar.Z</code> であり,
+            このファイル <span class="quote">「<span class="quote">だけで</span>」</span> FreeBSDで 動作させることができます.
+            <code class="command">gated</code> についてのすべての情報と文書 は
+            <a class="link" href="http://www.gated.merit.edu/" target="_top">
+              Merit GateD コンソーシアム</a> からはじまる Web
+            上で入手でき ます. <code class="command">gated</code>
+            のコンパイルとインストールを行ったならば,
+            独自の 設定のために <code class="filename">/etc/gated.conf</code>
+            ファイルを記述してください. 次の 例は,
+            筆者が FreeBSDによる SLIP
+            サーバで使っている内容と類似のものです.</p><pre class="programlisting">#
+# gated configuration file for dc.dsu.edu; for gated version 3.5alpha5
+# Only broadcast RIP information for xxx.xxx.yy out the ed Ethernet interface
+#
+#
+# tracing options
+#
+traceoptions "/var/tmp/gated.output" replace size 100k files 2 general ;
+
+rip yes {
+ interface sl noripout noripin ;
+ interface ed ripin ripout version 1 ;
+ traceoptions route ;
+} ;
+
+#
+# Turn on a bunch of tracing info for the interface to the kernel:
+kernel {
+ traceoptions remnants request routes info interface ;
+} ;
+
+#
+# Propagate the route to xxx.xxx.yy out the Ethernet interface via RIP
+#
+
+export proto rip interface ed {
+        proto direct {
+                <em class="replaceable"><code>xxx.xxx.yy</code></em> mask 255.255.252.0 metric 1; # SLIP connections
+        } ;
+} ;
+
+#
+# Accept routes from RIP via ed Ethernet interfaces
+
+import proto rip interface ed {
+        all ;
+} ;</pre><p>この <code class="filename">gated.conf</code> ファイルの例では,
+            SLIPのサブネット  <em class="replaceable"><code>xxx.xxx.yy</code></em>
+            についての経路情報を RIPを使って Ethernetへブロー
+            ドキャストしています. もし <code class="filename">ed</code>
+            ドライバ以外の Ethernetドライバを使うのであれば,
+            <code class="filename">ed</code>
+            インタフェースの記述を適切なものに置き換えてくだ さい.
+            またこの例では,
+            <code class="command">gated</code>の動作をデバッグするために,
+            <code class="filename">/var/tmp/gated.output</code>
+            へトレース情報を出力するように指示して います.
+            <code class="command">gated</code> が希望通りに動作したならば,
+            このトレースオプショ ンを止めることができます. なお,
+            例における <em class="replaceable"><code>xxx.xxx.yy</code></em> を, あ
+            なた自身の
+            SLIPサブネットのネットワークアドレスに換えてください (また
+            <code class="literal">proto direct</code>
+            部分のネットワークマスクも換えることを忘れないこ と)
+            .</p><p><code class="command">gated</code>
+            のコンパイルとインストールが終了し, コンフィグレーショ
+            ンファイルの作成も完了したら,
+            FreeBSDシステムではデフォルトの
+            <code class="command">routed</code>に代わって <code class="command">gated</code>
+            を起動してください. そのため には,
+            <code class="filename">/etc/netstart</code> の
+            <code class="filename">routed/gated</code> 起動パラメータを
+            適切な値に設定してください. <code class="command">gated</code>
+            のコマンドラインパラメータにつ いての情報は,
+            <code class="command">gated</code>
+            のマニュアルページを参照してください.</p></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pppoe.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="ppp-and-slip.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="mail.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">20.4.  PPP オーバイーサネット (PPPoE) の利用〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓第21章 電子メール</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

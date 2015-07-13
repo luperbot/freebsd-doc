@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>25.4. Utiliser DTrace</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="dtrace.html" title="Chapitre 25. DTrace" /><link rel="prev" href="dtrace-enable.html" title="25.3. Activer la prise en charge de DTrace" /><link rel="next" href="dtrace-language.html" title="25.5. Le langage D" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">25.4. Utiliser DTrace</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="dtrace-enable.html">Précédent</a> </td><th width="60%" align="center">Chapitre 25. DTrace</th><td width="20%" align="right"> <a accesskey="n" href="dtrace-language.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="dtrace-using"></a>25.4. Utiliser DTrace</h2></div></div></div><p>Avant d'utiliser DTrace, il faut que le
+      périphérique DTrace existe.  Pour charger le
+      périphérique, exécutez la commande
+      suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload dtraceall</code></strong></pre><p>Le système devrait maintenant supporter DTrace.
+      Pour afficher toutes les sondes, l'administrateur peut
+      maintenant executer la commande:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dtrace -l | more</code></strong></pre><p>Toutes les données sortantes de cette commande sont
+      passées à l'utilitaire <code class="command">more</code>,
+      pour empêcher qu'elles saturent l'écran.  A ce
+      niveau, DTrace peut être considéré comme
+      fonctionnel.  On est maintenant prêt à passer en
+      revue l'ensemble des outils disponibles.</p><p>La boîte à outils est une collection de scripts
+      prêts à fonctionner avec DTrace pour rassembler
+      des informations systèmes.  Il y a des scripts pour
+      vérifier les fichiers ouvertes, la mémoire,
+      l'usage du <acronym class="acronym">CPU</acronym> et beaucoup plus.  Il faut
+      extraire les scripts avec la commande suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gunzip -c DTracetoolkit* | tar xvf -</code></strong></pre><p>Aller dans ce répértoire en utilisant
+      <code class="command">cd</code> et changer les permissions de tous les
+      fichiers, les fichiers avec les noms en miniscules, à
+      <code class="literal">755</code>.</p><p>Chacun de ces scripts devra avoir son contenu
+      modifié.  Ceux qui font référence à
+      <code class="filename">/usr/bin/ksh</code> devront pointer sur
+      <code class="filename">/usr/local/bin/ksh</code>, les autres qui
+      utilisent <code class="filename">/usr/bin/sh</code> devront être
+      modifiés pour qu'ils utilisent
+      <code class="filename">/bin/sh</code>, et finalement ceux qui utilisent
+      <code class="filename">/usr/bin/perl</code>, devront pointer sur
+      <code class="filename">/usr/local/bin/perl</code>.</p><div xmlns="" class="important"><h3 class="admontitle">Important: </h3><p xmlns="http://www.w3.org/1999/xhtml">A ce point il est prudent de rappeler au lecteur
+	que le support de DTrace sous FreeBSD <span class="emphasis"><em>n'est pas
+	complet</em></span> et est encore
+	<span class="emphasis"><em>expérimental</em></span>.  Un bon nombre de
+	ces scripts ne fonctionneront pas, soit parce qu'ils sont trop
+	spécifiques à <span class="trademark">Solaris</span>&#8482;, soit parce qu'ils
+	utilisent des sondes qui ne sont pas encore
+	supportées.</p></div><p>Au moment de l'écriture de ces lignes, seuls deux des
+      scripts de la boîte à outils DTrace sont
+      totalement supportés sous FreeBSD: les outils
+      <code class="filename">hotkernel</code> et
+      <code class="filename">procsystime</code>.  Ce sont ces deux outils que
+      nous détaillerons dans la suite de cette section.</p><p>L'outil <code class="filename">hotkernel</code> est censé
+      identifier quel fonction utilise le plus de temps noyau.
+      Fonctionnant normalement, il affichera une liste comparable
+      à la suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>./hotkernel</code></strong>
+Sampling... Hit Ctrl-C to end.</pre><p>L'administrateur système doit utiliser la combinaison
+      de touches <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>C</strong></span> pour arrêter le processus.  Le script
+      affichera une liste de fonctions du noyau et des informations de
+      temps, et les triera dans l'ordre croissant du temps
+      consommé:</p><pre class="screen">kernel`_thread_lock_flags                                   2   0.0%
+0xc1097063                                                  2   0.0%
+kernel`sched_userret                                        2   0.0%
+kernel`kern_select                                          2   0.0%
+kernel`generic_copyin                                       3   0.0%
+kernel`_mtx_assert                                          3   0.0%
+kernel`vm_fault                                             3   0.0%
+kernel`sopoll_generic                                       3   0.0%
+kernel`fixup_filename                                       4   0.0%
+kernel`_isitmyx                                             4   0.0%
+kernel`find_instance                                        4   0.0%
+kernel`_mtx_unlock_flags                                    5   0.0%
+kernel`syscall                                              5   0.0%
+kernel`DELAY                                                5   0.0%
+0xc108a253                                                  6   0.0%
+kernel`witness_lock                                         7   0.0%
+kernel`read_aux_data_no_wait                                7   0.0%
+kernel`Xint0x80_syscall                                     7   0.0%
+kernel`witness_checkorder                                   7   0.0%
+kernel`sse2_pagezero                                        8   0.0%
+kernel`strncmp                                              9   0.0%
+kernel`spinlock_exit                                       10   0.0%
+kernel`_mtx_lock_flags                                     11   0.0%
+kernel`witness_unlock                                      15   0.0%
+kernel`sched_idletd                                       137   0.3%
+0xc10981a5                                              42139  99.3%</pre><p>Ce script fonctionnera aussi avec des modules de noyau.
+      Pour utiliser ce fonction, exécutez le script avec
+      l'option <code class="option">-m</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>./hotkernel -m</code></strong>
+Sampling... Hit Ctrl-C to end.
+^C
+MODULE                                                  COUNT   PCNT
+0xc107882e                                                  1   0.0%
+0xc10e6aa4                                                  1   0.0%
+0xc1076983                                                  1   0.0%
+0xc109708a                                                  1   0.0%
+0xc1075a5d                                                  1   0.0%
+0xc1077325                                                  1   0.0%
+0xc108a245                                                  1   0.0%
+0xc107730d                                                  1   0.0%
+0xc1097063                                                  2   0.0%
+0xc108a253                                                 73   0.0%
+kernel                                                    874   0.4%
+0xc10981a5                                             213781  99.6%</pre><p>Le script <code class="filename">procsystime</code> capture et
+      affiche le temps consommé en appels système pour
+      un <acronym class="acronym">PID</acronym> ou un processus donné.  Dans
+      l'exemple suivant, un nouvel exemplaire de
+      <code class="filename">/bin/csh</code> a été lancé.
+      L'outil <code class="filename">procsystime</code> a été
+      exécuté et laissé en attente pendant que
+      quelques commandes été tapées sur les
+      autres incarnations de <code class="command">csh</code>.  Voici le
+      résultat de ce test:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>./procsystime -n csh</code></strong>
+Tracing... Hit Ctrl-C to end...
+^C
+
+Elapsed Times for processes csh,
+
+         SYSCALL          TIME (ns)
+          getpid               6131
+       sigreturn               8121
+           close              19127
+           fcntl              19959
+             dup              26955
+         setpgid              28070
+            stat              31899
+       setitimer              40938
+           wait4              62717
+       sigaction              67372
+     sigprocmask             119091
+    gettimeofday             183710
+           write             263242
+          execve             492547
+           ioctl             770073
+           vfork            3258923
+      sigsuspend            6985124
+            read         3988049784</pre><p>Comme indiqué, l'appel système
+      <code class="function">read()</code> semble prendre le plus de temps en
+      nanosecondes, alors que l'appel système
+      <code class="function">getpid()</code> prend très peu de
+      temps.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="dtrace-enable.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="dtrace.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="dtrace-language.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">25.3. Activer la prise en charge de DTrace </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 25.5. Le langage D</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

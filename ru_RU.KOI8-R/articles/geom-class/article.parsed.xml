@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!--
+    The FreeBSD Russian Documentation Project
+    $FreeBSD$
+    $FreeBSDru$
+    Original revision: r44964
+-->
+<!-- Перевод: Тарас Коренко -->
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="ru">
+  
+
+  <info><title xmlns:xlink="http://www.w3.org/1999/xlink">Создание класса GEOM</title>
+
+    <authorgroup xmlns:xlink="http://www.w3.org/1999/xlink">
+      <author xmlns:xlink="http://www.w3.org/1999/xlink"><personname xmlns:xlink="http://www.w3.org/1999/xlink"><firstname xmlns:xlink="http://www.w3.org/1999/xlink">Ivan</firstname><surname xmlns:xlink="http://www.w3.org/1999/xlink">Voras</surname></personname><affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <address xmlns:xlink="http://www.w3.org/1999/xlink"><email xmlns:xlink="http://www.w3.org/1999/xlink">ivoras@FreeBSD.org</email>
+	  </address>
+	</affiliation></author>
+    </authorgroup>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD это зарегистрированная торговая
+  марка FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Intel, Celeron, EtherExpress, i386,
+  i486, Itanium, Pentium и Xeon это торговые марки или зарегистрированные
+  торговые марки Intel Corporation или ее дочерних компаний в Соединенных
+  Штатах и других странах.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Многие из обозначений, используемые
+  производителями и продавцами для обозначения своих продуктов, заявляются
+  в качестве торговых марок.  Когда такие обозначения появляются в этом
+  документе, и Проекту FreeBSD известно о торговой марке, к обозначению
+  добавляется знак <quote xmlns:xlink="http://www.w3.org/1999/xlink">TM</quote> или
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">(R)</quote>.</para>
+    </legalnotice>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Эта статья документирует некоторые начальные выкладки
+	в разработке GEOM-классов, а также модулей ядра в общем.
+	Предполагается, что читатель близко знаком с программированием
+	на Си в контексте пространства пользовательских процессов
+	(userland).</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="intro">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Вступление</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="intro-docs">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Документация</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Документация по программированию для ядра скудная, это одна из
+	немногих областей программирования, где почти нет хороших учебных
+	пособий, и совет <quote xmlns:xlink="http://www.w3.org/1999/xlink">читай исходники!</quote> -
+	сохраняет свою справедливость. Однако, существует несколько
+	статей и книг разной актуальности, которые рекомендуются к изучению
+	перед тем, как начать программировать:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/developers-handbook/index.html">
+	    Руководство FreeBSD для разработчиков</link> - часть
+	    Проекта Документации FreeBSD, ничего специфичного
+	    о программировании ядра в нем нет, зато есть немного общей
+	    полезной информации.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/arch-handbook/index.html">
+	    Руководство по Архитектуре FreeBSD</link> - также
+	    является частью Проекта Документации FreeBSD, содержит описания
+	    некоторых низкоуровневых средств и процедур. Уделите внимание
+	    разделу номер 13 -
+	    <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/arch-handbook/driverbasics.html">
+	    Написание драйверов устройств для FreeBSD</link>.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Несколько интересных статей об устройстве ядра
+	    можно найти на сайте
+	    <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.freebsddiary.com">FreeBSD
+	    Diary</link>.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Страницы из раздела номер 9 системного справочника,
+	    содержат важную документацию по функциям ядра.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Страница справочника <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry>, а также <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://phk.freebsd.dk/pubs/">слайды Пола-Хеннинга Кампа
+	    </link> - общее представление о подсистеме GEOM.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Страницы справочника <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_bio</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_event</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>,
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_data</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_provider</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>,
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_consumer</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>, <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_access</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>, а также другие,
+	    связанные с вышеупомянутыми и раскрывающие специфический
+	    функционал подсистемы GEOM.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Страница справочника <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">style</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry> - документирует
+	    соглашения о стиле оформления кода, которые обязаны быть соблюдены
+	    если вы планируете передать ваш код в Subversion репозиторий
+	    FreeBSD.</para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="prelim">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Подготовка</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Для того, чтоб заниматься разработками для ядра, желательно
+      иметь два отдельных компьютера. Один из них предназначен для среды
+      разработки и исходных кодов, а второй - для запуска тестов
+      отлаживаемого кода. Второму компьютеру для работы достаточно
+      иметь возможность выполнять начальную загрузку по сети и монтирование
+      файловых систем по сети. В этой ситуации, если отлаживаемый код
+      содержит ошибки и вызовет аварийную остановку системы, то это не
+      повлечет порчу или утерю исходного кода
+      <!-- (and other <quote>live</quote> data). -->.
+      Второму компьютеру даже не потребуется иметь свой монитор,
+      достаточно будет соединения асинхронных портов кабелем RS-232 или
+      соединения при помощи KVM-устройства.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Но так как далеко не у каждого есть два или более компьютеров
+      под рукой, есть пара способов подготовить иную <quote xmlns:xlink="http://www.w3.org/1999/xlink">живую</quote>
+      систему для разработки кода для ядра. Один из них - это
+      разработка в <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.vmware.com/">VMWare</link>
+      или <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://www.qemu.org/">QEmu</link> виртуальной машине
+      (это лучшее из доступного, после, конечно-же, выделенного для тестов
+      компьютера).</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="prelim-system">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Настройка системы для разработки</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Прежде всего необходимо иметь в ядре поддержку
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">INVARIANTS</option>. Добавьте следующие строки в
+	файл конфигурации ядра:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options INVARIANT_SUPPORT
+options INVARIANTS</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Для большей информативности при отладке включите поддержку
+	WITNESS, которая будет предупреждать вас в случае возникновения
+	взаимоблокировок:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options WITNESS_SUPPORT
+options WITNESS
+</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Также включите отладочные символы, если планируете
+	выполнять отладку по дампам аварийных отказов</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">  makeoptions    DEBUG=-g</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Установка отладочного ядра обычным способом (<command xmlns:xlink="http://www.w3.org/1999/xlink">make
+	installkernel</command>) не даст привычного результата:
+	файл ядра будет называться <filename xmlns:xlink="http://www.w3.org/1999/xlink">kernel.debug</filename>
+	и будет находиться в
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/obj/usr/src/sys/KERNELNAME/</filename>.
+	Для удобства, отладочное ядро необходимо скопировать в
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/kernel/</filename>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Также удобно иметь включенный отладчик ядра, так вы сможете
+	исследовать паники сразу-же после их возникновения. Для включения
+	отладчика добавьте следующие строки в файл конфигурации ядра:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">options KDB
+options DDB
+options KDB_TRACE</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Для автоматического запуска отладчика ядра после возникновения
+	паники может понадобиться установить переменную sysctl:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">  debug.debugger_on_panic=1</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Паники системы будут происходить, поэтому уделите внимание
+	кэшу файловой системы. Обычно, при включенном механизме
+	softupdates, последняя версия файла может быть утеряна если
+	паника произошла раньше сбрасывания кэша на устройство хранения.
+	Выключение механизма softupdates (посредством монтирования файловой
+	системы с опцией <quote xmlns:xlink="http://www.w3.org/1999/xlink">sync</quote>) значительно сказывается на
+	производительности и, опять-же, не гарантирует целостности
+	данных. Как компромисс, можно сократить задержки сбрасывания
+	кэша механизма softupdates. Есть три переменных sysctl, значения
+	которых необходимо изменить (лучше всего - прописав их в
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/sysctl.conf</filename>):</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">kern.filedelay=5
+kern.dirdelay=4
+kern.metadelay=3</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Значения этих переменных - секунды.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Для отладки паник ядра необходимы дампы памяти.
+	Так как паника ядра может <quote xmlns:xlink="http://www.w3.org/1999/xlink">сломать</quote> файловую
+	систему, дамп сначала сохраняется в <quote xmlns:xlink="http://www.w3.org/1999/xlink">сырой</quote>
+	раздел. Обычно, это своп-раздел. Поэтому, размер своп-раздела
+	должен быть не меньше размера ОЗУ компьютера. При последующей
+	загрузке дамп копируется в обычный файл. Это происходит сразу-же
+	после проверки и монтирования файловых систем, но перед
+	активированием раздела свопа. Такое поведение контролируется
+	следующими переменными <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">dumpdev="/dev/ad0s4b"
+dumpdir="/usr/core" </programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Переменная <varname xmlns:xlink="http://www.w3.org/1999/xlink">dumpdev</varname> указывает на раздел
+	подкачки, а <varname xmlns:xlink="http://www.w3.org/1999/xlink">dumpdir</varname> сообщает системе куда
+	перемещать дамп ядра при следующей загрузке.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Сохранение дампа ядра - процесс медленный, и, если
+	у вашего компьютера много оперативной памяти (&gt;256M) и если
+	паники случаются часто, то ожидание сохранения дампов может начать
+	раздражать (вспомним, что над дампом происходит две операции:
+	сохранение в своп-файл и перемещение на файловую систему).
+	В таком случае может оказаться удобным ограничивание объема
+	используемой системой памяти путем установки переменной в
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">  hw.physmem="256M"</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Если паники случаются часто и размер файловых систем большой
+	(или же вы просто не доверяете softupdates и фоновой проверке
+	файловых систем), рекомендуется отключить фоновую проверку файловых
+	систем посредством установки переменной в
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">  background_fsck="NO"</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">В этом случае файловые системы будут проверяться только при
+	необходимости. Также заметьте, что в случае использования фоновой
+	проверки, новая паника может случиться в то время, когда
+	проверяются диски. Другими словами, наиболее безопасный способ
+	- не иметь много локальных файловых систем, а использовать
+	второй компьютер в качестве NFS-сервера.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="prelim-starting">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Начало проекта</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Для написания нового класса GEOM необходимо создать поддиректорию
+	в любой доступной пользователю директории. Совсем не обязательно,
+	чтоб ваш модуль изначально размещался в
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr/src</filename>.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="prelim-makefile">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Правилом хорошего тона является создание
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename>-ов для каждого нетривиального
+	проекта, примером которого конечно-же является создание
+	модулей ядра.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Создание <filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename> - дело
+	не сложное благодаря исчерпывающему набору вспомогательных средств,
+	предоставляемых системой. В вкратце, вот как должен выглядеть
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename> для модуля ядра:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">SRCS=g_journal.c
+KMOD=geom_journal
+
+.include &lt;bsd.kmod.mk&gt;</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Этот <filename xmlns:xlink="http://www.w3.org/1999/xlink">Makefile</filename> (с измененными именами
+	файлов) подойдет к любому модулю ядра. Класс GEOM может размещаться
+	в одном единственном модуле ядра. Если для сборки вашего модуля
+	требуется больше, чем один файл, то перечислите их имена,
+	разделенные пробельными символами, в переменной <envar xmlns:xlink="http://www.w3.org/1999/xlink">SRCS</envar>.
+	</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernelprog">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Программирование в ядре FreeBSD</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernelprog-memalloc">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Выделение памяти</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Прочитайте <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">malloc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry> - выделение памяти лишь
+	немного отличается от своего эквивалента, используемого в пространстве
+	пользовательских процессов (userland). Наиболее приметно то, что
+	<function xmlns:xlink="http://www.w3.org/1999/xlink">malloc</function>() и <function xmlns:xlink="http://www.w3.org/1999/xlink">free</function>()
+	принимают дополнительные параметры, которые описаны в странице
+	справочника.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Тип <quote xmlns:xlink="http://www.w3.org/1999/xlink">malloc_type</quote> необходимо объявить в секции
+	деклараций файла с исходным кодом, например:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">  static MALLOC_DEFINE(M_GJOURNAL, "gjournal data", "GEOM_JOURNAL Data");</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Для того, чтобы можно было использовать этот макрос,
+	необходимо включить следующие заголовочные файлы:
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">sys/param.h</filename>,
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">sys/kernel.h</filename> и
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">sys/malloc.h</filename></para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Существует еще один механизм выделения памяти - UMA
+	(Universal Memory Allocator), описанный в <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">uma</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>.
+	Это специфический метод, преимущественно предназначенный для
+	быстрого выделения памяти под списки, состоящие из элементов
+	одинакового размера (например, динамические массивы структур).</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernelprog-lists">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Очереди и списки</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ознакомьтесь с <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">queue</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>
+	Во множестве случаев вам необходимо будет организовывать и
+	управлять такой структурой данных, как списки. К счастью, эта
+	структура данных реализована несколькими способами в виде макросов
+	на Си, а также включена в систему. Наиболее гибкий и часто
+	употребляемый тип списка - TAILQ. Этот тип списка также один
+	из наиболее требовательных к памяти (его элементы - с двойными
+	связями), а также - наиболее медленный (однако счет идет
+	на несколько инструкций ЦПУ, поэтому последнее утверждение не следует
+	воспринимать в всерьез).</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Если важна скорость получения данных, то возьмите на вооружение
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">tree</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry> и <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">hashinit</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="kernelprog-bios">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">BIOs</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Структура <varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">bio</varname> используется для всех
+	операций ввода/вывода, касающихся GEOM. Она содержит
+	информацию о том, какое устройство ('поставщик geom') должно ответить
+	на запрос, тип запроса, смещение, длину и указатель на буфер,
+	а также набор <quote xmlns:xlink="http://www.w3.org/1999/xlink">определенных пользователем</quote> флагов и
+	полей
+	<!-- , которые могут помочь осуществить various hacks-->.
+	</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Важным моментом является то, что <varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">bio</varname>
+	обрабатываются асинхронно. Это значит, что во многих частях кода
+	нет аналога к <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">read</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">2</manvolnum></citerefentry> и <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">write</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">2</manvolnum></citerefentry> функциям из пространства
+	пользовательских процессов, которые не возвращают управление пока
+	не выполнится системный вызов. Скорее, по завершении обработки
+	запроса (или в случае ошибки при обработке) как извещение вызывается
+	определенная пользователем функция.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Асинхронная модель программирования в чем-то сложней,
+	нежели чаще используемая императивная модель, используемая в
+	пространстве пользовательских процессов; в любом случае, привыкание
+	займет некоторое время. В некоторых случаях могут быть использованы
+	вспомогательные функции <function xmlns:xlink="http://www.w3.org/1999/xlink">g_write_data</function>() и
+	<function xmlns:xlink="http://www.w3.org/1999/xlink">g_read_data</function>(), но <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">далеко не
+	всегда</emphasis>. В частности, эти функции не могут использоваться
+	когда захвачен мьютекс; например, мьютекс GEOM-топологии или
+	внутренний мьютекс, удерживаемый в ходе выполнения
+	<function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function>() или <function xmlns:xlink="http://www.w3.org/1999/xlink">.stop</function>().</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Программирование в системе GEOM</title>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-ggate">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Ggate</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Если максимальная производительность не требуется,
+	то более простой способ совершать преобразования данных -
+	это выполнять их в пространстве пользовательских процессов
+	посредством ggate (GEOM gate). К недостаткам следует отнести
+	невозможность простого переноса кода в ядро.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-class">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Класс GEOM</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Класс GEOM выполняет преобразования данных. Эти преобразования
+	могут быть скомпонованы друг с другом в виде дерева. Экземпляр
+	класса GEOM называют <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">geom</emphasis>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">В каждом классе GEOM есть несколько <quote xmlns:xlink="http://www.w3.org/1999/xlink">методов класса</quote>,
+	которые вызываются когда экземпляра класса нет в наличии (или же
+	они не привязаны к конкретному экземпляру класса).</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.init</function> вызывается тогда, когда
+	    системе GEOM становится известно о классе GEOM (например,
+	    когда загружается модуль ядра).</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.fini</function> будет вызван в случае отказа
+	    GEOM системы от класса (например, при выгрузке модуля).</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.taste</function> вызывается, когда в
+	    системе появляется новый класс или поставщик geom
+	    (<quote xmlns:xlink="http://www.w3.org/1999/xlink">provider</quote>). Если соответствие найдено, то эта
+	    функция обычно создает и запускает экземпляр geom.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.destroy_geom</function> вызывается при
+	    необходимости разрушить экземпляр geom.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.ctlconf</function> будет вызван, когда
+	    пользователь запросит изменение конфигурации существующего
+	    экземпляра geom</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Также определены функции событий GEOM, которые копируются
+	в экземпляр geom.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Поле <function xmlns:xlink="http://www.w3.org/1999/xlink">.geom</function> в структуре
+	<varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">g_class</varname> - это список (LIST) экземпляров
+	geom, реализованных из класса.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Эти функции вызываются из g_event потока ядра.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-softc">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Softc</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink"><quote xmlns:xlink="http://www.w3.org/1999/xlink">softc</quote> - это устаревший термин
+	для <quote xmlns:xlink="http://www.w3.org/1999/xlink">приватных данных драйвера</quote> (<quote xmlns:xlink="http://www.w3.org/1999/xlink">driver
+	private data</quote>). Название вероятней всего происходит от
+	устаревшего термина <quote xmlns:xlink="http://www.w3.org/1999/xlink">software control block</quote>.
+	В системе GEOM softc это структура (точнее: указатель на
+	структуру) которая может быть присоединена к экземпляру geom
+	и может содержать приватные данные экземпляра. У большинства
+	классов GEOM есть следующие члены:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><varname xmlns:xlink="http://www.w3.org/1999/xlink">struct g_provider *provider</varname> :
+	    <quote xmlns:xlink="http://www.w3.org/1999/xlink">поставщик geom</quote> предоставляемый данным экземпляром
+	    geom</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><varname xmlns:xlink="http://www.w3.org/1999/xlink">uint16_t n_disks</varname> : Количество
+	    потребителей geom (<quote xmlns:xlink="http://www.w3.org/1999/xlink">consumer</quote>), обслуживаемых данным
+	    экземпляром geom</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><varname xmlns:xlink="http://www.w3.org/1999/xlink">struct g_consumer **disks</varname> :
+	    Массив <varname xmlns:xlink="http://www.w3.org/1999/xlink">struct g_consumer*</varname>. (Невозможно
+	    обойтись одинарным указателем, потому что система GEOM создает
+	    для нас структуры struct g_consumer*)</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Структура <varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">softc</varname> содержит состояние
+	экземпляра geom. У каждого экземпляра есть свой softc.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-metadata">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Метаданные</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Формат метаданных в той или иной мере зависит от конкретного
+	класса, но <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">обязан</emphasis> начинаться с:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">16-байтного буфера для подписи - строки с
+	    завершающим нулем (обычно это имя класса)</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">uint32 идентификатора версии</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Подразумевается, что классы geom знают как обращаться с
+	метаданными с идентификаторами версий ниже, чем их собственные.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Метаданные размещаются в последнем секторе поставщика geom
+	(поэтому обязаны целиком умещаться в нем).</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">(Все это зависит от реализации, но весь существующий код работает
+	подобно описанному и поддерживается библиотеками.)</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-creating">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Маркирование/создание экземпляра geom</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Последовательность событий следующая:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">пользователь запускает служебную программу <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry></para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">программа решает каким классом geom ей придется
+	    управлять и ищет библиотеку
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">geom_<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">CLASSNAME</replaceable>.so</filename>
+	    (которая обычно находится в <filename xmlns:xlink="http://www.w3.org/1999/xlink">/lib/geom</filename>).</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">она открывает библиотеку при помощи <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">dlopen</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">3</manvolnum></citerefentry>,
+	    извлекает вспомогательные функции и определения параметров
+	    командной строки.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Вот так происходит создание/маркирование нового экземпляра
+	geom:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">geom</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> ищет команду в аргументах командной
+	    строки (обычно это <option xmlns:xlink="http://www.w3.org/1999/xlink">label</option>) и вызывает
+	    вспомогательную функцию.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Вспомогательная функция проверяет параметры и
+	    собирает метаданные, которые записываются во все вовлеченные
+	    поставщики geom.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Это <quote xmlns:xlink="http://www.w3.org/1999/xlink">повреждает (spoil)</quote> существующие
+	    экземпляры geom (если они были) и порождает новый виток
+	    <quote xmlns:xlink="http://www.w3.org/1999/xlink">тестирования</quote> поставщиков geom. Целевой класс geom
+	    опознает метаданные и активирует экземпляр geom.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">(Приведенная выше последовательность событий зависит от
+	конкретной реализации, но весь существующий код работает
+	подобно описанному и поддерживается библиотеками.)</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-command">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Структура команд geom</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Вспомогательная библиотека <filename xmlns:xlink="http://www.w3.org/1999/xlink">geom_CLASSNAME.so</filename>
+	экспортирует структуру <varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">class_commands</varname>,
+	которая является массивом элементов
+	<varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">struct g_command</varname>. Эти команды одинакового
+	формата и выглядят следующим образом:</para>
+
+      <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">  команда [-опции] имя_geom [другие]</programlisting>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Общими командами являются:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">label - записать метаданные в устройства,
+	    чтобы они могли быть опознаны в процессе тестирования
+	    и использованы в соответствующих экземплярах geom</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">destroy - разрушить метаданные, за которым
+	    последует разрушение экземпляров geom</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Общие опции:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">-v</literal> : детальный вывод</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">-f</literal> : принудить</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Некоторые операции, к примеру маркирование метаданными и
+	разрушение метаданных могут быть выполнены из пространства
+	пользовательских процессов. Для этого, структура
+	<varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">g_command</varname> содержит поле
+	<varname xmlns:xlink="http://www.w3.org/1999/xlink">gc_func</varname>, которое может быть установлено на
+	функцию (в том-же <filename xmlns:xlink="http://www.w3.org/1999/xlink">.so</filename>), которая будет вызвана
+	для обработки команды. В случае, когда <varname xmlns:xlink="http://www.w3.org/1999/xlink">gc_func</varname>
+	равно NULL, команда будет передана модулю ядра: функции
+	<function xmlns:xlink="http://www.w3.org/1999/xlink">.ctlreq</function> класса GEOM.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-geoms">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Экземпляры geom</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">У экземпляров классов GEOM есть внутренние данные, которые
+	хранятся в структурах softc, а также есть некоторые функции,
+	посредством которых они реагируют на внешние события.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Функции событий:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.access</function> : просчитывает
+	    права доступа (чтение/запись/исключительный доступ)</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.dumpconf</function> : возвращает
+	    информацию о экземпляре geom; формат XML</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.orphan</function> : вызывается, когда
+	    отсоединяется любой из низлежащих поставщиков geom</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.spoiled</function> : вызывается, когда
+	    производится запись в низлежащий поставщик geom</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function> : обрабатывает ввод/вывод</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Эти функции вызываются из ядерного потока
+	<function xmlns:xlink="http://www.w3.org/1999/xlink">g_down</function> и в этом контексте не может быть
+	блокировок (поищите определение <quote xmlns:xlink="http://www.w3.org/1999/xlink">блокировка</quote> в других
+	источниках), что немного ограничивает свободу действий, но
+	способствует быстроте обработки.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Из вышеупомянутых, наиболее важной и выполняющей полезную работу
+	функцией является <function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function>(), которая вызывается
+	всякий раз, когда поставщику geom, управляемому экземпляром класса,
+	приходит запрос BIO.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-threads">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Потоки выполнения системы geom</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Системой GEOM в ядре ОС создаются и используются три
+	потока выполнения (kernel threads):</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">g_down</literal> : Обрабатывает запросы,
+	    приходящие от высокоуровневых сущностей (таких, как запросы из
+	    пространства пользовательских процессов) на пути к физическим
+	    устройствам</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">g_up</literal> : Обрабатывает ответы от
+	    драйверов устройств на запросы, выполненные высокоуровневыми
+	    сущностями</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink"><literal xmlns:xlink="http://www.w3.org/1999/xlink">g_event</literal> : Отрабатывает в остальных
+	    случаях, как-то создание экземпляра geom, просчитывание прав
+	    доступа, события <quote xmlns:xlink="http://www.w3.org/1999/xlink">повреждения</quote> и т.п.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Когда пользовательский процесс запрашивает <quote xmlns:xlink="http://www.w3.org/1999/xlink">прочитать
+	данные X по смещению Y файла</quote>, происходит следующее:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Файловая система преобразует запрос в экземпляр
+	    структуры bio и передает его системе GEOM. Файловая система
+	    <quote xmlns:xlink="http://www.w3.org/1999/xlink">знает</quote>, что экземпляр geom должен обработать запрос,
+	    так как файловые системы размещаются непосредственно
+	    над экземпляром geom.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Запрос завершается вызовом функции
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function>() в потоке g_down и достигает
+	    верхнего экземпляра geom.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Верхний экземпляр geom (например, это секционировщик
+	    разделов (partition slicer)) определяет, что запрос должен быть
+	    переадресован нижестоящему экземпляру geom (к примеру, драйверу
+	    диска). Вышестоящий экземпляр geom создает копию запроса bio
+	    (запросы bio <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">ВСЕГДА</emphasis> копируются при передаче
+	    между экземплярами geom при помощи
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_clone_bio</function>()!),
+	    изменяет поля смещения и целевого поставщика geom и запускает
+	    на обработку копию при помощи функции
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_io_request</function>()</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Драйвер диска также получает запрос bio, как вызов
+	    функции <function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function>() в потоке
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">g_down</literal>. Драйвер обращается к контроллеру диска,
+	    получает блок данных и вызывает функцию
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_io_deliver</function>() используя копию запроса bio
+	    </para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Теперь, извещение о завершении bio
+	    <quote xmlns:xlink="http://www.w3.org/1999/xlink">всплывает</quote> в потоке <literal xmlns:xlink="http://www.w3.org/1999/xlink">g_up</literal>.
+	    Сначала в потоке <literal xmlns:xlink="http://www.w3.org/1999/xlink">g_up</literal> вызывается функция
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">.done</function>() секционировщика разделов,
+	    последний использует полученную информацию, разрушает
+	    клонированный экземпляр структуры bio посредством
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_destroy_bio</function>() и вызывает
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_io_deliver</function>() используя
+	    первоначальный запрос</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Файловая система получает данные и передает их
+	    пользовательскому процессу</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">За информацией о том, как данные передаются в структуре
+	<varname xmlns:xlink="http://www.w3.org/1999/xlink" remap="structname">bio</varname> между экземплярами geom,
+	смотрите <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">g_bio</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry> (обратите внимание на использование полей
+	<varname xmlns:xlink="http://www.w3.org/1999/xlink">bio_parent</varname> и <varname xmlns:xlink="http://www.w3.org/1999/xlink">bio_children</varname>).
+	</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Важный момент в том, что <emphasis xmlns:xlink="http://www.w3.org/1999/xlink">НЕЛЬЗЯ ДОПУСКАТЬ БЛОКИРОВОК
+	В ПОТОКАХ G_UP И G_DOWN</emphasis>. Вот неполный перечень того,
+	что нельзя делать в этих потоках:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Вызывать функции <function xmlns:xlink="http://www.w3.org/1999/xlink">msleep</function>() или
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">tsleep</function>().</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Использовать функции
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_write_data</function>() и
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">g_read_data</function>(), так как они блокируются
+	    в момент обмена данными с потребителями geom.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Ожидать ввод/вывод.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Вызывать <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">malloc</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry> и
+	    <function xmlns:xlink="http://www.w3.org/1999/xlink">uma_zalloc</function>() с установленным флагом
+	    <varname xmlns:xlink="http://www.w3.org/1999/xlink">M_WAITOK</varname>.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Использовать <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sx</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry> <!-- и другие sleepable locks. -->
+	    </para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Это ограничение на код GEOM призвано избежать от
+	<quote xmlns:xlink="http://www.w3.org/1999/xlink">засорения</quote> пути запроса ввода/вывода, так как
+	блокировки обычно не имеют четких временных границ, и нет гарантий
+	на занимаемое время (также на то есть и другие технические причины).
+	Это также значит, что в вышеупомянутых потоках сколь-нибудь сложные
+	операции выполнить нельзя, например: любое сложное преобразование
+	требует выделения памяти. К счастью решение есть: создание
+	дополнительных ядерных потоков.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="geom-kernelthreads">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Ядерные потоки выполнения, предназначенные для использования
+	в коде geom</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Ядерные потоки выполнения создаются функцией
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">kthread_create</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>, в своем поведении они схожи с потоками,
+	созданными в пространстве пользовательских процессов, но есть одно
+	отличие: они не могут известить вызвавший их поток о своем завершении;
+	по завершению - необходимо вызывать <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">kthread_exit</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry></para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">В коде GEOM обычное назначение этих потоков - разгрузить
+	поток <literal xmlns:xlink="http://www.w3.org/1999/xlink">g_down</literal>
+	(функцию <function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function>() ) от обработки запросов. Эти
+	потоки подобны <quote xmlns:xlink="http://www.w3.org/1999/xlink">обработчикам событий</quote>
+	(<quote xmlns:xlink="http://www.w3.org/1999/xlink">event handlers</quote>):
+	у них есть очередь событий (которая наполняется событиями от разных
+	функций из разных потоков; очередь необходимо защищать мьютексом),
+	события из очереди выбираются одно за другим и обрабатываются
+	в большом блоке <literal xmlns:xlink="http://www.w3.org/1999/xlink">switch</literal>().</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Основное преимущество использования отдельного потока, который
+	обрабатывает запросы ввода/вывода, то, что он может блокироваться по
+	мере необходимости. Это, несомненно, привлекательно, но должно быть
+	хорошо обдумано. Блокирование - хорошо и удобно, но может
+	существенно снизить производительность преобразований данных в
+	системе GEOM. Особо требовательные к производительности классы
+	могут делать всю работу в функции <function xmlns:xlink="http://www.w3.org/1999/xlink">.start</function>(),
+	уделяя особое внимание ошибкам при работе с памятью.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Еще одно преимущество потока <quote xmlns:xlink="http://www.w3.org/1999/xlink">обработчика событий</quote>
+	это сериализация всех запросов и ответов, приходящих с разных
+	потоков geom в один поток. Это также удобно, но может быть медленным.
+	В большинстве случаев, обработка запросов функцией
+	<function xmlns:xlink="http://www.w3.org/1999/xlink">.done</function>() может быть оставлена потоку
+	<literal xmlns:xlink="http://www.w3.org/1999/xlink">g_up</literal>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">У мьютексов в ядре FreeBSD (<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">mutex</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>) есть одно различие
+	с их аналогами из пространства пользовательских процессов -
+	во время удержания мьютекса в коде не должно быть блокировки. Если
+	в коде необходимо блокирование, то лучше использовать <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sx</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">9</manvolnum></citerefentry>.
+	С другой стороны, если вся ваша работа выполняется в одном потоке,
+	вы можете обойтись вообще без мьютексов.</para>
+    </sect2>
+  </sect1>
+</article>

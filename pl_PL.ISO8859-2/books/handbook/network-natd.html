@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>27.8. Network Address Translation</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Podręcznik FreeBSD" /><link rel="up" href="advanced-networking.html" title="Rozdział 27. Advanced Networking" /><link rel="prev" href="network-isdn.html" title="27.7. ISDN" /><link rel="next" href="network-plip.html" title="27.9. Parallel Line IP (PLIP)" /><link rel="copyright" href="legalnotice.html" title="Informacja Prawna" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.8. Network Address Translation</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-isdn.html">Poprzedni</a> </td><th width="60%" align="center">Rozdział 27. Advanced Networking</th><td width="20%" align="right"> <a accesskey="n" href="network-plip.html">Następny</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-natd"></a>27.8. Network Address Translation</h2></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Chern</span> <span class="surname">Lee</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natoverview"></a>27.8.1. Overview</h3></div></div></div><a id="idp96502352" class="indexterm"></a><p>FreeBSD's Network Address Translation daemon, commonly known as
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> is a daemon that accepts incoming raw IP packets,
+        changes the source to the local machine and re-injects these packets
+        back into the outgoing IP packet stream.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> does this by changing
+        the source IP address and port such that when data is received back,
+        it is able to determine the original location of the data and forward
+        it back to its original requester.</p><a id="idp96505168" class="indexterm"></a><a id="idp96505680" class="indexterm"></a><p>The most common use of NAT is to perform what is commonly known as
+        Internet Connection Sharing.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natsetup"></a>27.8.2. Setup</h3></div></div></div><p>Due to the diminishing IP space in IPv4, and the increased number
+        of users on high-speed consumer lines such as cable or DSL, people are
+        increasingly in need of an Internet Connection Sharing solution.  The
+        ability to connect several computers online through one connection and
+        IP address makes <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> a reasonable choice.</p><p>Most commonly, a user has a machine connected to a cable or DSL
+        line with one IP address and wishes to use this one connected computer to
+        provide Internet access to several more over a LAN.</p><p>To do this, the FreeBSD machine on the Internet must act as a
+        gateway.  This gateway machine must have two NICs-one for connecting
+        to the Internet router, the other connecting to a LAN.  All the
+        machines on the LAN are connected through a hub or switch.</p><div xmlns="" class="note"><h3 class="admontitle">Uwaga: </h3><p xmlns="http://www.w3.org/1999/xhtml">There are many ways to get a LAN connected to the Internet
+	  through a FreeBSD gateway.   This example will only cover a
+	  gateway with at least two NICs.</p></div><div class="mediaobject"><img src="advanced-networking/natd.png" alt="Network Layout" /></div><p>A setup like this is commonly used to share an Internet
+        connection.  One of the <acronym class="acronym">LAN</acronym> machines is
+        connected to the Internet.  The rest of the machines access
+        the Internet through that <span class="quote">"<span class="quote">gateway</span>"</span>
+        machine.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdkernconfiguration"></a>27.8.3. Configuration</h3></div></div></div><a id="idp96523600" class="indexterm"></a><p>The following options must be in the kernel configuration
+        file:</p><pre class="programlisting">options IPFIREWALL
+options IPDIVERT</pre><p>Additionally, at choice, the following may also be suitable:</p><pre class="programlisting">options IPFIREWALL_DEFAULT_TO_ACCEPT
+options IPFIREWALL_VERBOSE</pre><p>The following must be in <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">gateway_enable="YES" <a id="co-natd-gateway-enable"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+firewall_enable="YES" <a id="co-natd-firewall-enable"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+firewall_type="OPEN" <a id="co-natd-firewall-type"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+natd_enable="YES"
+natd_interface="<em class="replaceable"><code>fxp0</code></em>" <a id="co-natd-natd-interface"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+natd_flags="" <a id="co-natd-natd-flags"></a><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-gateway-enable"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Sets up the machine to act as a gateway.  Running
+            <code class="command">sysctl net.inet.ip.forwarding=1</code> would
+            have the same effect.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-firewall-enable"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Enables the firewall rules in
+            <code class="filename">/etc/rc.firewall</code> at boot.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-firewall-type"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>This specifies a predefined firewall ruleset that
+            allows anything in.  See
+            <code class="filename">/etc/rc.firewall</code> for additional
+            types.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-natd-interface"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Indicates which interface to forward packets through
+            (the interface connected to the Internet).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-natd-flags"><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Any additional configuration options passed to
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> on boot.</p></td></tr></table></div><p>Having the previous options defined in
+        <code class="filename">/etc/rc.conf</code> would run
+        <code class="command">natd -interface fxp0</code> at boot.  This can also
+        be run manually.</p><div xmlns="" class="note"><h3 class="admontitle">Uwaga: </h3><p xmlns="http://www.w3.org/1999/xhtml">It is also possible to use a configuration file for
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> when there are too many options to pass.  In this
+	  case, the configuration file must be defined by adding the
+	  following line to <code class="filename">/etc/rc.conf</code>:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">natd_flags="-f /etc/natd.conf"</pre><p xmlns="http://www.w3.org/1999/xhtml">The <code class="filename">/etc/natd.conf</code> file will
+	  contain a list of configuration options, one per line.  For
+	  example the next section case would use the following
+	  file:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">redirect_port tcp 192.168.0.2:6667 6667
+redirect_port tcp 192.168.0.3:80 80</pre><p xmlns="http://www.w3.org/1999/xhtml">For more information about the configuration file,
+	  consult the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> manual page about the
+	  <code class="option">-f</code> option.</p></div><p>Each machine and interface behind the LAN should be
+        assigned IP address numbers in the private network space as
+        defined by <a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1918.txt" target="_top">RFC 1918</a>
+        and have a default gateway of the <span class="application">natd</span> machine's internal IP
+        address.</p><p>For example, client <code class="systemitem">A</code> and
+        <code class="systemitem">B</code> behind the LAN have IP addresses of <code class="systemitem">192.168.0.2</code> and <code class="systemitem">192.168.0.3</code>, while the natd machine's
+        LAN interface has an IP address of <code class="systemitem">192.168.0.1</code>.  Client <code class="systemitem">A</code>
+        and <code class="systemitem">B</code>'s default gateway must be set to that
+        of the <span class="application">natd</span> machine, <code class="systemitem">192.168.0.1</code>.  The <span class="application">natd</span> machine's
+        external, or Internet interface does not require any special
+        modification for <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> to work.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdport-redirection"></a>27.8.4. Port Redirection</h3></div></div></div><p>The drawback with <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> is that the LAN clients are not accessible
+        from the Internet.  Clients on the LAN can make outgoing connections to
+        the world but cannot receive incoming ones.  This presents a problem
+        if trying to run Internet services on one of the LAN client machines.
+        A simple way around this is to redirect selected Internet ports on the
+        <span class="application">natd</span> machine to a LAN client.
+      </p><p>For example, an IRC server runs on client <code class="systemitem">A</code>, and a web server runs
+        on client <code class="systemitem">B</code>.  For this to work properly, connections received on ports
+        6667 (IRC) and 80 (web) must be redirected to the respective machines.
+      </p><p>The <code class="option">-redirect_port</code> must be passed to
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> with the proper options.  The syntax is as follows:</p><pre class="programlisting">     -redirect_port proto targetIP:targetPORT[-targetPORT]
+                 [aliasIP:]aliasPORT[-aliasPORT]
+                 [remoteIP[:remotePORT[-remotePORT]]]</pre><p>In the above example, the argument should be:</p><pre class="programlisting">    -redirect_port tcp 192.168.0.2:6667 6667
+    -redirect_port tcp 192.168.0.3:80 80</pre><p>
+        This will redirect the proper <span class="emphasis"><em>tcp</em></span> ports to the
+        LAN client machines.
+      </p><p>The <code class="option">-redirect_port</code> argument can be used to indicate port
+        ranges over individual ports.  For example, <em class="replaceable"><code>tcp
+        192.168.0.2:2000-3000 2000-3000</code></em> would redirect
+        all connections received on ports 2000 to 3000 to ports 2000
+        to 3000 on client <code class="systemitem">A</code>.</p><p>These options can be used when directly running
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>, placed within the
+        <code class="literal">natd_flags=""</code> option in
+        <code class="filename">/etc/rc.conf</code>,
+	or passed via a configuration file.</p><p>For further configuration options, consult <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a></p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdaddress-redirection"></a>27.8.5. Address Redirection</h3></div></div></div><a id="idp96570448" class="indexterm"></a><p>Address redirection is useful if several IP addresses are
+        available, yet they must be on one machine.  With this,
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> can assign each LAN client its own external IP address.
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> then rewrites outgoing packets from the LAN clients
+        with the proper external IP address and redirects
+        all traffic incoming on that particular IP address back to
+        the specific LAN client.  This is also known as static NAT.
+        For example, the IP addresses <code class="systemitem">128.1.1.1</code>,
+        <code class="systemitem">128.1.1.2</code>, and
+        <code class="systemitem">128.1.1.3</code> belong to the <span class="application">natd</span> gateway
+        machine.  <code class="systemitem">128.1.1.1</code> can be used
+        as the <span class="application">natd</span> gateway machine's external IP address, while
+        <code class="systemitem">128.1.1.2</code> and
+        <code class="systemitem">128.1.1.3</code> are forwarded back to LAN
+        clients <code class="systemitem">A</code> and <code class="systemitem">B</code>.</p><p>The <code class="option">-redirect_address</code> syntax is as follows:</p><pre class="programlisting">-redirect_address localIP publicIP</pre><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>localIP</td><td>The internal IP address of the LAN client.</td></tr><tr><td>publicIP</td><td>The external IP address corresponding to the LAN client.</td></tr></tbody></table></div><p>In the example, this argument would read:</p><pre class="programlisting">-redirect_address 192.168.0.2 128.1.1.2
+-redirect_address 192.168.0.3 128.1.1.3</pre><p>Like <code class="option">-redirect_port</code>, these arguments are also placed within
+        the <code class="literal">natd_flags=""</code> option of <code class="filename">/etc/rc.conf</code>, or passed via a configuration file.  With address
+        redirection, there is no need for port redirection since all data
+        received on a particular IP address is redirected.</p><p>The external IP addresses on the <span class="application">natd</span> machine must be active and aliased
+        to the external interface.  Look at <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> to do so.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-isdn.html">Poprzedni</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Początek rozdziału</a></td><td width="40%" align="right"> <a accesskey="n" href="network-plip.html">Następny</a></td></tr><tr><td width="40%" align="left" valign="top">27.7. ISDN </td><td width="20%" align="center"><a accesskey="h" href="index.html">Spis treści</a></td><td width="40%" align="right" valign="top"> 27.9. Parallel Line IP (PLIP)</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

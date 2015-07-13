@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>12.7. 超时处理</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="scsi.html" title="第 12 章 通用访问方法SCSI控制器" /><link rel="prev" href="scsi-errors.html" title="12.6. 错误总览" /><link rel="next" href="usb.html" title="第 13 章 USB设备" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.7. 超时处理</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="scsi-errors.html">上一页</a> </td><th width="60%" align="center">第 12 章 通用访问方法SCSI控制器</th><td width="20%" align="right"> <a accesskey="n" href="usb.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="scsi-timeout"></a>12.7. 超时处理</h2></div></div></div><p>当HCB的超时期满时，请求就应当被中止，就像处理XPT_ABORT请求
+      一样。唯一区别在于被中止的请求的返回状态应当为CAM_CMD_TIMEOUT
+      而不是CAM_REQ_ABORTED（这就是为什么中止的实现最好由函数来完成）。
+      但还有一个可能的问题：如果中止请求自己出了麻烦怎么办？这种情况下
+      应当复位SCSI总线，就像处理XPT_RESET_BUS请求一样（并且将其实现为
+      函数，从两个地方调用的想法也适用于这儿）。而且如果设备复位请求出了
+      问题，我们应当复位整个SCSI总线。因此最终超时函数看起来像下面样子：
+      </p><pre class="programlisting">static void
+xxx_timeout(void *arg)
+{
+    struct xxx_hcb *hcb = (struct xxx_hcb *)arg;
+    struct xxx_softc *softc;
+    struct ccb_hdr *ccb_h;
+
+    softc = hcb-&gt;softc;
+    ccb_h = &amp;hcb-&gt;ccb-&gt;ccb_h;
+
+    if(hcb-&gt;flags &amp; HCB_BEING_ABORTED
+    || ccb_h-&gt;func_code == XPT_RESET_DEV) {
+        xxx_reset_bus(softc);
+    } else {
+        xxx_abort_ccb(hcb-&gt;ccb, CAM_CMD_TIMEOUT);
+    }
+}</pre><p>当我们中止一个请求时，同一目标/LUN的所有其他断开连接的请求
+      也会被中止。因此出现了一个问题，我们应当返回它们的状态
+      CAM_REQ_ABORTED还是CAM_CMD_TIMEOUT？当前的驱动程序使用
+      CAM_CMD_TIMEOUT。这看起来符合逻辑，因为如果一个请求超时，则可能
+      设备出现了某些的确很糟的事情，因此如果它们没有被扰乱则它们自己
+      应当超时。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="scsi-errors.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="scsi.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="usb.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">12.6. 错误总览 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 第 13 章 USB设备</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

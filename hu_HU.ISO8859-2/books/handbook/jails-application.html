@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>15.6. A jailek alkalmazása</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="jails.html" title="15. fejezet - A jail alrendszer" /><link rel="prev" href="jails-tuning.html" title="15.5. Finomhangolás és karbantartás" /><link rel="next" href="mac.html" title="16. fejezet - Kötelező hozzáférés-vezérlés (MAC)" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.6. A jailek alkalmazása</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="jails-tuning.html">Vissza</a> </td><th width="60%" align="center">15. fejezet - A jail alrendszer</th><td width="20%" align="right"> <a accesskey="n" href="mac.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="jails-application"></a>15.6. A jailek alkalmazása</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails"></a>15.6.1. Szolgáltatások jailbe
+	foglalása</h3></div><div><span class="authorgroup">Írta: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Gerzo</span>, <span class="firstname">Daniel</span></span>. </span></div></div></div><p>Ez a rész eredetileg Simon L. B. Nielsen <code class="uri"><a class="uri" href="http://simon.nitro.dk/service-jails.html" target="_top">http://simon.nitro.dk/service-jails.html</a></code> oldalon
+	található írásán, valamint
+	Ken Tom (<code class="email">&lt;<a xmlns="" class="email" href="mailto:locals@gmail.com">locals@gmail.com</a>&gt;</code>) átdolgozott
+	cikkén alapul.  Itt megismerhetjük, hogyan
+	állítsunk be a FreeBSD rendszerünkben egy
+	biztonsági réteget a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>
+	felhasználásával.  Továbbá
+	feltételezzük, hogy ez a rendszer legalább
+	RELENG_6_0 verziójú és a fejezetben
+	korábban tárgyaltakat az olvasó teljes
+	mértékben megértette.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-design"></a>15.6.1.1. A kialakítás</h4></div></div></div><p>A jailek egyik legnagyobb gondja a frissítés
+	  folyamatának lebonyolítása.  Azért
+	  jelent ez egyre inkább gondot, mert minden egyes jailt
+	  újra fel kell építenünk a
+	  frissítése során.  Ez többnyire nem
+	  okoz gondot egyetlen jail használata során,
+	  mivel maga a frissítési folyamat
+	  meglehetősen egyszerű, azonban igen
+	  időigényessé és
+	  fárasztóvá tud válni több
+	  jail esetében.</p><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ez a példa a FreeBSD képességeinek
+	    haladó szintű ismeretét követeli
+	    meg.  Amennyiben az itt bemutatott lépesek
+	    túlságosan is bonyolultnak
+	    tűnnének, érdemes olyan egyszerűbb
+	    rendszerek után nézni, mint mondjuk a
+	    <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/ezjail/pkg-descr">sysutils/ezjail</a>, amely
+	    egy egyszerűbb módszert kínál fel
+	    a FreeBSD-ben használt jailek
+	    karbantartására, és nem is annyira
+	    bonyolult, mint ez a példa.</p></div><p>A bemutatandó példa célja, hogy
+	  feloldja az ilyen jellegű problémákat,
+	  és ezért igyekszik a jailek között
+	  mindent megosztani, ami csak lehetséges.  Mindezt
+	  biztonságosan éri el -
+	  írásvédett <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mount_nullfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mount_nullfs</span>(8)</span></a>
+	  állományrendszer használatával,
+	  aminek köszönhetően a frissítés
+	  maga egyszerűbbé, az egyes
+	  szolgáltatások
+	  különzárása pedig
+	  vonzóbbá válik.  Ráadásul
+	  egyúttal egy nagyon egyszerű módszert mutat
+	  az új jailek hozzáadására
+	  és a régi törlésére
+	  ugyanúgy, mint a
+	  frissítésükre.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Például ilyen
+	    szolgáltatásokat kívánunk
+	    szabályozni: egy <acronym class="acronym">HTTP</acronym> szervert,
+	    egy <acronym class="acronym">DNS</acronym> szervert, egy
+	    <acronym class="acronym">SMTP</acronym> szervert és így
+	    tovább.</p></div><p>Az itt szereplő beállítás
+	  céljai:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Készítsünk egy egyszerűen
+	      és könnyen átlátható
+	      jailkezelési rendszert.  Ebből tehát
+	      következik, hogy <span class="emphasis"><em>ne</em></span> kelljen
+	      lefuttatni a teljes rendszer
+	      telepítését minden egyes
+	      jailre.</p></li><li class="listitem"><p>Könnyítsük meg az új jailek
+	      hozzáadását és a régiek
+	      eltávolítását.</p></li><li class="listitem"><p>Könnyítsük meg a már
+	      létező jailek frissítését
+	      és cseréjét.</p></li><li class="listitem"><p>Tegyük lehetővé saját FreeBSD
+	      ágak futtatását.</p></li><li class="listitem"><p>Legyünk különösen
+	      körültekintőek a biztonság
+	      tekintetében, és igyekezzünk
+	      minél jobban csökkenteni veszély
+	      kockázatát.</p></li><li class="listitem"><p>Takarékoskodjunk a tárhellyel és
+	      az állományrendszerrel, amennyire csak
+	      lehet.</p></li></ul></div><p>Ahogy azt már korábban is
+	  említettük, ez a kialakítás nagyban
+	  építkezik egyetlen fő sablonra, amely
+	  írásvédetten kerül
+	  csatlakoztatásra (<span class="application">nullfs</span>en
+	  keresztül) az egyes jailekben, valamint jailenként
+	  egy-egy írható-olvasható eszközre.
+	  Ez az eszköz lehet egy külön fizikai lemez, egy
+	  partíció vagy egy vnode alapú <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=md&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">md</span>(4)</span></a>
+	  eszköz.  Ebben a példában
+	  írható-olvasható
+	  <span class="application">nullfs</span> csatlakozásokat
+	  használunk.</p><p>Az állományrendszer kiosztása a most
+	  következő listában szerepel:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Minden jailt a <code class="filename">/home/j</code>
+	      könyvtárban csatlakoztatunk.</p></li><li class="listitem"><p>A <code class="filename">/home/j/mroot</code>
+	      lesz az összes jail sablonja és
+	      mindegyikük számára
+	      írásvédett.</p></li><li class="listitem"><p>Minden jailnek létrehozunk egy üres
+	      alkönyvtárat a <code class="filename">/home/j</code>
+	      könyvtárban.</p></li><li class="listitem"><p>Minden jailnek lesz egy <code class="filename">/s</code> alkönyvtára,
+	      amelyet a rendszer írható-olvasható
+	      részére irányítunk.</p></li><li class="listitem"><p>Minden jailnek lesz egy saját
+	      írható-olvasható része, amely
+	      a <code class="filename">/home/j/skel</code>
+	      könyvtáron alapszik.</p></li><li class="listitem"><p>Mindegyik elzárt terület (a jailek
+	      írható-olvasható része) a
+	      <code class="filename">/home/js</code>
+	      könyvtárban jön létre.</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ez a kiosztás feltételezi, hogy a jaileket
+	    a <code class="filename">/home</code>
+	    partíción hozzuk létre.  Ez
+	    természetesen bármi másra
+	    megváltoztatható, de akkor figyelnünk
+	    kell erre minden egyes parancs kiadása
+	    előtt.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-template"></a>15.6.1.2. A sablon létrehozása</h4></div></div></div><p>Ez a rész leírja a fő sablon
+	  létrehozásához szükséges
+	  lépéseket.  Ez a jailek számára
+	  írásvédett lesz.</p><p>Érdemes mindig frissíteni a FreeBSD
+	  rendszerünket a legújabb -RELEASE ágra.
+	  Ehhez olvassuk el az ide tartozó <a class="link" href="../../../../doc/hu_HU.ISO8859-2/books/handbook/makeworld.html" target="_top">fejezetet</a> a
+	  kézikönyvből.  Abban az esetben, ha a
+	  frissítés nem lenne megoldható, egy
+	  <code class="command">make buildworld</code> parancsot
+	  mindenképpen le kell tudnunk futtatni.  Ezenfelül
+	  a <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a> csomagra
+	  is szükségünk van.  Használni fogjuk a
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=portsnap&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">portsnap</span>(8)</span></a> segédprogramot is a FreeBSD
+	  Portgyűjtemény letöltéséhez.
+	  Akik nem ismernék, a kézikönyv <a class="link" href="../../../../doc/hu_HU.ISO8859-2/books/handbook/portsnap.html" target="_top">erről
+	  szóló fejezetében</a> olvashatnak
+	  róla.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Először is, készítsük el
+	      az írásvédett
+	      állományrendszer
+	      könyvtárszerkezetét, amely majd
+	      tartalmazni fogja a jailek által használt
+	      FreeBSD-s programokat.  Ezután lépjünk be
+	      a FreeBSD forrásfájának
+	      könyvtárába és
+	      telepítsük fel az
+	      írásvédett
+	      állományrendszert a sablonba:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot</code></strong></pre></li><li class="step"><p>Ezt követően készítsük
+	      elő a jailek számára a FreeBSD
+	      Portgyűjteményt és FreeBSD
+	      forrásfát, melyek kellenek a
+	      <span class="application">mergemaster</span>
+	      használatához:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir usr/ports</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>portsnap -p /home/j/mroot/usr/ports fetch extract</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src /home/j/mroot/usr/src</code></strong></pre></li><li class="step"><p>Hozzuk létre a rendszer
+	      írásvédett részének
+	      vázát:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/skel /home/j/skel/home /home/j/skel/usr-X11R6 /home/j/skel/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv etc /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv usr/local /home/j/skel/usr-local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv tmp /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv var /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv root /home/j/skel</code></strong></pre></li><li class="step"><p>Használjuk a
+	      <span class="application">mergemaster</span>t a
+	      hiányzó konfigurációs
+	      állományok
+	      telepítésére.  Szabaduljunk meg a
+	      <span class="application">mergemaster</span> által
+	      készített felesleges
+	      könyvtáraktól:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mergemaster -t /home/j/skel/var/tmp/temproot -D /home/j/skel -i</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R bin boot lib libexec mnt proc rescue sbin sys usr dev</code></strong></pre></li><li class="step"><p>Most pedig szimbolikusan linkeljük az
+	      írható-olvasható
+	      állományrendszert az
+	      írásvédett
+	      állományrendszerre.  Ellenőrizzük,
+	      hogy a szimbolikus linkek a megfelelő <code class="filename">s/</code> könyvtárakban
+	      jöttek létre.  Valós vagy rossz helyen
+	      létrehozott könyvtárak
+	      használata esetén a telepítés
+	      nem fog sikerülni.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../../s/distfiles usr/ports/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Utolsó lépésként hozzunk
+	      létre egy
+	      <code class="filename">/home/j/skel/etc/make.conf</code>
+	      állományt az alábbi
+	      tartalommal:</p><pre class="programlisting">WRKDIRPREFIX?=  /s/portbuild</pre><p>A <code class="literal">WRKDIRPREFIX</code>
+	      beállításával
+	      lehetővé válik a FreeBSD portok jaileken
+	      belüli fordítása.  Ne felejtsük
+	      el, hogy a portokat tartalmazó könyvtár
+	      az írásvédett rendszer része!
+	      Az átállított
+	      <code class="literal">WRKDIRPREFIX</code> azonban megengedi, hogy a
+	      fordítások az egyes jailek
+	      írható-olvasható részeiben
+	      történjenek.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-creating"></a>15.6.1.3. A jailek létrehozása</h4></div></div></div><p>Most, miután teljesen elkészült a FreeBSD
+	  jailek sablonja, be is tudjuk állítani és
+	  hozzá is tudjuk venni ezeket az
+	  <code class="filename">/etc/rc.conf</code> állományhoz.
+	  Ebben a példában 3 jail
+	  létrehozását láthatjuk:
+	  <span class="quote">"<span class="quote">NS</span>"</span>, <span class="quote">"<span class="quote">MAIL</span>"</span> és
+	  <span class="quote">"<span class="quote">WWW</span>"</span>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Írjuk bele a következő sorokat az
+	      <code class="filename">/etc/fstab</code> állományba,
+	      aminek köszönhetően az egyes jailek
+	      számára elérhetővé
+	      válik az írásvédett sablon
+	      és a hozzájuk tartozó
+	      írható-olvasható
+	      területek:</p><pre class="programlisting">/home/j/mroot   /home/j/ns     nullfs  ro  0   0
+/home/j/mroot   /home/j/mail   nullfs  ro  0   0
+/home/j/mroot   /home/j/www    nullfs  ro  0   0
+/home/js/ns     /home/j/ns/s   nullfs  rw  0   0
+/home/js/mail   /home/j/mail/s nullfs  rw  0   0
+/home/js/www    /home/j/www/s  nullfs  rw  0   0</pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Az első helyen nullával jelölt
+		partíciókat a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> nem fogja
+		ellenőrizni a rendszer indulása
+		során, a második helyen nullával
+		jelölt partíciókat pedig nem fogja
+		menteni a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a>.  Mi egyáltalán nem
+		akarjuk, hogy az <span class="application">fsck</span>
+		ellenőrizze vagy a <span class="application">dump</span>
+		lementse a jailjeinkhez tartozó
+		írásvédett
+		<span class="application">nullfs</span>-partícióinkat.
+		Ezért szerepel végig
+		<span class="quote">"<span class="quote">0 0</span>"</span> a fentebb szereplő
+		<code class="filename">fstab</code>-bejegyzések
+		utolsó két oszlopában.</p></div></li><li class="step"><p>Állítsuk be a jaileket az
+	      <code class="filename">/etc/rc.conf</code>-ban:</p><pre class="programlisting">jail_enable="YES"
+jail_set_hostname_allow="NO"
+jail_list="ns mail www"
+jail_ns_hostname="ns.example.org"
+jail_ns_ip="192.168.3.17"
+jail_ns_rootdir="/usr/home/j/ns"
+jail_ns_devfs_enable="YES"
+jail_mail_hostname="mail.example.org"
+jail_mail_ip="192.168.3.18"
+jail_mail_rootdir="/usr/home/j/mail"
+jail_mail_devfs_enable="YES"
+jail_www_hostname="www.example.org"
+jail_www_ip="62.123.43.14"
+jail_www_rootdir="/usr/home/j/www"
+jail_www_devfs_enable="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">Azért állítottuk a
+	      <code class="varname">jail_<em class="replaceable"><code>név</code></em>_rootdir</code>
+		változó értékét a
+		<code class="filename">/usr/home</code>
+		könyvtárra a <code class="filename">/home</code> könyvtár
+		helyett, mert a FreeBSD
+		alaptelepítésében a <code class="filename">/home</code> könyvtár
+		fizikailag a <code class="filename">/usr/home</code>
+		könyvtárral egyezik meg.  A
+		<code class="varname">jail_<em class="replaceable"><code>név</code></em>_rootdir</code>
+		változó értékeként
+		megadott könyvtár <span class="emphasis"><em>nem</em></span>
+		tartalmazhat szimbolikus linket,
+		máskülönben a jailek nem lesznek
+		hajlandóak létrejönni.  Ennek
+		megállapításában a
+		<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=realpath&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">realpath</span>(1)</span></a> segédprogram lehet
+		segítségünkre.  A
+		korlátozás részleteiről a
+		FreeBSD-SA-07:01.jail biztonsági
+		figyelmeztetésben olvashatunk.</p></div></li><li class="step"><p>Hozzuk létre az egyes jailek
+	      írásvédett
+	      állományrendszereihez szükséges
+	      csatlakozási pontokat:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/ns /home/j/mail /home/j/www</code></strong></pre></li><li class="step"><p>Telepítsük az
+	      írható-olvasható sablont az egyes
+	      jailekbe.  Figyeljük meg a <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a>
+	      használatát, amellyel az egyes
+	      könyvtárak pontos másolatait hozhatjuk
+	      létre:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/js</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/www</code></strong></pre></li><li class="step"><p>Ebben a fázisban a jailek már
+	      elkészültek és készen
+	      állnak a futásra.  Először
+	      csatlakoztassuk az egyes jailekhez szükséges
+	      állományrendszereket, majd indítsuk
+	      el ezeket a <code class="filename">/etc/rc.d/jail</code>
+	      szkripttel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>A jailek most már futnak.  Az elindulásuk
+	  ellenőrzéséhez használjuk a
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a> parancsot.  Valami ilyesmit láthatunk a
+	  kiadása után:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jls</code></strong>
+   JID  IP Address      Hostname                      Path
+     3  192.168.3.17    ns.example.org                /home/j/ns
+     2  192.168.3.18    mail.example.org              /home/j/mail
+     1  62.123.43.14    www.example.org               /home/j/www</pre><p>Itt már be tudunk jelentkezni az egyes jailekbe,
+	  új felhasználókat tudunk
+	  készíteni vagy démonokat tudunk
+	  beállítani.  A <code class="literal">JID</code> oszlop
+	  mutatja az egyes jailek azonosítási
+	  számát.  A 3-as <code class="literal">JID</code>
+	  számú jailben az alábbi parancs
+	  használatával karbantartási feladatokat
+	  elvégezni:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jexec 3 tcsh</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-upgrading"></a>15.6.1.4. Frissítés</h4></div></div></div><p>Időről időre adódhat, hogy
+	  frissítenünk kell a rendszert a FreeBSD egy
+	  újabb változatára, vagy egy
+	  biztonsági hiba javítása miatt, vagy
+	  pedig a már meglevő jailek számára
+	  hasznos újítások bevezetése miatt.
+	  Ez a kialakítás megkönnyíti a
+	  korábban létrehozott jailjeink
+	  frissítését.  Továbbá
+	  igyekszik minimalizálni a kiesésüket is,
+	  mivel a jaileket csak a legutolsó pillanatban fogjuk
+	  leállítani.  Sőt, még az is
+	  lehetővé válik, hogy
+	  visszaállítsuk a korábbi verziót,
+	  ha véletlenül valami rosszul sülne el
+	  menetközben.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Első lépéseként
+	      frissítsük magát a befogadó
+	      rendszert a megszokott módon.  Ezután
+	      hozzunk létre egy új
+	      írásvédett sablont a <code class="filename">/home/j/mroot2</code>
+	      könyvtárban.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong></pre><p>A <code class="buildtarget">installworld</code>
+	      lefuttatása létrehoz néhány
+	      felesleges könyvtárat, melyeket
+	      takarítsunk is el:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chflags -R 0 var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R etc var root usr/local tmp</code></strong></pre></li><li class="step"><p>Hozzuk újra létre az
+	      írható-olvasható szimbolikus
+	      linkjeinket a fő
+	      állományrendszerre:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Most érkezett el az idő, hogy
+	      leállítsuk a jaileket:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail stop</code></strong></pre></li><li class="step"><p>Válasszuk le az eredeti
+	      állományrendszereket:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Az írható-olvasható
+		állományrendszerek hozzá vannak
+		kapcsolva az írásvédett
+		állományrendszerhez (<code class="filename">/s</code>), ezért azokat
+		először le kell választani.</p></div></li><li class="step"><p>Mozgassuk el az útból a régi
+	      írásvédett
+	      állományrendszerünket és
+	      váltsuk fel az újjal.  Így
+	      biztonsági mentésként és a
+	      régi írásvédett rendszer
+	      archívumaként továbbra is
+	      rendelkezésre áll, ha valami baj
+	      történne.  Az itt használt
+	      elnevezés az újonnan létrehozott
+	      írásvédett
+	      állományrendszer
+	      dátumából ered.  Mozgassuk át
+	      az eredeti FreeBSD Portgyűjteményt az új
+	      állományrendszerre, hogy
+	      megtakarítsunk némi tárhelyet
+	      és
+	      állományleírót:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot mroot.20060601</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot2 mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot.20060601/usr/ports mroot/usr</code></strong></pre></li><li class="step"><p>Most már készen áll az új
+	      írásvédett sablon, így
+	      már csak az állományrendszerek
+	      újracsatlakoztatása és a jailek
+	      újraindítása maradt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a> használatával
+	  ellenőrizzük, hogy a jailek rendesen elindultak.  Ne
+	  felejtsük el jailenként lefuttatni a mergemastert
+	  sem.  A konfigurációs állományokat
+	  és az rc.d szkripteket is frissítenünk kell
+	  majd.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="jails-tuning.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="jails.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="mac.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">15.5. Finomhangolás és karbantartás </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 16. fejezet - Kötelező
+    hozzáférés-vezérlés (MAC)</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

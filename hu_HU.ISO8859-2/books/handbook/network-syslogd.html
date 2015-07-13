@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>29.11. Távoli gépek naplózása syslogd használatával</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="network-servers.html" title="29. fejezet - Hálózati szerverek" /><link rel="prev" href="network-ntp.html" title="29.10. Az órák egyeztetése az NTP használatával" /><link rel="next" href="firewalls.html" title="30. fejezet - Tűzfalak" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">29.11. Távoli gépek naplózása
+      <code class="command">syslogd</code> használatával</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-ntp.html">Vissza</a> </td><th width="60%" align="center">29. fejezet - Hálózati szerverek</th><td width="20%" align="right"> <a accesskey="n" href="firewalls.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-syslogd"></a>29.11. Távoli gépek naplózása
+      <code class="command">syslogd</code> használatával</h2></div><div><span class="authorgroup">Készítette: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Rhodes</span>, <span class="firstname">Tom</span></span>. </span></div></div></div><p>A rendszernaplókkal kapcsolatos műveletek
+      egyaránt fontosak a biztonság és a
+      karbantartás szempontjából.  Ha közepes
+      vagy nagyobb méretű, esetleg
+      különböző típusú
+      hálózatokban adminisztrálunk több
+      gépet, akkor könnyen
+      átláthatatlanná válhat a naplók
+      rendszeres felügyelete.  Ilyen helyzetekben a távoli
+      naplózás beállításával
+      az egész folyamatot sokkal kényelmesebbé
+      tehetjük.</p><p>Némileg képesek vagyunk enyhíteni a
+      naplóállományok kezelésének
+      terhét, ha egyetlen központi szerverre
+      küldjük át az adatokat.  Ekkor a FreeBSD
+      alaprendszerében megtalálható
+      alapeszközökkel, mint például a
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> vagy a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newsyslog</span>(8)</span></a>
+      felhasználásával egyetlen helyen be tudjuk
+      állítani a naplók
+      összegyűjtését,
+      összefésülését és
+      cseréjét.  A most következő példa
+      konfigurációban az <code class="systemitem">A</code> gép, a
+      <code class="systemitem">naploszerver.minta.com</code> fogja
+      gyűjteni a helyi hálózatról
+      érkező naplóinformációkat.  A
+      <code class="systemitem">B</code> gép, a <code class="systemitem">naplokliens.minta.com</code> pedig a szervernek
+      küldi a naplózandó adatokat.  Éles
+      környezetben mind a két gépnek rendelkeznie
+      kell megfelelő <acronym class="acronym">DNS</acronym> bejegyzésekkel,
+      vagy legalább szerepelniük kell egymás
+      <code class="filename">/etc/hosts</code> állományaiban.  Ha
+      ezt elmulasztjuk, a szerver nem lesz hajlandó adatokat
+      fogadni.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98495184"></a>29.11.1. A naplószerver
+	beállítása</h3></div></div></div><p>A naplószerverek olyan gépek, amelyeket
+	úgy állítottunk be, hogy
+	naplózási információkat tudjanak
+	fogadni távoli
+	számítógépekről.  A
+	legtöbb esetben így egyszerűsíteni
+	tudunk a konfiguráción, vagy olykor
+	egyszerűen csak hasznos, ha ezt a megoldást
+	alkalmazzuk.  Függetlenül attól, hogy
+	miért használjuk, a
+	továbblépés előtt néhány
+	előkészületet meg kell tennünk.</p><p>Egy rendesen beállított naplószervernek
+	legalább a következő követelményeknek
+	kell eleget tennie:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>az 514-es <acronym class="acronym">UDP</acronym> portot
+	    engedélyezni kell mind a kliensen, mind pedig a
+	    szerveren futó tűzfal
+	    szabályrendszerében;</p></li><li class="listitem"><p>a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> képes legyen a távoli
+	    kliens gépekről érkező üzeneteket
+	    fogadni;</p></li><li class="listitem"><p>a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> szervernek és az összes
+	    kliensnek rendelkeznie kell érvényes
+	    <acronym class="acronym">DNS</acronym> (közvetlen és inverz)
+	    bejegyzésekkel vagy szerepelnie kell az
+	    <code class="filename">/etc/hosts</code>
+	    állományban.</p></li></ul></div><p>A naplószerver
+	beállításához mindegyik klienst fel
+	kell vennünk az <code class="filename">/etc/syslog.conf</code>
+	állományba, valamint meg kell adnunk a
+	megfelelő funkciót (facility):</p><pre class="programlisting">+naplokliens.minta.com
+*.*     /var/log/naplokliens.log</pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">syslog.conf</span>(5)</span></a> man oldalán
+	  megtalálhatjuk a különböző
+	  támogatott és elérhető
+	  <span class="emphasis"><em>funkciókat</em></span>.</p></div><p>Miután beállítottuk, az összes
+	adott funkcióhoz tartozó üzenet az előbb
+	megadott állományba
+	(<code class="filename">/var/log/naplokliens.log</code>) fog
+	kerülni.</p><p>A szerveren továbbá meg kell adnunk a
+	következő sort az <code class="filename">/etc/rc.conf</code>
+	állományban:</p><pre class="programlisting">syslogd_enable="YES"
+syslogd_flags="-a naplokliens.minta.com -vv"</pre><p>Az első sorral engedélyezzük a
+	<code class="command">syslogd</code> elindítását a
+	rendszerindítás során, majd a
+	második sorral engedélyezzük, hogy a kliens
+	naplózni tudjon a szerverre.  Itt még
+	látható a <code class="option">-vv</code> opció,
+	amellyel a naplózott üzenetek
+	részletességét tudjuk növelni.  Ennek
+	nagyon fontos a szerepe a naplózási
+	funkciók behangolásakor, mivel így a
+	rendszergazdák pontosan láthatják milyen
+	típusú üzenetek milyen funkcióval
+	kerültek rögzítésre a
+	naplóban.</p><p>Befejezésképpen hozzuk létre a
+	naplóállományt.  Teljesen mindegy, hogy erre
+	milyen megoldást alkalmazunk, például a
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=touch&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">touch</span>(1)</span></a> remekül megfelel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/naplokliens.log</code></strong></pre><p>Ezután indítsuk újra és
+	ellenőrizzük a <code class="command">syslogd</code>
+	démont:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/syslogd restart</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>pgrep syslog</code></strong></pre><p>Ha válaszul megkapjuk a futó démon
+	azonosítóját, akkor sikerült
+	újraindítanunk, elkezdhetjük a kliens
+	beállítását.  Ha valamiért
+	nem indult volna újra a szerver, az
+	<code class="filename">/var/log/messages</code>
+	állományból próbáljuk meg
+	kideríteni az okát.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98518096"></a>29.11.2. A naplókliens
+	beállítása</h3></div></div></div><p>A naplókliens az a gép, amely egy helyi
+	naplópéldány karbantartása mellett
+	továbbküldni a naplózandó
+	információkat egy naplószervernek.</p><p>Hasonlóan a naplószerverekhez, a klienseknek
+	is teljesítenie bizonyos alapvető
+	elvárásokat:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> démon küldjön
+	    bizonyos típusú üzeneteket a
+	    naplószervernek, amely ezeket pedig képes
+	    legyen fogadni;</p></li><li class="listitem"><p>a hozzá tartozó tűzfal engedje
+	    át a forgalmat az 514-es <acronym class="acronym">UDP</acronym>
+	    porton;</p></li><li class="listitem"><p>rendelkezzen mind közvetlen, mind pedig inverz
+	    <acronym class="acronym">DNS</acronym> bejegyzéssel, vagy
+	    szerepeljenek az <code class="filename">/etc/hosts</code>
+	    állományban.</p></li></ul></div><p>A kliens beállítása sokkal
+	egyszerűbb a szerverhez képest.  A kliensen adjuk
+	hozzá a következő sorokat az
+	<code class="filename">/etc/rc.conf</code>
+	állományhoz:</p><pre class="programlisting">syslogd_enabled="YES"
+syslogd_flags="-s -vv"</pre><p>A szerver beállításaihoz
+	hasonlóan itt is engedélyezzük a
+	<code class="command">syslogd</code> démont és
+	megnöveljük a naplózott üzenetek
+	részletességét.  A <code class="option">-s</code>
+	kapcsolóval pedig megakadályozzuk, hogy a kliens
+	más gépekről is hajlandó legyen
+	naplóüzeneteket elfogadni.</p><p>A funkciók a rendszernek azon részét
+	írják le, amelyhez létrejön az adott
+	üzenet.  Tehát például az
+	<code class="literal">ftp</code> és <code class="literal">ipfw</code>
+	egyaránt ilyen funkciók.  Amikor keletkezik egy
+	naplóüzenet valamelyikükhöz,
+	általában megjelenik a nevük.  A
+	funkciókhoz tartozik még egy prioritás vagy
+	szint is, amellyel az adott üzenet
+	fontosságát jelzik.  Ezek közül a
+	leggyakoribb a <code class="literal">warning</code> (mint
+	<span class="quote">"<span class="quote">figyelmeztetés</span>"</span>) és
+	<code class="literal">info</code> (mint
+	<span class="quote">"<span class="quote">információ</span>"</span>).  A
+	használható funkciók és a
+	hozzájuk tartozó prioritások teljes
+	listáját a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslog&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">syslog</span>(3)</span></a> man oldalán
+	olvashatjuk.</p><p>A naplószervert meg kell adnunk a kliens
+	<code class="filename">/etc/syslog.conf</code>
+	állományában.  Itt a <code class="literal">@</code>
+	szimbólummal jelezzük, hogy az adatokat egy
+	távoli szerverre szeretnénk
+	továbbküldeni, valahogy így:</p><pre class="programlisting">*.*               @naploszerver.minta.com</pre><p>Ezután a beállítás
+	érvényesítéséhez újra
+	kell indítanunk a <code class="command">syslogd</code>
+	démont:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/syslogd restart</code></strong></pre><p>A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=logger&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">logger</span>(1)</span></a> használatával
+	próbáljuk ki a kliensről a
+	aplóüzenetek hálózaton keresztüli
+	küldését, és küldjünk
+	valamit a <code class="command">syslogd</code> démonnak:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>logger "Udvozlet a naplokliensrol"</code></strong></pre><p>A parancs kiadása után az üzenetnek mind
+	a kliens, mind pedig a szerver
+	<code class="filename">/var/log/messages</code>
+	állományában meg kell jelennie.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98544848"></a>29.11.3. Hibakeresés</h3></div></div></div><p>Előfordulhat, hogy a naplószerver
+	valamiért nem kapja meg rendesen az üzeneteket,
+	ezért valamilyen módon meg kell keresnünk a
+	hiba okát.  Ez több minden lehet, de
+	általában két leggyakoribb ok valamilyen
+	hálózati kapcsolódási vagy
+	<acronym class="acronym">DNS</acronym> beállítási hiba.
+	Ezek teszteléséhez gondoskodjunk róla, hogy
+	a gépek kölcsönösen elérhetőek
+	egymásról az <code class="filename">/etc/rc.conf</code>
+	állományban megadott hálózati
+	nevük szerint.  Ha ezzel látszólag minden
+	rendben van, akkor próbáljuk meg
+	módosítani a <code class="literal">syslogd_flags</code>
+	értékét az
+	<code class="filename">/etc/rc.conf</code>
+	állományban.</p><p>A most következő példában a
+	<code class="filename">/var/log/naplokliens.log</code> teljesen
+	üres, illetve a <code class="filename">/var/log/messages</code>
+	állomány semmilyen hibára utaló okot
+	nem tartalmaz.  A hibakereséshez még több
+	információt a <code class="literal">syslogd_flags</code>
+	átírásával tudunk
+	kérni:</p><pre class="programlisting">syslogd_flags="-d -a naploklien.minta.com -vv"</pre><p>Természetesen ne felejtsük el
+	újraindítani a szervert:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/syslogd restart</code></strong></pre><p>A démon újraindítása után
+	közvetlenül az alábbiakhoz hasonló
+	üzenetek árasztják el a
+	képernyőt:</p><pre class="screen">logmsg: pri 56, flags 4, from naploszerver.minta.com, msg syslogd: restart
+syslogd: restarted
+logmsg: pri 6, flags 4, from naploszerver.minta.com, msg syslogd: kernel boot file is /boot/kernel/kernel
+Logging to FILE /var/log/messages
+syslogd: kernel boot file is /boot/kernel/kernel
+cvthname(192.168.1.10)
+validate: dgram from IP 192.168.1.10, port 514, name naplokliens.minta.com;
+rejected in rule 0 due to name mismatch.</pre><p>A diagnosztikai üzeneteket végigolvasva
+	nyilvánvaló válik, hogy azért dobja el
+	az üzeneteket a szerver, mert nem megfelelő a
+	gép neve.  Miután átnézzük a
+	beállításainkat, felfedezhetünk az
+	<code class="filename">/etc/rc.conf</code> állományban egy
+	apró hibát:</p><pre class="programlisting">syslogd_flags="-d -a naploklien.minta.com -vv"</pre><p>Láthatjuk, hogy ebben a sorban a
+	<code class="literal">naplokliens</code> névnek kellene szerepelni,
+	nem pedig a <code class="literal">naploklien</code> névnek.
+	Miután elvégeztük a szükséges
+	javításokat, indítsuk újra a
+	szervert és vizsgáljuk meg az
+	eredményt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/syslogd restart</code></strong>
+logmsg: pri 56, flags 4, from naploszerver.minta.com, msg syslogd: restart
+syslogd: restarted
+logmsg: pri 6, flags 4, from naploszerver.minta.com, msg syslogd: kernel boot file is /boot/kernel/kernel
+syslogd: kernel boot file is /boot/kernel/kernel
+logmsg: pri 166, flags 17, from naploszerver.minta.com, msg Dec 10 20:55:02 &lt;syslog.err&gt; naploszerver.minta.com syslogd: exiting on signal 2
+cvthname(192.168.1.10)
+validate: dgram from IP 192.168.1.10, port 514, name naplokliens.minta.com;
+accepted in rule 0.
+logmsg: pri 15, flags 0, from naplokliens.minta.com, msg Dec 11 02:01:28 pgj: Masodik teszt uzenet
+Logging to FILE /var/log/naplokliens.log
+Logging to FILE /var/log/messages</pre><p>Itt már minden üzenet rendben megérkezett
+	és a megfelelő állományokba
+	került (a <code class="filename">/var/log/messages</code> a
+	kliensen, és a
+	<code class="filename">/var/log/naplokliens.log</code> a
+	szerveren)).</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98556240"></a>29.11.4. Biztonsági megfontolások</h3></div></div></div><p>Mint minden hálózati
+	szolgáltatás esetén, ilyenkor is figyelembe
+	kell vennünk bizonyos biztonsági
+	megfontolásokat a tényleges
+	konfiguráció kiépítése
+	előtt.  Olykor előfordulhat, hogy a naplók
+	különböző kényes
+	információkat tartalmaznak, mint
+	például a helyi rendszeren futó
+	szolgáltatások nevei, felhasználói
+	nevek vagy egyéb konfigurációs adatok.  A
+	kliens és a szerver között
+	hálózaton utazó adatok viszont se nem
+	titkosítottak, se nem jelszóval védettek.
+	Ha titkosítást szeretnénk használni,
+	akkor javasoljuk például a <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/stunnel/pkg-descr">security/stunnel</a> portot, amellyel egy
+	titkosított tunnelen keresztül tudunk adatokat
+	küldeni a hálózaton.</p><p>A helyi rendszer biztonságának
+	szavatolása is fontos lehet.  A naplók sem a
+	használat során, sem pedig a
+	lecserélésük után nem kerülnek
+	titkosításra.  Emiatt a helyi rendszerhez
+	hozzáférő felhasználók
+	kedvükre nyerhetnek ki belőlük a
+	rendszerünket érintő
+	konfigurációs információkat.
+	Ezért ilyenkor nagyon fontos, hogy mindig a
+	megfelelő engedélyeket állítsuk be a
+	naplókra.  A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newsyslog</span>(8)</span></a> segédprogrammal be
+	tudjuk állítani a frissen létrehozott
+	és a lecserélt naplók engedélyeit.
+	Tehát könnyen megakadályozhatjuk a helyi
+	felhasználók
+	kíváncsiskodását, ha itt a
+	naplók engedélyeit például a
+	<code class="literal">600</code> kóddal adjuk meg.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-ntp.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="network-servers.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="firewalls.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">29.10. Az órák egyeztetése az NTP
+      használatával </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 30. fejezet - Tűzfalak</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

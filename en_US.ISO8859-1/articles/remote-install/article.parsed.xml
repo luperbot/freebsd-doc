@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+  <info>
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Remote Installation of the FreeBSD Operating System Without a
+      Remote Console</title>
+
+    <author xmlns:xlink="http://www.w3.org/1999/xlink">
+      <personname xmlns:xlink="http://www.w3.org/1999/xlink">
+	<firstname xmlns:xlink="http://www.w3.org/1999/xlink">Daniel</firstname>
+	<surname xmlns:xlink="http://www.w3.org/1999/xlink">Gerzo</surname>
+      </personname>
+      <affiliation xmlns:xlink="http://www.w3.org/1999/xlink">
+	<address xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <email xmlns:xlink="http://www.w3.org/1999/xlink">danger@FreeBSD.org</email>
+	</address>
+      </affiliation>
+    </author>
+
+    <legalnotice xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="trademarks" role="trademarks">
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD is a registered trademark of
+  the FreeBSD Foundation.</para>
+      <para xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">Many of the designations used by
+  manufacturers and sellers to distinguish their products are claimed
+  as trademarks.  Where those designations appear in this document,
+  and the FreeBSD Project was aware of the trademark claim, the
+  designations have been followed by the <quote xmlns:xlink="http://www.w3.org/1999/xlink">&#8482;</quote> or the
+  <quote xmlns:xlink="http://www.w3.org/1999/xlink">®</quote> symbol.</para>
+    </legalnotice>
+
+    <copyright xmlns:xlink="http://www.w3.org/1999/xlink">
+      <year xmlns:xlink="http://www.w3.org/1999/xlink">2008</year>
+      <holder xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD Documentation Project</holder>
+    </copyright>
+
+    <pubdate xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</pubdate>
+
+    <releaseinfo xmlns:xlink="http://www.w3.org/1999/xlink">$FreeBSD$</releaseinfo>
+
+    <abstract xmlns:xlink="http://www.w3.org/1999/xlink">
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This article documents the remote installation of the FreeBSD
+	operating system when the console of the remote system is
+	unavailable.  The main idea behind this article is the result
+	of a collaboration with Martin Matuska <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">mm@FreeBSD.org</email> with valuable input
+	provided by Pawel Jakub Dawidek <email xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">pjd@FreeBSD.org</email>.</para>
+    </abstract>
+  </info>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="background">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Background</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">There are many server hosting providers in the world, but
+      very few of them are officially supporting FreeBSD.  They usually
+      provide support for a <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark> distribution to be installed on
+      the servers they offer.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">In some cases, these companies will install your preferred
+      <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark> distribution if you request it.  Using this option, we
+      will attempt to install FreeBSD.  In other cases, they may offer a
+      rescue system which would be used in an emergency.  It is
+      possible to use this for our purposes as well.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This article covers the basic installation and configuration
+      steps required to bootstrap a remote installation of FreeBSD with
+      RAID-1 and <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> capabilities.</para>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="intro">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Introduction</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">This section will summarize the purpose of this article and
+      better explain what is covered herein.  The instructions
+      included in this article will benefit those using services
+      provided by colocation facilities not supporting FreeBSD.</para>
+
+    <procedure xmlns:xlink="http://www.w3.org/1999/xlink">
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">As we have mentioned in the <link xmlns:xlink="http://www.w3.org/1999/xlink" linkend="background">Background</link> section, many of
+	  the reputable server hosting companies provide some kind of
+	  rescue system, which is booted from their
+	  <acronym xmlns:xlink="http://www.w3.org/1999/xlink">LAN</acronym> and accessible over
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application>.  They usually provide this
+	  support in order to help their customers fix broken
+	  operating systems.  As this article will explain, it is
+	  possible to install FreeBSD with the help of these rescue
+	  systems.</para>
+	<!-- XXXTR: Solaris has a restore command, something like
+	  sysrestore, FreeBSD Should have one too. -->
+      </step>
+
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The next section of this article will describe how to
+	  configure, and build minimalistic FreeBSD on the local machine.
+	  That version will eventually be running on the remote
+	  machine from a ramdisk, which will allow us to install a
+	  complete FreeBSD operating system from an
+	  <acronym xmlns:xlink="http://www.w3.org/1999/xlink">FTP</acronym> mirror using the
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> utility.</para>
+      </step>
+
+      <step xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The rest of this article will describe the installation
+	  procedure itself, as well as the configuration of the
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> file system.</para>
+      </step>
+    </procedure>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="requirements">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Requirements</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To continue successfully, you must:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Have a network accessible operating system with
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">SSH</application> access</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Understand the FreeBSD installation process</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Be familiar with the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> utility</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Have the FreeBSD installation <acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym>
+	    image or <acronym xmlns:xlink="http://www.w3.org/1999/xlink">CD</acronym> handy</para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="preparation">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Preparation - <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application></title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Before FreeBSD may be installed on the target system, it is
+      necessary to build the minimal FreeBSD operating system image which
+      will boot from the hard drive.  This way the new system can be
+      accessed from the network, and the rest of the installation can
+      be done without remote access to the system console.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> tool-set can be used
+      to build a tiny FreeBSD image.  As the name of
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> suggests (<quote xmlns:xlink="http://www.w3.org/1999/xlink">mfs</quote>
+      means <quote xmlns:xlink="http://www.w3.org/1999/xlink">memory file system</quote>), the resulting image
+      runs entirely from a ramdisk.  Thanks to this feature, the
+      manipulation of hard drives will not be limited, therefore it
+      will be possible to install a complete FreeBSD operating system.
+      The <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> <uri xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://mfsbsd.vx.sk/">home page</uri>
+      includes pointers to the latest release of the toolset.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Please note that the internals of
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> and how it all fits together
+      is beyond the scope of this article.  The interested reader
+      should consult the original documentation of
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> for more details.</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Download and extract the latest
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> release and change your
+      working directory to the directory where the
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> scripts will reside:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fetch http://mfsbsd.vx.sk/release/mfsbsd-<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">2.1</replaceable>.tar.gz</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tar xvzf mfsbsd-<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">2.1</replaceable>.tar.gz</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cd mfsbsd-<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">2.1</replaceable>/</userinput></screen>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="mfsbsd-config">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Configuration of
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Before booting <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>, a few
+	important configuration options have to be set.  The most
+	important that we have to get right is, naturally, the network
+	setup.  The most suitable method to configure networking
+	options depends on whether we know beforehand the type of the
+	network interface we will use, and the network interface
+	driver to be loaded for our hardware.  We will see how
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> can be configured in either
+	case.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Another important thing to set is the <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> password.  This can be
+	done by editing <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/loader.conf</filename>.  Please
+	see the included comments.</para>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">The <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/interfaces.conf</filename>
+	  method</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">When the installed network interface card is unknown, it
+	  is possible to use the auto-detection features of
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>.  The startup scripts of
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> can detect the correct
+	  driver to use, based on the MAC address of the interface, if
+	  we set the following options in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/interfaces.conf</filename>:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">mac_interfaces="ext1"
+ifconfig_ext1_mac="00:00:00:00:00:00"
+ifconfig_ext1="inet 192.168.0.2/24"</programlisting>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Do not forget to add the
+	  <literal xmlns:xlink="http://www.w3.org/1999/xlink">defaultrouter</literal> information to
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename>:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">defaultrouter="192.168.0.1"</programlisting>
+      </sect3>
+
+      <sect3 xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title xmlns:xlink="http://www.w3.org/1999/xlink">The <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename> Method</title>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">When the network interface driver is known, it is more
+	  convenient to use <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename> for
+	  networking options.  The syntax of this file is the same as
+	  the one used in the standard <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">rc.conf</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">5</manvolnum></citerefentry> file of
+	  FreeBSD.</para>
+
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">For example, if you know that a <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">re</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">4</manvolnum></citerefentry> network
+	  interface is going to be available, you can set the
+	  following options in
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">conf/rc.conf</filename>:</para>
+
+	<programlisting xmlns:xlink="http://www.w3.org/1999/xlink">defaultrouter="192.168.0.1"
+ifconfig_re0="inet 192.168.0.2/24"</programlisting>
+      </sect3>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="mfsbsd-build">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Building an <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>
+	Image</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The process of building an
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> image is pretty
+	straightforward.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The first step is to mount the FreeBSD installation
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">CD</acronym>, or the installation
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym> image to <filename xmlns:xlink="http://www.w3.org/1999/xlink">/cdrom</filename>.
+	For the sake of example, in this article we will assume that
+	you have downloaded the FreeBSD 10.1-RELEASE
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym>.  Mounting this ISO image to the
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/cdrom</filename> directory is easy with the
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">mdconfig</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> utility:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mdconfig -a -t vnode -u 10 -f <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">FreeBSD-10.1-RELEASE-amd64-disc1.iso</replaceable></userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount_cd9660 /dev/md10 /cdrom</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Since the recent FreeBSD releases do not contain regular
+	distribution sets, it is required to extract the FreeBSD distribution
+	files from the distribution archives located on the
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">ISO</acronym> image:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">DIST</replaceable></userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tar -xvf /cdrom/usr/freebsd-dist/base.txz -C <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">DIST</replaceable></userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">tar -xvf /cdrom/usr/freebsd-dist/kernel.txz -C <replaceable xmlns:xlink="http://www.w3.org/1999/xlink">DIST</replaceable></userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Next, build the bootable <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application>
+	image:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">make BASE=<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">DIST</replaceable></userinput></screen>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The above <command xmlns:xlink="http://www.w3.org/1999/xlink">make</command> has to be run from the
+	  top level of the <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> directory
+	  tree, for example
+	  <filename xmlns:xlink="http://www.w3.org/1999/xlink">~/mfsbsd-2.1/</filename>.</para>
+      </note>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Booting <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application></title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Now that the <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> image is
+	ready, it must be uploaded to the remote system running a live
+	rescue system or pre-installed <trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">Linux</trademark> distribution.  The most
+	suitable tool for this task is
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">scp</application>:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">scp disk.img root@192.168.0.2:.</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To boot <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> image properly,
+	it must be placed on the first (bootable) device of the given
+	machine.  This may be accomplished using this example
+	providing that <filename xmlns:xlink="http://www.w3.org/1999/xlink">sda</filename> is the first bootable
+	disk device:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">dd if=/root/disk.img of=/dev/sda bs=1m</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">If all went well, the image should now be in the
+	<acronym xmlns:xlink="http://www.w3.org/1999/xlink">MBR</acronym> of the first device and the machine can
+	be rebooted.  Watch for the machine to boot up properly with
+	the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ping</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> tool.  Once it has came back on-line, it
+	should be possible to access it over <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry> as user
+	<systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="username">root</systemitem> with the
+	configured password.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="installation">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">Installation of the FreeBSD Operating System</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The <application xmlns:xlink="http://www.w3.org/1999/xlink">mfsBSD</application> has been successfully
+      booted and it should be possible to log in through <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">ssh</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">1</manvolnum></citerefentry>.
+      This section will describe how to create and label slices, set
+      up <application xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</application> for RAID-1, and how to use
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> to install a minimal
+      distribution of the FreeBSD operating system.</para>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Preparation of Hard Drives</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The first task is to allocate disk space for FreeBSD, i.e.:
+	to create slices and partitions.  Obviously, the currently
+	running system is fully loaded in system memory and therefore
+	there will be no problems with manipulating hard drives.  To
+	complete this task, it is possible to use either
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> or <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">fdisk</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> in
+	conjunction to <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">At the start, mark all system disks as empty.  Repeat the
+	following command for each hard drive:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">dd if=/dev/zero of=/dev/<replaceable xmlns:xlink="http://www.w3.org/1999/xlink">ad0</replaceable> count=2</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Next, create slices and label them with your preferred
+	tool.  While it is considered easier to use
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application>, a powerful and also
+	probably less buggy method will be to use standard text-based
+	<trademark xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" class="registered">UNIX</trademark> tools, such as <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">fdisk</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> and <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>,
+	which will also be covered in this section.  The former option
+	is well documented in the <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="../../../../doc/en_US.ISO8859-1/books/handbook/install-steps.html">Installing
+	  FreeBSD</link> chapter of the FreeBSD Handbook.  As it was
+	mentioned in the introduction, this article will present how
+	to set up a system with RAID-1 and
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> capabilities.  Our set up will
+	consist of a small <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> mirrored
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/</filename> (root), <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename> dataset, and the rest of the disk
+	space will be allocated for a <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">zpool</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> mirrored
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> file system.  Please note, that
+	the <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> file system will be
+	configured after the FreeBSD operating system is successfully
+	installed and booted.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The following example will describe how to create slices
+	and labels, initialize <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> on each partition and
+	how to create a <application xmlns:xlink="http://www.w3.org/1999/xlink">UFS2</application> file system in
+	each mirrored partition:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fdisk -BI /dev/ad0</userinput> <co xml:id="fdisk"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">fdisk -BI /dev/ad1</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel -wB /dev/ad0s1</userinput> <co xml:id="bsdlabel-writing"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel -wB /dev/ad1s1</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel -e /dev/ad0s1</userinput> <co xml:id="bsdlabel-editing"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel /dev/ad0s1 &gt; /tmp/bsdlabel.txt &amp;&amp; bsdlabel -R /dev/ad1s1 /tmp/bsdlabel.txt</userinput> <co xml:id="bsdlabel-restore"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label root /dev/ad[01]s1a</userinput> <co xml:id="gmirror1"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label var /dev/ad[01]s1d</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label usr /dev/ad[01]s1e</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">gmirror label -F swap /dev/ad[01]s1b</userinput> <co xml:id="gmirror2"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs /dev/mirror/root</userinput> <co xml:id="newfs"/>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs /dev/mirror/var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">newfs /dev/mirror/usr</userinput></screen>
+
+      <calloutlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<callout arearefs="fdisk">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Create a slice covering the entire disk and initialize
+	    the boot code contained in sector 0 of the given disk.
+	    Repeat this command for all hard drives in the
+	    system.</para>
+	</callout>
+
+	<callout arearefs="bsdlabel-writing">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Write a standard label for each disk including the
+	    bootstrap code.</para>
+	</callout>
+
+	<callout arearefs="bsdlabel-editing">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Now, manually edit the label of the given disk.  Refer
+	    to the <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">bsdlabel</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> manual page in order to find out
+	    how to create partitions.  Create partitions
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">a</literal> for <filename xmlns:xlink="http://www.w3.org/1999/xlink">/</filename> (root)
+	    file system, <literal xmlns:xlink="http://www.w3.org/1999/xlink">b</literal> for swap,
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">d</literal> for <filename xmlns:xlink="http://www.w3.org/1999/xlink">/var</filename>,
+	    <literal xmlns:xlink="http://www.w3.org/1999/xlink">e</literal> for <filename xmlns:xlink="http://www.w3.org/1999/xlink">/usr</filename> and
+	    finally <literal xmlns:xlink="http://www.w3.org/1999/xlink">f</literal> which will later be used for
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application>.</para>
+	</callout>
+
+	<callout arearefs="bsdlabel-restore">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Import the recently created label for the second hard
+	    drive, so both hard drives will be labeled in the same
+	    way.</para>
+	</callout>
+
+	<callout arearefs="gmirror1">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Initialize <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> on each partition.</para>
+	</callout>
+
+	<callout arearefs="gmirror2">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Note that <option xmlns:xlink="http://www.w3.org/1999/xlink">-F</option> is used for the swap
+	    partition.  This instructs <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">gmirror</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> to assume that
+	    the device is in the consistent state after the
+	    power/system failure.</para>
+	</callout>
+
+	<callout arearefs="newfs">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Create a <application xmlns:xlink="http://www.w3.org/1999/xlink">UFS2</application> file system
+	    on each mirrored partition.</para>
+	</callout>
+      </calloutlist>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">System Installation</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">This is the most important part.  This section will
+	describe how to actually install the minimal distribution of
+	FreeBSD on the hard drives that we have prepared in the previous
+	section.  To accomplish this goal, all file systems need to be
+	mounted so <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> may write the
+	contents of FreeBSD to the hard drives:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount /dev/mirror/root /mnt</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mkdir /mnt/var /mnt/usr</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount /dev/mirror/var /mnt/var</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">mount /dev/mirror/usr /mnt/usr</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">When you are done, start <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry>.  Select the
+	<guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Custom</guimenuitem> installation from the main
+	menu.  Select <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Options</guimenuitem> and press
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap>.  With the help of arrow keys, move the
+	cursor on the <literal xmlns:xlink="http://www.w3.org/1999/xlink">Install Root</literal> item, press
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">Space</keycap> and change it to
+	<filename xmlns:xlink="http://www.w3.org/1999/xlink">/mnt</filename>.  Press
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">Enter</keycap> to submit your changes and exit the
+	<guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Options</guimenuitem> menu by pressing
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">q</keycap>.</para>
+
+      <warning xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">Note that this step is very important and if skipped,
+	  <application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> will be unable to
+	  install FreeBSD.</para>
+      </warning>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Go to the <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Distributions</guimenuitem> menu,
+	move the cursor with the arrow keys to
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">Minimal</option>, and check it by pressing
+	<keycap xmlns:xlink="http://www.w3.org/1999/xlink">Space</keycap>.  This article uses the Minimal
+	distribution in order to save network traffic, because the
+	system itself will be installed over
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">ftp</application>.  Exit this menu by choosing
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">Exit</option>.</para>
+
+      <note xmlns:xlink="http://www.w3.org/1999/xlink">
+	<para xmlns:xlink="http://www.w3.org/1999/xlink">The <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Partition</guimenuitem> and
+	  <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Label</guimenuitem> menus will be skipped, as
+	  these are useless now.</para>
+      </note>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">In the <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Media</guimenuitem> menu, select
+	<option xmlns:xlink="http://www.w3.org/1999/xlink">FTP</option>.  Select the nearest mirror and let
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> assume that the network
+	is already configured.  You will be returned back to the
+	<guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Custom</guimenuitem> menu.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">Finally, perform the system installation by selecting the
+	last option, <guimenuitem xmlns:xlink="http://www.w3.org/1999/xlink">Commit</guimenuitem>.  Exit
+	<application xmlns:xlink="http://www.w3.org/1999/xlink">sysinstall</application> when it finishes the
+	installation.</para>
+    </sect2>
+
+    <sect2 xmlns:xlink="http://www.w3.org/1999/xlink">
+      <title xmlns:xlink="http://www.w3.org/1999/xlink">Post Installation Steps</title>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The FreeBSD operating system should be installed now;
+	however, the process is not finished yet.  It is necessary to
+	perform some post installation steps in order to allow FreeBSD to
+	boot in the future and to be able to log in to the
+	system.</para>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">You must now <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">chroot</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> into the freshly installed
+	system in order to finish the installation.  Use the following
+	command:</para>
+
+      <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">chroot /mnt</userinput></screen>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">To complete our goal, perform these steps:</para>
+
+      <itemizedlist xmlns:xlink="http://www.w3.org/1999/xlink">
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Copy the <literal xmlns:xlink="http://www.w3.org/1999/xlink">GENERIC</literal> kernel to the
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/kernel</filename>
+	    directory:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">cp -Rp /boot/GENERIC/* /boot/kernel</userinput></screen>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Create the <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>,
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/resolv.conf</filename> and
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> files.  Do not forget to
+	    properly set the network information and to enable
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">sshd</application> in
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/rc.conf</filename>.  The contents of
+	    <filename xmlns:xlink="http://www.w3.org/1999/xlink">/etc/fstab</filename> will be similar to the
+	    following:</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/mirror/swap        none            swap    sw              0       0
+/dev/mirror/root        /               ufs     rw              1       1
+/dev/mirror/usr         /usr            ufs     rw              2       2
+/dev/mirror/var         /var            ufs     rw              2       2
+/dev/cd0                /cdrom          cd9660  ro,noauto       0       0</programlisting>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Create <filename xmlns:xlink="http://www.w3.org/1999/xlink">/boot/loader.conf</filename> with the
+	    following contents:</para>
+
+	  <programlisting xmlns:xlink="http://www.w3.org/1999/xlink">geom_mirror_load="YES"
+zfs_load="YES"</programlisting>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Perform the following command, which will make
+	    <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> available on the next
+	    boot:</para>
+
+	  <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">echo 'zfs_enable="YES"' &gt;&gt; /etc/rc.conf </userinput></screen>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Add additional users to the system using the
+	    <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">adduser</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> tool.  Do not forget to add a user to the
+	    <systemitem xmlns:xlink="http://www.w3.org/1999/xlink" class="groupname">wheel</systemitem> group so
+	    you may obtain root access after the reboot.</para>
+	</listitem>
+
+	<listitem xmlns:xlink="http://www.w3.org/1999/xlink">
+	  <para xmlns:xlink="http://www.w3.org/1999/xlink">Double-check all your settings.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para xmlns:xlink="http://www.w3.org/1999/xlink">The system should now be ready for the next boot.  Use the
+	<citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">reboot</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> command to reboot your system.</para>
+    </sect2>
+  </sect1>
+
+  <sect1 xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="zfs">
+    <title xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</title>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">If your system survived the reboot, it should now be
+      possible to log in.  Welcome to the fresh FreeBSD installation,
+      performed remotely without the use of a remote console!</para>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">The only remaining step is to configure <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">zpool</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> and
+      create some <citerefentry xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink"><refentrytitle xmlns:xlink="http://www.w3.org/1999/xlink">zfs</refentrytitle><manvolnum xmlns:xlink="http://www.w3.org/1999/xlink">8</manvolnum></citerefentry> file systems.  Creating and
+      administering <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> is very
+      straightforward.  First, create a mirrored pool:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zpool create tank mirror /dev/ad[01]s1f</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">Next, create some file systems:</para>
+
+    <screen xmlns:xlink="http://www.w3.org/1999/xlink"><prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs create tank/ports</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs create tank/src</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set compression=gzip tank/ports</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set compression=on tank/src</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set mountpoint=/usr/ports tank/ports</userinput>
+<prompt xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink">#</prompt> <userinput xmlns:xlink="http://www.w3.org/1999/xlink">zfs set mountpoint=/usr/src tank/src</userinput></screen>
+
+    <para xmlns:xlink="http://www.w3.org/1999/xlink">That is all.  If you are interested in more details about
+      <application xmlns:xlink="http://www.w3.org/1999/xlink">ZFS</application> on FreeBSD, please refer to the
+      <link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://wiki.freebsd.org/ZFS">ZFS</link>
+      section of the FreeBSD Wiki.</para>
+  </sect1>
+</article>

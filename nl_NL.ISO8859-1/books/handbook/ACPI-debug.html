@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>12.17. FreeBSD ACPI gebruiken en debuggen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="config-tuning.html" title="Hoofdstuk 12. Instellingen en optimalisatie" /><link rel="prev" href="acpi-overview.html" title="12.16. Energie- en bronnenbeheer" /><link rel="next" href="boot.html" title="Hoofdstuk 13. Het FreeBSD opstartproces" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.17. FreeBSD <acronym class="acronym">ACPI</acronym> gebruiken en debuggen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="acpi-overview.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 12. Instellingen en optimalisatie</th><td width="20%" align="right"> <a accesskey="n" href="boot.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ACPI-debug"></a>12.17. FreeBSD <acronym class="acronym">ACPI</acronym> gebruiken en debuggen</h2></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nate</span> <span class="surname">Lawson</span></span>. </span></div><div><span class="authorgroup">Met medewerking van <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Peter</span> <span class="surname">Schultz</span></span>. </span></div><div><span class="authorgroup"><span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><p><acronym class="acronym">ACPI</acronym> is een totaal nieuwe manier om
+      apparaten te ontdekken, om energieverbruik te beheren en om een
+      gestandaardiseerde toegang te bieden tot allerlei apparaten die
+      eerder via het <acronym class="acronym">BIOS</acronym> beheerd werden.  Er wordt
+      voortdurend vooruitgang geboekt om <acronym class="acronym">ACPI</acronym> op alle
+      systemen te laten werken, maar bugs in de
+      <em class="firstterm"><acronym class="acronym">ACPI</acronym>Machine Language</em>
+      (<acronym class="acronym">AML</acronym>) bytecode van sommige moederborden,
+      onvolledigheden in de subsystemen van de kernel van FreeBSD en bugs
+      in de <span class="trademark">Intel</span>® <acronym class="acronym">ACPI-CA</acronym> interpreter blijven
+      opduiken.</p><p>Deze tekst is bedoeld om u te helpen met het bijstaan van de
+      FreeBSD <acronym class="acronym">ACPI</acronym> beheerders met het vinden van de
+      hoofdoorzaken van problemen die u opmerkt en met het debuggen en
+      het vinden van een oplossing.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-submitdebug"></a>12.17.1. Debuginformatie aanleveren</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Voordat een probleem wordt gemeld, moet het zeker zijn dat
+	  de laatste <acronym class="acronym">BIOS</acronym> versie draait en indien
+	  beschikbaar de geïntregeerde controller firmware
+	  versie.</p></div><p>Diegenen die meteen een probleem willen indienen, sturen de
+	volgende informatie naar <a class="link" href="mailto:freebsd-acpi@FreeBSD.org" target="_top">
+	  freebsd-acpi@FreeBSD.org</a>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Omschrijving van het foutieve gedrag, inclusief
+	    systeemtype en -model en alles wat de fout kan veroorzaken.
+	    Als het een nieuw fenomeen is, dan dient ook zo accuraat
+	    mogelijk aangegeven te worden wanneer de fout het eerst
+	    optrad.</p></li><li class="listitem"><p>De uitvoer van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dmesg&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dmesg</span>(8)</span></a> van <code class="command">boot
+	      -v</code>, inclusief foutmeldingen die gegenereerd
+	    worden als de fout optreedt.</p></li><li class="listitem"><p>De uitvoer van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dmesg&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dmesg</span>(8)</span></a> van <code class="command">boot
+	      -v</code> met <acronym class="acronym">ACPI</acronym> uitgeschakeld,
+	    indien het uitzetten van <acronym class="acronym">ACPI</acronym> het
+	    probleem oplost.</p></li><li class="listitem"><p>Uitvoer van <code class="command">sysctl hw.acpi</code>.  Dit is
+	    tevens een goede manier om uit te vinden welke
+	    <acronym class="acronym">ACPI</acronym>-mogelijkheden een systeem
+	    heeft.</p></li><li class="listitem"><p>Een <acronym class="acronym">URL</acronym> waar de
+	    <em class="firstterm"><acronym class="acronym">ACPI</acronym>Source
+	      Language</em> (<acronym class="acronym">ASL</acronym>) gevonden
+	    kan worden.  De <acronym class="acronym">ASL</acronym> dient
+	    <span class="emphasis"><em>niet</em></span> rechtstreeks naar de lijst
+	    gezonden te worden, omdat deze nogal groot kan zijn.  Een
+	    kopie van een ASL kan gemaakt worden met het volgende
+	    commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>acpidump -dt &gt; naam-systeem.asl</code></strong></pre><p>(Vervang uw aanmeldnaam door
+	    <code class="filename">$NAME</code> en producent/model door
+	    <code class="filename">$SYSTEM</code>.  Bijvoorbeeld:
+	    <code class="filename">njl-FooCo6000.asl</code>)</p></li></ul></div><p>De meeste FreeBSD-programmeurs lezen de <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current" target="_top">FreeBSD-CURRENT mailinglijst</a>, maar
+	problemen gaan bij voorkeur ook naar <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">freebsd-acpi</a> zodat ze
+	zeker gezien worden.  Het kan enige tijd duren voordat er
+	antwoord komt, omdat deze mensen elders ook nog volledige banen
+	hebben.  Als de bug niet meteen duidelijk is, komt er
+	waarschijnlijk en verzoek om een <acronym class="acronym">PR</acronym> in te
+	dienen via <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=send-pr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">send-pr</span>(1)</span></a>.  Als er een <acronym class="acronym">PR</acronym>
+	moet worden opgesteld, dan dient alle hierboven gevraagde
+	informatie vermeld te worden.  Dit helpt om het probleem te
+	kunnen volgen en oplossen.  Het sturen van een
+	<acronym class="acronym">PR</acronym> zonder eerst <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">freebsd-acpi</a> te mailen is
+	niet wenselijk, aangezien men <acronym class="acronym">PR</acronym>s gebruikt
+	als herinnering van bestaande problemen, niet als
+	rapportagesysteem.  Mogelijk is een probleem al eens door iemand
+	anders gemeld.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-background"></a>12.17.2. Achtergrond</h3></div></div></div><p><acronym class="acronym">ACPI</acronym> is aanwezig op alle moderne
+	computers die voldoen aan de ia32 (x86), ia64 (Itanium) of amd64
+	(AMD) architecturen.  De volledige standaard heeft vele
+	mogelijkheden zoals <acronym class="acronym">CPU</acronym>-prestatiebeheer,
+	energiebeheer, thermische zones, diverse batterijsystemen,
+	ingebedde controllers en busnummering.  De meeste systemen
+	implementeren minder dan de volledige standaard.  Een
+	desktopsysteem implementeert bijvoorbeeld meestal alleen
+	busnummering, terwijl laptops mogelijk ook koeling- en
+	batterijbeheer ondersteunen.  Laptops hebben ook suspend en
+	resume (slapen en wakker worden) met hun eigen aanverwante
+	comlexiteit.</p><p>Een <acronym class="acronym">ACPI</acronym>-compliant systeem heeft
+	verscheidene componenten.  Het <acronym class="acronym">BIOS</acronym>- en
+	chipsetverkopers bieden verscheidene vaste tabellen aan zoals
+	<acronym class="acronym">FADT</acronym> in het geheugen die zaken als de
+	<acronym class="acronym">APIC</acronym>-afbeelding (gebruikt voor
+	<acronym class="acronym">SMP</acronym>), configuratieregisters, en eenvoudige
+	configuratiewaarden specificeren.  Ook wordt er een tabel van
+	bytecode (de <em class="firstterm">Differentiated System
+	  Description Table</em> of <acronym class="acronym">DSDT</acronym>)
+	geleverd die een op een boomstructuur lijkende namespace biedt
+	voor apparaten en methoden.</p><p>Het stuurprogramma <acronym class="acronym">ACPI</acronym> moet de
+	voorgedefinieerde tabellen verwerken, een interpreter voor de
+	bytecode implementeren en apparaatstuurprogramma's en de kernel
+	aanpassen om informatie van het
+	<acronym class="acronym">ACPI</acronym>-subsysteem te accepteren.  <span class="trademark">Intel</span>® heeft
+	een interpreter beschikbaar gesteld (<acronym class="acronym">ACPI-CA</acronym>)
+	die door FreeBSD en ook door <span class="trademark">Linux</span>® en NetBSD gebruikt wordt.  De
+	<acronym class="acronym">ACPI-CA</acronym>-broncode staat in <code class="filename">src/sys/contrib/dev/acpica</code>.  De
+	lijmcode die <acronym class="acronym">ACPI-CA</acronym> laat werken met FreeBSD
+	staat in <code class="filename">src/sys/dev/acpica/Osd</code>.
+	Stuurprogramma's die verscheidene
+	<acronym class="acronym">ACPI</acronym>-apparaten implementeren staan in
+	<code class="filename">src/sys/dev/acpica</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-comprob"></a>12.17.3. Algemene problemen</h3></div></div></div><p>Wil <acronym class="acronym">ACPI</acronym> goed werken, dan moeten alle
+	onderdelen goed werken.  Hieronder staan enkele algemene
+	problemen in volgorde van hoe vaak ze optreden en enkele
+	mogelijke oplossingen of manieren om de problemen te
+	vermijden.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp75933264"></a>12.17.3.1. Muisproblemen</h4></div></div></div><p>Soms doet een muis het niet bij het opstarten uit de
+	  slaapstand.  Een bekend lapmiddel is het toevoegen van
+	  <code class="literal">hint.psm.0.flags="0x3000"</code> aan
+	  <code class="filename">/boot/loader.conf</code>.  Als dat niet werkt,
+	  dan wordt aangeraden een bugrapport in te sturen, zoals
+	  eerder is beschreven.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp75935312"></a>12.17.3.2. Suspend/resume</h4></div></div></div><p><acronym class="acronym">ACPI</acronym> heeft drie slaapstanden waarbij
+	  het geheugen (<acronym class="acronym">RAM</acronym>) wordt ingezet.  Dit
+	  zijn de <acronym class="acronym">STR</acronym>-toestanden
+	  <code class="literal">S1</code>-<code class="literal">S3</code>, en nog een
+	  slaap-met-gebruik-van-harde-schijf toestand
+	  (<code class="literal">STD</code>) die <code class="literal">S4</code> heet.
+	  <code class="literal">S5</code> is <span class="quote">&#8220;<span class="quote">zacht uit</span>&#8221;</span> en is de
+	  normale status van een systeem als het is aangesloten maar
+	  niet is aangezet.  <code class="literal">S4</code> kan feitelijk op twee
+	  manieren geïmplementeerd worden:
+	  <code class="literal">S4</code><acronym class="acronym">BIOS</acronym> is een slaapstand
+	  naar schijf met behulp van het <acronym class="acronym">BIOS</acronym> en
+	  <code class="literal">S4</code><acronym class="acronym">OS</acronym> wordt volledig door
+	  het besturingssysteem geïmplenteerd.</p><p>als eerste dienen de <code class="command">sysctl hw.acpi</code>
+	  items die iets met de slaapstand te maken hebben gecontroleerd
+	  te worden.  Hieronder staan de resultaten voor een
+	  Thinkpad:</p><pre class="screen">hw.acpi.supported_sleep_state: S3 S4 S5
+hw.acpi.s4bios: 0</pre><p>Dit betekent dat hier <code class="command">acpiconf -s</code>
+	  gebruikt kan worden om <code class="literal">S3</code>,
+	  <code class="literal">S4</code><acronym class="acronym">OS</acronym> en
+	  <code class="literal">S5</code> te testen.  Als <code class="option">s4bios</code>
+	  gelijk was aan (<code class="literal">1</code>), dan zou er
+	  <code class="literal">S4</code><acronym class="acronym">BIOS</acronym> ondersteuning
+	  zijn in plaats van <code class="literal">S4</code>
+	  <acronym class="acronym">OS</acronym>.</p><p>Als suspend/resume getest moet worden, dient, indien
+	  ondersteund, bij <code class="literal">S1</code> begonnen te worden.
+	  Deze toestand heeft de grootste kans om te werken, omdat deze
+	  niet veel stuurprogrammaondersteuning vereist.  Niemand heeft
+	  nog <code class="literal">S2</code> geïmplementeerd, maar het is
+	  ongeveer hetzelfde als <code class="literal">S1</code>.  Daarna wordt
+	  <code class="literal">S3</code> getest.  Dit is het diepste
+	  <acronym class="acronym">STR</acronym>-niveau en heeft uitgebreide
+	  ondersteuning van stuurprogramma's nodig om hardware goed
+	  opnieuw te kunnen starten.  Mochten er blokkades optreden,
+	  dan kan naar de <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">freebsd-acpi</a> lijst gemaild worden.  Er kan
+	  echter geen snelle oplossing verwacht worden, omdat er nog de
+	  nodige stuurprogramma's/hardware liggen om getest en bewerkt
+	  te worden.</p><p>Een veelvoorkomend probleem met suspend/resume is dat veel
+	  apparaatstuurprogramma's hun firmware, registers of apparaatgeheugen
+	  niet fatsoenlijk opslaan, herstellen, of herinitialiseren.  Een
+	  eerste poging om het probleem te vinden omvat:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl debug.bootverbose=1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>sysctl debug.acpi.suspend_bounce=1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>acpiconf -s 3</code></strong></pre><p>Deze test emuleert de suspend/resume-cyclus van alle
+	  apparaten zonder daadwerkelijk naar de toestand <code class="literal">S3</code>
+	  te gaan.  In sommige gevallen kunt u zo eenvoudig problemen
+	  vaststellen (bijvoorbeeld het verliezen van de firmware-toestand,
+	  timeout van de apparaatwaakhond, en steeds opnieuw iets proberen).
+	  Merk op dat het systeem niet werkelijk naar de toestand
+	  <code class="literal">S3</code> gaat, wat inhoudt dat apparaten geen spanning
+	  verliezen waardoor velen prima zullen werken zelfs als de
+	  suspend/resume-methoden geheel ontbreken, dit in tegenstelling tot de
+	  echte toestand <code class="literal">S3</code>.</p><p>Moeilijkere gevallen vereisen aanvullende hardware, dat is een
+	  serieële poort/kabel voor de serieële console of een
+	  Firewire poort/kabel voor <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dcons&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">dcons</span>(4)</span></a>, en vaardigheden in het
+	  debuggen van de kernel.</p><p>Om een probleem te kunnen isoleren helpt het om zoveel
+	  mogelijk stuurprogramma's uit de kernel te halen.  Als dit
+	  werkt, kan er teruggewerkt worden naar het stuurprogramma dat
+	  schuldig is aan het falen.  Meestal vertonen binaire
+	  stuurprogramma's als <code class="filename">nvidia.ko</code>, X11
+	  beeldschermstuurprogramma's en <acronym class="acronym">USB</acronym> de
+	  meeste problemen, terwijl bijvoorbeeld Ethernet-interfaces
+	  meestal meteen goed werken.  Als de stuurprogramma's zonder
+	  problemen geladen en verwijderd kunnen worden, dan is dit te
+	  automatiseren door de juiste commando's in
+	  <code class="filename">/etc/rc.suspend</code> en
+	  <code class="filename">/etc/rc.resume</code> te zetten.  Er staat een
+	  voorbeeld (achter commentaartekens) voor het laden en
+	  verwijderen van een stuurprogramma.  Als het beeldscherm er na
+	  wakker worden vreemd uitziet, kan geprobeerd worden
+	  <code class="option">hw.acpi.reset_video</code> op nul te zetten.  Met
+	  langere of kortere waarden voor
+	  <code class="option">hw.acpi.sleep_delay</code> kan bekeken worden of dat
+	  helpt.</p><p>In geval van problemen is het ook een optie om een recente
+	  <span class="trademark">Linux</span>® distibutie met ondersteuning voor
+	  <acronym class="acronym">ACPI</acronym> support te starten en daarvan de
+	  suspend/resume ondersteuning op dezelfde hardware uit te
+	  proberen.  Als het werkt met <span class="trademark">Linux</span>®, dan is het
+	  waarschijnlijk een FreeBSD stuurprogrammaprobleem en als het
+	  mogelijk is uit te vinden over welk stuurprogramma het gaat,
+	  kan dat bijdragen aan het oplossen van het probleem.
+	  <acronym class="acronym">ACPI</acronym> houdt zich in het algemeen niet bezig
+	  met andere stuurprogramma's zoals geluid,
+	  <acronym class="acronym">ATA</acronym>, enzovoort.  Als er dus een echt
+	  probleem met een stuurprogramma is, dan is waarchijnlijk
+	  uiteindelijk ook nodig naar de <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current" target="_top">freebsd-current</a> lijst te
+	  posten en naar de beheerder van het stuurprogramma.  Voor
+	  degenen met moed is het vooral aan te raden een paar
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=printf&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">printf</span>(3)</span></a>s in problematische stukken van een
+	  stuurprogramma te plaatsen voor debugging om na te gaan waar
+	  de resumefunctie precies hangt.</p><p>Tot slot kan geprobeerd worden om <acronym class="acronym">ACPI</acronym>
+	  uit te zetten en in plaats daarvan <acronym class="acronym">APM</acronym> aan
+	  te zetten.  Als suspend/resume werkt met
+	  <acronym class="acronym">APM</acronym>, is het wellicht verstandig het daarbij
+	  te houden, vooral met wat oudere apparatuur (voor 2000).
+	  Producenten hebben nogal wat tijd nodig gehad om
+	  <acronym class="acronym">ACPI</acronym> ondersteuning goed te krijgen en voor
+	  oudere hardware is het waarschijnlijker dat er
+	  <acronym class="acronym">BIOS</acronym>-problemen zijn met
+	  <acronym class="acronym">ACPI</acronym>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp75978192"></a>12.17.3.3. Systeem hangt (tijdelijk of permanent)</h4></div></div></div><p>Meestal is het hangen van het systeem het gevolg van
+	  verloren interrupts of een interruptstorm.  Chipsets kunnen
+	  een heleboel problemen hebben, afhankelijk van hoe het
+	  <acronym class="acronym">BIOS</acronym> interrupts instelt voor het opstarten,
+	  of de <acronym class="acronym">APIC</acronym> (<acronym class="acronym">MADT</acronym>) tabel
+	  correct is en de routering van het <em class="firstterm">System Control
+	    Interrupt</em> (<acronym class="acronym">SCI</acronym>).</p><a id="idp75981136" class="indexterm"></a><p>Interruptstorms kunnen onderscheiden worden van verloren
+	  geraakte interrupts door de uitvoer van <code class="command">vmstat
+	    -i</code> te controleren en de regel met
+	  <code class="literal">acpi0</code> goed te lezen.  Als de teller in
+	  toenemende mate hoger staat dan enkele per seconde, dan is
+	  sprake van een interruptstorm.  Als het systeem lijkt te
+	  hangen, is het wellicht nog mogelijk door te dringen tot
+	  de <acronym class="acronym">DDB</acronym> (<span class="keycap"><strong>CTRL</strong></span>+<span class="keycap"><strong>ALT</strong></span>+<span class="keycap"><strong>ESC</strong></span>) en
+	  <code class="literal">show interrupts</code> uit te voeren.</p><a id="idp75984848" class="indexterm"></a><p>De beste hoop in geval van interruptproblemen is om
+	  <acronym class="acronym">APIC</acronym>-ondersteuning uit te zetten met
+	  <code class="literal">hint.apic.0.disabled="1"</code> in
+	  <code class="filename">loader.conf</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp75991888"></a>12.17.3.4. Panics</h4></div></div></div><p>Panics zijn relatief zeldzaam met <acronym class="acronym">ACPI</acronym>
+	  en krijgen de hoogste prioriteit bij het oplossen.  Eerst
+	  moeten de verschillende gebeurtenissen waarmee de panic (als
+	  mogelijk) te reproduceren is geïsoleerd worden en moet
+	  een backtrace gemaakt worden.  <code class="literal">options DDB</code>
+	  dient aangezet te worden en er dient een seriële
+	  console (<a class="xref" href="serialconsole-setup.html#serialconsole-ddb" title="26.6.5.3. De debugger DDB gebruiken via de seriële verbinding">Paragraaf 26.6.5.3, &#8220;De debugger DDB gebruiken via de seriële
+	  verbinding&#8221;</a>) of een
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a> partitie te komen.  In <acronym class="acronym">DDB</acronym> is
+	  een backtrace te maken met <code class="literal">tr</code>.  Als de
+	  backtrace handmatig opgeschreven moet worden, is het
+	  belangrijk dat in ieder geval de bovenste en onderste vijf (5)
+	  regels van de backtrace genoteerd worden.</p><p>Daarna dient getracht te worden het systeem te starten
+	  zonder <acronym class="acronym">ACPI</acronym>.  Als dat werkt, is het
+	  <acronym class="acronym">ACPI</acronym>-subsysteem geïsoleerd en kunnen
+	  de verschillende <code class="option">debug.acpi.disable</code>-waarden
+	  uitgeprobeerd worden.  In <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi</span>(4)</span></a> staan enkele
+	  voorbeelden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76002256"></a>12.17.3.5. Systeem slaat aan na slaapstand of stop</h4></div></div></div><p><code class="literal">hw.acpi.disable_on_poweroff="0"</code> kan
+	  uitgezet worden in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">loader.conf</span>(5)</span></a>.  Hierdoor schakelt
+	  <acronym class="acronym">ACPI</acronym> bepaalde gebeurtenissen tijdens het
+	  afsluitproces niet uit.  Om dezelfde redenen moeten sommige
+	  systemen deze waarde altijd op <code class="literal">1</code>
+	  (standaard) hebben staan.  In het algemeen lost dit een
+	  probleem op waarbij een systeem spontaan weer opkomt nadat het
+	  in slaapstand is gezet of geheel gestopt is.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76005200"></a>12.17.3.6. Overige problemen</h4></div></div></div><p>Als er nog andere problemen zijn met
+	  <acronym class="acronym">ACPI</acronym> (met een docking station of
+	  apparaten niet gedetecteerd, enzovoort), dan kan een mail met
+	  beschijving naar de mailinglijst gezonden worden.  Sommige
+	  zaken kunnen echter gerelateerd zijn aan delen van het
+	  <acronym class="acronym">ACPI</acronym>-subsysteem die nog niet af zijn,
+	  dus het kan in sommige gevallen een tijd duren.  Gebruikers
+	  moeten soms geduld en de bereidheid om eventuele
+	  patches uit te proberen hebben.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-aslanddump"></a>12.17.4. <acronym class="acronym">ASL</acronym>, <code class="command">acpidump</code> en
+	<acronym class="acronym">IASL</acronym></h3></div></div></div><a id="idp76008912" class="indexterm"></a><p>Het grootste probleem is dat
+	<acronym class="acronym">BIOS</acronym>-producenten vaak incorrecte (of gewoon
+	foutieve) bytecode leveren.  Dit blijkt doorgaans uit
+	kernelboodschappen als:</p><pre class="screen">ACPI-1287: *** Error: Method execution failed [\\_SB_.PCI0.LPC0.FIGD._STA] \\
+(Node 0xc3f6d160), AE_NOT_FOUND</pre><p>Vaak kunnen dergelijke problemen geoplost worden door de
+	<acronym class="acronym">BIOS</acronym> bij te werken tot de laatste revisie.
+	De meeste consoleberichten zijn onschuldig, maar als er andere
+	problemen zijn, zoals batterijstatus die niet werkt, dan ligt
+	het voor de hand te zoeken naar problemen in de
+	<acronym class="acronym">AML</acronym>-code.  De bytecode die
+	<acronym class="acronym">AML</acronym> genoemd wordt, wordt gecompileerd van een
+	broncodetaal <acronym class="acronym">ASL</acronym>.  Deze staat weer in een
+	tabel <acronym class="acronym">DSDT</acronym>.  Met <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpidump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">acpidump</span>(8)</span></a> kan een
+	kopie van de <acronym class="acronym">ASL</acronym> gemaakt worden.  Dan moeten
+	zowel de opties <code class="option">-t</code> (laat inhoud van vaste
+	tabellen zien) als <code class="option">-d</code> (disassembleer
+	<acronym class="acronym">AML</acronym> naar <acronym class="acronym">ASL</acronym>) gebruikt
+	worden.  In <a class="link" href="ACPI-debug.html#ACPI-submitdebug" title="12.17.1. Debuginformatie aanleveren">Debuginformatie
+	  aanleveren</a> staat een voorbeeld.</p><p>De eenvoudigste eerste controle is de
+	<acronym class="acronym">ASL</acronym>-code opnieuw compileren en kijken of er
+	foutmeldingen optreden.  Waarschuwingen kunnen doorgaans
+	genegeerd worden, maar fouten zijn bugs die er meestal toe
+	leiden dat <acronym class="acronym">ACPI</acronym> niet correct werkt.  Om
+	<acronym class="acronym">ASL</acronym> te hercompileren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>iasl eigen.asl</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-fixasl"></a>12.17.5. <acronym class="acronym">ASL</acronym> repareren</h3></div></div></div><a id="idp76024784" class="indexterm"></a><p>Op langere termijn is het de bedoeling dat voor vrijwel elke
+	machine <acronym class="acronym">ACPI</acronym> werkt zonder enig ingrijpen van
+	de gebruiker.  Op dit moment wordt er echter nog gewerkt aan
+	oplossingen voor veel voorkomende vergissingen die
+	<acronym class="acronym">BIOS</acronym>-producenten maken.  De <span class="trademark">Microsoft</span>®
+	interpreter (<code class="filename">acpi.sys</code> en
+	<code class="filename">acpiec.sys</code>) controleert niet strikt of het
+	<acronym class="acronym">BIOS</acronym> volledig aan de standaard voldoet,
+	waardoor het voorkomt dat <acronym class="acronym">BIOS</acronym>-makers die
+	alleen testen onder <span class="trademark">Windows</span>® bepaalde fouten in hun
+	<acronym class="acronym">ASL</acronym> nooit correct repareren.  FreeBSD hoopt door
+	te gaan met de identificatie en documentatie van welk
+	niet-standaard gedrag precies wordt toegelaten door
+	<span class="trademark">Microsoft</span>®'s interpreter en te dit te repliceren zodat FreeBSD
+	kan werken zonder dat gebruikers zich gedwongen zien om de
+	<acronym class="acronym">ASL</acronym> te repareren.  Als een tijdelijke
+	oplossing en om te helpen met het in kaart brengen van bepaald
+	gedrag, kan de <acronym class="acronym">ASL</acronym> handmatig gerepareerd
+	worden.  Mocht dit lukken, dan wordt erop aangedrongen een
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> van de oude en de nieuwe <acronym class="acronym">ASL</acronym> te
+	mailen, zodat het foutieve gedrag mogelijk in
+	<acronym class="acronym">ACPI-CA</acronym> kan worden verwerkt, waardoor andere
+	gebruikers niet meer handmatig met hun <acronym class="acronym">ASL</acronym>
+	aan de gang hoeven.</p><a id="idp76041808" class="indexterm"></a><p>Hieronder staat een lijst algemene foutmeldingen, hun
+	oorzaken en hoe ze op te lossen:</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76043344"></a>12.17.5.1. _OS afhankelijkheden</h4></div></div></div><p>Sommige <acronym class="acronym">AML</acronym>s gaan ervan uit dat de
+	  wereld enkel bestaat uit <span class="trademark">Windows</span>® versies.  FreeBSD kan zich
+	  voordoen als elk <acronym class="acronym">OS</acronym> om te kijken of dit
+	  problemen oplost.  Een gemakkelijke manier om dit te doen is
+	  <code class="literal">hw.acpi.osname="Windows 2001"</code> in te stellen
+	  in <code class="filename">/boot/loader.conf</code> of andere
+	  gelijksoortige strings die in een <acronym class="acronym">ASL</acronym>
+	  staan.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76059344"></a>12.17.5.2. Ontbrekende return-opdrachten</h4></div></div></div><p>Sommige methoden hebben geen specifieke returnwaarde,
+	  zoals wel vereist wordt door de standaard.  Hoewel
+	  <acronym class="acronym">ACPI-CA</acronym> hier niets mee doet, heeft FreeBSD
+	  de mogelijkheid tot impliciete returns.  Er kunnen ook
+	  expliciete return-opdrachten toegevoegd worden waar vereist,
+	  als het bekend is welke waarden teruggevoerd moeten worden.
+	  Om <code class="command">iasl</code> te dwingen tot compilatie van
+	  <acronym class="acronym">ASL</acronym> kan de schakeloptie
+	  <code class="option">-f</code> gebruikt worden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76062032"></a>12.17.5.3. De standaard <acronym class="acronym">AML</acronym> aanpassen</h4></div></div></div><p>Nadat <code class="filename">eigen.asl</code> aangepast is, kan
+	  deze als volgt gecompileerd worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>iasl eigen.asl</code></strong></pre><p>Met de optie <code class="option">-f</code> is af te dwingen dat de
+	  <acronym class="acronym">AML</acronym> gemaakt wordt, zelfs als er
+	  compileerfouten optreden.  Sommige fouten (zoals ontbrekende
+	  return-opdrachten) worden automatisch opgelost door de
+	  interpreter.</p><p><code class="filename">DSDT.aml</code> is de standaardnaam voor het
+	  bestand dat door <code class="command">iasl</code> wordt geproduceerd.
+	  Dit is in plaats van de foutieve versie uit het
+	  <acronym class="acronym">BIOS</acronym> (die nog steeds aanwezig is in het
+	  flashgeneugen) te laden door
+	  <code class="filename">/boot/loader.conf</code> als volgt te
+	  wijzigen:</p><pre class="programlisting">acpi_dsdt_load="YES"
+acpi_dsdt_name="/boot/DSDT.aml"</pre><p><code class="filename">DSDT.aml</code> moet in de map <code class="filename">/boot</code> staan.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-debugoutput"></a>12.17.6. Debuguitvoer van <acronym class="acronym">ACPI</acronym> verkrijgen</h3></div></div></div><a id="idp76074704" class="indexterm"></a><a id="idp76075856" class="indexterm"></a><p>Het stuurprogramma <acronym class="acronym">ACPI</acronym> heeft een zeer
+	flexibele debugfaciliteit.  Er kan zowel een verzameling van
+	subsystemen aangegeven worden als het niveau van uitvoerigheid.
+	De te debuggen subsystemen worden aangegeven als lagen
+	(<span class="quote">&#8220;<span class="quote">layers</span>&#8221;</span>) en zijn opgedeeld in
+	<acronym class="acronym">ACPI-CA</acronym>-componenten (ACPI_ALL_COMPONENTS) en
+	<acronym class="acronym">ACPI</acronym>-hardware-ondersteuning
+	(ACPI_ALL_DRIVERS).  De uitvoerigheid van debuguitvoer wordt
+	aangegeven als het niveau (<span class="quote">&#8220;<span class="quote">level</span>&#8221;</span>) en gaat van
+	CPI_LV_ERROR (alleen fouten rapporteren) tot ACPI_LV_VERBOSE
+	(alles).  Het niveau is een bitmasker en dus kunnen er meerdere
+	opties tegelijk ingeschakeld worden (gescheiden door spaties).
+	In de praktijk wordt wellicht een seriële console gebruikt
+	om de uitvoer te loggen als deze zo omvangrijk is dat de
+	console berichtbuffer vol loopt (misschien wel meerdere keren).
+	Een complete lijst van de individuele lagen en niveaus staat in
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi</span>(4)</span></a>.</p><p>Debuguitvoer staat standaard niet aan.  Door
+	<code class="literal">options ACPI_DEBUG</code> toe te voegen aan het
+	bestand met kernelinstellingen als <acronym class="acronym">ACPI</acronym> als
+	de kernel is gebouwd, wordt het ingeschakeld.  Door
+	<code class="literal">ACPI_DEBUG=1</code> toe te voegen aan
+	<code class="filename">/etc/make.conf</code> wordt het systeembreed
+	ingeschakeld.  Als <acronym class="acronym">ACPI</acronym> als module wordt
+	gebruikt (de normale situatie), dan hoeft slechts de module
+	<code class="filename">acpi.ko</code> opnieuw gecompileerd te
+	worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /sys/modules/acpi/acpi
+&amp;&amp; make clean &amp;&amp;
+make ACPI_DEBUG=1</code></strong></pre><p><code class="filename">acpi.ko</code> moet in
+	<code class="filename">/boot/kernel</code> komen te
+	staan en de gewenste debuglaag en het gewenste niveau van
+	uitvoerigheid dienen toegevoegd te worden aan
+	<code class="filename">loader.conf</code>.  Hieronder een voorbeeld
+	waarmee debuguitvoer wordt aangezet voor alle
+	<acronym class="acronym">ACPI-CA</acronym>-componenten en alle
+	<acronym class="acronym">ACPI</acronym>-hardware-stuurprogramma's
+	(<acronym class="acronym">CPU</acronym>, <acronym class="acronym">LID</acronym>, enzovoort.
+	Het niveau van uitvoerigheid is het laagst mogelijke.  Er
+	worden alleen fouten gemeld.</p><pre class="programlisting">debug.acpi.layer="ACPI_ALL_COMPONENTS ACPI_ALL_DRIVERS"
+debug.acpi.level="ACPI_LV_ERROR"</pre><p>Als de gezochte informatie wordt veroorzaakt door een
+	specifieke gebeurtenis (bijvoorbeeld in en uit slaapstand gaan),
+	dan kunnen wijzigingen aan <code class="filename">loader.conf</code>
+	achterwege blijven en in plaats daarvan kan
+	<code class="command">sysctl</code> gebruikt worden om laag en niveau in
+	te stellen na het opstarten en zo het systeem voor te bereiden
+	op die specifieke gebeurtenis.  De <code class="command">sysctl</code>s
+	hebben dezelfde namen als de parameters in
+	<code class="filename">loader.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-References"></a>12.17.7. Verwijzingen</h3></div></div></div><p>Meer informatie over <acronym class="acronym">ACPI</acronym> staat op de
+	volgende locaties:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>De <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">FreeBSD ACPI mailinglijst</a></p></li><li class="listitem"><p>De <acronym class="acronym">ACPI</acronym> mailinglijst archieven <code class="uri"><a class="uri" href="http://lists.freebsd.org/pipermail/freebsd-acpi/" target="_top">http://lists.freebsd.org/pipermail/freebsd-acpi/</a></code></p></li><li class="listitem"><p>De oude <acronym class="acronym">ACPI</acronym> mailinglijst archieven <code class="uri"><a class="uri" href="http://home.jp.FreeBSD.org/mail-list/acpi-jp/" target="_top">http://home.jp.FreeBSD.org/mail-list/acpi-jp/</a></code></p></li><li class="listitem"><p>De <acronym class="acronym">ACPI</acronym> 2.0 specificatie
+	    <code class="uri"><a class="uri" href="http://acpi.info/spec.htm" target="_top">http://acpi.info/spec.htm</a></code></p></li><li class="listitem"><p>FreeBSD Handleidingen: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi</span>(4)</span></a>,
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi_thermal&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi_thermal</span>(4)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpidump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">acpidump</span>(8)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=iasl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">iasl</span>(8)</span></a>,
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpidb&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">acpidb</span>(8)</span></a></p></li><li class="listitem"><p><a class="link" href="http://www.cpqlinux.com/acpi-howto.html#fix_broken_dsdt" target="_top">
+	      <acronym class="acronym">DSDT</acronym> debugging informatie</a>.
+	    (Gebruikt Compaq als voorbeeld, maar van algemeen
+	    nut).</p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="acpi-overview.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="config-tuning.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="boot.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">12.16. Energie- en bronnenbeheer </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> Hoofdstuk 13. Het FreeBSD opstartproces</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

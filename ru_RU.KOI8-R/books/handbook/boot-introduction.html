@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>13.2. Проблема загрузки</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="boot.html" title="Глава 13. Процесс загрузки FreeBSD" /><link rel="prev" href="boot.html" title="Глава 13. Процесс загрузки FreeBSD" /><link rel="next" href="boot-blocks.html" title="13.3. Менеджер загрузки и этапы загрузки" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">13.2. Проблема загрузки</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="boot.html">Пред.</a> </td><th width="60%" align="center">Глава 13. Процесс загрузки FreeBSD</th><td width="20%" align="right"> <a accesskey="n" href="boot-blocks.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="boot-introduction"></a>13.2. Проблема загрузки</h2></div></div></div><p>Включение компьютера и запуск операционной системы приводят к
+      интересной дилемме.  По определению до запуска операционной системы
+      компьютер не умеет ничего.  В том числе и не знает, как запускать программы
+      с диска.  Так что компьютер не может запустить программу с диска без
+      операционной системы, но программы операционной системы находятся на
+      диске, но как запустить операционную систему?</p><p>Эта проблема имеет параллели с одной проблемой из книги
+      <em class="citetitle">Приключения барона Мюнхгаузена</em>.  Герой провалился в
+      болото, и вытащил сам себя, ухватив за волосы и потянув.  В эпоху начала
+      компьютеризации термин <em class="firstterm">начальная загрузка</em>
+      применялся к механизму, используемому для загрузки операционной системы,
+      и затем был сокращен до просто <span class="quote"><<<span class="quote">загрузки</span>>></span>.</p><a id="idp87645136" class="indexterm"></a><a id="idp87645648" class="indexterm"></a><p>На оборудовании архитектуры x86 за загрузку операционной системы
+      отвечает BIOS (Basic Input/Output System).  Для этого BIOS ищет на
+      жестком диске MBR (Master Boot Record), которая должна располагаться в
+      определенном месте на диске.  BIOS может загрузить и запустить MBR, и
+      предполагается, что MBR может взять на себя остальную работу, связанную с
+      загрузкой операционной системы.</p><a id="idp87646800" class="indexterm"></a><a id="idp87647312" class="indexterm"></a><p>Выполняемую часть MBR обычно называют <span class="emphasis"><em>менеджером
+      загрузки (boot manager)</em></span>, в особенности если она
+      взаимодействует с пользователем.  В этом случае менеджер загрузки,
+      как правило, занимает большее пространство на первом
+      <span class="emphasis"><em>треке</em></span> диска или внутри файловой системы ОС.
+      (Менеджер загрузки иногда называют <span class="emphasis"><em>загрузчиком (boot
+      loader)</em></span>, но во FreeBSD этот термин используется для
+      описания более поздней фазы загрузки).  Среди популярных менеджеров
+      загрузки стоит отметить <span class="application">boot0</span> (он же
+      <span class="application">Boot Easy</span>, стандартный менеджер загрузки
+      FreeBSD), <span class="application">Grub</span>, <span class="application">GAG</span>
+      и <span class="application">LILO</span>.  Из перечисленных менеджеров
+      загрузки в MBR помещается только
+      <span class="application">boot0</span>.</p><p>Если на вашем диске установлена только одна операционная система, то
+      стандартной MBR будет достаточно.  Такая MBR выполняет поиск на диске
+      первого загрузочного (активного) слайса, после чего запускает с этого слайса код
+      загрузки оставшейся части операционной системы.  Утилита <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fdisk&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fdisk</span>(8)</span></a>
+      по умолчанию устанавливает именно такую MBR, на основе файла
+      <code class="filename">/boot/mbr</code>.</p><p>Если на ваших дисках установлено несколько операционных систем, то
+      вы можете установить другой менеджер загрузки, который может выдать список различных
+      операционных систем и позволит вам выбрать одну из них для загрузки.
+      Два варианта менеджеров загрузки будут описаны чуть ниже.</p><p>Оставшаяся часть системы начальной загрузки FreeBSD разделяется на
+      три этапа.  Первый этап запускается из MBR, и он знает достаточно для
+      перевода компьютера в особое состояние и загрузки второго этапа.  Второй
+      этап может делать несколько больше до запуска третьего этапа.  Третий
+      этап заканчивает работу по загрузке операционной системы.  Работа
+      разделена на эти три этапа, потому что стандарты ПК ограничивают размеры
+      программ, которые могут быть запущены на первом и втором этапах.
+      Последовательное выполнение работ позволяет FreeBSD получить более гибкий
+      загрузчик.</p><a id="idp87658192" class="indexterm"></a><a id="idp87658704" class="indexterm"></a><p>Затем стартует ядро, которое начинает опознавать устройства и
+      выполняет их инициализацию.  После завершения процесса своей загрузки,
+      ядро передает управление пользовательскому процессу с именем
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a>, который выполняет проверку дисков на возможность
+      использования.  Затем <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> запускает пользовательский процесс
+      настройки ресурсов, который монтирует файловые системы, выполняет
+      настройку сетевых адаптеров для работы в сети и вообще осуществляет
+      запуск всех процессов, обычно выполняемых в системе FreeBSD при
+      загрузке.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="boot.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="boot.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="boot-blocks.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 13. Процесс загрузки FreeBSD </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 13.3. Менеджер загрузки и этапы загрузки</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.4. RAID</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="disks.html" title="Chapitre 19. Stockage des données" /><link rel="prev" href="disks-adding.html" title="19.3. Ajouter des disques" /><link rel="next" href="usb-disks.html" title="19.5. Périphériques de stockage USB" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.4. RAID</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="disks-adding.html">Précédent</a> </td><th width="60%" align="center">Chapitre 19. Stockage des données</th><td width="20%" align="right"> <a accesskey="n" href="usb-disks.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="raid"></a>19.4. RAID</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="raid-soft"></a>19.4.1. RAID logiciel</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ccd"></a>19.4.1.1. Configuration du pilote de disque concaténé
+	  (CCD &#8212; &#8220;Concatenated Disk Driver&#8221;)</h4></div><div><span class="authorgroup">Travail original de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Christopher</span> <span class="surname">Shumway</span></span>. </span></div><div><span class="authorgroup">Révisé par <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Jim</span> <span class="surname">Brown</span></span>. </span></div></div></div><a id="idp79861456" class="indexterm"></a><a id="idp79862224" class="indexterm"></a><p>Quand il est question du choix d'une solution de
+	  stockage de masse les critères de choix les plus
+	  importants à considérer sont la vitesse, la
+	  fiabilité, et le
+	  coût.  Il est plutôt rare de pouvoir réunir
+	  ces trois critères; normalement un
+	  périphérique de stockage rapide et fiable est
+	  coûteux, et pour diminuer les coûts la
+	  vitesse ou la fiabilité doivent
+	  être sacrifiées.</p><p>A la conception du système décrit plus bas,
+	  le coût a été choisi comme facteur
+	  le plus important, suivi de la vitesse, et enfin
+	  la fiabilité.  La vitesse de transfert des données
+	  est limitée par le réseau.  Et tandis que la
+	  fiabilité est très importante, le disque CCD
+	  décrit ci-dessous est destiné au stockage de
+	  données en ligne qui sont déjà
+	  complètement sauvegardées sur CD-Rs et qui
+	  peuvent être facilement remplacées.</p><p>Définir vos propres besoins est la première
+	  étape dans le choix d'une solution de stockage
+	  de masse.  Si vos critères de choix privilégient
+	  la vitesse ou la fiabilité par rapport au coût,
+	  votre solution diférera du système décrit dans
+	  cette section.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ccd-installhw"></a>19.4.1.1.1. Installation du matériel</h5></div></div></div><p>En plus du disque système IDE, trois
+	    disques Western Digital de 30Go, 5400 trs/min IDE
+	    forment le coeur du disque CCD décrit ci-dessous
+	    donnant approximativement 90Go de stockage en ligne.
+	    La solution idéale serait d'avoir
+	    pour chaque disque IDE son propre câble et
+	    contrôleur IDE, mais pour minimiser les coûts,
+	    des contrôleur IDE supplémentaires n'ont pas
+	    été utilisés.  Aussi, les disques ont
+	    été configuré de telle façon que chaque
+	    contrôleur IDE ait un disque maître et un disque
+	    esclave.</p><p>Au redémarrage, le BIOS a été
+	    configuré pour détecter automatiquement
+	    les disques attachés.  FreeBSD les a d'ailleurs
+	    détectés au redémarrage:</p><pre class="programlisting">ad0: 19574MB &lt;WDC WD205BA&gt; [39770/16/63] at ata0-master UDMA33
+ad1: 29333MB &lt;WDC WD307AA&gt; [59598/16/63] at ata0-slave UDMA33
+ad2: 29333MB &lt;WDC WD307AA&gt; [59598/16/63] at ata1-master UDMA33
+ad3: 29333MB &lt;WDC WD307AA&gt; [59598/16/63] at ata1-slave UDMA33</pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Si FreeBSD ne détecte pas les disques,
+	    assurez-vous que vous avez correctement placé les
+	    cavaliers.  La plupart des disques IDE disposent
+	    également d'un cavalier &#8220;Cable Select&#8221;.
+	    Ce n'est <span class="emphasis"><em>pas</em></span> le cavalier de
+	    configuration maître/esclave.  Consultez la
+	    documentation du disque pour identifier le cavalier
+	    correct.</p></div><p>Ensuite, réfléchissez sur la manière
+	    de les intégrer au système de fichiers.
+	    Vous devriez faire des recherches sur <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vinum</span>(8)</span></a>
+	    (<a class="xref" href="vinum-vinum.html" title="Chapitre 21. Le gestionnaire de volume Vinum">Chapitre 21, <em>Le gestionnaire de volume Vinum</em></a>) et <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>.  Dans
+	    cette configuration particulière, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> a
+	    été choisi.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ccd-setup"></a>19.4.1.1.2. Configuration du CCD</h5></div></div></div><p>Le pilote <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> vous permet de prendre
+	    plusieurs disques identiques et les concaténer
+	    en un seul système de fichiers logique.  Afin
+	    d'utiliser <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>, vous avez besoin
+	    d'un noyau avec le support <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>.
+	    Ajoutez la ligne suivante à votre fichier de
+	    configuration de noyau, recompilez, et installez
+	    le noyau:</p><pre class="programlisting">device   ccd</pre><p>Le support <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> peut
+	    également chargé sous la forme d'un module
+	    noyau.</p><p>Pour configurer <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>,
+	    vous devez tout d'abord utiliser <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a>
+	    pour labéliser les disques:</p><pre class="programlisting">bsdlabel -w ad1 auto
+bsdlabel -w ad2 auto
+bsdlabel -w ad3 auto</pre><p>Cela a créé un label de disque
+	    <code class="filename">ad1c</code>,
+	    <code class="filename">ad2c</code> et
+	    <code class="filename">ad3c</code> qui s'étend sur
+	    l'intégralité du disque.</p><p>L'étape suivante est de modifier le type de label de
+	    disque.  Vous pouvez utiliser <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a> pour
+	    éditer les disques:</p><pre class="programlisting">bsdlabel -e ad1
+bsdlabel -e ad2
+bsdlabel -e ad3</pre><p>Cela ouvre le label de disque actuel de chaque
+	    disque dans l'éditeur fixé par la variable
+	    d'environnement <code class="envar">EDITOR</code>,
+	    généralement, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a>.</p><p>Un label de disque non modifié ressemblera
+	    à quelque chose comme ceci:</p><pre class="programlisting">8 partitions:
+#        size   offset    fstype   [fsize bsize bps/cpg]
+  c: 60074784        0    unused        0     0     0   # (Cyl.    0 - 59597)</pre><p>Ajoutez une nouvelle partition
+	    <code class="literal">e</code> pour être utilisé par
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>.  Cela peut être une copie de la
+	    partition <code class="literal">c</code> mais le type de système
+	    de fichiers (<code class="option">fstype</code>) doit être
+	    <strong class="userinput"><code>4.2BSD</code></strong>.  Le label de disque devait
+	    ressembler à:</p><pre class="programlisting">8 partitions:
+#        size   offset    fstype   [fsize bsize bps/cpg]
+  c: 60074784        0    unused        0     0     0   # (Cyl.    0 - 59597)
+  e: 60074784        0    4.2BSD        0     0     0   # (Cyl.    0 - 59597)</pre></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ccd-buildingfs"></a>19.4.1.1.3. Création du système de fichiers</h5></div></div></div><p>Maintenant que tous les disques sont labélisés,
+	    vous devez construire le <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>.  Pour cela,
+	    utilisez <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccdconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ccdconfig</span>(8)</span></a>, avec des options semblables
+	    à ce qui suit:</p><pre class="programlisting">ccdconfig ccd0<a id="co-ccd-dev"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span> 32<a id="co-ccd-interleave"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span> 0<a id="co-ccd-flags"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span> /dev/ad1e<a id="co-ccd-devs"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span> /dev/ad2e /dev/ad3e</pre><p>L'utilisation et la signification de chaque option
+	    est données ci-dessous:</p><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-ccd-dev"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Le premier argument est le périphérique
+	      à configurer, dans ce cas,
+	      <code class="filename">/dev/ccd0c</code>. La partie
+	      <code class="filename">/dev/</code> est optionnelle.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-ccd-interleave"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>L'entrelacement (&#8220;interleave&#8221;) du
+	      système de fichiers.  L'entrelacement définit
+	      la taille d'une bande de blocs disque, de 512 octets
+	      chacune normalement.  Donc un entrelacement de 32
+	      serait d'une largeur de 16384 octets.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-ccd-flags"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Paramètres pour <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccdconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ccdconfig</span>(8)</span></a>.  Si vous
+	      désirez activer les miroirs disque, vous pouvez
+	      spécifier un indicateur à cet endroit.  Cette
+	      configuration ne fournit pas de miroir pour
+	      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>, aussi l'indicateur est a 0
+	      (zéro).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-ccd-devs"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Les derniers arguments de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccdconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ccdconfig</span>(8)</span></a>
+	      sont les périphériques à placer dans
+	      le disque concaténé.  Utilisez le chemin
+	      complet pour chaque périphérique.</p></td></tr></table></div><p>Après avoir utilisé <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccdconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ccdconfig</span>(8)</span></a> le
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> est configuré.  Un système de fichiers
+	    peut être créé.  Consultez la page de manuel de
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> pour les options disponibles, ou lancez
+	    simplement:</p><pre class="programlisting">newfs /dev/ccd0c</pre></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ccd-auto"></a>19.4.1.1.4. Automatiser la procédure</h5></div></div></div><p>Généralement, vous voudrez monter le
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> à chaque redémarrage.  Pour cela,
+	    vous devez le configurer avant toute chose.
+	    Ecrivez votre configuration actuelle dans
+	    <code class="filename">/etc/ccd.conf</code> en utilisant la
+	    commande suivante:</p><pre class="programlisting">ccdconfig -g &gt; /etc/ccd.conf</pre><p>Lors du démarrage, la procédure
+	    <code class="command">/etc/rc</code> exécute
+	    <code class="command">ccdconfig -C</code> si
+	    <code class="filename">/etc/ccd.conf</code> existe.  Cela configure
+	    automatiquement le <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> de façon
+	    à pouvoir être monté.</p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Si vous démarrez en mode mono-utilisateur,
+	    avant que vous ne puissiez monter le <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>, vous
+	    devez utiliser la commande suivante pour configurer
+	    l'unité:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">ccdconfig -C</pre></div><p>Pour monter automatiquement le <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a>
+	    placez une entrées pour le <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ccd&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ccd</span>(4)</span></a> dans
+	    <code class="filename">/etc/fstab</code>, il sera ainsi monté
+	    au démarrage:</p><pre class="programlisting">/dev/ccd0c              /media       ufs     rw      2       2</pre></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vinum"></a>19.4.1.2. Le gestionnaire de volume Vinum</h4></div></div></div><a id="idp79925072" class="indexterm"></a><a id="idp79925840" class="indexterm"></a><p>Le gestionnaire de volume Vinum est un pilote
+	  de périphérique de gestion de disques
+	  virtuels.  Il sépare le disque matériel de l'interface
+	  de périphérique bloc et organise les données
+	  de telle façon qu'il en résulte une amélioration
+	  de la flexibilité, des performances et de la
+	  fiabilité, comparé à la vision
+	  traditionnelle sous forme partitionnée du stockage
+	  disque.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vinum</span>(8)</span></a> implémente les modèles
+	  RAID-0, RAID-1 et RAID-5, individuellement ou
+	  combinés.</p><p>Voir le <a class="xref" href="vinum-vinum.html" title="Chapitre 21. Le gestionnaire de volume Vinum">Chapitre 21, <em>Le gestionnaire de volume Vinum</em></a> pour plus
+	  d'information au sujet de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vinum</span>(8)</span></a>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="raid-hard"></a>19.4.2. RAID Matériel</h3></div></div></div><a id="idp79934928" class="indexterm"></a><p>FreeBSD supporte également de nombreux contrôleurs
+	<acronym class="acronym">RAID</acronym>.  Ces périphériques
+	peuvent contrôler un système <acronym class="acronym">RAID</acronym>
+	sans nécessiter l'utilisation d'un logiciel spécifique
+	pour FreeBSD pour gérer l'unité.</p><p>En utilisant son propre <acronym class="acronym">BIOS</acronym>, la carte
+	contrôle la plupart des opérations disque.  Ce qui
+	suit est une description rapide d'une configuration utilisant
+	un contrôleur Promise <acronym class="acronym">IDE</acronym> <acronym class="acronym">RAID</acronym>.
+	Quand cette carte est installée et le système
+	redémarré, une invite s'affichera posant quelques
+	questions.  Suivez les instructions à l'écran
+	pour atteindre l'écran de configuration de la carte.
+	A partir de là, vous avez la possibilité de combiner
+	tous les disques attachés.  En faisant cela, les
+	disques apparaîtront sous la forme d'un unique disque
+	sous FreeBSD.  D'autres niveaux <acronym class="acronym">RAID</acronym>
+	peuvent être configurés en conséquence.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp79939280"></a>19.4.3. Reconstruire une unité ATA RAID1</h3></div></div></div><p>FreeBSD vous permet de remplacer à chaud
+	un disque défectueux dans une unité.  Cela doit
+	être fait avant redémarrage.</p><p>Vous verrez probablement dans
+	<code class="filename">/var/log/messages</code> ou dans la sortie de
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dmesg&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dmesg</span>(8)</span></a> quelque chose comme:</p><pre class="programlisting">ad6 on monster1 suffered a hard error.
+ad6: READ command timeout tag=0 serv=0 - resetting
+ad6: trying fallback to PIO mode
+ata3: resetting devices .. done
+ad6: hard error reading fsbn 1116119 of 0-7 (ad6 bn 1116119; cn 1107 tn 4 sn 11)
+status=59 error=40
+ar0: WARNING - mirror lost</pre><p>En utilisant <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=atacontrol&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">atacontrol</span>(8)</span></a>, recherchez
+	de plus amples informations:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>atacontrol list</code></strong>
+ATA channel 0:
+	Master:      no device present
+	Slave:   acd0 &lt;HL-DT-ST CD-ROM GCR-8520B/1.00&gt; ATA/ATAPI rev 0
+
+ATA channel 1:
+	Master:      no device present
+	Slave:       no device present
+
+ATA channel 2:
+	Master:  ad4 &lt;MAXTOR 6L080J4/A93.0500&gt; ATA/ATAPI rev 5
+	Slave:       no device present
+
+ATA channel 3:
+	Master:  ad6 &lt;MAXTOR 6L080J4/A93.0500&gt; ATA/ATAPI rev 5
+	Slave:       no device present
+
+<code class="prompt">#</code> <strong class="userinput"><code>atacontrol status ar0</code></strong>
+ar0: ATA RAID1 subdisks: ad4 ad6 status: DEGRADED</pre><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Vous devrez détacher le canal ATA avec le
+	    disque défectueux de façon à pouvoir
+	    le retirer sans risque:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>atacontrol detach ata3</code></strong></pre></li><li class="step"><p>Remplacer le disque.</p></li><li class="step"><p>Rattacher le canal ATA:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>atacontrol attach ata3</code></strong>
+Master:  ad6 &lt;MAXTOR 6L080J4/A93.0500&gt; ATA/ATAPI rev 5
+Slave:   no device present</pre></li><li class="step"><p>Rajouter le disque de rechange à
+	    l'unité:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>atacontrol addspare ar0 ad6</code></strong></pre></li><li class="step"><p>Recontruire l'unité:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>atacontrol rebuild ar0</code></strong></pre></li><li class="step"><p>Il est possible de contrôler l'avancée de
+	    la procédure en utilisant la commande
+	    suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dmesg | tail -10</code></strong>
+[output removed]
+ad6: removed from configuration
+ad6: deleted from ar0 disk1
+ad6: inserted into ar0 disk1 as spare
+
+<code class="prompt">#</code> <strong class="userinput"><code>atacontrol status ar0</code></strong>
+ar0: ATA RAID1 subdisks: ad4 ad6 status: REBUILDING 0% completed</pre></li><li class="step"><p>Attendre jusqu'à la fin de cette opération.</p></li></ol></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="disks-adding.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="usb-disks.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">19.3. Ajouter des disques </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 19.5. Périphériques de stockage USB</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

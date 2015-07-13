@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>29.5. Lightweight Directory Access Protocol (LDAP)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Handbook" /><link rel="up" href="network-servers.html" title="Chapter 29. Network Servers" /><link rel="prev" href="network-nis.html" title="29.4. Network Information System (NIS)" /><link rel="next" href="network-dhcp.html" title="29.6. Dynamic Host Configuration Protocol (DHCP)" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">29.5. Lightweight Directory Access Protocol
+      (<acronym class="acronym">LDAP</acronym>)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-nis.html">Prev</a> </td><th width="60%" align="center">Chapter 29. Network Servers</th><td width="20%" align="right"> <a accesskey="n" href="network-dhcp.html">Next</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-ldap"></a>29.5. Lightweight Directory Access Protocol
+      (<acronym class="acronym">LDAP</acronym>)</h2></div><div><span class="authorgroup">Written by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp85344208" class="indexterm"></a><p>The Lightweight Directory Access Protocol
+      (<acronym class="acronym">LDAP</acronym>) is an application layer protocol used
+      to access, modify, and authenticate objects using a distributed
+      directory information service.  Think of it as a phone or record
+      book which stores several levels of hierarchical, homogeneous
+      information.  It is used in Active Directory and
+      <span class="application">OpenLDAP</span> networks and allows users to
+      access to several levels of internal information utilizing a
+      single account.  For example, email authentication, pulling
+      employee contact information, and internal website
+      authentication might all make use of a single user account in
+      the <acronym class="acronym">LDAP</acronym> server's record base.</p><p>This section provides a quick start guide for configuring an
+      <acronym class="acronym">LDAP</acronym> server on a FreeBSD system.  It assumes
+      that the administrator already has a design plan which includes
+      the type of information to store, what that information will be
+      used for, which users should have access to that information,
+      and how to secure this information from unauthorized
+      access.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp85347152"></a>29.5.1. <acronym class="acronym">LDAP</acronym> Terminology and Structure</h3></div></div></div><p><acronym class="acronym">LDAP</acronym> uses several terms which should be
+	understood before starting the configuration.  All directory
+	entries consist of a group of
+	<em class="firstterm">attributes</em>.  Each of these attribute
+	sets contains a unique identifier known as a
+	<em class="firstterm">Distinguished Name</em>
+	(<acronym class="acronym">DN</acronym>) which is normally built from several
+	other attributes such as the common or
+	<em class="firstterm">Relative Distinguished Name</em>
+	(<acronym class="acronym">RDN</acronym>).  Similar to how directories have
+	absolute and relative paths, consider a <acronym class="acronym">DN</acronym>
+	as an absolute path and the <acronym class="acronym">RDN</acronym> as the
+	relative path.</p><p>An example <acronym class="acronym">LDAP</acronym> entry looks like the
+	following.  This example searches for the entry for the
+	specified user account (<code class="literal">uid</code>),
+	organizational unit (<code class="literal">ou</code>), and organization
+	(<code class="literal">o</code>):</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ldapsearch -xb "uid=<em class="replaceable"><code>trhodes</code></em>,ou=<em class="replaceable"><code>users</code></em>,o=<em class="replaceable"><code>example.com</code></em>"</code></strong>
+# extended LDIF
+#
+# LDAPv3
+# base &lt;uid=trhodes,ou=users,o=example.com&gt; with scope subtree
+# filter: (objectclass=*)
+# requesting: ALL
+#
+
+# trhodes, users, example.com
+dn: uid=trhodes,ou=users,o=example.com
+mail: trhodes@example.com
+cn: Tom Rhodes
+uid: trhodes
+telephoneNumber: (123) 456-7890
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 2
+# numEntries: 1</pre><p>This example entry shows the values for the
+	<code class="literal">dn</code>, <code class="literal">mail</code>,
+	<code class="literal">cn</code>, <code class="literal">uid</code>, and
+	<code class="literal">telephoneNumber</code> attributes.  The
+	<acronym class="acronym">cn</acronym> attribute is the
+	<acronym class="acronym">RDN</acronym>.</p><p>More information about <acronym class="acronym">LDAP</acronym> and its
+	terminology can be found at <code class="uri"><a class="uri" href="http://www.openldap.org/doc/admin24/intro.html" target="_top">http://www.openldap.org/doc/admin24/intro.html</a></code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ldap-config"></a>29.5.2. Configuring an <acronym class="acronym">LDAP</acronym> Server</h3></div></div></div><a id="idp85369552" class="indexterm"></a><p>FreeBSD does not provide a built-in <acronym class="acronym">LDAP</acronym>
+	server.  Begin the configuration by installing the <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/openldap24-server/pkg-descr">net/openldap24-server</a> package or port.
+	Since the port has many configurable options, it is
+	recommended that the default options are reviewed to see if
+	the package is sufficient, and to instead compile the port if
+	any options should be changed.  In most cases, the defaults
+	are fine.  However, if SQL support is needed, this option must
+	be enabled and the port compiled using the instructions in
+	<a class="xref" href="ports-using.html" title="5.5. Using the Ports Collection">Section 5.5, &#8220;Using the Ports Collection&#8221;</a>.</p><p>Next, create the directories to hold the data and to store
+	the certificates:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /var/db/openldap-data</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir /usr/local/etc/openldap/private</code></strong></pre><p>Copy over the database configuration file:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /usr/local/etc/openldap/DB_CONFIG.example /var/db/openldap-data/DB_CONFIG</code></strong></pre><p>The next phase is to configure the certificate authority.
+	The following commands must be executed from
+	<code class="filename">/usr/local/etc/openldap/private</code>.  This is
+	important as the file permissions need to be restrictive and
+	users should not have access to these files.  To create the
+	certificate authority, start with this command and follow the
+	prompts:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>openssl req -days <em class="replaceable"><code>365</code></em> -nodes -new -x509 -keyout ca.key -out ../ca.crt</code></strong></pre><p>The entries for the prompts may be generic
+	<span class="emphasis"><em>except</em></span> for the
+	<code class="literal">Common Name</code>.  This entry must be
+	<span class="emphasis"><em>different</em></span> than the system hostname.  If
+	this will be a self signed certificate, prefix the hostname
+	with <code class="literal">CA</code> for certificate authority.</p><p>The next task is to create a certificate signing request
+	and a private key.  Input this command and follow the
+	prompts:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>openssl req -days <em class="replaceable"><code>365</code></em> -nodes -new -keyout server.key -out server.csr</code></strong></pre><p>During the certificate generation process, be sure to
+	correctly set the <code class="literal">Common Name</code> attribute.
+	Once complete, sign the key:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>openssl x509 -req -days <em class="replaceable"><code>365</code></em> -in server.csr -out ../server.crt -CA ../ca.crt -CAkey ca.key -CAcreateserial</code></strong></pre><p>The final part of the certificate generation process is to
+	generate and sign the client certificates:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>openssl req -days <em class="replaceable"><code>365</code></em> -nodes -new -keyout client.key -out client.csr</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>openssl x509 -req -days 3650 -in client.csr -out ../client.crt -CA ../ca.crt -CAkey ca.key</code></strong></pre><p>Remember to use the same <code class="literal">Common Name</code>
+	attribute when prompted.  When finished, ensure that a total
+	of eight (8) new files have been generated through the
+	proceeding commands.  If so, the next step is to edit
+	<code class="filename">/usr/local/etc/openldap/slapd.conf</code> and
+	add the following options:</p><pre class="programlisting">TLSCipherSuite HIGH:MEDIUM:+SSLv3
+TLSCertificateFile /usr/local/etc/openldap/server.crt
+TLSCertificateKeyFile /usr/local/etc/openldap/private/server.key
+TLSCACertificateFile /usr/local/etc/openldap/ca.crt</pre><p>Then, edit
+	<code class="filename">/usr/local/etc/openldap/ldap.conf</code> and add
+	the following lines:</p><pre class="programlisting">TLS_CACERT /usr/local/etc/openldap/ca.crt
+TLS_CIPHER_SUITE HIGH:MEDIUM:+SSLv3</pre><p>While editing this file, uncomment the following entries
+	and set them to the desired values: <code class="option">BASE</code>,
+	<code class="option">URI</code>, <code class="option">SIZELIMIT</code> and
+	<code class="option">TIMELIMIT</code>.  Set the <code class="option">URI</code> to
+	contain <code class="option">ldap://</code> and
+	<code class="option">ldaps://</code>.  Then, add two entries pointing to
+	the certificate authority.  When finished, the entries should
+	look similar to the following:</p><pre class="programlisting">BASE    dc=example,dc=com
+URI     ldap:// ldaps://
+
+SIZELIMIT       12
+TIMELIMIT       15
+
+TLS_CACERT /usr/local/etc/openldap/ca.crt
+TLS_CIPHER_SUITE HIGH:MEDIUM:+SSLv3</pre><p>The default password for the server should then be
+	changed:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>slappasswd -h "{SHA}" &gt;&gt; /usr/local/etc/openldap/slapd.conf</code></strong></pre><p>This command will prompt for the password and, if the
+	process does not fail, a password hash will be added to the
+	end of <code class="filename">slapd.conf</code>.  Several hashing
+	formats are supported.  Refer to the manual page for
+	<code class="command">slappasswd</code> for more information.</p><p>Next, edit
+	<code class="filename">/usr/local/etc/openldap/slapd.conf</code> and
+	add the following lines:</p><pre class="programlisting">password-hash {sha}
+allow bind_v2</pre><p>The <code class="option">suffix</code> in this file must be updated
+	to match the <code class="option">BASE</code> used in
+	<code class="filename">/usr/local/etc/openldap/ldap.conf</code> and
+	<code class="option">rootdn</code> should also be set.  A recommended
+	value for <code class="option">rootdn</code> is something like
+	<code class="option">cn=Manager</code>.  Before saving this file, place
+	the <code class="option">rootpw</code> in front of the password output
+	from <code class="command">slappasswd</code> and delete the old
+	<code class="option">rootpw</code>.  The end result should
+	look similar to this:</p><pre class="programlisting">TLSCipherSuite HIGH:MEDIUM:+SSLv3
+TLSCertificateFile /usr/local/etc/openldap/server.crt
+TLSCertificateKeyFile /usr/local/etc/openldap/private/server.key
+TLSCACertificateFile /usr/local/etc/openldap/ca.crt
+rootpw  {SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=</pre><p>Finally, enable the <span class="application">OpenLDAP</span>
+	service in <code class="filename">/etc/rc.conf</code> and set the
+	<acronym class="acronym">URI</acronym>:</p><pre class="programlisting">slapd_enable="YES"
+slapd_flags="-4 -h ldaps:///"</pre><p>At this point the server can be started and tested:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service slapd start</code></strong></pre><p>If everything is configured correctly, a search of the
+	directory should show a successful connection with a single
+	response as in this example:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ldapsearch -Z</code></strong>
+# extended LDIF
+#
+# LDAPv3
+# base &lt;dc=example,dc=com&gt; (default) with scope subtree
+# filter: (objectclass=*)
+# requesting: ALL
+#
+
+# search result
+search: 3
+result: 32 No such object
+
+# numResponses: 1</pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">If the command fails and the configuration looks
+	  correct, stop the <code class="command">slapd</code> service and
+	  restart it with debugging options:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service slapd stop</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/usr/local/libexec/slapd -d -1</code></strong></pre></div><p>Once the service is responding, the directory can be
+	populated using <code class="command">ldapadd</code>.  In this example,
+	a file containing this list of users is first created.  Each
+	user should use the following format:</p><pre class="programlisting">dn: dc=<em class="replaceable"><code>example</code></em>,dc=<em class="replaceable"><code>com</code></em>
+objectclass: dcObject
+objectclass: organization
+o: <em class="replaceable"><code>Example</code></em>
+dc: <em class="replaceable"><code>Example</code></em>
+
+dn: cn=<em class="replaceable"><code>Manager</code></em>,dc=<em class="replaceable"><code>example</code></em>,dc=<em class="replaceable"><code>com</code></em>
+objectclass: organizationalRole
+cn: <em class="replaceable"><code>Manager</code></em></pre><p>To import this file, specify the file name.  The following
+	command will prompt for the password specified earlier and the
+	output should look something like this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ldapadd -Z -D "cn=<em class="replaceable"><code>Manager</code></em>,dc=<em class="replaceable"><code>example</code></em>,dc=<em class="replaceable"><code>com</code></em>" -W -f <em class="replaceable"><code>import.ldif</code></em></code></strong>
+Enter LDAP Password:
+adding new entry "dc=example,dc=com"
+
+adding new entry "cn=Manager,dc=example,dc=com"</pre><p>Verify the data was added by issuing a search on the
+	server using <code class="command">ldapsearch</code>:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ldapsearch -Z</code></strong>
+# extended LDIF
+#
+# LDAPv3
+# base &lt;dc=example,dc=com&gt; (default) with scope subtree
+# filter: (objectclass=*)
+# requesting: ALL
+#
+
+# example.com
+dn: dc=example,dc=com
+objectClass: dcObject
+objectClass: organization
+o: Example
+dc: Example
+
+# Manager, example.com
+dn: cn=Manager,dc=example,dc=com
+objectClass: organizationalRole
+cn: Manager
+
+# search result
+search: 3
+result: 0 Success
+
+# numResponses: 3
+# numEntries: 2</pre><p>At this point, the server should be configured and
+	functioning properly.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-nis.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="network-servers.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="network-dhcp.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">29.4. Network Information System
+      (<acronym class="acronym">NIS</acronym>) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 29.6. Dynamic Host Configuration Protocol
+      (<acronym class="acronym">DHCP</acronym>)</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

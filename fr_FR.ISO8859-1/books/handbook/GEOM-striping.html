@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.3. RAID0 - « Striping »</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="GEOM.html" title="Chapitre 20. GEOM: architecture modulaire de gestion des disques" /><link rel="prev" href="GEOM-intro.html" title="20.2. Introduction à GEOM" /><link rel="next" href="GEOM-mirror.html" title="20.4. RAID1 - « mirroring »" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.3. RAID0 - <span class="quote">« <span class="quote">Striping</span> »</span></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-intro.html">Précédent</a> </td><th width="60%" align="center">Chapitre 20. GEOM: architecture modulaire de gestion des disques</th><td width="20%" align="right"> <a accesskey="n" href="GEOM-mirror.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-striping"></a>20.3. RAID0 - <span class="quote">« <span class="quote">Striping</span> »</span></h2></div><div><span class="authorgroup">Ecrit par <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span> et <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Murray</span> <span class="surname">Stokely</span></span>. </span></div></div></div><a id="idp81286736" class="indexterm"></a><a id="idp81287504" class="indexterm"></a><p>Le <span class="quote">« <span class="quote">striping</span> »</span> (ou entrelacement) est
+      utilisé pour combiner plusieurs disques en un seul volume
+      de stockage.  Dans de nombreux cas, cette configuration est
+      réalisée à l'aide de contrôleurs
+      matériels.  Le sous-système GEOM offre le support
+      pour le niveau <acronym class="acronym">RAID</acronym>0, également connu
+      sous le nom de <span class="quote">« <span class="quote">striping</span> »</span>.</p><p>Dans un système <acronym class="acronym">RAID</acronym>0, les
+      données sont divisées en blocs répartis sur
+      l'ensemble des disques de la <span class="quote">« <span class="quote">grappe</span> »</span>.  Au lieu de
+      devoir attendre l'écriture de 256k sur un disque, un
+      système <acronym class="acronym">RAID</acronym>0 peut écrire en
+      simultané 64k sur quatre disques différents,
+      offrant alors des performances d'accès
+      supérieures.  Ces performances peuvent être encore
+      améliorées en utilisant plusieurs
+      contrôleurs de disques.</p><p>Chaque disque d'une bande (<span class="quote">« <span class="quote">stripe</span> »</span>)
+      <acronym class="acronym">RAID</acronym>0 doit avoir la même taille,
+      puisque les requêtes d'E/S sont entrelacées de
+      manière à lire ou écrire sur plusieurs
+      disques en parallèle.</p><div class="mediaobject" align="center"><img src="geom/striping.png" align="middle" alt="Illustration de l'entrelacement de disques" /></div><div class="procedure"><a id="idp81294672"></a><div class="procedure-title">Procédure 20.1. Création d'un système entrelacé
+	à partir de disques ATA non formatés</div><ol class="procedure" type="1"><li class="step"><p>Chargez le module
+	  <code class="filename">geom_stripe</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_stripe</code></strong></pre></li><li class="step"><p>Assurez-vous de l'existence d'un point de montage.  Si
+	  ce volume doit devenir une partition racine, utilisez alors un
+	  autre point de montage comme <code class="filename">/mnt</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /mnt</code></strong></pre></li><li class="step"><p>Déterminez les noms de
+	  périphériques pour les disques qui seront
+	  entrelacé, et créez le nouveau
+	  périphérique entrelacé.  Par exemple, pour
+	  entrelacer deux disques <acronym class="acronym">ATA</acronym> non
+	  utilisés et non partitionnés, par exemple
+	  <code class="filename">/dev/ad2</code> et
+	  <code class="filename">/dev/ad3</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gstripe label -v st0 /dev/ad2 /dev/ad3</code></strong></pre></li><li class="step"><p>Créez un label standard, également connu
+	  sous le nom de table des partitions, sur le nouveau volume et
+	  installez le code d'amoraçage par défaut:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/stripe/st0</code></strong></pre></li><li class="step"><p>Cette opération doit avoir créé
+	  deux autres périphériques dans le
+	  répertoire <code class="filename">/dev/stripe</code> en plus du
+	  périphérique <code class="filename">st0</code>:
+	  <code class="filename">st0a</code> et
+	  <code class="filename">st0c</code>.  A ce stade, un système de fichiers
+	  peut être créé sur
+	  <code class="filename">st0a</code> en utilisant la commande
+	  <code class="command">newfs</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/stripe/st0a</code></strong></pre><p>Des nombres défileront à l'écran,
+	  l'opération sera s'achèvera après
+	  quelques secondes.  Le volume a été
+	  créé et est prêt à être
+	  monté.</p></li></ol></div><p>Pour
+      monter manuellement une grappe de disques entrelacés
+      fraîchement créée:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/stripe/st0a /mnt</code></strong></pre><p>Pour monter automatiquement au démarrage ce
+      système de fichiers entrelacé, ajoutez les
+      informations concernant ce volume dans le fichier
+      <code class="filename">/etc/fstab</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "/dev/stripe/st0a /mnt ufs rw 2 2" \</code></strong>
+    <strong class="userinput"><code>&gt;&gt; /etc/fstab</code></strong></pre><p>Le module <code class="filename">geom_stripe</code> doit également
+      être automatiquement chargé lors de
+      l'initialisation du système en ajoutant une ligne au
+      fichier <code class="filename">/boot/loader.conf</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_stripe_load="YES"' &gt;&gt; /boot/loader.conf</code></strong></pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-intro.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM-mirror.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">20.2. Introduction à GEOM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 20.4. RAID1 - <span class="quote">« <span class="quote">mirroring</span> »</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

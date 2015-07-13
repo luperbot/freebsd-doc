@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>14.10. VPN sobre IPsec</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="security.html" title="Capítulo 14. Seguridad" /><link rel="prev" href="openssl.html" title="14.9. OpenSSL" /><link rel="next" href="openssh.html" title="14.11. OpenSSH" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">14.10. VPN sobre IPsec</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="openssl.html">Anterior</a> </td><th width="60%" align="center">Capítulo 14. Seguridad</th><td width="20%" align="right"> <a accesskey="n" href="openssh.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ipsec"></a>14.10. VPN sobre IPsec</h2></div><div><span class="authorgroup">Escrito por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nik</span> <span class="surname">Clayton</span></span>. </span></div></div></div><a id="idp76110928" class="indexterm"></a><p>Creación de una VPN entre dos redes, a través de
+      Internet, mediante puertas de enlace
+      (<span class="quote">&#8220;<span class="quote">gateways</span>&#8221;</span>) FreeBSD.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76112464"></a>14.10.1. Qué es IPsec</h3></div><div><span class="authorgroup">Escrito por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Hiten M.</span> <span class="surname">Pandya</span></span>. </span></div></div></div><p>Esta sección le guiará a través del
+        proceso de configuración de IPsec, y de su uso en un
+        entorno consistente en máquinas FreeBSD y
+        <span class="application"><span class="trademark">Microsoft</span>® <span class="trademark">Windows</span>® 2000/XP</span>, para
+        hacer que se comuniquen de manera segura.  Para configurar
+        IPsec es necesario que esté familiarizado con los
+        conceptos de construcción de un kernel personalizado
+        (consulte el <a class="xref" href="kernelconfig.html" title="Capítulo 8. Configuración del kernel de FreeBSD">Capítulo 8, <em>Configuración del kernel de FreeBSD</em></a>).</p><p><span class="emphasis"><em>IPsec</em></span> es un protocolo que está
+        sobre la capa del protocolo de Internet (IP).  Le permite
+        a dos o más equipos comunicarse de forma segura (de ahí
+        el nombre).  La <span class="quote">&#8220;<span class="quote">pila de red</span>&#8221;</span> IPsec de FreeBSD
+        se basa en la implementación
+        <a class="link" href="http://www.kame.net/" target="_top">KAME</a>, que incluye
+        soporte para las dos familias de protocolos, IPv4 e IPv6.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">FreeBSD 5.X contiene una pila IPsec <span class="quote">&#8220;<span class="quote">acelerada
+          por hardware</span>&#8221;</span>, conocida como <span class="quote">&#8220;<span class="quote">Fast
+          IPsec</span>&#8221;</span>, que fué obtenida de OpenBSD.
+          Emplea hardware criptográfico (cuando es posible)
+          a través del subsistema <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crypto&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">crypto</span>(4)</span></a> para
+          optimizar el rendimiento de IPsec.  Este subsistema es
+          nuevo, y no soporta todas las opciones disponibles en la
+          versión KAME de IPsec.  Para poder habilitar IPsec
+          acelerado por hardware debe añadir las siguientes
+          opciones al fichero de configuración de su kernel:</p><a xmlns="http://www.w3.org/1999/xhtml" id="idp76125648" class="indexterm"></a><pre xmlns="http://www.w3.org/1999/xhtml" class="screen">
+options	  FAST_IPSEC  # new IPsec (cannot define w/ IPSEC)
+        </pre><p xmlns="http://www.w3.org/1999/xhtml">Tenga en cuenta que no es posible utilizar el subsistema
+          <span class="quote">&#8220;<span class="quote">Fast IPsec</span>&#8221;</span>  y la implementación
+          KAME de IPsec en la misma computadora.  Consulte la
+	  página de manual <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fast_ipsec&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">fast_ipsec</span>(4)</span></a> para más
+          información.</p></div><a id="idp76128976" class="indexterm"></a><a id="idp76130128" class="indexterm"></a><p>IPsec consta de dos sub-protocolos:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>Encapsulated Security Payload
+            (ESP)</em></span>, que protege los datos del paquete IP
+            de interferencias de terceros, cifrando el contenido
+            utilizando algoritmos de criptografía simétrica
+            (como Blowfish, 3DES).</p></li><li class="listitem"><p><span class="emphasis"><em>Authentication Header (AH)</em></span>, que
+            protege la cabecera del paquete IP de interferencias de
+            terceros así como contra la  falsificación
+	    (<span class="quote">&#8220;<span class="quote">spoofing</span>&#8221;</span>), calculando una suma de
+	    comprobación criptográfica y aplicando a
+            los campos de cabecera IP una función hash segura.
+	    Detrás de todo esto va una cabecera adicional que
+	    contiene el hash para permitir la validación de
+	    la información que contiene el paquete.</p></li></ul></div><p><acronym class="acronym">ESP</acronym> y <acronym class="acronym">AH</acronym> pueden
+        utilizarse conjunta o separadamente, dependiendo del
+        entorno.</p><a id="idp76135504" class="indexterm"></a><a id="idp76136272" class="indexterm"></a><p>IPsec puede utilizarse para cifrar directamente el
+        tráfico entre dos equipos (conocido como
+        <span class="emphasis"><em>modo de transporte</em></span>) o para construir
+        <span class="quote">&#8220;<span class="quote">túneles virtuales</span>&#8221;</span> entre dos subredes,
+        que pueden usarse para comunicación segura
+        entre dos redes corporativas (conocido como <span class="emphasis"><em>modo
+        de túnel</em></span>).  Este último es muy
+        conocido como una <span class="emphasis"><em>red privada virtual (Virtual
+        Private Network, o VPN)</em></span>.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipsec&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ipsec</span>(4)</span></a> contiene
+        información detallada sobre el subsistema IPsec de
+	FreeBSD.</p><p>Si quiere añdir soporte IPsec a su kernel debe
+        incluir las siguientes opciones al fichero de configuración
+	de su kernel:</p><a id="idp76140624" class="indexterm"></a><a id="idp76141776" class="indexterm"></a><pre class="screen">
+options   IPSEC        #IP security
+options   IPSEC_ESP    #IP security (crypto; define w/ IPSEC)
+      </pre><a id="idp76143312" class="indexterm"></a><p>Si quiere soporte para la depuración de
+        errores no olvide la siguiente opción:</p><pre class="screen">
+options   IPSEC_DEBUG  #debug for IP security
+      </pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76149584"></a>14.10.2. El Problema</h3></div></div></div><p>No existe un estándar para lo que constituye una VPN.
+        Las VPN pueden implementarse utilizando numerosas
+        tecnologías diferentes, cada una de las cuales tiene sus
+        pros y sus contras.  Esta sección presenta un
+        escenario, y las estrategias usadas para implementar una VPN
+        para este escenario.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76150736"></a>14.10.3. El escenario: dos redes, conectadas por Internet, que
+        queremos que se comporten como una sola</h3></div></div></div><a id="idp76151376" class="indexterm"></a><p>Este es el punto de partida:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Usted tiene al menos dos sitios</p></li><li class="listitem"><p>Ambos sitios utilizan IP internamente</p></li><li class="listitem"><p>Ambos sitios están conectados a Internet, a
+            través de una puerta de enlace FreeBSD.</p></li><li class="listitem"><p>La puerta de enlace de cada red tiene al menos una
+	    dirección IP pública.</p></li><li class="listitem"><p>Las direcciones internas de las dos redes pueden ser
+            direcciones IP públicas o privadas, no importa.
+            Puede ejecutar NAT en la máquina que hace de
+	    puerta de enlace si es necesario.</p></li><li class="listitem"><p>Las direcciones IP internas de las dos redes
+            <span class="emphasis"><em>no colisionan</em></span>.  Aunque espero
+            que sea teóricamente posible utilizar una
+	    combinación de tecnología VPN y NAT
+            para hacer funcionar todo esto sospecho que
+	    configurarlo sería una pesadilla.</p></li></ul></div><p>Si lo que intenta es conectar dos redes y ambas usan el
+        mismo rango de direcciones IP privadas (por ejemplo las dos usan
+        <code class="systemitem">192.168.1.x</code>)debería renumerar
+	una de las dos redes.</p><p>La topología de red se parecería a esto:</p><div class="mediaobject" align="center"><img src="security/ipsec-network.png" align="middle" /></div><p>Observe las dos direcciones IP públicas.  Usaré
+        letras para referirme a ellas en el resto de este artículo.
+        El cualquier lugar que vea esas letras en este artículo
+        reemplácelas con su propia dirección IP pública.
+        Observe también que internamente las dos máquinas
+        que hacen de puerta de enlace tienen la dirección IP .1,
+	y que las dos redes tienen direcciones IP privadas diferentes
+        (<code class="systemitem">192.168.1.x</code> y <code class="systemitem">192.168.2.x</code> respectivamente).  Todas las
+        máquinas de las redes privadas están configuradas para
+        utilizar la máquina <code class="systemitem">.1</code>
+        como su puerta de enlace por defecto.</p><p>La intención es que, desde el punto de vista de la
+        red, cada red debe ver las máquinas en la otra red como
+        si estuvieran directamente conectadas al mismo router (aunque
+        aunque sea un router ligeramente lento con una tendencia
+        ocasional a tirar paquetes).</p><p>Esto significa que (por ejemplo), la máquina
+        <code class="systemitem">192.168.1.20</code> debe ser
+        capaz de ejecutar</p><pre class="programlisting">ping 192.168.2.34</pre><p>y recibir de forma transparente una respuesta.  Las
+        máquinas <span class="trademark">Windows</span>® deben ser capaces de ver las
+        máquinas de la otra red, acceder a sus ficheros
+	compartidos, etc, exactamente igual que cuando acceden a
+        las máquinas de la red local.</p><p>Y todo debe hacerse de forma segura.  Esto significa que el
+        tráfico entre las dos redes tiene que ser
+        cifrado.</p><p>La creación de una VPN entre estas dos redes es un
+        proceso que requiere varios pasos.  Las etapas son estas:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Crear un enlace de red <span class="quote">&#8220;<span class="quote">virtual</span>&#8221;</span> entre las dos
+            redes, a través de Internet.  Probarlo usando herramientas
+            como <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> para asegurarse de que funcione.</p></li><li class="listitem"><p>Aplicar políticas de seguridad para asegurarse
+            de que el tráfico entre las dos redes sea cifrado
+            y descifrado de forma transparente.  Comprobarlo mediante
+            herramientas como <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> para asegurarse de que
+            el tráfico esté siendo efectivamente
+	    cifrado.</p></li><li class="listitem"><p>Configurar software adicional en las puertas de
+	    enlace FreeBSD para permitir a las máquinas <span class="trademark">Windows</span>®
+            verse entre ellas a través de la VPN.</p></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76180560"></a>14.10.3.1. Paso 1: Creación y prueba de un enlace de
+        red <span class="quote">&#8220;<span class="quote">virtual</span>&#8221;</span></h4></div></div></div><p>Suponga que está en la puerta de enlace de la red
+        red #1 (con dirección IP pública <code class="systemitem">A.B.C.D</code>, dirección IP privada
+        <code class="systemitem">192.168.1.1</code>), y ejecuta
+        <code class="command">ping 192.168.2.1</code>, que es la dirección
+        privada de la máquina con dirección IP
+        <code class="systemitem">W.X.Y.Z</code>.  ?Qué
+	hace falta para esto?</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>La puerta de enlace necesita saber cómo alcanzar
+            a <code class="systemitem">192.168.2.1</code>.  En otras
+            palabras, necesita tener una ruta hasta <code class="systemitem">192.168.2.1</code>.</p></li><li class="listitem"><p>Las direcciones IP privadas, como las que están
+	    en el rango <code class="systemitem">192.168.x</code>
+            no deberían aparecer en Internet.  Por eso, cada paquete
+            que mande a <code class="systemitem">192.168.2.1</code>
+            necesitará encerrarse dentro de otro paquete.
+            Este paquete debe tener todas las características
+            de haber sido enviado desde
+	    <code class="systemitem">A.B.C.D</code>,
+            y tendrá que ser enviado a <code class="systemitem">W.X.Y.Z</code>.  Este proceso recibe el nombre
+            de <em class="firstterm">encapsulado</em>.</p></li><li class="listitem"><p>Una vez que este paquete llega a
+            <code class="systemitem">W.X.Y.Z</code> necesitará
+            ser <span class="quote">&#8220;<span class="quote">desencapsulado</span>&#8221;</span>, y entregado a
+            <code class="systemitem">192.168.2.1</code>.</p></li></ol></div><p>Puede verlo como si necesitara un <span class="quote">&#8220;<span class="quote">túnel</span>&#8221;</span>
+        entre las dos redes.  Las dos <span class="quote">&#8220;<span class="quote">bocas del túnel</span>&#8221;</span>
+        son las direcciones IP <code class="systemitem">A.B.C.D</code> y
+        <code class="systemitem">W.X.Y.Z</code>, y debe hacer que el
+	túnel sepa cuáles serán las direcciones
+	IP privadas que tendrán permitido el paso a través
+	de él.  El túnel se usa para transferir tráfico
+        con direcciones IP privadas a través de la Internet
+        pública.</p><p>Este túnel se crea mediante la interfaz genérica,
+        o dispositivo <code class="filename">gif</code> en FreeBSD.  Como
+        puede imaginarse la interfaz <code class="filename">gif</code>
+        de cada puerta de enlace debe configurarse con cuatro
+        direcciones IP:  dos para las direcciones IP públicas,
+        y dos para las direcciones IP privadas.</p><p>El soporte para el dispositivo gif debe compilarse en el
+        kernel de FreeBSD en ambas máquinas añadiendo
+        la línea</p><pre class="programlisting">device gif</pre><p>a los ficheros de configuración del kernel de
+        ambas máquinas, compilarlo, instalarlo y reiniciar.</p><p>La configuración del túnel es un proceso
+        que consta de dos partes.  Primero se le debe decir al
+	túnel cuáles son las direcciones IP exteriores
+        (o públicas) mediante <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gifconfig</span>(8)</span></a>.  Después
+        configure las direcciones IP con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">En FreeBSD 5.X las funciones de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gifconfig</span>(8)</span></a>
+          se han incluido en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>.</p></div><p>En la puerta de enlace de la red #1 debe ejecutar
+        las siguientes dos órdenes para configurar el
+	túnel.</p><pre class="programlisting">gifconfig gif0 A.B.C.D W.X.Y.Z
+ifconfig gif0 inet 192.168.1.1 192.168.2.1 netmask 0xffffffff
+      </pre><p>En la otra puerta de enlace ejecute las mismas
+        órdenes, pero con el orden las direcciones IP
+        invertido.</p><pre class="programlisting">gifconfig gif0 W.X.Y.Z A.B.C.D
+ifconfig gif0 inet 192.168.2.1 192.168.1.1 netmask 0xffffffff
+      </pre><p>Ahora ejecute:</p><pre class="programlisting">gifconfig gif0</pre><p>y podrá ver la configuración.  Por ejemplo, en la
+        puerta de enlace de la red #1 vería algo parecido
+	a esto:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gifconfig gif0</code></strong>
+gif0: flags=8011&lt;UP,POINTTOPOINT,MULTICAST&gt; mtu 1280
+inet 192.168.1.1 --&gt; 192.168.2.1 netmask 0xffffffff
+physical address inet A.B.C.D --&gt; W.X.Y.Z
+      </pre><p>Como puede ver se ha creado un túnel entre las direcciones
+        físicas <code class="systemitem">A.B.C.D</code> y
+        <code class="systemitem">W.X.Y.Z</code>, y el tráfico
+        que puede pasar a través del túnel es entre
+        <code class="systemitem">192.168.1.1</code> y
+        <code class="systemitem">192.168.2.1</code>.</p><p>Esto también habrá agregado una entrada en
+        la tabla de rutas de ambas máquinas, que puede
+        examinar con <code class="command">netstat -rn</code>.
+        Esta salida es de la puerta de enlace de la red #1.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>netstat -rn</code></strong>
+Routing tables
+
+Internet:
+Destination      Gateway       Flags    Refs    Use    Netif  Expire
+...
+192.168.2.1      192.168.1.1   UH        0        0    gif0
+...
+      </pre><p>Como el valor de <span class="quote">&#8220;<span class="quote">Flags</span>&#8221;</span> lo indica, esta
+        es una ruta de equipo, lo que significa que cada puerta de
+        enlace sabe como alcanzar la otra puerta de enlace, pero no saben
+	cómo llegar al resto de sus respectivas redes.  Ese
+        problema se solucionará en breve.</p><p>Es posible que disponga de un cortafuegos en ambas
+        máquinas, por lo que tendrá que buscar la
+	forma de que el tráfico de la VPN pueda entrar y
+	salir limpiamente.  Puede permitir todo el tráfico
+	de ambas redes, o puede que quiera incluir reglas en el
+	cortafuegos para que protejan ambos extremos de la VPN uno
+	del otro.</p><p>Las pruebas se simplifican enormemente si configura
+        el cortafuegos para permitir todo el tráfico a
+        través de la VPN.  Siempre puede ajustar las cosas
+        después.  Si utiliza <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> en las puertas de
+        enlace una orden similar a</p><pre class="programlisting">ipfw add 1 allow ip from any to any via gif0</pre><p>permitirá todo el tráfico entre los dos
+        extremos de la VPN, sin afectar al resto de reglas del
+        cortafuegos.  Obviamente tendrá que ejecutar esta orden
+        en ambas puertas de enlace.</p><p>Esto es suficiente para permitir a cada puerta de enlace
+        hacer un ping entre ellas.  En
+	<code class="systemitem">192.168.1.1</code> deberí poder
+        ejecutar</p><pre class="programlisting">ping 192.168.2.1</pre><p>y obtener una respuesta; es obvio que debería poder
+        hacer los mismo en la otra puerte de enlace.</p><p>Aún no podrá acceder a las máquinas
+        internas de las redes.  El problema está en el
+	encaminamiento: aunque las puertas de enlace saben
+	cómo alcanzarse mútuamente no saben cómo
+	llegar a la red que hay detrás de la otra.</p><p>Para resolver este problema debe añadir una ruta
+        estática en cada puerta de enlace.  La orden
+        en la primera puerta de enlace podría ser:</p><pre class="programlisting">route add 192.168.2.0 192.168.2.1 netmask 0xffffff00
+      </pre><p>Esto significa <span class="quote">&#8220;<span class="quote">Para alcanzar los equipos en
+        la red <code class="systemitem">192.168.2.0</code>, envía
+        los paquetes al equipo
+	<code class="systemitem">192.168.2.1</code></span>&#8221;</span>.
+        Necesitará ejecutar una orden similar en la otra
+        puerta de enlace, pero obviamente con las direcciones
+        <code class="systemitem">192.168.1.x</code>.</p><p>El tráfico IP de equipos en una red no será
+        capaz de alcanzar equipos en la otra red.</p><p>Ya tiene dos tercios de una VPN, puesto que ya es
+        <span class="quote">&#8220;<span class="quote">virtual</span>&#8221;</span> y es una <span class="quote">&#8220;<span class="quote">red</span>&#8221;</span>.
+        Todavía no es privada.  Puede comprobarlo con
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> y <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a>.  Abra una sesión en
+	la puerta de enlace y ejecute</p><pre class="programlisting">tcpdump dst host 192.168.2.1</pre><p>En otra sesión en el mismo equipo ejecute</p><pre class="programlisting">ping 192.168.2.1</pre><p>Verá algo muy parecido a esto:</p><pre class="programlisting">
+16:10:24.018080 192.168.1.1 &gt; 192.168.2.1: icmp: echo request
+16:10:24.018109 192.168.1.1 &gt; 192.168.2.1: icmp: echo reply
+16:10:25.018814 192.168.1.1 &gt; 192.168.2.1: icmp: echo request
+16:10:25.018847 192.168.1.1 &gt; 192.168.2.1: icmp: echo reply
+16:10:26.028896 192.168.1.1 &gt; 192.168.2.1: icmp: echo request
+16:10:26.029112 192.168.1.1 &gt; 192.168.2.1: icmp: echo reply
+      </pre><p>Como puede ver los mensajes ICMP van y vienen sin
+        cifrar.  Si usa el parámetro <code class="option">-s</code>
+        en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> para tomar más bytes de datos de
+        estos paquetes verá más información.</p><p>Obviamente esto es inaceptable.  La siguiente sección
+        explicará cómo asegurar el enlace entre las dos
+        redes para que todo el tráfico se cifre
+        automáticamente.</p><div class="itemizedlist"><div class="itemizedlist-title">Sumario:</div><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Configure ambos kernel con <span class="quote">&#8220;<span class="quote">pseudo-device
+            gif</span>&#8221;</span>.</p></li><li class="listitem"><p>Edite <code class="filename">/etc/rc.conf</code> en la puerta de
+            enlace #1 y añada las siguientes líneas
+            (reemplazando las direcciones IP según sea necesario).</p><pre class="programlisting">gifconfig_gif0="A.B.C.D W.X.Y.Z"
+ifconfig_gif0="inet 192.168.1.1 192.168.2.1 netmask 0xffffffff"
+static_routes="vpn"
+route_vpn="192.168.2.0 192.168.2.1 netmask 0xffffff00"
+          </pre></li><li class="listitem"><p>Edite la configuración de su cortafuegos
+            (<code class="filename">/etc/rc.firewall</code>, o lo que corresponda)
+            en ambos equipos y añada</p><pre class="programlisting">ipfw add 1 allow ip from any to any via gif0</pre></li><li class="listitem"><p>Haga los cambios oportunos en el
+            <code class="filename">/etc/rc.conf</code> de la puerta de
+            enlace #2, invirtiendo el orden de las direcciones IP.</p></li></ul></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76254544"></a>14.10.3.2. Paso 2: Asegurar el enlace</h4></div></div></div><p>Para asegurar el enlace usaremos IPsec. IPsec ofrece un
+        mecanismo para que dos equipos coincidan en una llave de
+        cifrado, y usar esta llave para cifrar los datos
+        entre los dos equipos.</p><p>Existen dos áreas de configuración a
+        tener en cuenta:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Debe existir un mecanismo para que los dos equipos
+            se pongan de acuerdo en el mecanismo de cifrado que van a
+            utilizar.  Una vez que los dos equipos se han puesto de
+            acuerdo dice que existe una
+            <span class="quote">&#8220;<span class="quote">asociación de seguridad</span>&#8221;</span> entre
+            ellos.</p></li><li class="listitem"><p>Debe existir un mecanismo para especificar que tráfico
+            debe ser cifrado.  Obviamente, usted no querrá
+            cifrar todo su tráfico saliente: solo querrá
+            cifrar el tráfico que es parte de la VPN.  Las
+            reglas con las que determinará qué tráfico
+            será cifrado se llaman <span class="quote">&#8220;<span class="quote">políticas
+            de seguridad</span>&#8221;</span>.</p></li></ol></div><p>Tanto las asociaciones de seguridad como las
+         políticas de seguridad son responsabilidad del kernel,
+	 pero pueden ser modificadas desde el espacio de usuario.
+	 Antes de poder hacerlo, tendrá que configurar el kernel
+	 para que incluya IPsec y el protocolo ESP
+         (Encapsulated Security Payload).  Incluya en el fichero de
+	 configuración de su kernel lo siguiente:</p><a id="idp76259280" class="indexterm"></a><pre class="programlisting">options IPSEC
+options IPSEC_ESP
+       </pre><p>Recompile y resintale su kernel y reinicie.  Como se dijo
+         anteriormente, tendrá que hacer lo mismo en el kernel
+	 de las dos puertas de enlace.</p><a id="idp76261200" class="indexterm"></a><p>Tiene dos opciones cuando se trata de configurar
+         asociaciones de seguridad.  Puede configurarlas a mano en
+         los dos equipos, lo que significa elegir el algoritmo de
+         cifrado, las llaves de cifrado, etc, o puede utilizar
+         alguno de los dæmons que implementan el protocolo
+         de intercambio de llaves de Internet (IKE, Internet Key
+	 Exchange).</p><p>Le recomiendo la segunda opción.  Aparte de
+         otras consideraciones es más fácil de
+	 configurar.</p><a id="idp76262736" class="indexterm"></a><a id="idp76264016" class="indexterm"></a><p>La edición y despliegue se efectúa con
+         <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>.  Todo esto se entiende mejor con una
+	 analogía.  <code class="command">setkey</code> es a las tablas
+	 de políticas de seguridad del kernel lo que <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a>
+	 es a las tablas de rutas del kernel.
+         También puede usar <code class="command">setkey</code>
+         ver las asociaciones de seguridad en vigor, siguiendo con
+         la analogía, igual que puede usar
+         <code class="command">netstat -r</code>.</p><p>Existen numerosos dæmons que pueden encargarse de
+         la gestión de asociaciones de seguridad en FreeBSD.  En
+	 este texto se muestra cómo usar uno de ellos,
+         racoon (que puede instalar desde
+         <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/racoon/pkg-descr">security/racoon</a> en la
+         colección de ports de FreeBSD.</p><a id="idp76268752" class="indexterm"></a><p>El software <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/racoon/pkg-descr">security/racoon</a>
+         debe ejecutarse en las dos puertas de enlace.  En cada equipo
+         debe configurar la dirección IP del otro extremo de la
+         VPN y una llave secreta (que usted puede y debe elegir, y debe ser
+	 la misma en ambas puertas de enlace).</p><p>Los dos dæmons entran en contacto uno con otro, y confirman
+         que son quienes dicen ser (utilizando la llave secreta que usted
+         configuró).  Los dæmons generan una nueva llave
+         secreta, y la utilizan para cifrar el tráfico que discurre a
+         través de la VPN.  Periódicamente cambian esta
+         llave, para que incluso si un atacante comprometiera una
+         de las llaves (lo cual es teóricamente cercano a
+	 imposible) no le serviriía de mucho: para cuando el
+	 atacante haya <span class="quote">&#8220;<span class="quote">crackeado</span>&#8221;</span> la llave los dæmons
+         ya habrán escogido una nueva.</p><p>El fichero de configuración de racoon
+         está en <code class="filename">${PREFIX}/etc/racoon</code>.
+         No debería tener que hacer demasiados cambios a ese
+	 fichero.  El otro componente de la configuración de
+	 racoon (que <span class="emphasis"><em>sí</em></span> tendrá que
+	 modificar) es la <span class="quote">&#8220;<span class="quote">llave pre-compartida</span>&#8221;</span>.</p><p>La configuración por defecto de racoon
+         espera encontrarla en
+	 <code class="filename">${PREFIX}/etc/racoon/psk.txt</code>.
+         Es importante saber que la llave precompartida <span class="emphasis"><em>no</em></span>
+         es la llave que se utilizará para cifrar el
+         tráfico a través del enlace VPN; solamente es una
+         muestra que permite a los dæmons que administran las
+         llaves confiar el uno en el otro.</p><p><code class="filename">psk.txt</code> contiene una línea
+         por cada sitio remoto con el que esté tratando.  En
+         nuestro ejemplo, donde existen dos sitios, cada fichero
+         <code class="filename">psk.txt</code> contendrá una línea
+         (porque cada extremo de la VPN solo está tratando
+         con un sitio en el otro extremo).</p><p>En la puerta de enlace #1 esta línea debería
+         parecerse a esta:</p><pre class="programlisting">W.X.Y.Z            secreto</pre><p>Esto es, la dirección IP
+         <span class="emphasis"><em>pública</em></span> del extremo remoto, un
+	 espacio en blanco, y una cadena de texto que es el secreto
+	 en sí.
+         en el extremo remoto, espacio en blanco, y un texto de cadena que
+         proporcina el secreto. Obviamente, no debe utilizar
+	 <span class="quote">&#8220;<span class="quote">secret</span>&#8221;</span> como su llave; aplique aquí las
+	 reglas y recomendaciones habituales para la elección de
+	 contraseñas.</p><p>En la puerta de enlace #2 la línea se parecería
+         a esta</p><pre class="programlisting">A.B.C.D            secreto</pre><p>Esto es, la dirección IP pública del
+         extremo remoto, y la misma llave secreta.
+	 <code class="filename">psk.txt</code> debe tener modo
+         <code class="literal">0600</code> (es decir, modo de solo
+         lectura/escritura para <code class="systemitem">root</code>) antes de
+         que ejecute racoon.</p><p>Debe ejecutar racoon en ambas puertas de enlace.
+         También tendrá que añadir algunas reglas
+         a su cortafuegos para permitir el tráfico IKE, que se
+         transporta sobre UDP al puerto ISAKMP (Internet Security
+         Association Key Management Protocol).   Esto debe estar
+         al principio de las reglas de su cortafuegos.</p><pre class="programlisting">ipfw add 1 allow udp from A.B.C.D to W.X.Y.Z isakmp
+ipfw add 1 allow udp from W.X.Y.Z to A.B.C.D isakmp
+       </pre><p>Una vez que ejecute racoon puede tratar de hacer un
+         ping a una puerta de enlace desde la otra.  La conexión
+         todavía no está cifrada porque aún no se
+         han creado las asociaciones de seguridad entre los dos
+         equipos: esto puede llevar un poco de tiempo; es posible que
+	 advierta un pequeño retraso antes de los ping empiecen
+         responder.</p><p>Una vez creadas las asociaciones de seguridad
+         puede verlas utilizando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>. Ejecute</p><pre class="programlisting">setkey -D</pre><p>en cualquiera de los equipos para comprobar la información
+         de la asociación de seguridad.</p><p>Ya está resuelta la mitad del problema. La otra mitad es
+         configurar sus políticas de seguridad.</p><p>Queremos crear una política de seguridad sensata,
+         así que vamos a revisar lo que tenemos configurado
+	 hasta el momento.  Esta revisión abarca ambos extremos
+	 del enlace.</p><p>Cada paquete IP que usted manda tiene una cabecera que
+         contiene datos acerca del paquete.  La cabecera incluye la
+         dirección IP de destino y del origen.  Como ya sabemos,
+         las direcciones IP privadas como el rango
+         <code class="systemitem">192.168.x.y</code> no deberían
+         aparezcan en Internet.  Dado que es a través de Internet
+	 por donde los queremos transmitir los debemos encapsular dentro
+	 de otro paquete.  Este paquete debe contener tanto la dirección
+	 IP de destino y origen públicas sustituidas por las
+	 direcciones privadas.</p><p>Así que si su paquete saliente empezó
+         pareciendose a este:</p><div class="mediaobject" align="center"><img src="security/ipsec-out-pkt.png" align="middle" /></div><p>tras el encapsulado se parecerá bastante a este:</p><div class="mediaobject" align="center"><img src="security/ipsec-encap-pkt.png" align="middle" /></div><p>El dispositivo <code class="filename">gif</code> se encarga
+         del encapsulado.  Como puede ver el paquete tiene una
+	 dirección IP real en el exterior, y nuestro paquete
+	 original ha sido envuelto como dato dentro del paquete que
+	 enviaremos a través de Internet.</p><p>Obviamente, queremos que todo el tráfico entre
+         las VPN vaya cifrado.  Pongamos esto último en
+	 palabras para comprenderlo mejor:</p><p><span class="quote">&#8220;<span class="quote">Si un paquete sale desde <code class="systemitem">A.B.C.D</code>, y tiene como destino
+         <code class="systemitem">W.X.Y.Z</code>, cífralo
+         utilizando las asociaciones de seguridad necesarias.</span>&#8221;</span></p><p><span class="quote">&#8220;<span class="quote">Si un paquete llega desde <code class="systemitem">W.X.Y.Z</code>, y tiene como destino
+         <code class="systemitem">A.B.C.D</code>, descífralo
+         utilizando las asociaciones de seguridad necesarias.</span>&#8221;</span></p><p>Este planteamiento se aproxima bastante, pero no es
+         exactamente lo que queremos hacer.  Si lo hiciera así
+         todo el tráfico desde y hacia
+	 <code class="systemitem">W.X.Y.Z</code>, incluso el tráfico
+         que no forma parte de la VPN, será cifrado; esto no es lo que
+	 queremos.  La política correcta es la siguiente:</p><p><span class="quote">&#8220;<span class="quote">Si un paquete sale desde <code class="systemitem">A.B.C.D</code>, y está
+         encapsulando a otro paquete, y tiene como destino
+         <code class="systemitem">W.X.Y.Z</code>, cífralo
+         utilizando las asociaciones de seguridad necesarias.</span>&#8221;</span></p><p><span class="quote">&#8220;<span class="quote">Si un paquete llega desde <code class="systemitem">W.X.Y.Z</code>, y está
+          encapsulando a otro paquete, y tiene como destino
+          <code class="systemitem">A.B.C.D</code>, descífralo
+          utilizando las asociaciones de seguridad necesarias.</span>&#8221;</span></p><p>Un cambio sutil, pero necesario.</p><p>Las políticas de seguridad también se
+         imponen utilizando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a>.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a> proporciona
+         un lenguaje de configuración para definir la
+         política.  Puede introducir las instrucciones de
+         configuración a través de la entrada estándar
+	 (stdin), o puede usar la opción
+         <code class="option">-f</code> para especificar un fichero que
+         contenga las instrucciones de configuración.</p><p>La configuración en la puerta de enlace #1 (que
+         tiene la dirección IP pública
+         <code class="systemitem">A.B.C.D</code>) para forzar que todo
+         el tráfico saliente hacia
+	 <code class="systemitem">W.X.Y.Z</code> vaya cifrado es:</p><pre class="programlisting">
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P out ipsec esp/tunnel/A.B.C.D-W.X.Y.Z/require;
+       </pre><p>Ponga estas órdenes en un fichero (por ejemplo
+         <code class="filename">/etc/ipsec.conf</code>) y ejecute</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -f /etc/ipsec.conf</code></strong></pre><p><code class="option">spdadd</code> le dice a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a> que
+         queremos añadir una regla a la base de datos de
+	 políticas de seguridad.  El resto de la línea
+	 especifica qué paquetes se ajustarán a esta
+         política.
+         <code class="systemitem">A.B.C.D/32</code> y
+         <code class="systemitem">W.X.Y.Z/32</code> son las direcciones IP
+         y máscaras de red que identifican la red o equipos a los
+         que se aplicará esta política.  En nuestro caso
+         queremos aplicarla al tráfico entre estos dos equipos.
+         <code class="option">-P out</code> dice que esta política se aplica
+         a paquetes salientes, e <code class="option">ipsec</code> hace que el
+         paquete sea asegurado.</p><p>La segunda línea especifica cómo será
+         cifrado este paquete.   <code class="option">esp</code> es el
+         protocolo que se utilizará, mientras que
+         <code class="option">tunnel</code> indica que el paquete será
+         después encapsulado en un paquete IPsec.  El uso repetido de
+         <code class="systemitem">A.B.C.D</code> y
+         <code class="systemitem">W.X.Y.Z</code> se utiliza para
+         seleccionar la asociación de seguridad a usar, y
+         por último <code class="option">require</code> exige que los
+         paquetes deben cifrarse si concuerdan con esta
+         regla.</p><p>Esta regla solo concuerda con paquetes salientes.
+         Necesitará una regla similar para los paquetes
+         entrantes.</p><pre class="programlisting">spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P in ipsec esp/tunnel/W.X.Y.Z-A.B.C.D/require;</pre><p>Observe el <code class="option">in</code> en lugar del <code class="option">out</code>
+         en este caso, y la inversión necesaria de las direcciones
+         IP.</p><p>La otra puerta de enlace (que tiene la dirección
+         IP pública <code class="systemitem">W.X.Y.Z</code>)
+         necesitará reglas similares.</p><pre class="programlisting">spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P out ipsec esp/tunnel/W.X.Y.Z-A.B.C.D/require;
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P in ipsec esp/tunnel/A.B.C.D-W.X.Y.Z/require;</pre><p>Finalmente, necesita añadir reglas a su cortafuegos
+         para permitir la circulación de paquetes ESP e IPENCAP
+         de ida y vuelta.  Tendrá que añadir reglas como
+	 estas a ambos equipos.</p><pre class="programlisting">ipfw add 1 allow esp from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow esp from W.X.Y.Z to A.B.C.D
+ipfw add 1 allow ipencap from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow ipencap from W.X.Y.Z to A.B.C.D
+       </pre><p>Debido a que las reglas son simétricas puede utilizar
+         las mismas reglas en ambas puertas de enlace.</p><p>Los paquetes salientes tendrán ahora este aspecto:</p><div class="mediaobject" align="center"><img src="security/ipsec-crypt-pkt.png" align="middle" /></div><p>Cuando los paquetes llegan al otro extremo de la VPN
+         serán descifrados (utilizando las
+         asociaciones de seguridad que han sido negociadas por racoon).
+         Después entrarán al interfaz
+	 <code class="filename">gif</code>, que desenvuelve la segunda capa,
+	 hasta que nos quedamos con paquete má interno, que puede
+	 entonces viajar a la red interna.</p><p>Puede revisar la seguridad utilizando la misma prueba de
+         <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a> anterior.  Primero, inicie una sesión en
+         la puerta de enlace <code class="systemitem">A.B.C.D</code>,
+         y ejecute:</p><pre class="programlisting">tcpdump dst host 192.168.2.1</pre><p>En otra sesión en la misma máquina ejecute</p><pre class="programlisting">ping 192.168.2.1</pre><p>Debería ver algo similar a lo siguiente:</p><pre class="programlisting">XXX tcpdump output</pre><p>ahora, como puede ver, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> muestra los paquetes ESP.
+         Si trata de examinarlos con la opción <code class="option">-s</code>
+         verá basura (aparentemente), debido al
+	 cifrado.</p><p>Felicidades. Acaba de configurar una VPN entre dos sitios
+        remotos.</p><div class="itemizedlist"><div class="itemizedlist-title">Sumario</div><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Configure ambos kernel con:</p><pre class="programlisting">options IPSEC
+options IPSEC_ESP
+          </pre></li><li class="listitem"><p>Instale <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/racoon/pkg-descr">security/racoon</a>.
+            Edite <code class="filename">${PREFIX}/etc/racoon/psk.txt</code> en ambas
+            puertas de enlace añadiendo una entrada para la
+	    dirección IP del equipo remoto y una llave secreta que
+	    ambos conozcan.  Asegúrese de que este fichero esté
+	    en modo 0600.</p></li><li class="listitem"><p>Añada las siguientes líneas a
+            <code class="filename">/etc/rc.conf</code> en ambos equipos:</p><pre class="programlisting">ipsec_enable="YES"
+ipsec_file="/etc/ipsec.conf"
+          </pre></li><li class="listitem"><p>Crée en ambos equipos un
+	    <code class="filename">/etc/ipsec.conf</code> que contenga las
+            líneas spdadd necesarias.  En la puerta de enlace
+            #1 sería:</p><pre class="programlisting">
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P out ipsec
+  esp/tunnel/A.B.C.D-W.X.Y.Z/require;
+spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P in ipsec
+  esp/tunnel/W.X.Y.Z-A.B.C.D/require;
+</pre><p>En la puerta de enlace #2 sería:</p><pre class="programlisting">
+spdadd W.X.Y.Z/32 A.B.C.D/32 ipencap -P out ipsec
+  esp/tunnel/W.X.Y.Z-A.B.C.D/require;
+spdadd A.B.C.D/32 W.X.Y.Z/32 ipencap -P in ipsec
+  esp/tunnel/A.B.C.D-W.X.Y.Z/require;
+</pre></li><li class="listitem"><p>Añada a su(s) cortafuegos las reglas necesarias para
+	    que permita(n) el paso de tráfico IKE, ESP e
+            IPENCAP en ambos equipos:</p><pre class="programlisting">
+ipfw add 1 allow udp from A.B.C.D to W.X.Y.Z isakmp
+ipfw add 1 allow udp from W.X.Y.Z to A.B.C.D isakmp
+ipfw add 1 allow esp from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow esp from W.X.Y.Z to A.B.C.D
+ipfw add 1 allow ipencap from A.B.C.D to W.X.Y.Z
+ipfw add 1 allow ipencap from W.X.Y.Z to A.B.C.D
+          </pre></li></ul></div><p>Los dos pasos previos deben bastar para levantar la VPN.
+        Las máquinas en cada red seán capaces de
+        dirigirse una a otra utilizando direcciones IP, y todo el
+	tráfico a través del enlace será cifrado de
+	forma automática y segura.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="openssl.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="openssh.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">14.9. OpenSSL </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> 14.11. OpenSSH</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

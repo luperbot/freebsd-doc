@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>24.7. Suivre les mises à jour pour plusieurs machines</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="updating-upgrading.html" title="Chapitre 24. Mise à jour de FreeBSD" /><link rel="prev" href="makeworld.html" title="24.6. Recompiler le système" /><link rel="next" href="dtrace.html" title="Chapitre 25. DTrace" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">24.7. Suivre les mises à jour pour plusieurs machines</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="makeworld.html">Précédent</a> </td><th width="60%" align="center">Chapitre 24. Mise à jour de FreeBSD</th><td width="20%" align="right"> <a accesskey="n" href="dtrace.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="small-lan"></a>24.7. Suivre les mises à jour pour plusieurs machines</h2></div><div><span class="authorgroup">Contribution de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Mike</span> <span class="surname">Meyer</span></span>. </span></div></div></div><a id="idp83206864" class="indexterm"></a><p>Si vous avez plusieurs machines dont vous voulez maintenir à
+      jour l'arborescence des sources, alors faire
+      télécharger et recompiler à chacune d'entre elles
+      les sources semble un gaspillage de ressources: espace disque, bande
+      passante réseau, et cycles CPU.  C'est en effet bien le cas,
+      et la solution est d'avoir une machine qui fait la majeure
+      partie du travail, pendant que le reste des machines montent ce
+      travail par NFS.  Cette section décrit une façon
+      de le faire.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="small-lan-preliminaries"></a>24.7.1. Préliminaires</h3></div></div></div><p>Premièrement, identifiez un ensemble de machines
+	qui va utiliser le même ensemble de binaires, que nous
+	appellerons un <span class="emphasis"><em>ensemble de compilation</em></span>.
+	Chaque machine peut avoir un noyau personnalisé, mais
+	elles exécuteront les mêmes binaires utilisateur du
+	système de base.  Dans cet ensemble de machine, choisissez
+	une machine qui sera la <span class="emphasis"><em>machine de
+	compilation</em></span>.  Cela sera la machine sur laquelle
+	le monde et le noyau seront compilés.  Idéalement, cela
+	devrait être une machine rapide avec un CPU suffisamment
+	disponible pour exécuter la commande <code class="command">make
+	buildworld</code> et <code class="command">make buildkernel</code>.  Vous voudrez également utiliser
+	une <span class="emphasis"><em>machine de test</em></span>, qui testera
+	les mises à jour logicielles avant d'être utilisées
+	en production.  Cela <span class="emphasis"><em>doit</em></span> être une
+	machine que vous pouvez vous permettre d'avoir hors service
+	pour une longue période.  Cela peut être la machine
+	de compilation, mais cela n'est pas obligatoire.</p><p>Toutes les machines de cet ensemble de compilation
+	doivent monter <code class="filename">/usr/obj</code> et
+	<code class="filename">/usr/src</code> à partir de la même
+	machine, et du même point de montage.  Idéalement, ces
+	derniers sont sur deux disques différents sur la machine de
+	compilation, mais peuvent également être
+	montés par NFS sur cette machine.  Si vous avez plusieurs
+	ensembles de compilation, <code class="filename">/usr/src</code>
+	devrait être sur une machine de compilation, et monté
+	par NFS sur les autres.</p><p>Finalement assurez-vous que
+	<code class="filename">/etc/make.conf</code> et
+	<code class="filename">/etc/src.conf</code> sur toutes les machines
+	de l'ensemble de compilation sont en accord avec la machine de
+	compilation.  Cela signifie que la machine de compilation doit
+	compiler toutes les parties du système de base que toute
+	machine de l'ensemble de compilation va installer.
+	De plus, chaque machine de compilation devra avoir son nom de
+	noyau défini avec <code class="varname">KERNCONF</code> dans
+	<code class="filename">/etc/make.conf</code>, et la machine de
+	compilation devrait tous les lister dans
+	<code class="varname">KERNCONF</code>, en listant son noyau en premier.
+	La machine de compilation doit avoir les fichiers de
+	configuration des noyaux de chaque machine dans
+	<code class="filename">/usr/src/sys/arch/conf</code>
+	si elle va compiler leur noyau.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83220432"></a>24.7.2. Le système de base</h3></div></div></div><p>Maintenant que tout est configuré, vous êtes
+	fin prêt pour tout compiler.  Compilez le noyau et le monde
+	sur la machine de compilation comme décrit dans la <a class="xref" href="makeworld.html#make-buildworld" title="24.6.7.2. Compiler le nouveau système">Section 24.6.7.2, « Compiler le nouveau système »</a>, mais n'installez rien.  La
+	compilation une fois terminée, allez sur la machine de
+	test, et installez le noyau que vous venez juste de compiler.
+	Si la machine monte <code class="filename">/usr/src</code>
+	et <code class="filename">/usr/obj</code> via NFS, quand vous
+	redémarrez en mode mono-utilisateur vous devrez activer le
+	réseau et monter ces répertoires.  La méthode
+	la plus simple est de démarrer en mode multi-utilisateur,
+	puis exécutez <code class="command">shutdown now</code> pour passer en
+	mode mono-utilisateur.  Une fois à ce niveau, vous pouvez
+	installer le nouveau noyau et monde puis exécuter
+	<code class="command">mergemaster</code> comme vous le feriez
+	habituellement.  Une fois cela effectué, redémarrez
+	pour retourner en mode multi-utilisateur pour cette
+	machine.</p><p>Après que vous soyez certain que tout fonctionne
+	correctement sur la machine de test, utilisez la même
+	procédure pour installer le nouvel ensemble logiciel sur
+	chacune des autres machines de l'ensemble de
+	compilation.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp83223888"></a>24.7.3. Les logiciels portés</h3></div></div></div><p>La même idée peut être utilisée
+	pour le catalogue des logiciels portés.  La
+	première étape critique est de monter
+	<code class="filename">/usr/ports</code> depuis la même machine vers
+	toutes les machines de l'ensemble de compilation.  Vous
+	pouvez alors configurer correctement
+	<code class="filename">/etc/make.conf</code> pour partager les
+	archives.  Vous devrez faire pointer <code class="varname">DISTDIR</code>
+	sur un répertoire de partage commun dans lequel peut
+	écrire n'importe quel utilisateur utilisé pour
+	correspondance de l'utilisateur <code class="systemitem">root</code> par vos
+	montages NFS.  Chaque machine devrait faire pointer
+	<code class="varname">WRKDIRPREFIX</code> sur une répertoire de
+	compilation local.  Et enfin, si vous projetez de compiler et
+	distribuer des logiciels précompilés, vous
+	devriez fixer <code class="varname">PACKAGES</code> sur un répertoire
+	similaire à <code class="varname">DISTDIR</code>.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="makeworld.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="updating-upgrading.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="dtrace.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">24.6. Recompiler le système </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Chapitre 25. DTrace</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>22.9. NIS/YP</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="advanced-networking.html" title="第22章 高度なネットワーク" /><link rel="prev" href="network-isdn.html" title="22.8. ISDN" /><link rel="next" href="network-dhcp.html" title="22.10. DHCP" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">22.9. NIS/YP</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-isdn.html">戻る</a>〓</td><th width="60%" align="center">第22章 高度なネットワーク</th><td width="20%" align="right">〓<a accesskey="n" href="network-dhcp.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-nis"></a>22.9. NIS/YP</h2></div><div><span class="authorgroup">原作: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Swingle</span> <span class="firstname">Bill</span> [FAMILY Given]</span>. </span></div><div><span class="authorgroup">追記: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Ogren</span> <span class="firstname">Eric</span> [FAMILY Given]</span> 、 <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Erdelhoff</span> <span class="firstname">Udo</span> [FAMILY Given]</span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96295376"></a>22.9.1. NIS/YP とは?</h3></div></div></div><a id="idp96296016" class="indexterm"></a><a id="idp96296528" class="indexterm"></a><a id="idp96297040" class="indexterm"></a><a id="idp96297680" class="indexterm"></a><a id="idp96298192" class="indexterm"></a><a id="idp96298704" class="indexterm"></a><a id="idp96299216" class="indexterm"></a><p>NIS とは Network Information Services の略で
+	Sun Microsystems によって <span class="trademark">UNIX</span>® の (もともとは <span class="trademark">SunOS</span>™ の)
+	集中管理のために開発されました。現在では事実上の業界標準になっており、
+	主要な <span class="trademark">UNIX</span>® ライクシステム
+	(<span class="trademark">Solaris</span>™, HP-UX, <span class="trademark">AIX</span>®, Linux, NetBSD, OpenBSD, FreeBSD、等々)
+	はすべてこれをサポートしています。</p><a id="idp96302416" class="indexterm"></a><p>NIS は元々、イエローページといっていましたが、
+	商標問題から Sun はその名前を変えました。
+	古い用語 (および yp) はまだよく見られ、使用されています。</p><a id="idp96303568" class="indexterm"></a><p>NIS は RPC を使ったクライアント/サーバシステムです。
+	これを使うと NIS ドメイン内のマシン間で、
+	共通の設定ファイルを共有することができます。
+	また NIS を使うことでシステム管理者は最小限の設定データで
+	NIS クライアントを立ち上げることができ、
+	1 ヶ所から設定データの追加、削除、変更が可能です。</p><a id="idp96305104" class="indexterm"></a><p>NIS は <span class="trademark">Windows NT</span>® のドメインシステムに似ています。
+	内部の実装は似ても似つかないものですが、
+	基本的な機能を対比することはできます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96306768"></a>22.9.2. 知っておくべき用語 / プロセス</h3></div></div></div><p>NIS サーバの立ち上げや NIS クライアントの設定など、
+	NIS を FreeBSD に導入するにあたって、
+	目にするであろう用語や重要なユーザプロセスがいくつかあります。</p><a id="idp96307792" class="indexterm"></a><div class="informaltable"><table border="1"><colgroup><col /><col /></colgroup><thead><tr><th>用語</th><th>説明</th></tr></thead><tbody><tr><td>NIS ドメイン名</td><td>NIS マスタサーバとそのクライアントすべて
+		(スレーブサーバを含む) には NIS ドメイン名がついています。
+		<span class="trademark">Windows NT</span>® ドメイン名と同様に、NIS ドメイン名は
+		DNS とは何の関係もありません。</td></tr><tr><td>portmap</td><td>RPC (Remote Procedure Call,
+		NIS で使用されるネットワークプロトコル)
+		を利用するために実行しておかなければなりません。
+		<code class="command">portmap</code> が動作していなければ、
+		NIS サーバを起動することも、
+		NIS クライアントとして動作させることもできません。</td></tr><tr><td>ypbind</td><td>NIS クライアントを
+		NIS サーバに <span class="quote">「<span class="quote">結びつけ</span>」</span> ます。
+		これは NIS ドメイン名をシステムから取得し
+		RPC を用いてサーバに接続します。<code class="command">ypbind</code>
+		は NIS 環境におけるクライアントとサーバ間の通信の中枢です。
+		クライアントマシンの
+		<code class="command">ypbind</code> が停止した場合は、NIS
+		サーバへアクセスすることができなくなります。</td></tr><tr><td>ypserv</td><td>は NIS サーバでのみ実行されるべきもので、
+		NIS サーバプロセスそのものです。<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a>
+		が停止した場合、サーバはもはや NIS
+		リクエストに応答することができなくなるでしょう
+		(できれば、後を引き継ぐスレーブサーバがあるとよいでしょう)。
+		今まで使っていたサーバが機能を停止したとき、
+		別のサーバに再接続しに行かない NIS の実装もいくつかあります
+		(FreeBSD のものは違います)。
+		そのような場合に復帰するための唯一の方法は、
+		サーバプロセス (あるいはサーバ全体)、もしくはクライアントの
+		<code class="command">ypbind</code>
+		プロセスを再スタートすることです。</td></tr><tr><td>rpc.yppasswdd</td><td>NIS マスターサーバで動かすべき、
+		もう一つのプロセスです。これは NIS クライアントが
+		NIS パスワードを変更することを可能にするデーモンです。
+		このデーモンが動作していないときは、
+		ユーザは NIS マスタサーバにログインし、
+		そこでパスワードを変更しなければなりません。</td></tr></tbody></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96329168"></a>22.9.3. 動作のしくみ</h3></div></div></div><p>NIS 環境にあるホストは、
+	マスターサーバ、スレーブサーバ、クライアントの
+	3 種類に分類されます。
+	サーバは、ホストの設定情報の中心的な情報格納庫の役割をします。
+	マスターサーバは元となる信頼できる情報を保持し、
+	スレーブサーバは冗長性を確保するためこの情報をミラーします。
+	そしてクライアントは、サーバから情報の提供を受けて動作します。</p><p>この方法を用いることで、数多くのファイルにある情報が共有できます。
+	よく NIS で共有されるのは、
+	<code class="filename">master.passwd</code> や <code class="filename">group</code>,
+	<code class="filename">hosts</code> といったファイルです。
+	クライアント上のプロセスが、
+	通常ならローカルのファイルにある情報を必要とするときは、
+	クライアントは代わりに接続している
+	NIS サーバに問い合わせを行います。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96331856"></a>22.9.3.1. マシンの分類</h4></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>NIS マスターサーバ</em></span><a id="idp96333392" class="indexterm"></a>。
+	      このサーバは <span class="trademark">Windows NT</span>®
+	      で言うところのプライマリドメインコントローラにあたります。
+	      すべての NIS クライアントで利用されるファイルを保守します。
+	      <code class="filename">passwd</code> や <code class="filename">group</code>、
+	      その他 NIS クライアントが参照するファイルは、
+	      マスターサーバにあります。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">一つのマシンが一つ以上の NIS
+	        ドメインのマスターサーバになることは可能です。
+	        しかし、ここでは比較的小規模の NIS 環境を対象としているため、
+	        そのような場合については扱いません。</p></div></li><li class="listitem"><p><span class="emphasis"><em>NIS スレーブサーバ</em></span><a id="idp96336976" class="indexterm"></a>。
+	      <span class="trademark">Windows NT</span>® のバックアップドメインコントローラに似たもので、
+	      NIS スレーブサーバは NIS
+	      マスターサーバのデータファイルのコピーを保持します。
+	      NIS スレーブサーバは重要な環境で必要とされる冗長性を提供し、
+	      マスターサーバの負荷のバランスをとります。
+	      NIS クライアントは常に最初にレスポンスを返したサーバを
+	      NIS サーバとして接続しますが、
+	      これにはスレーブサーバも含まれます。</p></li><li class="listitem"><p><span class="emphasis"><em>NIS クライアント</em></span><a id="idp96339280" class="indexterm"></a>。
+	      NIS クライアントは大部分の <span class="trademark">Windows NT</span>®
+	      ワークステーションのように、ログオンに際して
+	      NIS サーバ (<span class="trademark">Windows NT</span>® ワークステーションの場合は
+	      <span class="trademark">Windows NT</span>® ドメインコントローラ)
+	      に接続して認証します。</p></li></ul></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96342224"></a>22.9.4. NIS/YP を使う</h3></div></div></div><p>この節では NIS 環境の立ち上げ例を取り上げます。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">この節ではあなたが FreeBSD 3.3
+	  以降を使っているものとします。
+	  ここで与えられる指示は <span class="emphasis"><em>おそらく</em></span> FreeBSD の
+	  3.0 以降のどのバージョンでも機能するでしょうが、
+	  それを保証するものではありません。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96344528"></a>22.9.4.1. 計画を立てる</h4></div></div></div><p>あなたが大学の小さな研究室の管理人であるとしましょう。
+	  この研究室は 15 台の FreeBSD マシンからなっていて、
+	  現在はまだ集中管理されていません。
+	  すなわち、各マシンは <code class="filename">/etc/passwd</code> と
+	  <code class="filename">/etc/master.passwd</code> を各々が持っています。
+	  これらのファイルは手動でお互いに同期させています。
+	  つまり現時点では、新しいユーザをあなたが追加するとき、
+	  <code class="command">adduser</code> を
+	  15 ヶ所すべてで実行しなければなりません。
+	  これは明らかに変える必要があるため、
+	  あなたはこのうち 2 台をサーバにして
+	  NIS を導入することを決めました。</p><p>その結果、研究室の設定はこのようなものになります。</p><div class="informaltable"><table border="1"><colgroup><col /><col /><col /></colgroup><thead><tr><th>マシンの名前</th><th>IP アドレス</th><th>役割</th></tr></thead><tbody><tr><td><code class="systemitem">ellington</code></td><td><code class="systemitem">10.0.0.2</code></td><td>NIS マスタ</td></tr><tr><td><code class="systemitem">coltrane</code></td><td><code class="systemitem">10.0.0.3</code></td><td>NIS スレーブ</td></tr><tr><td><code class="systemitem">basie</code></td><td><code class="systemitem">10.0.0.4</code></td><td>教員用のワークステーション</td></tr><tr><td><code class="systemitem">bird</code></td><td><code class="systemitem">10.0.0.5</code></td><td>クライアントマシン</td></tr><tr><td><code class="systemitem">cli[1-11]</code></td><td><code class="systemitem">10.0.0.[6-17]</code></td><td>その他のクライアントマシン</td></tr></tbody></table></div><p>もし NIS によるシステム管理の設定を行なうのが初めてなら、
+	  どのようにしたいのか、
+	  ひととおり最後まで考えてみることをお勧めします。
+	  ネットワークの規模によらず、
+	  いくつか決めるべきことがあるからです。</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96372816"></a>22.9.4.1.1. NIS ドメイン名を決める</h5></div></div></div><a id="idp96373456" class="indexterm"></a><p>ここでいうドメイン名は、今まであなたが使っていた、
+	    いわゆる <span class="quote">「<span class="quote">ドメイン名</span>」</span> と呼んでいたものとは違います。
+	    正確には <span class="quote">「<span class="quote">NIS ドメイン名</span>」</span> と呼ばれます。
+	    クライアントがサーバに情報を要求するとき、
+	    その要求には自分が属する NIS ドメインの名前が含まれています。
+	    これは 1 つのネットワークに複数のサーバがある場合に、
+	    どのサーバが要求を処理すれば良いかを決めるために使われます。
+	    NIS ドメイン名とは、
+	    関連のあるホストをグループ化するための名前である、
+	    と考えると良いでしょう。</p><p>組織によってはインターネットのドメイン名を
+	    NIS ドメイン名に使っているところがあります。
+	    これはネットワークのトラブルをデバッグするときに混乱の原因となるため、
+	    お勧めできません。
+	    NIS ドメイン名はネットワーク内で一意なければいけません。そして、
+	    ドメイン名がドメインに含まれるマシンを表すようなものであれば分かり易いです。
+	    たとえば Acme 社のアート (Art) 部門であれば NIS ドメイン名を
+	    <span class="quote">「<span class="quote">acme-art</span>」</span> とすれば良いでしょう。この例では
+	    NIS ドメイン名として <span class="emphasis"><em>test-domain</em></span>
+	    を使用します。</p><a id="idp96381136" class="indexterm"></a><p>しかしながらオペレーティングシステムによっては (特に <span class="trademark">SunOS</span>™)、
+	    NIS ドメイン名をネットワークドメイン名として使うものもあります。
+	    あなたのネットワークにそのような制限のあるマシンが
+	    1 台でもあるときは、NIS
+	    のドメイン名としてインターネットのネットワークドメイン名を使わなければ
+	    <span class="emphasis"><em>いけません</em></span>。</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96382928"></a>22.9.4.1.2. サーバマシンの物理的必要条件</h5></div></div></div><p>NIS サーバとして使うマシンを選ぶ際には、
+	    いくつか注意すべき点があります。
+	    NIS に関する困ったことの一つに、
+	    クライアントのサーバへの依存度があります。
+	    クライアントが自分の NIS ドメインのサーバに接続できないと、
+	    マシンが使用不能になることがあまりに多いのです。
+	    もし、ユーザやグループに関する情報が得られなければ、
+	    ほとんどのシステムは一時的に停止してしまいます。
+	    こういったことを念頭に置いて、頻繁にリブートされるマシンや、
+	    開発に使われそうなマシンを選ばないようにしなければなりません。
+	    理想的には NIS サーバはスタンドアロンで
+	    NIS サーバ専用のマシンにするべきです。
+	    ネットワークの負荷が重くなければ、
+	    他のサービスを走らせているマシンを
+	    NIS サーバにしてもかまいません。
+	    ただし NIS サーバが使えなくなると、
+	    <span class="emphasis"><em>すべての</em></span>
+	    クライアントに影響をおよぼす、
+	    という点には注意しなければなりません。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96384592"></a>22.9.4.2. NIS サーバ</h4></div></div></div><p>元となるすべての NIS 情報は、
+	  NIS マスターサーバと呼ばれる 1 台のマシンに格納されます。
+	  この情報が格納されるデータベースを NIS マップと呼びます。
+	  FreeBSD では、このマップは
+	  <code class="filename">/var/yp/[domainname]</code> に置かれます。
+	  <code class="filename">[domainname]</code> は、
+	  サーバがサービスする NIS ドメインです。
+	  1 台の NIS サーバが複数のドメインをサポートすることも可能です。
+	  つまり、このディレクトリを各々のドメインごとに作ることができます。
+	  それぞれのドメインは、
+	  独立したマップの集合を持つことになります。</p><p>NIS のマスターサーバとスレーブサーバ上では、
+	  <code class="command">ypserv</code> デーモンがすべての NIS 要求を処理します。
+	  <code class="command">ypserv</code> は NIS クライアントからの要求を受け付け、
+	  ドメイン名とマップ名を対応するデータベースファイルへのパスに変換し、
+	  データをクライアントに返送します。</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96391760"></a>22.9.4.2.1. NIS マスターサーバの設定</h5></div></div></div><a id="idp96392400" class="indexterm"></a><p>やりたいことにもよりますが
+	    NIS マスターサーバの設定は比較的単純です。
+	    FreeBSD は初期状態で NIS に対応しています。
+	    必要なのは以下の行を <code class="filename">/etc/rc.conf</code>
+	    に追加することだけで、
+	    あとは FreeBSD がやってくれます。</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><pre class="programlisting">nisdomainname="test-domain"</pre><p>
+	      この行はネットワークの設定後に (たとえば再起動後に)
+	      NIS のドメイン名を <span class="emphasis"><em>test-domain</em></span>
+	      に設定します。</p></li><li class="step"><p>
+		</p><pre class="programlisting">nis_server_enable="YES"</pre><p>
+		これは FreeBSD に次にネットワークが立ち上がったとき NIS
+		のサーバプロセスを起動させます。</p></li><li class="step"><p>
+		</p><pre class="programlisting">nis_yppasswdd_enable="YES"</pre><p>
+		これは <code class="command">rpc.yppasswdd</code>
+		デーモンを有効にします。上述したようにこれはユーザが NIS
+		のパスワードをクライアントのマシンから変更することを可能にします。</p></li></ol></div><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">NIS の設定によっては、
+	      さらに他のエントリを付け加える必要があるかもしれません。
+	      詳細については、下記の <a class="link" href="network-nis.html#network-nis-server-is-client" title="22.9.10. NIS クライアントとしても動作している NIS サーバ">NIS
+	      クライアントとしても動作している NIS サーバ</a>
+	      節を参照してください。</p></div><p>さて、あとはスーパユーザ権限で
+	    <code class="command">/etc/netstart</code> コマンドを実行するだけです。
+	    これにより <code class="filename">/etc/rc.conf</code>
+	    で定義された値を使ってすべての設定が行なわれます。</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96401488"></a>22.9.4.2.2. NIS マップの初期化</h5></div></div></div><a id="idp96402128" class="indexterm"></a><p><span class="emphasis"><em>NIS マップ</em></span> とは
+	    <code class="filename">/var/yp</code>
+	    ディレクトリにあるデータベースファイルです。
+	    これらは NIS マスタの <code class="filename">/etc</code>
+	    ディレクトリの設定ファイルから作られます。
+	    唯一の例外は <code class="filename">/etc/master.passwd</code>
+	    ファイルです。これは <code class="systemitem">root</code>
+	    や他の管理用アカウントのパスワードまでその
+	    NIS ドメインのすべてのサーバに伝えたくないという、
+	    もっともな理由によるものです。このため NIS
+	    マップの初期化の前に以下を行う必要があります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /etc/master.passwd /var/yp/master.passwd</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /var/yp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>vi master.passwd</code></strong></pre><p>システムに関するアカウント
+	    (<code class="systemitem">bin</code>, <code class="systemitem">tty</code>,
+	    <code class="systemitem">kmem</code>, <code class="systemitem">games</code> など)
+	    や、NIS クライアントに伝えたくないアカウント
+	    (たとえば <code class="systemitem">root</code>
+	    や他の UID が 0 (スーパユーザ) のアカウント)
+	    をすべて NIS マップから取り除かなければなりません。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">
+	      <code class="filename">/var/yp/master.passwd</code> が
+	      グループまたは誰もが読めるようになっていないようにしてください
+	      (モード 600)!
+	      必要なら <code class="command">chmod</code>
+	      コマンドを使ってください。</p></div><a id="idp96445136" class="indexterm"></a><p>すべてが終わったら NIS マップを初期化します!
+	    FreeBSD には、これを行うために <code class="command">ypinit</code>
+	    という名のスクリプトが含まれています
+	    (詳細はそのマニュアルページをご覧ください)。
+	    このスクリプトはほとんどの <span class="trademark">UNIX</span>® OS に存在しますが、
+	    すべてとは限らないことを覚えておいてください。
+	    Digital Unix/Compaq Tru64 UNIX では <code class="command">ypsetup</code>
+	    と呼ばれています。NIS マスタのためのマップを作るためには
+	    <code class="option">-m</code> オプションを <code class="command">ypinit</code>
+	    に与えます。上述のステップを完了しているなら、以下を実行して
+	    NIS マップを生成します。</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>ypinit -m test-domain</code></strong>
+Server Type: MASTER Domain: test-domain
+Creating an YP server will require that you answer a few questions.
+Questions will all be asked at the beginning of the procedure.
+Do you want this procedure to quit on non-fatal errors? [y/n: n] <strong class="userinput"><code>n</code></strong>
+Ok, please remember to go back and redo manually whatever fails.
+If you don't, something might not work.
+At this point, we have to construct a list of this domains YP servers.
+rod.darktech.org is already known as master server.
+Please continue to add any slave servers, one per line. When you are
+done with the list, type a &lt;control D&gt;.
+master server   :  ellington
+next host to add:  <strong class="userinput"><code>coltrane</code></strong>
+next host to add:  <strong class="userinput"><code>^D</code></strong>
+The current list of NIS servers looks like this:
+ellington
+coltrane
+Is this correct?  [y/n: y] <strong class="userinput"><code>y</code></strong>
+
+[..output from map generation..]
+
+NIS Map update completed.
+ellington has been setup as an YP master server without any errors.</pre><p><code class="command">ypinit</code> は
+	    <code class="filename">/var/yp/Makefile</code> を
+	    <code class="filename">/var/yp/Makefile.dist</code> から作成します。
+	    作成された時点では、そのファイルはあなたが FreeBSD
+	    マシンだけからなるサーバが 1 台だけの
+	    NIS 環境を扱っていると仮定しています。
+	    <span class="emphasis"><em>test-domain</em></span>
+	    はスレーブサーバを一つ持っていますので
+	    <code class="filename">/var/yp/Makefile</code>
+	    を編集しなければなりません。</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>vi /var/yp/Makefile</code></strong></pre><p>以下の行を (もし既にコメントアウトされていないならば)
+	    コメントアウトしなければなりません。</p><pre class="programlisting">NOPUSH = "True"</pre></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96454992"></a>22.9.4.2.3. NIS スレーブサーバの設定</h5></div></div></div><a id="idp96455632" class="indexterm"></a><p>NIS スレーブサーバの設定はマスターサーバの設定以上に簡単です。
+	    スレーブサーバにログオンし <code class="filename">/etc/rc.conf</code>
+	    ファイルを前回と同様に編集します。唯一の違うところは
+	    <code class="command">ypinit</code> の実行に <code class="option">-s</code>
+	    オプションを使わなければいけないことです。
+	    <code class="option">-s</code> オプションは
+	    NIS マスターサーバの名前を要求し、
+	    コマンドラインは以下のようになります。</p><pre class="screen">coltrane<code class="prompt">#</code> <strong class="userinput"><code>ypinit -s ellington test-domain</code></strong>
+
+Server Type: SLAVE Domain: test-domain Master: ellington
+
+Creating an YP server will require that you answer a few questions.
+Questions will all be asked at the beginning of the procedure.
+
+Do you want this procedure to quit on non-fatal errors? [y/n: n]  <strong class="userinput"><code>n</code></strong>
+
+Ok, please remember to go back and redo manually whatever fails.
+If you don't, something might not work.
+There will be no further questions. The remainder of the procedure
+should take a few minutes, to copy the databases from ellington.
+Transferring netgroup...
+ypxfr: Exiting: Map successfully transferred
+Transferring netgroup.byuser...
+ypxfr: Exiting: Map successfully transferred
+Transferring netgroup.byhost...
+ypxfr: Exiting: Map successfully transferred
+Transferring master.passwd.byuid...
+ypxfr: Exiting: Map successfully transferred
+Transferring passwd.byuid...
+ypxfr: Exiting: Map successfully transferred
+Transferring passwd.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring group.bygid...
+ypxfr: Exiting: Map successfully transferred
+Transferring group.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring services.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring rpc.bynumber...
+ypxfr: Exiting: Map successfully transferred
+Transferring rpc.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring protocols.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring master.passwd.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring networks.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring networks.byaddr...
+ypxfr: Exiting: Map successfully transferred
+Transferring netid.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring hosts.byaddr...
+ypxfr: Exiting: Map successfully transferred
+Transferring protocols.bynumber...
+ypxfr: Exiting: Map successfully transferred
+Transferring ypservers...
+ypxfr: Exiting: Map successfully transferred
+Transferring hosts.byname...
+ypxfr: Exiting: Map successfully transferred
+
+coltrane has been setup as an YP slave server without any errors.
+Don't forget to update map ypservers on ellington.</pre><p>この例の場合 <code class="filename">/var/yp/test-domain</code>
+	    というディレクトリが必要になります。
+	    NIS マスターサーバのマップファイルのコピーは、
+	    このディレクトリに置いてください。
+	    これらを確実に最新のものに維持する必要があります。
+	    次のエントリをスレーブサーバの <code class="filename">/etc/crontab</code>
+	    に追加することで、最新のものに保つことができます。</p><pre class="programlisting">20      *       *       *       *       root   /usr/libexec/ypxfr passwd.byname
+21      *       *       *       *       root   /usr/libexec/ypxfr passwd.byuid</pre><p>この二行はスレーブサーバにあるマップファイルを、
+	    マスターサーバのマップファイルと同期させるものです。
+	    このエントリは必須というわけではありませんが、マスターサーバは
+	    NIS マップに対する変更をスレーブサーバに伝えようとしますし、
+	    サーバが管理するシステムにとってパスワード情報はとても重要なので、
+	    強制的に更新してしまうことはよい考えです。特に、
+	    マップファイルの更新がきちんと行なわれるかどうかわからないくらい混雑するネットワークでは、
+	    重要になります。</p><p>スレーブサーバ上でも <code class="command">/etc/netstart</code>
+	    コマンドを実行して、NIS サーバを再起動してください。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96487888"></a>22.9.4.3. NIS クライアント</h4></div></div></div><p>NIS クライアントは <code class="command">ypbind</code>
+	  デーモンを使って、特定の NIS
+	  サーバとの間に結合 (binding) と呼ばれる関係を成立させます。
+	  <code class="command">ypbind</code> はシステムのデフォルトのドメイン
+	  (<code class="command">domainname</code> コマンドで設定されます)
+	  を確認し、RPC 要求をローカルネットワークにブロードキャストします。
+	  この RPC 要求により <code class="command">ypbind</code>
+	  が結合を成立させようとしているドメイン名が指定されます。
+	  要求されているドメイン名に対してサービスするよう設定されたサーバが
+	  ブロードキャストを受信すると、
+	  サーバは <code class="command">ypbind</code> に応答し<code class="command">ypbind</code>
+	  は応答のあったサーバのアドレスを記録します。複数のサーバ
+	  (たとえば一つのマスターサーバと、複数のスレーブサーバ)
+	  が利用可能な場合、<code class="command">ypbind</code> は、
+	  最初に応答したサーバのアドレスを使用します。
+	  これ以降、クライアントのシステムは、
+	  すべての NIS の要求をそのサーバに向けて送信します。
+	  <code class="command">ypbind</code> は、
+	  サーバが順調に動作していることを確認するため、
+	  時々 <span class="quote">「<span class="quote">ping</span>」</span> をサーバに送ります。
+	  反応が戻ってくるべき時間内に ping に対する応答が来なければ、
+	  <code class="command">ypbind</code> は、そのドメインを結合不能
+	  (unbound) として記録し、別のサーバを見つけるべく、
+	  再びブロードキャストパケットの送信を行います。</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96496976"></a>22.9.4.3.1. NIS クライアントの設定</h5></div></div></div><a id="idp96497616" class="indexterm"></a><p>FreeBSD マシンを NIS クライアントにする設定は非常に単純です。</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>ネットワークの起動時に NIS ドメイン名を設定して
+	        <code class="command">ypbind</code> を起動させるために
+		<code class="filename">/etc/rc.conf</code>
+		ファイルを編集して以下の行を追加します。</p><pre class="programlisting">nisdomainname="test-domain"
+nis_client_enable="YES"</pre></li><li class="step"><p>NIS サーバから、
+		利用可能なパスワードエントリをすべて取り込むため、
+		<code class="filename">/etc/master.passwd</code>
+		からすべてのユーザアカウントを取り除いて、
+		<code class="command">vipw</code> コマンドで以下の行を
+		<code class="filename">/etc/master.passwd</code> の最後に追加します。</p><pre class="programlisting">+:::::::::</pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">この行によって NIS
+		  サーバのパスワードマップにアカウントがある人全員にアカウントが与えられます。
+		  この行を変更すると、
+		  さまざまな NIS クライアントの設定を行なうことが可能です。
+		  詳細は <a class="link" href="network-nis.html#network-netgroups" title="22.9.7. ネットグループの利用">ネットグループ</a>
+		  を、さらに詳しい情報については、O'Reilly の
+		  <code class="literal">Managing NFS and NIS</code> を参照してください。</p></div><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="filename">/etc/master.passwd</code>
+		  内に少なくとも一つのローカルアカウント
+		  (つまり NIS 経由でインポートされていないアカウント)
+		  を置くべきです。
+		  また、このアカウントは <code class="systemitem">wheel</code>
+		  グループのメンバーであるべきです。
+		  NIS がどこか調子悪いときには、
+		  リモートからこのアカウントでログインし、
+		  root になって修復するのに利用できます。</p></div></li><li class="step"><p>NIS
+		サーバにあるすべてのグループエントリを取り込むため、
+		以下の行を <code class="filename">/etc/group</code>
+		に追加します。</p><pre class="programlisting">+:*::</pre></li></ol></div><p>上記の手順がすべて完了すれば、
+	    <code class="command">ypcat passwd</code> によって
+	    NIS サーバの passwd マップが参照できるようになっているはずです。
+	  </p></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96509904"></a>22.9.5. NIS セキュリティ</h3></div></div></div><p>一般にドメイン名さえ知っていれば、
+	どこにいるリモートユーザでも <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> に RPC を発行して
+	NIS マップの内容を引き出すことができます。
+	こういった不正なやりとりを防ぐため、
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> には securenets と呼ばれる機能があります。これは、
+	アクセスを決められたホストだけに制限するのに使える機能です。
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> は起動時に <code class="filename">/var/yp/securenets</code>
+	ファイルから securenets に関する情報を読み込みます。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">上記のパス名は <code class="option">-p</code>
+	  オプションで指定されたパス名によって変わります。このファイルは、
+	  空白で区切られたネットワーク指定とネットマスクのエントリからなっていて、
+	  <span class="quote">「<span class="quote">#</span>」</span> で始まる行はコメントとみなされます。
+	  簡単な securenets ファイルの例を以下に示します。</p></div><pre class="programlisting"># allow connections from local host -- mandatory
+127.0.0.1     255.255.255.255
+# allow connections from any host
+# on the 192.168.128.0 network
+192.168.128.0 255.255.255.0
+# allow connections from any host
+# between 10.0.0.0 to 10.0.15.255
+10.0.0.0      255.255.240.0</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a>
+	が上記のルールの一つと合致するアドレスからの要求を受け取った場合、
+	処理は正常に行なわれます。
+	もしアドレスがルールに合致しなければ、
+	その要求は無視されて警告メッセージがログに記録されます。
+	また <code class="filename">/var/yp/securenets</code> が存在しない場合、
+	<code class="command">ypserv</code> はすべてのホストからの接続を受け入れます。
+      </p><p><code class="command">ypserv</code> は Wietse Venema 氏による
+	<span class="application">tcpwrapper</span> パッケージもサポートしています。
+	そのため <code class="filename">/var/yp/securenets</code> の代わりに
+	<span class="application">tcpwrapper</span>
+	の設定ファイルを使ってアクセス制御を行なうことも可能です。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">これらのアクセス制御機能は一定のセキュリティを提供しますが、
+	  どちらも特権ポートのテストのような <span class="quote">「<span class="quote">IP spoofing</span>」</span>
+	  攻撃に対して脆弱です。すべての NIS
+	  関連のトラフィックはファイアウォールでブロックされるべきです。</p><p xmlns="http://www.w3.org/1999/xhtml"><code class="filename">/var/yp/securenets</code>
+	  を使っているサーバは、古い TCP/IP
+	  実装を持つ正当なクライアントへのサービスに失敗することがあります。
+	  これらの実装の中にはブロードキャストのホストビットをすべて
+	  0 でセットしてしまったり、
+	  ブロードキャストアドレスの計算でサブネットマスクを見落としてしまったりするものがあります。
+	  これらの問題にはクライアントの設定を正しく行なえば解決できるものもありますが、
+	  問題となっているクライアントシステムを引退させるか、
+	  <code class="filename">/var/yp/securenets</code>
+	  を使わないようにしなければならないものもあります。</p><p xmlns="http://www.w3.org/1999/xhtml">このような古風な TCP/IP の実装を持つサーバで
+	  <code class="filename">/var/yp/securenets</code>
+	  を使うことは実に悪い考えであり、
+	  あなたのネットワークの大部分において
+	  NIS の機能喪失を招きます。</p><a xmlns="http://www.w3.org/1999/xhtml" id="idp96538576" class="indexterm"></a><p xmlns="http://www.w3.org/1999/xhtml"><span class="application">tcpwrapper</span>
+	  パッケージを使うとあなたの NIS サーバのレイテンシ (遅延)
+	  が増加します。特に混雑したネットワークや遅い NIS
+	  サーバでは、遅延の増加によって、
+	  クライアントプログラムのタイムアウトが起こるかもしれません。
+	  一つ以上のクライアントシステムがこれらの兆候を示したなら、
+	  あなたは問題となっているクライアントシステムを
+	  NIS スレーブサーバにして自分自身に結び付くように強制すべきです。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96539984"></a>22.9.6. 何人かのユーザのログオンを遮断する</h3></div></div></div><p>わたしたちの研究室には <code class="systemitem">basie</code> という、
+	教員専用のマシンがあります。わたしたちはこのマシンを
+	NIS ドメインの外に出したくないのですが、
+	マスタ NIS サーバの <code class="filename">passwd</code>
+	ファイルには教員と学生の両方が載っています。
+	どうしたらいいでしょう?</p><p>当該人物が NIS のデータベースに載っていても、
+	そのユーザがマシンにログオンできないようにする方法があります。
+	そうするには
+	<span class="emphasis"><em>-<em class="replaceable"><code>username</code></em></em></span>
+	をクライアントマシンの <code class="filename">/etc/master.passwd</code>
+	ファイルの末尾に付け足します。
+	<em class="replaceable"><code>username</code></em>
+	はあなたがログインさせたくないと思っているユーザのユーザ名です。
+	これは <code class="command">vipw</code> で行うべきです。
+	<code class="command">vipw</code> は <code class="filename">/etc/master.passwd</code>
+	への変更をチェックし、編集終了後パスワードデータベースを再構築します。
+	たとえば、ユーザ <span class="emphasis"><em>bill</em></span> が <code class="systemitem">basie</code>
+	にログオンするのを防ぎたいなら、以下のようにします。</p><pre class="screen">basie<code class="prompt">#</code> <strong class="userinput"><code>vipw</code></strong>
+<strong class="userinput"><code>[add -bill to the end, exit]</code></strong>
+vipw: rebuilding the database...
+vipw: done
+
+basie<code class="prompt">#</code> <strong class="userinput"><code>cat /etc/master.passwd</code></strong>
+
+root:[password]:0:0::0:0:The super-user:/root:/bin/csh
+toor:[password]:0:0::0:0:The other super-user:/root:/bin/sh
+daemon:*:1:1::0:0:Owner of many system processes:/root:/sbin/nologin
+operator:*:2:5::0:0:System &amp;:/:/sbin/nologin
+bin:*:3:7::0:0:Binaries Commands and Source,,,:/:/sbin/nologin
+tty:*:4:65533::0:0:Tty Sandbox:/:/sbin/nologin
+kmem:*:5:65533::0:0:KMem Sandbox:/:/sbin/nologin
+games:*:7:13::0:0:Games pseudo-user:/usr/games:/sbin/nologin
+news:*:8:8::0:0:News Subsystem:/:/sbin/nologin
+man:*:9:9::0:0:Mister Man Pages:/usr/share/man:/sbin/nologin
+bind:*:53:53::0:0:Bind Sandbox:/:/sbin/nologin
+uucp:*:66:66::0:0:UUCP pseudo-user:/var/spool/uucppublic:/usr/libexec/uucp/uucico
+xten:*:67:67::0:0:X-10 daemon:/usr/local/xten:/sbin/nologin
+pop:*:68:6::0:0:Post Office Owner:/nonexistent:/sbin/nologin
+nobody:*:65534:65534::0:0:Unprivileged user:/nonexistent:/sbin/nologin
++:::::::::
+-bill
+
+basie<code class="prompt">#</code></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-netgroups"></a>22.9.7. ネットグループの利用</h3></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Erdelhoff</span> <span class="firstname">Udo</span> [FAMILY Given]</span>. </span></div></div></div><a id="idp96554960" class="indexterm"></a><p>前節までに見てきた手法は、
+	極めて少ないユーザ/マシン向けに個別のルールを必要としている場合にはうまく機能します。
+	しかし大きなネットワークでは、
+	ユーザに触られたくないマシンへログオンを防ぐのを
+	<span class="emphasis"><em>忘れるでしょう</em></span> し、
+	そうでなくとも各マシンを個別に設定して回らなければならず、
+	<span class="emphasis"><em>集中</em></span>管理という NIS の恩恵を失ってしまいます。</p><p>NIS の開発者はこの問題を <span class="emphasis"><em>ネットグループ</em></span>
+	と呼ばれる方法で解決しました。
+	その目的と意味合いは <span class="trademark">UNIX</span>®
+	のファイルシステムで使われている一般的なグループと比較できます。
+	主たる相違は数値 ID が存在しないことと、
+	ユーザアカウントと別のネットグループを含めたネットグループを定義できることです。</p><p>ネットグループは百人/台以上のユーザとマシンを含む、
+	大きく複雑なネットワークを扱うために開発されました。
+	あなたがこのような状況を扱わなければならないなら便利なものなのですが、
+	一方で、この複雑さは単純な例でネットグループの説明をすることをほとんど不可能にしています。
+	この節の残りで使われている例は、この問題を実演しています。</p><p>あなたの行なった、
+	研究室への NIS の導入の成功が上司の目に止ったとしましょう。
+	あなたの次の仕事は、あなたの NIS
+	ドメインをキャンパスの他のいくつものマシンを覆うものへ拡張することです。
+	二つの表は新しいユーザと新しいマシンの名前とその説明を含んでいます。</p><div class="informaltable"><table border="1"><colgroup><col /><col /></colgroup><thead><tr><th>ユーザの名前</th><th>説明</th></tr></thead><tbody><tr><td>alpha, beta</td><td>IT 学科の通常の職員</td></tr><tr><td>charlie, delta</td><td>IT 学科の新しい見習い</td></tr><tr><td>echo, foxtrott, golf, ...</td><td>一般の職員</td></tr><tr><td>able, baker, ...</td><td>まだインターン</td></tr></tbody></table></div><div class="informaltable"><table border="1"><colgroup><col /><col /></colgroup><thead><tr><th>マシンの名前</th><th>説明</th></tr></thead><tbody><tr><td>war, death, famine, pollution</td><td>最も重要なサーバ。IT 職員だけがログオンを許されます。</td></tr><tr><td>pride, greed, envy, wrath, lust, sloth</td><td>あまり重要でないサーバ。
+		IT 学科の全員がログオンを許されます。</td></tr><tr><td>one, two, three, four, ...</td><td>通常のワークステーション。
+	        <span class="emphasis"><em>本当の</em></span>
+		職員だけがログオンを許されます。</td></tr><tr><td>trashcan</td><td>重要なデータの入っていないひどく古いマシン。
+	        インターンでもこのマシンの使用を許されます。</td></tr></tbody></table></div><p>もしあなたがこの手の制限を各ユーザを個別にブロックする形で実装するなら、
+	あなたはそのシステムにログオンすることが許されていない各ユーザについて
+	-<em class="replaceable"><code>user</code></em> という 1 行を、各システムの
+	<code class="filename">passwd</code> に追加しなければならなくなるでしょう。
+	もしあなたが 1 エントリでも忘れればトラブルに巻き込まれてしまいます。
+	最初のセットアップの時にこれを正しく行えるのはありえることかも知れませんが、
+	遂には連日の業務の間に例の行を追加し<span class="emphasis"><em>忘れてしまうでしょう</em></span>。
+	結局マーフィーは楽観主義者だったのです。</p><p>この状況をネットグループで扱うといくつかの有利な点があります。
+	各ユーザを別個に扱う必要はなく、
+	ユーザを一つ以上のネットグループに割り当て、
+	ネットグループの全メンバのログインを許可したり禁止したりすることができます。
+	新しいマシンを追加するときはネットグループへログインの制限を定義するだけ、
+	新しいユーザを追加するときはそのユーザを一つ以上のネットグループへ追加するだけで、
+	それぞれ行なうことができます。
+	これらの変更は互いに独立なので、
+	<span class="quote">「<span class="quote">ユーザとマシンの組合わせをどうするか</span>」</span>
+	は存在しなくなります。
+	あなたの NIS のセットアップが注意深く計画されていれば、
+	マシンへのアクセスを認めるにも拒否するにも中心の設定をたった一カ所変更するだけです。</p><p>最初のステップは NIS マップネットグループの初期化です。
+	FreeBSD の <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypinit&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypinit</span>(8)</span></a> はこのマップをデフォルトで作りませんが、
+	その NIS の実装はそれが作られさえすればそれをサポートするものです。
+	空のマップを作るには、単に</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>vi /var/yp/netgroup</code></strong></pre><p>とタイプして内容を追加していきます。
+	わたしたちの例では、すくなくとも IT 職員、IT 見習い、一般職員、
+	インターンの 4 つのネットグループが必要です。</p><pre class="programlisting">IT_EMP  (,alpha,test-domain)    (,beta,test-domain)
+IT_APP  (,charlie,test-domain)  (,delta,test-domain)
+USERS   (,echo,test-domain)     (,foxtrott,test-domain) \
+	(,golf,test-domain)
+INTERNS (,able,test-domain)     (,baker,test-domain)</pre><p><code class="literal">IT_EMP</code>, <code class="literal">IT_APP</code>
+	等はネットグループの名前です。
+	それぞれの括弧で囲まれたグループが一人以上のユーザアカウントをそれに登録しています。
+	グループの 3 つのフィールドは</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>その記述が有効なホスト (群) の名称。
+	    ホスト名を特記しなければそのエントリはすべてのホストで有効です。
+	    もしあなたがホスト名を特記するなら、
+	    あなたは闇と恐怖と全き混乱の領域に入り込んでしまうでしょう。</p></li><li class="listitem"><p>このネットグループに所属するアカウントの名称。</p></li><li class="listitem"><p>そのアカウントの NIS ドメイン。
+	    もしあなたが一つ以上の NIS ドメインの不幸な仲間なら、
+	    あなたは他の NIS
+	    ドメインからあなたのネットグループにアカウントを導入できます。</p></li></ol></div><p>各フィールドには、ワイルドカードが使えます。
+	詳細は <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=netgroup&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">netgroup</span>(5)</span></a> をご覧ください。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><a xmlns="http://www.w3.org/1999/xhtml" id="idp96593616" class="indexterm"></a><p xmlns="http://www.w3.org/1999/xhtml">8 文字以上のネットグループ名は、特にあなたの NIS
+	  ドメインで他のオペレーティングシステムを走らせているときは使うべきではありません。
+	  名前には大文字小文字の区別があります。
+	  そのためネットグループ名に大文字を使う事は、
+	  ユーザやマシン名とネットグループ名を区別する簡単な方法です。</p><p xmlns="http://www.w3.org/1999/xhtml">(FreeBSD 以外の) NIS クライアントの中には
+	  多数のエントリを扱えないものもあります。
+	  たとえば <span class="trademark">SunOS</span>™ の古い版では 15 以上の
+	  <span class="emphasis"><em>エントリ</em></span>
+	  を含むネットグループはトラブルを起こします。
+	  この制限は 15 ユーザ以下のサブネットグループをいくつも作り、
+	  本当のネットグループはこのサブネットグループからなるようにすることで回避できます。</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">BIGGRP1  (,joe1,domain)  (,joe2,domain)  (,joe3,domain) [...]
+BIGGRP2  (,joe16,domain)  (,joe17,domain) [...]
+BIGGRP3  (,joe31,domain)  (,joe32,domain)
+BIGGROUP  BIGGRP1 BIGGRP2 BIGGRP3</pre><p xmlns="http://www.w3.org/1999/xhtml">単一のネットグループに 225 人以上のユーザをいれたいときは、
+	  このやり方を繰り返すことができます。</p></div><p>新しい NIS マップの有効化と配布は簡単です。</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>cd /var/yp</code></strong>
+ellington<code class="prompt">#</code> <strong class="userinput"><code>make</code></strong></pre><p>これで新しい 3 つの NIS マップ
+	<code class="filename">netgroup</code>,
+	<code class="filename">netgroup.byhost</code>,
+	<code class="filename">netgroup.byuser</code> ができるはずです。
+	新しい NIS マップが利用できるか確かめるには
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypcat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ypcat</span>(1)</span></a> を使います。</p><pre class="screen">ellington<code class="prompt">%</code> <strong class="userinput"><code>ypcat -k netgroup</code></strong>
+ellington<code class="prompt">%</code> <strong class="userinput"><code>ypcat -k netgroup.byhost</code></strong>
+ellington<code class="prompt">%</code> <strong class="userinput"><code>ypcat -k netgroup.byuser</code></strong></pre><p>最初のコマンドの出力は <code class="filename">/var/yp/netgroup</code>
+	の内容に似ているはずです。
+	2 番目のコマンドはホスト別のネットグループを作っていなければ出力されません。
+	3 番目のコマンドはユーザに対するネットグループのリストを得るのに使えます。</p><p>クライアント側の設定は非常に簡単です。
+	サーバ <em class="replaceable"><code>war</code></em> を設定するには、
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vipw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vipw</span>(8)</span></a> を実行して以下の行</p><pre class="programlisting">+:::::::::</pre><p>を</p><pre class="programlisting">+@IT_EMP:::::::::</pre><p>に入れ替えるだけです。</p><p>今、ネットグループ <em class="replaceable"><code>IT_EMP</code></em>
+	で定義されたユーザのデータだけが <em class="replaceable"><code>war</code></em>
+	のパスワードデータベースに読み込まれ、
+	そのユーザだけがログインを許されています。</p><p>残念ながらこの制限はシェルの ~ の機能や、
+	ユーザ名や数値の ユーザ ID の変換ルーチンにも影響します。
+	つまり、
+	<code class="command">cd ~user</code> はうまく動かず、
+	<code class="command">ls -l</code> はユーザ名のかわりに数値の ID を表示し
+	<code class="command">find . -user joe -print</code> は
+	<span class="quote">「<span class="quote">No such user</span>」</span> で失敗します。
+	これを避けるためには、すべてのユーザのエントリを
+	<span class="emphasis"><em>サーバにログインすることを許さずに</em></span>
+	読み込まなければなりません。</p><p>これはもう一行を <code class="filename">/etc/master.passwd</code>
+	に追加することで実現できます。その行は以下の</p><p><code class="literal">+:::::::::/sbin/nologin</code> を含んでおり、
+	これは
+	<span class="quote">「<span class="quote">すべてのエントリを読み込むが、読み込まれたエントリのシェルは
+	  <code class="filename">/sbin/nologin</code> で置き換えられる</span>」</span>
+	ということを意味します。passwd エントリの他のフィールドを
+	<code class="filename">/etc/master.passwd</code>
+	の既定値から置き換えることも可能です。</p><div xmlns="" class="warning"><h3 class="admontitle">警告: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="literal">+:::::::::/sbin/nologin</code> の行が
+	  <code class="literal">+@IT_EMP:::::::::</code>
+	  の行より後ろに位置することに注意してください。
+	  さもないと NIS から読み込まれた全ユーザが /sbin/nologin
+	  をログインシェルとして持つことになります。</p></div><p>この変更の後では、新しい職員が IT 学科に参加しても
+	NIS マップを一つ書き換えるだけで済みます。
+	同様にして、あまり重要でないサーバのローカルの
+	<code class="filename">/etc/master.passwd</code> のかつての
+	<code class="literal">+:::::::::</code> 行を以下のように置き換えます。</p><pre class="programlisting">+@IT_EMP:::::::::
++@IT_APP:::::::::
++:::::::::/sbin/nologin</pre><p>この行は、一般のワークステーションでは以下のようになります。</p><pre class="programlisting">+@IT_EMP:::::::::
++@USERS:::::::::
++:::::::::/sbin/nologin</pre><p>これでしばらく順調に運用していましたが、
+	数週間後、ポリシに変更がありました。
+	IT 学科はインターンを雇い始め、IT
+	インターンは一般のワークステーションと余り重要ではないサーバを使うことが許され、
+	IT 見習いはメインサーバへのログインが許されました。
+	あなたは新たなネットグループ IT_INTERN を追加して新しい IT
+	インターンたちをそのグループに登録し、
+	すべてのマシンの設定を変えて回ることにしました。
+	古い諺にこうあります。
+	<span class="quote">「<span class="quote">集中管理における過ちは、大規模な混乱を導く</span>」</span>。</p><p>いくつかのネットグループから新たなネットグループを作るという
+	NIS の機能は、このような状況に対処するために利用できます。
+	その方法の一つは、役割別のネットグループを作ることです。
+	たとえば、重要なサーバへのログイン制限を定義するために
+	<em class="replaceable"><code>BIGSRV</code></em> というネットグループを作り
+	あまり重要ではないサーバへは <em class="replaceable"><code>SMALLSRV</code></em>
+	というネットグループを、そして一般のワークステーション用に
+	<em class="replaceable"><code>USERBOX</code></em> という第 3 のネットグループを
+	作ることができます。これらのネットグループの各々は、
+	各マシンにログインすることを許されたネットグループを含みます。
+	あなたの NIS マップネットグループの新しいエントリは、
+	以下のようになるはずです。</p><pre class="programlisting">BIGSRV    IT_EMP  IT_APP
+SMALLSRV  IT_EMP  IT_APP  ITINTERN
+USERBOX   IT_EMP  ITINTERN USERS</pre><p>このログイン制限の定義法は、
+	同一の制限を持つマシンのグループを定義できるときには便利なものです。
+	残念ながらこのようなケースは例外的なものです。
+	ほとんどの場合、
+	各マシンに基づくログイン制限の定義機能が必要となるでしょう。</p><p>マシンごとのネットグループの定義は、
+	上述したようなポリシの変更を扱うことができるもうひとつの方法です。
+	このシナリオでは、各マシンの
+	<code class="filename">/etc/master.passwd</code> は
+	<span class="quote">「<span class="quote">+</span>」</span> で始まる 2 つの行からなります。
+	最初のものはそのマシンへのログインを許されたアカウントを追加するもので、
+	2 番目はその他のアカウントを <code class="filename">/sbin/nologin</code>
+	をシェルとして追加するものです。
+	マシン名をすべて大文字で記述したものをネットグループの名前として使うのは良い考えです。
+	言い換えれば、件の行は次のようになるはずです。</p><pre class="programlisting">+@<em class="replaceable"><code>BOXNAME</code></em>:::::::::
++:::::::::/sbin/nologin</pre><p>一度、各マシンに対してこの作業を済ませてしまえば、
+	二度とローカルの <code class="filename">/etc/master.passwd</code>
+	を編集する必要がなくなります。
+	以降のすべての変更は NIS マップの編集で扱うことができます。
+	以下はこのシナリオに対応するネットグループマップに、
+	いくつかの便利な定義を追加した例です。</p><pre class="programlisting"># Define groups of users first
+IT_EMP    (,alpha,test-domain)    (,beta,test-domain)
+IT_APP    (,charlie,test-domain)  (,delta,test-domain)
+DEPT1     (,echo,test-domain)     (,foxtrott,test-domain)
+DEPT2     (,golf,test-domain)     (,hotel,test-domain)
+DEPT3     (,india,test-domain)    (,juliet,test-domain)
+ITINTERN  (,kilo,test-domain)     (,lima,test-domain)
+D_INTERNS (,able,test-domain)     (,baker,test-domain)
+#
+# Now, define some groups based on roles
+USERS     DEPT1   DEPT2     DEPT3
+BIGSRV    IT_EMP  IT_APP
+SMALLSRV  IT_EMP  IT_APP    ITINTERN
+USERBOX   IT_EMP  ITINTERN  USERS
+#
+# And a groups for a special tasks
+# Allow echo and golf to access our anti-virus-machine
+SECURITY  IT_EMP  (,echo,test-domain)  (,golf,test-domain)
+#
+# machine-based netgroups
+# Our main servers
+WAR       BIGSRV
+FAMINE    BIGSRV
+# User india needs access to this server
+POLLUTION  BIGSRV  (,india,test-domain)
+#
+# This one is really important and needs more access restrictions
+DEATH     IT_EMP
+#
+# The anti-virus-machine mentioned above
+ONE       SECURITY
+#
+# Restrict a machine to a single user
+TWO       (,hotel,test-domain)
+# [...more groups to follow]</pre><p>もしユーザアカウントを管理するのにデータベースの類を使っているなら、
+	データベースのレポートツールからマップの最初の部分を作れるようにするべきです。
+	そうすれば、新しいユーザは自動的にマシンにアクセスできるでしょう。</p><p>最後に使用上の注意を:
+	マシン別のネットグループを使うことが常に賢明というわけではありません。
+	あなたが数ダースから数百の同一の環境のマシンを学生の研究室に配置しているのならば、
+	NIS マップのサイズを手頃な範囲に押さえるために、
+	マシン別のネットグループのかわりに役割別のネットグループを使うべきです。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96637904"></a>22.9.8. 忘れてはいけないこと</h3></div></div></div><p>NIS 環境にある今、
+	今までとは違ったやり方が必要なことがいくつかあります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>研究室にユーザを追加するときは、それをマスター
+	    NIS サーバに <span class="emphasis"><em>だけ</em></span>
+	    追加しなければならず、さらに
+	    <span class="emphasis"><em>NIS マップを再構築することを忘れてはいけません</em></span>。
+	    これを忘れると新しいユーザは
+	    NIS マスタ以外のどこにもログインできなくなります。
+	    たとえば、新しくユーザ <span class="quote">「<span class="quote">jsmith</span>」</span>
+	    をラボに登録したいときは以下のようにします。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw useradd jsmith</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /var/yp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make test-domain</code></strong></pre><p><code class="command">pw useradd jsmith</code> のかわりに
+	    <code class="command">adduser jsmith</code> を使うこともできます。</p></li><li class="listitem"><p><span class="emphasis"><em>管理用アカウントを
+	    NIS マップから削除してください</em></span>。
+	    管理用アカウントやパスワードを、
+	    それらのアカウントへアクセスさせてはいけないユーザが居るかも知れないマシンにまで伝えて回りたいとは思わないでしょう。</p></li><li class="listitem"><p><span class="emphasis"><em>NIS のマスタとスレーブをセキュアに、
+	      そして機能停止時間を最短に保ってください</em></span>。
+	    もし誰かがこれらのマシンをクラックしたり、
+	    あるいは単に電源を落としたりすると、
+	    彼らは実質的に多くの人を研究室へログインできなくしてしまえます。</p><p>これはどの集中管理システムにとってももっとも大きな弱点でしょう。
+	    あなたの NIS
+	    サーバを守らなければ怒れるユーザと対面することになるでしょう!</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96651472"></a>22.9.9. NIS v1 との互換性</h3></div></div></div><p>FreeBSD の
+	<span class="application">ypserv</span> は、
+	NIS v1 クライアントを部分的にサポートしています。
+	FreeBSD の NIS 実装は NIS v2 プロトコルのみを使用していますが、
+	ほかの実装では、古いシステムとの下位互換性を持たせるため
+	v1 プロトコルをサポートしているものもあります。
+	そのようなシステムに付いている
+	<span class="application">ypbind</span> デーモンは、
+	必要がないにもかかわらず NIS v1
+	のサーバとの結合を成立させようとします
+	(しかも v2 サーバからの応答を受信した後でも、
+	ブロードキャストをし続けるかも知れません)。
+	FreeBSD の ypserv は、
+	クライアントからの通常のリクエストはサポートしていますが、
+	v1 のマップ転送リクエストはサポートしていないことに注意してください。
+	つまり FreeBSD の ypserv を、
+	v1 だけをサポートするような古い NIS サーバと組み合わせて
+	マスターやスレーブサーバとして使うことはできません。
+	幸いなことに、現在、そのようなサーバが使われていることは
+	ほとんどないでしょう。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-nis-server-is-client"></a>22.9.10. NIS クライアントとしても動作している NIS サーバ</h3></div></div></div><p>複数のサーバが存在し、サーバ自身が NIS
+	クライアントでもあるようなドメインで
+	ypserv が実行される場合には注意が必要です。
+	一般的に良いとされているのは、
+	他のサーバと結合をつくるようにブロードキャストさせるのではなく、
+	サーバをそれ自身に結合させることです。
+	もし、サーバ同士が依存関係を持っていて、一つのサーバが停止すると、
+	奇妙なサービス不能状態に陥ることがあります。
+	その結果、すべてのクライアントはタイムアウトを起こして
+	他のサーバに結合しようと試みますが、
+	これにかかる時間はかなり大きく、
+	サーバ同士がまた互いに結合してしまったりすると、
+	サービス不能状態はさらに継続することになります。</p><p>
+	<code class="command">ypbind</code> に
+	<code class="option">-S</code> オプションフラグを指定して実行することで、
+	ホストを特定のサーバに結合することが可能です。
+	NIS サーバを再起動するたびに、これを手動で行いたくないなら、
+	次の行を <code class="filename">/etc/rc.conf</code>
+	に追加すればよいでしょう。</p><pre class="programlisting">nis_client_enable="YES"	# run client stuff as well
+nis_client_flags="-S <em class="replaceable"><code>NIS domain</code></em>,<em class="replaceable"><code>server</code></em>"</pre><p>詳細については <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypbind&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypbind</span>(8)</span></a> を参照してください。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96658640"></a>22.9.11. パスワード形式</h3></div></div></div><a id="idp96659280" class="indexterm"></a><p>
+	NIS を実装しようする人の誰もがぶつかる問題の一つに、
+	パスワード形式の互換性があります。
+	NIS サーバが DES 暗号化パスワード使っている場合には、
+	同様に DES を使用しているクライアントしか対応できません。
+	たとえば <span class="trademark">Solaris</span>™； の NIS クライアントがネットワーク内にある場合、
+	ほぼ確実に DES 暗号化パスワードを使用しなければならないでしょう。</p><p>サーバとクライアントがどのライブラリを使用しているかは、
+	<code class="filename">/etc/login.conf</code> を確認してください。
+	ホストが DES 暗号パスワードを使用するように設定されている場合、
+	<code class="literal">default</code>
+	クラスには以下のようなエントリが含まれます。</p><pre class="programlisting">default:\
+    :passwd_format=des:\
+    :copyright=/etc/COPYRIGHT:\
+    [Further entries elided]</pre><p><code class="literal">passwd_format</code>
+	特性について他に利用可能な値は
+	<code class="literal">blf</code> および <code class="literal">md5</code>
+	(それぞれ Blowfish および MD5 暗号化パスワード) です。</p><p><code class="filename">/etc/login.conf</code> を変更したときは、
+	ログイン特性データベースも再構築しなければなりません。
+	これは <code class="systemitem">root</code>
+	権限で下記のようにコマンドを実行すればできます。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">すでに <code class="filename">/etc/master.passwd</code>
+	内に記録されているパスワード形式は、
+	ログイン特性データベースが再構築された<span class="emphasis"><em>後</em></span>、
+	ユーザが彼らのパスワードをはじめて変更するまで変更されないでしょう。</p></div><p>次に、
+	パスワードが選択した形式で暗号化されることを確実にするために、
+	さらに <code class="filename">/etc/auth.conf</code> 内の
+	<code class="literal">crypt_default</code> において、
+	選択したパスワード形式に高い優先順位がついていることも確認してください。
+	そうするためには、選択した形式をリストの先頭に置いてください。
+	たとえば DES 暗号化されたパスワードを使用するときは、
+	エントリは次のようになります。</p><pre class="programlisting">crypt_default	=	des blf md5</pre><p>FreeBSD 上の各
+	NIS サーバおよびクライアントにおいて上記の手順に従えば、
+	ネットワーク内でどのパスワード形式が使用されるかが
+	それらのマシン間で整合されているということを確信できます。
+	NIS クライアント上で問題があれば、
+	ここから問題となりそうな部分を探すと良いでしょう。
+	覚えておいてください:
+	異種混在ネットワークに NIS サーバを配置したいときには、
+	DES が最大公約数的な標準となるでしょうから、
+	すべてのシステムで DES を使用しなければならないかもしれません。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-isdn.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="network-dhcp.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">22.8. ISDN〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓22.10. DHCP</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

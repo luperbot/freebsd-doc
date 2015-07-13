@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>5.6. Déverminer</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="tools.html" title="Chapitre 5. Outils de programmation" /><link rel="prev" href="ch05s05.html" title="5.5. Make" /><link rel="next" href="emacs.html" title="5.7. Utiliser Emacs comme environnement de développement" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5.6. Déverminer</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s05.html">Précédent</a> </td><th width="60%" align="center">Chapitre 5. Outils de programmation</th><td width="20%" align="right"> <a accesskey="n" href="emacs.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="debugging"></a>5.6. Déverminer</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64800464"></a>5.6.1. Le dévermineur</h3></div></div></div><p>Le dévermineur fourni avec FreeBSD est appelé
+      <code class="command">gdb</code> (<span class="application">GNU
+	  debugger</span>). Vous pouvez le démarrer en tapant
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gdb nomprog</code></strong>
+      </pre><p>bien que la plupart des gens préfèrent le démarrer au
+      sein d'<span class="application">Emacs</span>. Vous pouvez faire cela avec:
+      </p><pre class="screen"><strong class="userinput"><code>M-x gdb RET nomprog RET</code></strong>
+      </pre><p>Utiliser un dévermineur vous permet d'exécuter le programme
+      dans des circonstances plus contrôlées. Typiquement, vous pouvez
+      exécuter le programme ligne à ligne, inspecter la valeur des
+      variables, changer cette dernière, dire au dévermineur d'exécuter jusqu'à
+      un certain point puis de s'arrêter etc... Vous pouvez même vous brancher
+      sur un programme en fonctionnement, ou charger un fichier <code class="filename">core</code>
+      pour enquêter sur le plantage du programme. Il est même possible de
+      déverminer le noyau, quoique ce soit un peu plus rusé que de
+      déverminer des applications utilisateur dont nous discuterons
+      dans cette section.
+      </p><p><code class="command">gdb</code> dispose d'une assez bonne aide en ligne
+      comme d'un ensemble de pages d'info, aussi cette section va se concentrer sur
+      quelques commandes basiques.
+      </p><p>Finalement, si vous trouvez son interface texte non fonctionnelle,
+      il y a une interface graphique pour celui-ci, <a class="link" href="../../ports/devel.html" target="_top">xxgdb</a>,
+      dans la collection des logiciels portés.
+      </p><p>Cette section a pour but d'être une introduction
+      à l'utilisation de <code class="command">gdb</code> et ne couvre pas les sujets
+      très spécialisés comme le déverminage du noyau.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64832464"></a>5.6.2. Exécuter un programme dans le dévermineur</h3></div></div></div><p>Vous devrez avoir compilé le programme avec l'option	<code class="option">-g</code>
+      pour avoir la meilleure utilisation de <code class="command">gdb</code>. Il fonctionnera sans
+      mais vous ne verrez que le nom de la fonction dans laquelle vous vous trouvez plutôt
+      que son code source. Si vous voyez une ligne comme:
+      </p><pre class="screen">&#8230; (no debugging symbols found) &#8230;
+      </pre><p>quand <code class="command">gdb</code> démarre, vous saurez que le programme
+      n'a pas été compilé avec l'option <code class="option">-g</code>.
+      </p><p>A l'invite de <code class="command">gdb</code>, tapez
+      <strong class="userinput"><code>break main</code></strong>. Cela dira au dévermineur
+      de passer le code préliminaire d'initialisation du programme
+      et de démarrer au début de votre code. Maintenant tapez
+      <strong class="userinput"><code>run</code></strong> pour démarrer le programme&#8212;cela va
+      démarrer au début du code d'initialisation et ensuite s'arrêtera
+      lors de l'appel à <code class="function">main()</code>.
+      (Si vous vous êtes toujours demandé où <code class="function">main()</code>
+      était appelé, maintenant vous le savez !).
+      </p><p>Vous pouvez maintenant vous déplacer dans le programme ligne par ligne en
+      pressant <code class="command">n</code>. Si vous arrivez à l'appel d'une fonction,
+      vous pouvez entrer dans celle-ci en appuyant sur <code class="command">s</code>. Une fois
+      que vous êtes dans l'appel de la fonction, vous pouvez retourner dans le code
+      appelant en appuyant sur <code class="command">f</code>. Vous pouvez aussi utiliser
+      <code class="command">up</code> et <code class="command">down</code> pour avoir une vue rapide de l'appelant.
+      </p><p>Voici un exemple simple de comment détecter une erreur dans un programme avec
+      <code class="command">gdb</code>. Voici notre programme (avec une erreur délibérée):
+      </p><pre class="programlisting">#include &lt;stdio.h&gt;
+
+int bazz(int anint);
+
+main() {
+	int i;
+
+	printf("C'est mon programme\n");
+	bazz(i);
+	return 0;
+}
+
+int bazz(int anint) {
+	printf("Vous m'avez fourni %d\n", anint);
+	return anint;
+}</pre><p>Le programme met <span class="symbol">i</span> à <code class="literal">5</code> et le passe à une
+      fonction <code class="function">bazz()</code> qui imprime le nombre que nous lui avons donné.
+      </p><p>Puis nous compilons et exécutons le programme obtenu
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cc -g -o temp temp.c</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>./temp</code></strong>
+C'est mon programme
+Vous m'avez fourni 4231
+      </pre><p>Ce n'était pas ce que nous attendions ! Il est temps de voir ce qui se passe !
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gdb temp</code></strong>
+GDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "show copying" to see the conditions.
+There is absolutely no warranty for GDB; type "show warranty" for details.
+GDB 4.13 (i386-unknown-freebsd), Copyright 1994 Free Software Foundation, Inc.
+(gdb) <strong class="userinput"><code>break main</code></strong>				<em class="lineannotation"><span class="lineannotation">passe le code d'initialisation</span></em>
+Breakpoint 1 at 0x160f: file temp.c, line 9.	<em class="lineannotation"><span class="lineannotation">gdb met un point d'arrêt sur main()</span></em>
+(gdb) <strong class="userinput"><code>run</code></strong>					<em class="lineannotation"><span class="lineannotation">Exécute jusqu'à main()</span></em>
+Starting program: /home/james/tmp/temp		<em class="lineannotation"><span class="lineannotation">Le programme démarre</span></em>
+
+Breakpoint 1, main () at temp.c:9		<em class="lineannotation"><span class="lineannotation">gdb s'arrête à main()</span></em>
+(gdb) <strong class="userinput"><code>n</code></strong>						<em class="lineannotation"><span class="lineannotation">Va à la ligne suivante</span></em>
+C'est mon programme				<em class="lineannotation"><span class="lineannotation">Le programme écrit</span></em>
+(gdb) <strong class="userinput"><code>s</code></strong>						<em class="lineannotation"><span class="lineannotation">entre dans bazz()</span></em>
+bazz (anint=4231) at temp.c:17			<em class="lineannotation"><span class="lineannotation">gdb montre la pile</span></em>
+(gdb)
+      </pre><p>Arrêtons-nous une minute! Comment <span class="symbol">anint</span> a eu la valeur
+      <code class="literal">4231</code>? Ne l'avons-nous pas mis à <code class="literal">5</code>
+      dans <code class="function">main()</code>? Remontons dans <code class="function">main()</code>
+      et regardons.
+      </p><pre class="screen">(gdb) <strong class="userinput"><code>up</code></strong>					<em class="lineannotation"><span class="lineannotation">Remonte la pile des appels</span></em>
+#1  0x1625 in main () at temp.c:11		<em class="lineannotation"><span class="lineannotation">gdb montre la pile</span></em>
+(gdb) <strong class="userinput"><code>p i</code></strong>					<em class="lineannotation"><span class="lineannotation">Montre la valeur de i</span></em>
+$1 = 4231					<em class="lineannotation"><span class="lineannotation">gdb montre 4231</span></em>
+      </pre><p>Oh ! En regardant dans le code, nous avons oublié d'initialiser <span class="symbol">i</span>.
+      Nous aurions dû mettre
+      </p><pre class="programlisting"><em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+main() {
+	int i;
+
+	i = 5;
+	printf("C'est mon programme\n");
+<em class="lineannotation"><span class="lineannotation">&#8230;</span></em></pre><p>mais nous n'avions pas mis la ligne <code class="literal">i=5;</code>. Comme
+      nous n'avons pas initialisé <span class="symbol">i</span>, il a pris le nombre se trouvant
+      dans la zone de mémoire quand le programme a démarré,
+      ce qui dans ce cas était <code class="literal">4231</code>.
+      </p><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="command">gdb</code> montre la pile chaque fois que nous entrons ou sortons
+	d'une fonction, même si nous avons utilisé	<code class="command">up</code> et
+	<code class="command">down</code> pour nous déplacer dans la pile des appels.
+	Cela montre le nom de la fonction et les valeurs de ses arguments, ce qui nous aide
+	à garder une trace d'où nous sommes et de ce qui se passe.
+	(La pile est une zone de stockage où le programme stocke les informations
+	sur les arguments passés aux fonctions et où il doit aller
+	quand il revient d'une fonction).
+	</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64929872"></a>5.6.3. Examiner un fichier <code class="filename">core</code></h3></div></div></div><p>Un fichier <code class="filename">core</code> est basiquement un fichier qui contient
+      l'état complet du processus quand il s'est planté.
+      Dans <span class="quote">« <span class="quote">le bon vieux temps</span> »</span>, les programmeurs devait imprimer des
+      listings en hexadécimal de fichiers <code class="filename">core</code> et transpirer
+      sur leur manuels de code machine, mais la vie est maintenant un peu plus facile.
+      Par chance, sous FreeBSD et les autres systèmes 4.4BSD, un fichier <code class="filename">core</code>
+      est appelé <code class="filename">nomprog.core</code>
+      plutôt que juste <code class="filename">core</code>, pour mieux savoir à quel
+      programme appartient un fichier <code class="filename">core</code>.
+      </p><p>Pour examiner un fichier <code class="filename">core</code>, démarrez <code class="command">gdb</code>
+      de façon habituel. Plutôt que de taper <code class="command">break</code> ou
+      <code class="command">run</code>, tapez
+      </p><pre class="screen">(gdb) <strong class="userinput"><code>core nomprog.core</code></strong>
+      </pre><p>Si vous n'êtes pas dans le même répertoire que le fichier
+      <code class="filename">core</code>, vous devrez faire <strong class="userinput"><code>dir /path/to/core/file</code></strong>
+      d'abord.
+      </p><p>Vous devriez voir quelque chose comme cela:
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>gdb a.out</code></strong>
+GDB is free software and you are welcome to distribute copies of it
+ under certain conditions; type "show copying" to see the conditions.
+There is absolutely no warranty for GDB; type "show warranty" for details.
+GDB 4.13 (i386-unknown-freebsd), Copyright 1994 Free Software Foundation, Inc.
+(gdb) <strong class="userinput"><code>core a.out.core</code></strong>
+Core was generated by `a.out'.
+Program terminated with signal 11, Segmentation fault.
+Cannot access memory at address 0x7020796d.
+#0  0x164a in bazz (anint=0x5) at temp.c:17
+(gdb)
+      </pre><p>Dans ce cas, le programme a été appelé	<code class="filename">a.out</code>,
+      aussi le fichier <code class="filename">core</code> s'appelle <code class="filename">a.out.core</code>.
+      Nous pouvons voir que le programme s'est planté car il a essayé
+      d'accèder à une zone dans la mémoire qui n'était pas
+      disponible dans la fonction appelée <code class="function">bazz</code>.
+      </p><p>Quelquefois il est utile de pouvoir voir comment une fonction a été
+      appelée car le problème peut avoir eu lieu bien avant
+      dans la pile des appels dans un programme complexe. La commande <code class="command">bt</code>
+      demande à <code class="command">gdb</code> d'afficher une trace inverse de la pile
+      des appels:
+      </p><pre class="screen">(gdb) <strong class="userinput"><code>bt</code></strong>
+#0  0x164a in bazz (anint=0x5) at temp.c:17
+#1  0xefbfd888 in end ()
+#2  0x162c in main () at temp.c:11
+(gdb)
+      </pre><p>La fonction <code class="function">end()</code> est appelée lorsque le programme se plante;
+      dans ce cas, la fonction <code class="function">bazz()</code> a été appelée
+      <code class="function">main()</code>.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64995152"></a>5.6.4. Se brancher sur un programme en cours d'exécution</h3></div></div></div><p>Une des plus belles caractéristiques de <code class="command">gdb</code>
+      est qu'il peut se brancher sur un programme qui s'exécute déjà.
+      Bien sûr, cela suppose que vous ayez les privilèges suffisants pour
+      le faire. Un problème habituel est quand vous vous déplacez dans
+      un programme qui se dédouble et que vous voulez tracer le programme fils
+      cependant le dévermineur ne vous laissera seulement tracer le père.
+      </p><p>Ce que vous devez faire est de démarrer un autre <code class="command">gdb</code>,
+      utiliser <code class="command">ps</code> pour trouver l'ID du processus fils et faire
+      </p><pre class="screen">(gdb) <strong class="userinput"><code>attach identifiant_processus</code></strong>
+      </pre><p>dans <code class="command">gdb</code>, et déverminer ensuite comme d'habitude.
+      </p><p><span class="quote">« <span class="quote">C'est tout simple,</span> »</span> pensez-vous certainement,<span class="quote">« <span class="quote">
+      mais pendant le temps que je faisais ça, le processus fils
+      sera déjà parti loin</span> »</span>. Ne vous en faites pas,
+      noble lecteur, voici comment faire (avec l'appui des pages d'info
+      de <code class="command">gdb</code>):
+      </p><pre class="screen"><em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+if ((pid = fork()) &lt; 0)		/* _Toujours_ verifier cela */
+	error();
+else if (pid == 0) {		/* le fils */
+	int PauseMode = 1;
+
+	while (PauseMode)
+		sleep(10);	/* Attendre jusqu'a ce que quelqu'un se brache sur nous */
+	<em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+} else {			/* le pere */
+	<em class="lineannotation"><span class="lineannotation">&#8230;</span></em>
+      </pre><p>Maintenant tout ce que nous avons à faire est de nous brancher sur le processus fils,
+      de mettre <span class="symbol">PauseMode</span> à <code class="literal">0</code> et d'attendre
+      que l'appel à la fonction <code class="function">sleep()</code> retourne !
+      </p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s05.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="tools.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="emacs.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">5.5. Make </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 5.7. Utiliser Emacs comme environnement de développement</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

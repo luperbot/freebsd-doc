@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>23.9. Vinum für das Root-Dateisystem benutzen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="vinum-vinum.html" title="Kapitel 23. Der Vinum Volume Manager" /><link rel="prev" href="vinum-config.html" title="23.8. Vinum konfigurieren" /><link rel="next" href="virtualization.html" title="Kapitel 24. Virtualisierung" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">23.9. Vinum für das Root-Dateisystem benutzen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-config.html">Zurück</a> </td><th width="60%" align="center">Kapitel 23. Der Vinum Volume Manager</th><td width="20%" align="right"> <a accesskey="n" href="virtualization.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-root"></a>23.9. Vinum für das Root-Dateisystem benutzen</h2></div></div></div><p>Auf einem System, das mit Hilfe von Vinum
+      vollgespiegelte Dateisysteme hat, ist es wünschenswert, auch
+      das Root-Dateisystem zu spiegeln.  Solch eine Konfiguration ist
+      allerdings weniger trivial als das Spiegeln eines
+      gewöhnlichen Dateisystems, weil:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Das Root-Dateisystem in einer sehr frühen Phase
+	  des Bootvorgangs verfügbar sein muss, und damit auch
+	  die Vinum-Infrastruktur.</p></li><li class="listitem"><p>Das Volume, welches das Root-Dateisystem enthält,
+	  auch den Bootstrap und den Kernel enthält, die
+	  wiederum nur mit den systemeigenen Tools (zum Beispiel
+	  dem BIOS bei handelsüblichen PCs) gelesen werden
+	  können und meist nicht dazu gebracht werden können,
+	  Vinum zu verstehen.</p></li></ul></div><p>Im folgenden Abschnitt wird der Begriff
+      <span class="quote">&#8222;<span class="quote">Root-Volume</span>&#8220;</span> benutzt, um das Vinum-Volume zu
+      beschreiben, welches das Root-Dateisystem enthält.  Es ist
+      eine gute Idee, für dieses Volume den Namen
+      <code class="literal">"root"</code> zu benutzen, aber es ist in keiner
+      Weise technisch nötig (Das folgende Beispiel geht allerdings
+      davon aus, dass dies der Fall ist.).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84380496"></a>23.9.1. Vinum für das Root-Dateisystem rechtzeitig
+	starten</h3></div></div></div><p>Damit dies gelingt, müssen Sie folgende Aufgaben
+	erledigen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Vinum muss zum Zeitpunkt des Bootvorganges im
+	     Kernel zur Verfügung stehen.  Deswegen ist die
+	     Methode zum Start von Vinum, die in
+	     <a class="xref" href="vinum-config.html#vinum-rc-startup" title="23.8.1.1. Automatische Inbetriebnahme">Abschnitt 23.8.1.1, &#8222;Automatische Inbetriebnahme&#8220;</a> beschrieben wird,
+	     für diese Aufgabe nicht geeignet.  Also muss
+	     auch der <code class="literal">start_vinum</code>-Parameter
+	     eigentlich <span class="emphasis"><em>nicht</em></span> gesetzt werden,
+	     wenn man das folgende Setup einrichtet.  Die erste
+	     Möglichkeit wäre es, Vinum statisch in den
+	     Kernel zu kompilieren, so dass es ständig
+	     verfügbar ist, was aber in der Regel nicht
+	     erwünscht ist.  Ebenso gibt es die Möglichkeit
+	     <code class="filename">/boot/loader</code>
+	     (<a class="xref" href="boot-blocks.html#boot-loader" title="13.3.3. Phase drei, /boot/loader">Abschnitt 13.3.3, &#8222;Phase drei, <code class="filename">/boot/loader</code>&#8220;</a>) das Vinum-Kernelmodul
+	     früh genug laden zu lassen (und zwar noch bevor
+	     der Kernel gestartet wird).  Dies kann bewerkstelligt
+	     werden, indem die Zeile</p><pre class="programlisting">geom_vinum_load="YES"</pre><p>in die Datei <code class="filename">/boot/loader.conf</code>
+	    eingetragen wird.</p></li><li class="listitem"><p>Für <span class="emphasis"><em>Gvinum</em></span> ist das oben
+	    beschriebene Prozedere alles, was Sie tun müssen,
+	    da der gesamte Startvorgang automatisch erledigt wird,
+	    sobald das Kernelmodul geladen wurde.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84407760"></a>23.9.2. Ein Vinum-basiertes Root-Volume dem Bootstrap
+	verfügbar machen</h3></div></div></div><p>Da der aktuelle FreeBSD-Bootstrap nur 7,5 KB Code
+	enthält und schon ohne Vinum die Aufgabe hat,
+	bestimmte Dateien (wie <code class="filename">/boot/loader</code>)
+	von einem UFS-Dateisystem zu lesen, ist es schier
+	unmöglich, ihm auch noch die Interna von Vinum
+	beizubringen, damit er die Vinum-Konfigurationsdaten
+	auslesen und die Elemente eines Boot-Volumes selbst
+	herausfinden könnte.  Daher sind ein paar Tricks
+	nötig, um dem Bootstrap-Code die Illusion
+	einer Standard-<code class="literal">"a"</code>-Partition mit
+	einem Root-Dateisystem vorzugaukeln.</p><p>Damit dies überhaupt möglich wird,
+	müssen die folgenden Bedingungen für das
+	Root-Dateisystem erfüllt sein:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Das Root-Volume darf weder gestriped noch
+	    RAID-5 sein.</p></li><li class="listitem"><p>Das Root-Volume darf nicht mehr als eine konkatenierte
+	    Subdisk pro Plexus enthalten.</p></li></ul></div><p>Beachten Sie, dass es möglich und
+	wünschenswert ist, mehrere Plexus zu haben, von denen
+	jeder eine Kopie des Root-Dateisystems enthält.  Der
+	Bootstrap-Prozess wird hingegen nur einen dieser Plexus
+	benutzen, um den Bootstrap und alle Dateien zu finden, bis der
+	Kernel letztendlich das Root-Dateisystem selbst laden wird.
+	Jede einzelne Subdisk innerhalb dieser Plexus wird dann ihre
+	eigene Illusion der Partition <code class="literal">"a"</code> brauchen,
+	damit das entsprechende Gerät bootbar wird.  Es ist nicht
+	unbedingt notwendig, dass sich jede dieser gefälschten
+	<code class="literal">"a"</code>-Partitionen auf seinem Gerät an
+	einem Ort befindet, der um den selben Wert verschoben ist wie
+	auf den anderen Geräten, die Plexus des Root-Dateisystems
+	enthalten.  Um Unklarheiten zu verhindern, ist es jedoch eine
+	gute Idee, die Vinum-Volumes so zu erstellen, dass die
+	gespiegelten Geräte symmetrisch sind.</p><p>Damit diese <code class="literal">"a"</code>-Partitionen eingerichtet
+	werden können, muss für alle Geräte, die Teil des
+	Root-Dateisystems sind, folgendes getan werden:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Der Ort (Verschiebung vom Beginn des Gerätes) und
+	    die Größe der Subdisk, die Teil des Root-Volumes
+	    ist, muss untersucht werden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gvinum l -rv root</code></strong></pre><p>Beachten Sie, dass Vinum-Verschiebungen und
+	    -Größen in Bytes gemessen werden.  Sie müssen
+	    deshalb durch 512 geteilt werden, um die Blockanzahl zu
+	    erhalten, wie sie das <code class="command">bsdlabel</code>-Kommando
+	    verwendet.</p></li><li class="step"><p>Führen Sie den Befehl</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -e devname</code></strong></pre><p>für jedes Gerät, dass am Root-Volume beteiligt
+	    ist, aus.  <em class="replaceable"><code>devname</code></em> muss entweder
+	    der Name der Platte (wie <code class="filename">da0</code>), im
+	    Falle einer Platte ohne Slice-Tabelle oder der Name des
+	    Slices (wie <code class="filename">ad0s1</code>) sein.</p><p>Wenn es schon eine <code class="literal">"a"</code>-Partition auf
+	    dem Gerät (in der Regel wahrscheinlich ein
+	    Prä-Vinum-Root-Dateisystem) gibt, sollte diese
+	    umbenannt werden, damit sie weiterhin verfügbar bleibt
+	    (nur für den Fall).  Sie wird aber nicht länger
+	    benutzt, um das System zu starten.  Beachten Sie aber, dass
+	    aktive Partitionen (wie ein gemountetes Root-Dateisystem)
+	    nicht umbenannt werden können, sodass Sie entweder von
+	    einem <span class="quote">&#8222;<span class="quote">Fixit</span>&#8220;</span>-Medium booten müssen, oder
+	    aber mittels eines zweistufigen Prozesses (sofern Sie in einer
+	    gespiegelten Umgebung arbeiten) zuerst die Platte
+	    ändern, von der gerade nicht gebootet wurde.</p><p>Nun muss die Verschiebung der Vinum-Partition (sofern
+	    vorhanden) auf diesem Gerät mit der Veschiebung der
+	    entsprechenden Root-Volume-Subdisk addiert werden. Das
+	    Resultat wird der <code class="literal">"offset"</code>-Wert für
+	    die neue <code class="literal">"a"</code>-Partition. Der
+	    <code class="literal">"size"</code>-Wert für diese Partition
+	    kann entsprechend der Berechnung ermittelt werden.
+	    <code class="literal">"fstype"</code> sollte <code class="literal">4.2BSD</code>
+	    sein.  Die <code class="literal">"fsize"</code>-,
+	    <code class="literal">"bsize"</code>-, und
+	    <code class="literal">"cpg"</code>- Werte sollten entsprechend dem
+	    eigentlichen Dateisystem gewählt werden, obwohl sie in
+	    diesem Kontext ziemlich unwichtig sind.</p><p>Auf diese Art und Weise wird eine neue Partition
+	    <code class="literal">"a"</code> etabliert, die die Vinum-Partition
+	    auf diesem Gerät überschneidet.  Beachte Sie, dass
+	    das <code class="command">bsdlabel</code>-Kommando diese
+	    Überschneidung nur erlaubt, wenn die Partition richtig
+	    mit dem <code class="literal">"vinum"</code>-fstype markiert ist.</p></li><li class="step"><p>Das ist alles.  Auf jedem Gerät befindet sich nun
+	    eine gefälschte <code class="literal">"a"</code>-Partition, die
+	    eine Kopie des Root-Volumes enthält. Es wird dringend
+	    empfohlen, das Resultat dieser Konfiguration zu
+	    überprüfen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -n /dev/devnamea</code></strong></pre></li></ol></div><p>Denken Sie stets daran, dass alle Dateien, die
+	Kontrollinformationen enthalten, nun relativ zum
+	Root-Dateisystem innerhalb des Vinum-Volumes sein müssen.
+	Denn ein neu eingerichtetes Vinum-Root-Dateisystem ist
+	möglicherweise inkompatibel zum gerade aktiven
+	Root-Dateisystem.  Deshalb müssen insbesondere die
+	Dateien <code class="filename">/etc/fstab</code> und
+	<code class="filename">/boot/loader.conf</code> überprüft
+	werden.</p><p>Beim nächsten Systemstart sollte der Bootstrap die
+	adäquaten Kontrollinformationen des neuen
+	Vinum-basierten Root-Dateisystems automatisch herausfinden und
+	entsprechend handeln.  Am Ende des
+	Kernel-Initialisierungsprozesses (nachdem alle Geräte
+	angezeigt wurden) erhalten Sie bei einer erfolgreichen
+	Konfiguration eine Nachricht ähnlich der folgenden:</p><pre class="screen">Mounting root from ufs:/dev/gvinum/root</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84434384"></a>23.9.3. Beispiel eines Vinum-basierten Root-Setups</h3></div></div></div><p>Nachdem das Vinum-Root-Volume eingerichtet wurde,
+	könnte die Ausgabe von <code class="command">gvinum l -rv root</code>
+	bespielsweise so aussehen:</p><pre class="screen">
+...
+Subdisk root.p0.s0:
+		Size:        125829120 bytes (120 MB)
+		State: up
+		Plex root.p0 at offset 0 (0  B)
+		Drive disk0 (/dev/da0h) at offset 135680 (132 kB)
+
+Subdisk root.p1.s0:
+		Size:        125829120 bytes (120 MB)
+		State: up
+		Plex root.p1 at offset 0 (0  B)
+		Drive disk1 (/dev/da1h) at offset 135680 (132 kB)
+	</pre><p>Wichtig ist hier insbesondere ist der Wert
+	<code class="literal">135680</code> für die Verschiebung (relativ zur
+	Partition <code class="filename">/dev/da0h</code>).  Das entspricht
+	beim Einsatz von <code class="command">bsdlabel</code> 265
+	512-Byte-Plattenblöcken.  Dieses Root-Volume ist ebenso
+	245760 512-Byte-Blöcke groß.
+	<code class="filename">/dev/da1h</code> enthält die
+	zweite Kopie dieses Root-Volumes und ist symmetrisch aufgebaut.</p><p>Das Bsdlabel für diese Geräte könnte
+	so aussehen:</p><pre class="screen">
+...
+8 partitions:
+#        size   offset    fstype   [fsize bsize bps/cpg]
+  a:   245760      281    4.2BSD     2048 16384     0   # (Cyl.    0*- 15*)
+  c: 71771688        0    unused        0     0         # (Cyl.    0 - 4467*)
+  h: 71771672       16     vinum                        # (Cyl.    0*- 4467*)
+	</pre><p>Wie man leicht feststellen kann, entspricht der Parameter
+	<code class="literal">"size"</code> der gefälschten
+	<code class="literal">"a"</code>-Partition dem ausgewiesenen Wert von
+	oben, während der Parameter
+	<code class="literal">"offset"</code> gleich der Summe der Verschiebung
+	innerhalb der Vinum-Partition <code class="literal">"h"</code> und der
+	Verschiebung innerhalb des Geräts (oder Slice) ist.  Dies
+	ist ein typischer Aufbau, der nötig ist, um die in
+	<a class="xref" href="vinum-root.html#vinum-root-panic" title="23.9.4.3. Nichts bootet, der Bootstrap hängt sich auf">Abschnitt 23.9.4.3, &#8222;Nichts bootet, der Bootstrap hängt sich auf&#8220;</a> beschriebenen Probleme zu
+	vermeiden.  Die gesamte Partition <code class="literal">"a"</code> befindet
+	sich in	<code class="literal">"h"</code>, die alle Vinum-Daten für
+	dieses Gerät enthält.</p><p>Beachten Sie, dass in dem oben beschriebenen Beispiel das
+	gesamte Gerät Vinum gewidmet ist und keine
+	Prä-Vinum-Partition zurückgelassen wurde, da es sich
+	im Beispiel um eine neu eingerichtete Platte handelt, die nur
+	für die Vinum-Konfiguration bestimmt war.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84446672"></a>23.9.4. Fehlerbehebung</h3></div></div></div><p>Der folgende Abschnitt beschreibt einige bekannte
+	Probleme und Fallstricke bei der Vinum-Konfiguration sowie
+	deren Behebung.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84447952"></a>23.9.4.1. Der System-Bootstrap lädt zwar, das System startet
+	  aber nicht.</h4></div></div></div><p>Wenn aus irgendeinem Grund das System nicht mit dem Booten
+	  fortfährt, kann man den Bootstrap während der
+	  10-Sekunden-Warnung durch Drücken der
+	  <span class="keycap"><strong>Leertaste</strong></span> unterbrechen.  Die
+	  <span class="foreignphrase"><em class="foreignphrase">loader</em></span>-Variablen (wie
+	  <code class="literal">vinum.autostart</code>) können mittels des
+	  <code class="command">show</code>-Kommandos untersucht, und mit
+	  <code class="command">set</code> oder <code class="command">unset</code>
+	  geändert werden.</p><p>Wenn das einzige Problem das Fehlen des
+	  Vinum-Kernelmoduls in der Liste der automatisch zu ladenden
+	  Module ist, hilft ein einfaches
+	  <code class="command">load geom_vinum</code>.</p><p>Danach können Sie den Bootvorgang mit
+	  <code class="command">boot -as</code> fortsetzen.  Die Optionen
+	  <code class="option">-as</code> fordern den Kernel auf, nach dem zu
+	  mountenden Root-Dateisystem zu fragen (<code class="option">-a</code>),
+	  und den Bootvorgang im Single-User-Modus
+	  (<code class="option">-s</code>) zu beenden, in dem das
+	  Root-Dateisystem schon schreibgeschützt gemountet ist.
+	  Auf diese Weise wird keine Dateninkonsistenz zwischen den
+	  Plexus riskiert, auch wenn nur ein Plexus eines
+	  Multi-Plexus-Volumes gemountet wurde.</p><p>Beim Prompt, das nach einem Root-Dateisystem fragt,
+	  kann jedes Gerät angegeben werden, dass ein
+	  gültiges Root-Dateisystem hat.  Wenn
+	  <code class="filename">/etc/fstab</code> richtig konfiguriert
+	  wurde, sollte die Vorgabe etwas wie
+	  <code class="literal">ufs:/dev/gvinum/root</code> sein.  Eine typische
+	  Alternative würde etwas wie
+	  <code class="literal">ufs:da0d</code> sein, welches eine
+	  hypothetische Partition sein könnte, die ein
+	  Pre-Vinum-Root-Dateisystem enthält. Vorsicht sollte
+	  walten, wenn eine der <span class="foreignphrase"><em class="foreignphrase">alias</em></span>
+	  <code class="literal">"a"</code>-Partitionen hier eingegeben wird, die
+	  eigentlich Referenzen auf die Subdisks des
+	  Vinum-Root-Dateisystems sind, da so nur ein Stück eines
+	  gespiegelten Root-Gerätes gemountet werden würde.
+	  Wenn das Dateisystem später zum Lesen und Schreiben
+	  gemountet werden soll, ist es nötig, die anderen Plexus
+	  des Vinum-Root-Volumes zu entfernen, weil diese Plexus
+	  andernfalls inkonsistente Daten enthalten würden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84456656"></a>23.9.4.2. Nur der primäre Bootstrap lädt</h4></div></div></div><p>Wenn das Laden von <code class="filename">/boot/loader</code>
+	  fehlschlägt, aber der primäre Bootstrap dennoch
+	  lädt (sichtbar an dem einzelnen Strich in der linken
+	  Spalte des Bildschirms gleich nachdem der Bootprozess
+	  startet), kann man versuchen, den primären Bootstrap
+	  an diesem Punkt durch Benutzen der
+	  <span class="keycap"><strong>Leertaste</strong></span> zu unterbrechen.  Dies wird
+	  den Bootstrap in der zweiten Phase stoppen (siehe dazu auch
+	  <a class="xref" href="boot-blocks.html#boot-boot1" title="13.3.2. Phase Eins, /boot/boot1 und Phase Zwei, /boot/boot2">Abschnitt 13.3.2, &#8222;Phase Eins, <code class="filename">/boot/boot1</code> und Phase Zwei,
+	<code class="filename">/boot/boot2</code>&#8220;</a>).  Hier kann nun der Versuch
+	  unternommen werden, von einer anderen Partition zu booten,
+	  wie beispielsweise dem vorhergehenden Root-Dateisystem,
+	  das von <code class="literal">"a"</code> verschoben wurde.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vinum-root-panic"></a>23.9.4.3. Nichts bootet, der Bootstrap hängt sich auf</h4></div></div></div><p>Diese Situation wird vorkommen, wenn der Bootstrap durch
+	  die Vinum-Installation zerstört worden ist.
+	  Unglücklicherweise lässt Vinum am Anfang seiner
+	  Partition nur 4 KB frei und schreibt dahinter seine
+	  Kopfinformationen.  Allerdings benötigen Stufe-Eins-
+	  und -Zwei-Bootstraps plus dem dazwischen eingebetteten
+	  <span class="foreignphrase"><em class="foreignphrase">bsdlabel</em></span> momentan 8 KB.
+	  Demzufolge wird die Vinum-Installation, wenn die
+	  Vinum-Partition mit der Verschiebung 0 (innerhalb eines
+	  Slice oder einer Platte, die zum Start bestimmt waren)
+	  eingerichtet wurde, den Bootstrap zerstören.</p><p>Analog wird eine anschließende
+	  Reinstallation eines Bootstrap (zum Beispiel durch Booten
+	  eines <span class="quote">&#8222;<span class="quote">Fixit</span>&#8220;</span>-Mediums) mit
+	  <code class="command">bsdlabel -B</code>, wie in
+	  <a class="xref" href="boot-blocks.html#boot-boot1" title="13.3.2. Phase Eins, /boot/boot1 und Phase Zwei, /boot/boot2">Abschnitt 13.3.2, &#8222;Phase Eins, <code class="filename">/boot/boot1</code> und Phase Zwei,
+	<code class="filename">/boot/boot2</code>&#8220;</a> beschrieben, den Vinum-Kopf
+	  zerstören und Vinum wird seine Platte(n) nicht mehr
+	  finden können.  Obwohl keine eigentlichen
+	  Vinum-Konfigurationsdaten oder Daten in den Vinum-Volumes
+	  zerstört werden und es möglich wäre, alle
+	  Daten wiederherzustellen, indem die exakt gleichen
+	  Vinum-Konfigurationsdaten noch einmal eingegeben werden,
+	  bleibt die Situation schwer zu bereinigen, da es nötig
+	  ist, die gesamte Vinum-Partition um mindestens
+	  4 KB nach hinten zu verschieben, damit Bootstrap
+	  und Vinum-Kopf nicht mehr kollidieren.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-config.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="virtualization.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">23.8. Vinum konfigurieren </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Kapitel 24. Virtualisierung</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

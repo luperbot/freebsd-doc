@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>3.6. Modifying Variable Expansion</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="shortcuts.html" title="Chapter 3. Short-cuts and Other Nice Things" /><link rel="prev" href="specialtargets.html" title="3.5. Special Targets" /><link rel="next" href="moreexercises.html" title="3.7. More Exercises" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">3.6. Modifying Variable Expansion</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="specialtargets.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Short-cuts and Other Nice Things</th><td width="20%" align="right"> <a accesskey="n" href="moreexercises.html">Next</a></td></tr></table><hr /></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="modyvarex"></a>3.6. Modifying Variable Expansion</h2></div></div></div><p>Variables need not always be expanded verbatim.
+      <span class="application">PMake</span> defines several modifiers
+      that may be applied to a variable's value before it is expanded.
+      You apply a modifier by placing it after the variable name with
+      a colon between the two, like so:</p><pre class="programlisting">${VARIABLE:modifier}</pre><p>Each modifier is a single character followed by something
+      specific to the modifier itself.  You may apply as many
+      modifiers as you want &#8211; each one is applied to the
+      result of the previous and is separated from the
+      previous by another colon.</p><p>There are seven ways to modify a variable's expansion,
+      most of which come from the C shell variable modification
+      characters:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="literal">Mpattern</code></span></dt><dd><p>This is used to select only those words (a word is a
+	    series of characters that are neither spaces nor tabs)
+	    that match the given pattern.  The pattern is a
+	    wildcard pattern like that used by the shell, where
+	    <code class="literal">*</code> means <code class="literal">0</code> or more
+	    characters of any sort; <code class="literal">?</code> is any
+	    single character; <code class="literal">[abcd]</code> matches any
+	    single character that is either <code class="literal">a</code>,
+	    <code class="literal">b</code>, <code class="literal">c</code> or
+	    <code class="literal">d</code> (there may be any number of
+	    characters between the brackets);
+	    <code class="literal">[0-9]</code> matches any single character
+	    that is between <code class="literal">0</code> and
+	    <code class="literal">9</code> (i.e. any digit.  This form may be
+	    freely mixed with the other bracket form), and
+	    <code class="literal">\</code> is used to escape any of the
+	    characters <code class="literal">*</code>, <code class="literal">?</code>,
+	    <code class="literal">[</code> or <code class="literal">:</code>, leaving
+	    them as regular characters to match themselves in a
+	    word.  For example, the system makefile
+	    <code class="filename">&lt;makedepend.mk&gt;</code> uses
+	    <code class="literal">$(CFLAGS:M-[ID]*)</code> to extract all the
+	    <code class="option">-I</code> and <code class="option">-D</code> flags that
+	    would be passed to the C compiler.  This allows it to
+	    properly locate include files and generate the correct
+	    dependencies.</p></dd><dt><span class="term"><code class="literal">Npattern</code></span></dt><dd><p>This is identical to <code class="literal">:M</code> except
+	    it substitutes  all words that do not match the given
+	    pattern.</p></dd><dt><span class="term"><code class="literal">S/search-string/replacement-string/[g]</code></span></dt><dd><p>Causes the first occurrence of search-string in
+	    the variable to be replaced by replacement-string,
+	    unless the <code class="option">g</code> flag is given at the end,
+	    in which case all occurrences of the string are
+	    replaced.  The substitution is performed on each word in
+	    the variable in turn.  If search-string begins with a
+	    <code class="literal">^</code>, the string must match starting at
+	    the beginning of the word.  If search-string ends with a
+	    <code class="literal">$</code>, the string must match to the end
+	    of the word (these two may be combined to force an exact
+	    match).  If a backslash precedes these two characters,
+	    however, they lose their special meaning.  Variable
+	    expansion also occurs in the normal fashion inside both
+	    the search-string and the replacement-string, except
+	    that a backslash is used to prevent the expansion of a
+	    <code class="literal">$</code>, not another dollar sign, as is
+	    usual.  Note that search-string is just a string, not a
+	    pattern, so none of the usual regularexpression/wildcard
+	    characters have any special meaning save
+	    <code class="literal">^</code> and <code class="literal">$</code>.  In the
+	    replacement string, the <code class="literal">&amp;</code> character
+	    is replaced by the search-string unless it is preceded
+	    by a backslash.  You are allowed to use any character
+	    except colon or exclamation point to separate the two
+	    strings.  This so-called delimiter character may be
+	    placed in either string by preceding it with a
+	    backslash.</p></dd><dt><span class="term"><code class="literal">T</code></span></dt><dd><p>Replaces each word in the variable expansion by
+	    its last component (its <span class="quote">&#8220;<span class="quote">tail</span>&#8221;</span>).
+	    For example, given:</p><pre class="programlisting">OBJS = ../lib/a.o b /usr/lib/libm.a
+TAILS = $(OBJS:T)</pre><p>the variable <code class="varname">TAILS</code> would expand
+	    to <code class="literal">a.o b libm.a.</code></p></dd><dt><span class="term"><code class="literal">H</code></span></dt><dd><p>This is similar to <code class="literal">:T</code>, except
+	    that every word is replaced by everything but the tail
+	    (the <span class="quote">&#8220;<span class="quote">head</span>&#8221;</span>).  Using the same definition of
+	    <code class="varname">OBJS</code>, the string
+	    <code class="literal">$(OBJS:H)</code> would expand to
+	    <code class="literal">../lib /usr/lib.</code>  Note that the final
+	    slash on the heads is removed and anything without
+	    a head is replaced by the empty string.</p></dd><dt><span class="term"><code class="literal">E</code></span></dt><dd><p><code class="literal">:E</code> replaces each word by its
+	    suffix (<span class="quote">&#8220;<span class="quote">extension</span>&#8221;</span>).  So
+	    <code class="literal">$(OBJS:E)</code> would give you
+	    <code class="literal">.o .a.</code></p></dd><dt><span class="term"><code class="literal">R</code></span></dt><dd><p>This replaces each word by everything but the
+	    suffix (the <span class="quote">&#8220;<span class="quote">root</span>&#8221;</span> of the word).
+	    <code class="literal">$(OBJS:R)</code> expands to
+	    <code class="literal">../lib/a b /usr/lib/libm</code>.</p></dd></dl></div><p>In addition, the System V style of substitution is also
+      supported.  This looks like:</p><pre class="programlisting">$(VARIABLE:search-string=replacement)</pre><p>It must be the last modifier in the chain.  The search is
+      anchored at the end of each word, so only suffixes or whole
+      words may be replaced.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="specialtargets.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="shortcuts.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="moreexercises.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">3.5. Special Targets </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 3.7. More Exercises</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

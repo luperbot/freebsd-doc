@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Chapitre 17. Les périphériques PCI</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="devicedrivers.html" title="Partie XI. Pilotes de périphérique" /><link rel="prev" href="ch16s05.html" title="16.5. Pilotes Réseau" /><link rel="next" href="ch17s02.html" title="17.2. Les ressources du bus" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Chapitre 17. Les périphériques PCI</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch16s05.html">Précédent</a> </td><th width="60%" align="center">Partie XI. Pilotes de périphérique</th><td width="20%" align="right"> <a accesskey="n" href="ch17s02.html">Suivant</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pci"></a>Chapitre 17. Les périphériques PCI</h2></div></div></div><div class="toc"><div class="toc-title">Table des matières</div><dl class="toc"><dt><span class="sect1"><a href="pci.html#idp68093264">17.1. Rechercher et rattacher</a></span></dt><dt><span class="sect1"><a href="ch17s02.html">17.2. Les ressources du bus</a></span></dt></dl></div><p>Ce chapître traitera des mécanismes de FreeBSD pour
+    écrire un pilote de périphérique pour un périphérique sur
+    bus PCI.</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp68093264"></a>17.1. Rechercher et rattacher</h2></div></div></div><p>Informations ici sur comment le code du bus PCI fait un cycle
+      sur les périphériques non rattachés et voir si le nouvellement chargé
+      pilote de périphérique chargeable dans le noyau (kld)
+       sera rattaché à l'un d'eux.</p><pre class="programlisting">/*
+ * Simple KLD pour jouer avec les fonctions PCI.
+ *
+ * Murray Stokely
+ */
+
+#define MIN(a,b) (((a) &lt; (b)) ? (a) : (b))
+
+#include &lt;sys/types.h&gt;
+#include &lt;sys/module.h&gt;
+#include &lt;sys/systm.h&gt;  /* uprintf */
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/param.h&gt;  /* defines used in kernel.h */
+#include &lt;sys/kernel.h&gt; /* types used in module initialization */
+#include &lt;sys/conf.h&gt;   /* cdevsw struct */
+#include &lt;sys/uio.h&gt;    /* uio struct */
+#include &lt;sys/malloc.h&gt;
+#include &lt;sys/bus.h&gt;	/* structs, prototypes for pci bus stuff */
+
+#include &lt;pci/pcivar.h&gt; /* For get_pci macros! */
+
+/* Prototypes des fonctions */
+d_open_t      mypci_open;
+d_close_t     mypci_close;
+d_read_t      mypci_read;
+d_write_t     mypci_write;
+
+/* Points d'entrée du pilote de périphérique caractère */
+
+static struct cdevsw mypci_cdevsw = {
+  mypci_open,
+  mypci_close,
+  mypci_read,
+  mypci_write,
+  noioctl,
+  nopoll,
+  nommap,
+  nostrategy,
+  "mypci",
+  36,                   /* reserved for lkms - /usr/src/sys/conf/majors */
+  nodump,
+  nopsize,
+  D_TTY,
+  -1
+};
+
+/* variables */
+static dev_t sdev;
+
+/* Nous sommes plus interresses dans la recherche/attachement
+que dans l'ouverture/fermeture/lecture/ecriture a ce point */
+
+int
+mypci_open(dev_t dev, int oflags, int devtype, struct proc *p)
+{
+  int err = 0;
+
+  uprintf("Peripherique \"monpci\" ouvert avec succes.\n");
+  return(err);
+}
+
+int
+mypci_close(dev_t dev, int fflag, int devtype, struct proc *p)
+{
+  int err=0;
+
+  uprintf("Peripherique \"monpci.\ "ferme\n");
+  return(err);
+}
+
+int
+mypci_read(dev_t dev, struct uio *uio, int ioflag)
+{
+  int err = 0;
+
+  uprintf("lecture dans monpci!\n");
+  return err;
+}
+
+int
+mypci_write(dev_t dev, struct uio *uio, int ioflag)
+{
+  int err = 0;
+
+  uprintf("Ecriture dans monpci!\n");
+  return(err);
+}
+
+/* PCI Support Functions */
+
+/*
+ * Retourne la chaine d'identification si ce peripherique est le notre
+ */
+static int
+mypci_probe(device_t dev)
+{
+  uprintf("MonPCI Probe\n"
+	  "ID Fabricant: 0x%x\n"
+	  "ID Peripherique : 0x%x\n",pci_get_vendor(dev),pci_get_device(dev));
+
+  if (pci_get_vendor(dev) == 0x11c1) {
+    uprintf("Nous avons le WinModem, recherche reussi!\n");
+    return 0;
+  }
+
+  return ENXIO;
+}
+
+/* La fonction Attach n'est appelée que si
+la recherche est reussie*/
+
+static int
+mypci_attach(device_t dev)
+{
+  uprintf("Rattachement de MonPCI pour: ID Peripherique: 0x%x\n",pci_get_vendor(dev));
+  sdev = make_dev(<code class="literal">&amp;</code>mypci_cdevsw,
+		  0,
+		  UID_ROOT,
+		  GID_WHEEL,
+		  0600,
+		  "monpci");
+  uprintf("Peripherique Monpci charge.\n");
+  return ENXIO;
+}
+
+/* Detach le peripherique. */
+
+static int
+mypci_detach(device_t dev)
+{
+  uprintf("Monpci detache!\n");
+  return 0;
+}
+
+/* Appele lors de l'arret du systeme apres sync. */
+
+static int
+mypci_shutdown(device_t dev)
+{
+  uprintf("Monpci arrete!\n");
+  return 0;
+}
+
+/*
+ * routine de suspension du peripherique
+ */
+static int
+mypci_suspend(device_t dev)
+{
+  uprintf("Monpci suspendu!\n");
+  return 0;
+}
+
+/*
+ * routine de reprise du peripherique
+ */
+
+static int
+mypci_resume(device_t dev)
+{
+  uprintf("Monpci resume!\n");
+  return 0;
+}
+
+static device_method_t mypci_methods[] = {
+	/* Interface Peripherique*/
+	DEVMETHOD(device_probe,		mypci_probe),
+	DEVMETHOD(device_attach,	mypci_attach),
+	DEVMETHOD(device_detach,	mypci_detach),
+	DEVMETHOD(device_shutdown,	mypci_shutdown),
+	DEVMETHOD(device_suspend,	mypci_suspend),
+	DEVMETHOD(device_resume,	mypci_resume),
+
+	{ 0, 0 }
+};
+
+static driver_t mypci_driver = {
+	"monpci",
+	mypci_methods,
+	0,
+	/*	sizeof(struct mypci_softc), */
+};
+
+static devclass_t mypci_devclass;
+
+DRIVER_MODULE(mypci, pci, mypci_driver, mypci_devclass, 0, 0);</pre><p>Informations complémentaires
+    </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><a class="link" href="http://www.pcisig.org" target="_top">PCI
+	Special Interest Group</a></li><li class="listitem">PCI System Architecture, Fourth Edition by
+	Tom Shanley, et al.</li></ul></div><p>
+    </p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch16s05.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="devicedrivers.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch17s02.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">16.5. Pilotes Réseau </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 17.2. Les ressources du bus</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

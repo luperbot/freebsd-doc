@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>4.4. 打补丁</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter 手册" /><link rel="up" href="slow.html" title="第 4 章 复杂的 Porting" /><link rel="prev" href="slow-modifying.html" title="4.3. 修改 port" /><link rel="next" href="slow-configure.html" title="4.5. 配置" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4.4. 打补丁</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="slow-modifying.html">上一页</a> </td><th width="60%" align="center">第 4 章 复杂的 Porting</th><td width="20%" align="right"> <a accesskey="n" href="slow-configure.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slow-patch"></a>4.4. 打补丁</h2></div></div></div><p>在您准备制作 port 的过程中， 增加或修改的文件，
+	  都可以通过 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> 来做成补丁。 希望应用到源代码上的每个补丁，
+	  都应保存为单独的文件， 并命名为
+	  <code class="filename">patch-*</code>， 其中
+	  <em class="replaceable"><code>*</code></em> 表示将要修改的文件的完整路径名，
+	  例如 <code class="filename">patch-Imakefile</code> 或
+	  <code class="filename">patch-src-config.h</code>。 这些文件，
+	  都应保存在 <code class="varname">PATCHDIR</code>
+	  (通常是 <code class="filename">files/</code>)， 这里的补丁都会自动应用到源代码上。
+	  所有的补丁必须是相对于
+	  <code class="varname">WRKSRC</code> 的 (一般而言， 您的 port 会将其
+	  tarball 解压缩在那里， 并完成余下的工作)。 为了让修正和升级更容易，
+	  您应避免使用多个 patch 去修改同一个文件 (例如，
+	  <code class="filename">patch-file</code> 以及
+	  <code class="filename">patch-file2</code> 都修改
+	  <code class="filename">WRKSRC/foobar.c</code>) 这种情况。
+	  需要注意的是， 如果修改的文件的路径中包含下划线
+	  (<code class="literal">_</code>) 字符， 则在补丁文件名中应使用两个下划线来代替。
+	  例如， 如果需要修改名为 <code class="filename">src/freeglut_joystick.c</code> 的文件，
+	  补丁文件的名字应为
+	  <code class="filename">patch-src-freeglut__joystick.c</code>。</p><p>只有 <code class="literal">[-+._a-zA-Z0-9]</code> 这些字符，
+	  可以出现在补丁的文件名中， 请务必不要使用除这些字符以外的其它字符。
+	  不要把您的补丁命名成 <code class="filename">patch-aa</code>
+	  或 <code class="filename">patch-ab</code> 等这样的名字，
+	  最好能在补丁名中提到路径和文件名。</p><p>不要把 RCS 字符串放进补丁。 我们把文件放进 ports
+	  树的时候， CVS 会损坏它们， 当我们再 check out 出来的时候，
+	  它们就会和原来的不一样， 从而导致打补丁失败。 RCS 字符串
+	  是由美元符号 (<code class="literal">$</code>) 围绕的，
+	  通常由 <code class="literal">$Id</code> 或
+	  <code class="literal">$RCS</code> 开头。</p><p>使用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> 的递归选项(<code class="option">-r</code>)
+	  很好， 但是请检查一下最后输出的 patch，
+	  确保没有任何的垃圾信息。 特别地， 有 2 种文件不需要 diff，
+	  并且应该删除： 一种是 <code class="filename">Makefile</code>，
+	  当您的port使用了<code class="command">Imake</code>，
+	  或者 GNU <code class="command">configure</code> 等等的话。
+	  如果您不得不编辑<code class="filename">configure.in</code>
+	  以使 <code class="command">autoconf</code> 去生成
+	  <code class="command">configure</code>， 不要使用
+	  <code class="command">configure</code> 来做 diff
+	  (这常常会有好几千行长!)； 请定义
+	  <code class="literal">USE_AUTOTOOLS=autoconf:261</code> 并对应
+	  <code class="filename">configure.in</code> 来制作 diff。</p><p>另外， 您还应尽量减少补丁中非功能性的空格及空白变动。
+	  在开源世界中， 遵循不同的编码规范的项目共享大量代码是很常见的事情。
+	  如果您从某个项目中提取一部分功能用来修正另一个程序中的问题时，
+	  请务必小心： 补丁中很可能到处都是非功能性的变动行。 这不仅会导致 CVS
+	  库的膨胀， 而且也会让导致问题的故障点， 以及您到底修改了什么变得不甚清晰。</p><p>假如需要删除文件， 则应在
+	  <code class="buildtarget">post-extract</code> target，
+	  而不是作为补丁的一部分来完成。</p><p>除此之外， port 的
+	  <code class="filename">Makefile</code> 还可以通过 in-place 模式的
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sed&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sed</span>(1)</span></a> 来直接进行简单的替换操作。 如果补丁需要使用变量值，
+	  这就非常有用了。 例如：</p><pre class="programlisting">post-patch:
+	@${REINPLACE_CMD} -e 's|for Linux|for FreeBSD|g' ${WRKSRC}/README
+	@${REINPLACE_CMD} -e 's|-pthread|${PTHREAD_LIBS}|' ${WRKSRC}/configure</pre><p>往往在移植某些软件的时候会遇到这样一种情况，
+	  特别是这个软件是在 <span class="trademark">Windows</span>® 上开发的时候，
+	  大多数的源代码都需要进行CR/LF的转换。
+	  这很可能会给以后打补丁带来问题， 还可能触发编译警告，
+	  并给脚本的执行带来麻烦 (<code class="command">/bin/sh^M</code> not found)，
+	  等等。 要迅速将所有文件中的 CR/LF 改为只用 LF， 可以在 port 的
+	  <code class="filename">Makefile</code> 中加入
+	  <code class="literal">USE_DOS2UNIX=yes</code>。 除此之外，
+	  还可以指定一个需要执行这种转换操作的文件列表：</p><pre class="programlisting">USE_DOS2UNIX=    util.c util.h</pre><p>如果希望转换一系列目录中的一组文件， 也可以使用
+	  <code class="varname">DOS2UNIX_REGEX</code>。 它的参数是与
+	  <code class="command">find</code> 兼容的正则表达式。
+	  关于这种格式的说明， 请参阅 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=re_format&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">re_format</span>(7)</span></a>。
+	  这个选项对转换所有指定扩展名的文件， 例如只转换源代码文件这样的应用非常有用：</p><pre class="programlisting">USE_DOS2UNIX=    yes
+DOS2UNIX_REGEX=  .*\.(c|cpp|h)</pre><p>如果您希望基于现存的文件创建补丁， 可以把文件复制为带
+	  <code class="filename">.orig</code> 扩展名的名字， 然后修改原文件。
+	  然后使用 <code class="buildtarget">makepatch</code>
+	  目标根据修改在 port 的 <code class="filename">files</code> 目录中生成补丁文件。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="slow-modifying.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="slow.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="slow-configure.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">4.3. 修改 port </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 4.5. 配置</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

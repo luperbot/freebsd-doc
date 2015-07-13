@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>26.9. Installation mehrerer Maschinen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="updating-upgrading.html" title="Kapitel 26. FreeBSD aktualisieren" /><link rel="prev" href="make-delete-old.html" title="26.8. Veraltete Dateien, Verzeichnisse und Bibliotheken löschen" /><link rel="next" href="dtrace.html" title="Kapitel 27. DTrace" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">26.9. Installation mehrerer Maschinen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="make-delete-old.html">Zurück</a> </td><th width="60%" align="center">Kapitel 26. FreeBSD aktualisieren</th><td width="20%" align="right"> <a accesskey="n" href="dtrace.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="small-lan"></a>26.9. Installation mehrerer Maschinen</h2></div><div><span class="authorgroup">Beigetragen von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Mike</span> <span class="surname">Meyer</span></span>. </span></div></div></div><p>Wenn Sie mehrere Maschinen besitzen, die Sie alle auf dem
+      gleichen Stand halten wollen, ist es eine Verschwendung von
+      Ressourcen, die Quellen auf jeder Maschine vorzuhalten und zu
+      übersetzen.  Die Lösung dazu ist, eine Maschine den
+      Großteil der Arbeit durchführen zu lassen und den anderen
+      Maschinen das Ergebnis mit NFS zur Verfügung zu stellen.  Dieser
+      Abschnitt zeigt Ihnen wie das geht.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="small-lan-preliminaries"></a>26.9.1. Voraussetzungen</h3></div></div></div><p>Stellen Sie zuerst eine Liste der Maschinen zusammen, die auf
+        demselben Stand sein sollen.  Wir nennen diese Maschinen die
+	<span class="emphasis"><em>Baugruppe</em></span>.  Jede dieser Maschinen kann mit
+	einem eigenen Kernel laufen, doch sind die Programme des Userlands
+	auf allen Maschinen gleich.  Wählen Sie aus der Baugruppe eine
+	Maschine aus, auf der der Bau durchgeführt wird, den
+	<span class="emphasis"><em>Bau-Master</em></span>.  Dies sollte eine Maschine sein,
+	die über die nötigen Ressourcen für
+	<code class="command">make buildworld</code> und
+	<code class="command">make installworld</code> verfügt.
+	Sie brauchen auch eine
+	<span class="emphasis"><em>Testmaschine</em></span>, auf der Sie die Updates testen,
+	bevor Sie sie in Produktion installieren.  Dies sollte eine
+	Maschine, eventuell der Bau-Master, sein, die über einen
+	längeren Zeitraum nicht zur Verfügung stehen kann.</p><p>Alle Maschinen der Baugruppe müssen
+        <code class="filename">/usr/obj</code> und <code class="filename">/usr/src</code> von
+	derselben Maschine an gleichem Ort einhängen.  Idealerweise
+	befinden sich die beiden Verzeichnisse auf dem Bau-Master auf
+	verschiedenen Festplatten, sie können allerdings auch auf dem
+	Bau-Master über NFS zur Verfügung gestellt werden.  Wenn
+	Sie mehrere Baugruppen haben, sollte sich
+	<code class="filename">/usr/src</code> auf einem Bau-Master befinden und
+	über NFS für den Rest der Maschinen zur Verfügung
+	gestellt werden.</p><p>Stellen Sie sicher, dass
+        <code class="filename">/etc/make.conf</code> und
+        <code class="filename">/etc/src.conf</code> auf allen Maschinen einer
+	Baugruppe mit der Datei des Bau-Masters übereinstimmt.  Der
+	Bau-Master muss jeden Teil des Systems bauen, den irgendeine
+	Maschine der Baugruppe benötigt.  Auf dem Bau-Master
+	müssen in <code class="filename">/etc/make.conf</code> alle zu bauenden
+	Kernel mit der Variablen <code class="varname">KERNCONF</code> bekannt gegeben
+	werden.  Geben Sie dabei den Kernel des Bau-Masters zuerst an.
+	Für jeden zu bauenden Kernel muss auf dem Bau-Master die
+	entsprechende Konfigurationsdatei unter
+	<code class="filename">/usr/src/sys/arch/conf</code>
+	abgelegt werden.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="small-lan-base-system"></a>26.9.2. Installation des Basissystems</h3></div></div></div><p>Nach diesen Vorbereitungen können Sie mit dem Bau
+        beginnen.  Bauen Sie auf dem Bau-Master, wie in <a class="xref" href="makeworld.html#make-buildworld" title="26.7.7.2. Übersetzen des Basissystems">Abschnitt 26.7.7.2, &#8222;Übersetzen des Basissystems&#8220;</a> beschrieben, den Kernel und die Welt,
+	installieren Sie aber nichts.  Wechseln Sie auf die Testmaschine
+	und installieren Sie den gerade gebauten Kernel.  Wenn diese
+	Maschine <code class="filename">/usr/src</code> und
+	<code class="filename">/usr/obj</code> über NFS bekommt, müssen
+	Sie das Netzwerk im Single-User-Modus aktivieren und die beiden
+	Dateisysteme einhängen.  Am einfachsten ist dies, wenn Sie
+	auf der Testmaschine ausgehend vom Mehrbenutzermodus mit
+	<code class="command">shutdown now</code> in den Single-User-Modus wechseln.
+	Sie können dann mit der normalen Prozedur den neuen Kernel
+	und das System installieren und anschließend
+	<code class="command">mergemaster</code> laufen lassen.  Wenn Sie damit
+	fertig sind, können Sie die Maschine wieder in den
+	Mehrbenutzermodus booten.</p><p>Nachdem Sie sichergestellt haben, dass die Testmaschine
+        einwandfrei funktioniert, wiederholen Sie diese Prozedur für
+	jede Maschine in der Baugruppe.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="small-lan-ports"></a>26.9.3. Die Ports-Sammlung</h3></div></div></div><p>Dasselbe Verfahren können Sie auch für die
+        Ports-Sammlung anwenden.  Zuerst müssen alle Maschinen einer
+	Baugruppe <code class="filename">/usr/ports</code> von derselben Maschine
+	über NFS zur Verfügung gestellt bekommen.  Setzen Sie
+	dann ein Verzeichnis für die Quellen auf, das sich alle
+	Maschinen teilen.  Dieses Verzeichnis können Sie in
+	<code class="filename">/etc/make.conf</code> mit der Variablen
+	<code class="varname">DISTDIR</code> angeben.  Das Verzeichnis sollte
+	für den Benutzer beschreibbar sein, auf den der Benutzer
+	<code class="systemitem">root</code> vom NFS Subsystem abgebildet wird.  Jede
+	Maschine sollte noch <code class="varname">WRKDIRPREFIX</code> auf ein
+	lokales Bauverzeichnis setzen.  Wenn Sie vorhaben, Pakete zu bauen
+	und zu verteilen, sollten Sie <code class="varname">PACKAGES</code> auf ein
+	Verzeichnis mit den gleichen Eigenschaften wie
+	<code class="varname">DISTDIR</code> setzen.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="make-delete-old.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="updating-upgrading.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="dtrace.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">26.8. Veraltete Dateien, Verzeichnisse und Bibliotheken
+      löschen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Kapitel 27. DTrace</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

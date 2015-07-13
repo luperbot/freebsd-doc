@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>21.7. Отслеживание исходных текстов для нескольких машин</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="updating-upgrading.html" title="Глава 21. Обновление системы и смена версии" /><link rel="prev" href="makeworld.html" title="21.6. Пересборка <<world>>" /><link rel="next" href="network-communication.html" title="Часть IV. Сетевые коммуникации" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.7. Отслеживание исходных текстов для нескольких машин</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="makeworld.html">Пред.</a> </td><th width="60%" align="center">Глава 21. Обновление системы и смена версии</th><td width="20%" align="right"> <a accesskey="n" href="network-communication.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="small-lan"></a>21.7. Отслеживание исходных текстов для нескольких машин</h2></div><div><span class="authorgroup">Текст предоставил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Mike</span> <span class="surname">Meyer</span></span>. </span></div></div></div><a id="idp94284368" class="indexterm"></a><p>Если у вас множество машин, для которых вы хотите отслеживать одно
+      и то же дерево исходных текстов, то загрузка кода и перестроение системы
+      полностью выглядит как ненужная трата ресурсов: дискового пространства,
+      пропускной способности сети и процессорного времени.  Так оно и есть, и
+      решением является выделение одной машины, которая выполняет основной
+      объём работы, в то время как остальные используют результаты работы
+      посредством NFS.  В этом разделе описывается именно этот метод.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="small-lan-preliminaries"></a>21.7.1. Подготовка</h3></div></div></div><p>Первым делом определите набор машин, на которых выполняется один
+	и тот же набор бинарных программ, и мы будем называть его
+	<span class="emphasis"><em>набором для построения</em></span>.  Каждая машина может иметь
+	собственное уникальное ядро, но они будут работать с одними и теми же
+	программами пользователя.  Из этого набора выберите машину, которая
+	будет являться <span class="emphasis"><em>машиной для построения</em></span>.  Она станет
+	машиной, на которой будут строиться ядро и всё окружение.  В идеальном
+	случае с достаточно незагруженным CPU для выполнения команд
+	<code class="command">make buildworld</code> и <code class="command">make
+	buildkernel</code>.  Вам также потребуется выбрать машину,
+	которая будет <span class="emphasis"><em>тестовой</em></span> для проверки обновлений
+	программного обеспечения прежде, чем оно будет запущено в промышленную
+	эксплуатацию.  Это <span class="emphasis"><em>должна</em></span> быть машина, которая
+	может быть в нерабочем состоянии достаточно долго.  Это может быть
+	машина для построения, но не обязательно.</p><p>Все машины в этом наборе для построения должны монтировать каталоги
+	<code class="filename">/usr/obj</code> и
+	<code class="filename">/usr/src</code> с одной и той же машины и в одну и ту же
+	точку монтирования.  В идеальном случае они располагаются на разных
+	дисках машины построения, но они могут также монтироваться по NFS на
+	этой машине.  Если у вас имеется несколько наборов для построения, то
+	каталог <code class="filename">/usr/src</code> должен быть на машине построения,
+	а по NFS он должен быть смонтирован на остальных.</p><p>Наконец, удостоверьтесь в том, что файлы
+	<code class="filename">/etc/make.conf</code> и
+	<code class="filename">/etc/src.conf</code> на всех машинах набора для
+	построения соответствуют машине построения.  Это означает, что машина
+	построения должна строить все части основного системного набора,
+	которые будут устанавливаться на каждой машине из набора для
+	построения.  Кроме того, у каждой машины построения должно быть задано
+	имя ядра посредством переменной <code class="varname">KERNCONF</code> в файле
+	<code class="filename">/etc/make.conf</code>, а машина построения должна
+	перечислить их все в переменной <code class="varname">KERNCONF</code>, причём
+	первым должно быть имя её собственного ядра.  Машина построения должна
+	хранить конфигурационные файлы ядра каждой машины в каталоге
+	<code class="filename">/usr/src/sys/<em class="replaceable"><code>arch</code></em>/conf</code>,
+	если на ней будут строиться соответствующие ядра..</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94302544"></a>21.7.2. Основные системные компоненты</h3></div></div></div><p>Теперь, когда всё это сделано, вы готовы к построению.  Постройте
+	ядро и всё окружение так, как это описано в <a class="xref" href="makeworld.html#make-buildworld" title="21.6.7.2. Компиляция базовых компонентов системы">Раздел 21.6.7.2, <<Компиляция базовых компонентов системы>></a> на машине построения, но ничего не
+	устанавливайте.  После того, как процесс построения завершится,
+	перейдите к тестовой машине и установите только что построенное ядро.
+	Если эта машина монтирует каталоги <code class="filename">/usr/src</code> и
+	<code class="filename">/usr/obj</code> посредством NFS, то при перезагрузке в
+	однопользовательский режим вам потребуется задействовать сеть и
+	смонтировать их.  Самым простым способом сделать это является переход
+	во многопользовательский режим и запуск команды <code class="command">shutdown
+	now</code> для перехода в однопользовательский режим.  После этого
+	вы можете установить новое ядро и всё окружение, а затем выполнить
+	команду <code class="command">mergemaster</code> обычным образом.  После
+	выполнения этих действий перезагрузитесь для возвращения к обычному
+	режиму работы во многопользовательском режиме с этой машиной.</p><p>После того, как вы убедитесь в нормальной работе всего на тестовой
+	машине, проведите ту же самую процедуру для установки нового
+	программного обеспечения на каждой из оставшихся машин из набора для
+	построения.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp94306128"></a>21.7.3. Порты</h3></div></div></div><p>Те же самые идеи могут использоваться и для дерева портов.  Первым
+	критическим шагом является монтирование <code class="filename">/usr/ports</code>
+	с одной и той же машины на всех компьютерах в наборе для построения.
+	Затем вы можете корректно настроить <code class="filename">/etc/make.conf</code>
+	для использования общего каталога с дистрибутивными файлами.  Вы должны
+	задать переменную <code class="varname">DISTDIR</code> так, чтобы она указывала
+	на общедоступный каталог, доступный тому пользователю, который
+	отображается в пользователя <code class="systemitem">root</code> для ваших точек
+	монтирования NFS.  Каждая машина
+	должна задавать <code class="varname">WRKDIRPREFIX</code> так, чтобы она
+	указывала на локальный каталог построения.  Наконец, если вы
+	собираетесь строить и распространять пакеты, то должны задать
+	переменную <code class="varname">PACKAGES</code> так, чтобы она указывала на
+	каталог, соответствующий <code class="varname">DISTDIR</code>.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="makeworld.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="updating-upgrading.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="network-communication.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">21.6. Пересборка <span class="quote"><<<span class="quote">world</span>>></span> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Часть IV. Сетевые коммуникации</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

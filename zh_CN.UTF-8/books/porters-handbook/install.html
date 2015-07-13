@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>5.14. 安装文件</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter 手册" /><link rel="up" href="makefile.html" title="第 5 章 配置 Makefile" /><link rel="prev" href="conflicts.html" title="5.13. 处理冲突" /><link rel="next" href="special.html" title="第 6 章 特殊情况" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5.14. 安装文件</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="conflicts.html">上一页</a> </td><th width="60%" align="center">第 5 章 配置 Makefile</th><td width="20%" align="right"> <a accesskey="n" href="special.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="install"></a>5.14. 安装文件</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-macros"></a>5.14.1. INSTALL_* 宏</h3></div></div></div><p>一定要使用由 <code class="filename">bsd.port.mk</code>
+	  提供的宏， 以确保在您自己的
+	  <code class="buildtarget">*-install</code> target 中能够以正确的属主和权限模式安装文件。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="varname">INSTALL_PROGRAM</code> 是安装可执行二进制文件的命令。</p></li><li class="listitem"><p><code class="varname">INSTALL_SCRIPT</code> 是安装可执行脚本文件的命令。</p></li><li class="listitem"><p><code class="varname">INSTALL_LIB</code> 是安装动态连接库的命令。</p></li><li class="listitem"><p><code class="varname">INSTALL_KLD</code> 是用于安装可加载式内核模块的命令。
+	      在某些平台上， 当对内核模块进行 strip 之后会导致一些问题，
+	      因此您应使用这个宏而不是 <code class="varname">INSTALL_PROGRAM</code> 来安装内核模块。</p></li><li class="listitem"><p><code class="varname">INSTALL_DATA</code> 是安装可共享数据的命令。</p></li><li class="listitem"><p><code class="varname">INSTALL_MAN</code> 是安装联机手册和其他文档的命令
+	      (注意它并不会执行压缩操作)。</p></li></ul></div><p>这些宏展开后基本上都是包含适当参数的 <code class="command">install</code> 命令。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-strip"></a>5.14.2. 对可执行文件和动态连接库做脱模 (strip) 操作</h3></div></div></div><p>除非不得不进行， 否则不要手工对可执行文件作脱模操作。
+	  所有文件在安装时都应脱模， 但 <code class="varname">INSTALL_PROGRAM</code>
+	  宏会在安装的同时对其进行脱模 (参见下一节的内容)。
+	  <code class="varname">INSTALL_LIB</code> 宏</p><p>如果您需要对某一文件进行脱模， 但不希望使用
+	  <code class="varname">INSTALL_PROGRAM</code> 及 <code class="varname">INSTALL_LIB</code> 宏，
+	  则应使用 <code class="varname">${STRIP_CMD}</code> 来处理程序。
+	  一般而言这应该在
+	  <code class="buildtarget">post-install</code> target 中进行。 例如：</p><pre class="programlisting">post-install:
+	${STRIP_CMD} ${PREFIX}/bin/xdl</pre><p>可以使用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=file&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">file</span>(1)</span></a> 命令来检查所安装的可执行文件是否进行过脱模。
+	  如果它没有给出 <code class="literal">not stripped</code> 的提示，
+	  则表示已经做过脱模了。 另外，
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=strip&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">strip</span>(1)</span></a> 不会对已经脱模过的文件重新脱模， 它会直接退出的。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-copytree"></a>5.14.3. 安装一个目录下的全部文件</h3></div></div></div><p>有时， 会有需要安装大量的文件， 并保持其层次结构， 例如，
+	  将整个目录结构从 <code class="varname">WRKSRC</code> 复制到 <code class="varname">PREFIX</code> 的目标目录。</p><p>针对这种情况， 系统提供了两个宏。 使用这些宏，
+	  而不是直接使用 <code class="command">cp</code> 的优势是它们能够确保目标文件的属主和权限正确。 第一个宏，
+	  <code class="varname">COPYTREE_BIN</code> 将所有安装的文件视为可执行文件， 因而适合安装文件到
+	  <code class="filename">PREFIX/bin</code>。
+	  第二个宏， <code class="varname">COPYTREE_SHARE</code>， 则不会设置可执行权限，
+	  因此适合于将文件安装到 <code class="filename">PREFIX/share</code>
+	  下。</p><pre class="programlisting">post-install:
+	${MKDIR} ${EXAMPLESDIR}
+	(cd ${WRKSRC}/examples/ &amp;&amp; ${COPYTREE_SHARE} \* ${EXAMPLESDIR})</pre><p>这个例子将原作者提供的整个
+	  <code class="filename">examples</code> 目录复制到您 port 指定的安装示范文件的位置。</p><pre class="programlisting">post-install:
+	${MKDIR} ${DATADIR}/summer
+	(cd ${WRKSRC}/temperatures/ &amp;&amp; ${COPYTREE_SHARE} "June July August" ${DATADIR}/summer/)</pre><p>这个例子将把夏季的三个月的数据， 复制到
+	  <code class="filename">DATADIR</code> 中的
+	  <code class="filename">summer</code> 子目录。</p><p>经由设置 <code class="varname">COPYTREE_*</code> 宏的第三个参数，
+	  您还可以为 <code class="command">find</code> 指定额外的参数。
+	  例如， 如果希望安装除了 Makefile 之外的其他所有文件，
+	  可以使用下述命令。</p><pre class="programlisting">post-install:
+	${MKDIR} ${EXAMPLESDIR}
+	(cd ${WRKSRC}/examples/ &amp;&amp; \
+		${COPYTREE_SHARE} \* ${EXAMPLESDIR} "! -name Makefile")</pre><p>需要注意的是， 这些宏并不能自动将所安装的文件加到
+	  <code class="filename">pkg-plist</code> 中， 您还是需要自行列出它们。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-documentation"></a>5.14.4. 安装附加的文档</h3></div></div></div><p>如果您的软件包含了标准的联机手册和 info 手册以外的文档，
+	  而且您认为它们对用户会有用， 请把这些文档安装到
+	  <code class="filename">PREFIX/share/doc</code> 下。
+	  和前面类似， 这也可以在
+	  <code class="buildtarget">post-install</code> target 中完成。</p><p>为您的 port 建立一个新的目录。
+	  这个目录的名字应该反映它是属于哪个 port 的。 通常建议使用
+	  <code class="varname">PORTNAME</code>。 不过， 如果您认为不同版本的 port
+	  可能会同时安装， 也可以用完整的
+	  <code class="varname">PKGNAME</code>。</p><p>另外， 应该让是否安装取决于变量
+	  <code class="varname">NOPORTDOCS</code> 的设置， 这样用户就能够在
+	  <code class="filename">/etc/make.conf</code> 中禁止安装它。 例如：</p><pre class="programlisting">post-install:
+.if !defined(NOPORTDOCS)
+	${MKDIR} ${DOCSDIR}
+	${INSTALL_MAN} ${WRKSRC}/docs/xvdocs.ps ${DOCSDIR}
+.endif</pre><p>这里是一些便于使用的变量， 以及它们在
+	  <code class="filename">Makefile</code> 中默认的展开方式：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="varname">DATADIR</code> 会展开成
+	      <code class="filename">PREFIX/share/PORTNAME</code>。</p></li><li class="listitem"><p><code class="varname">DATADIR_REL</code> 会展开成
+	      <code class="filename">share/PORTNAME</code>。</p></li><li class="listitem"><p><code class="varname">DOCSDIR</code> 会展开成
+	      <code class="filename">PREFIX/share/doc/PORTNAME</code>。</p></li><li class="listitem"><p><code class="varname">DOCSDIR_REL</code> 会展开成
+	      <code class="filename">share/doc/PORTNAME</code>。</p></li><li class="listitem"><p><code class="varname">EXAMPLESDIR</code> 会展开成
+	      <code class="filename">PREFIX/share/examples/PORTNAME</code>。</p></li><li class="listitem"><p><code class="varname">EXAMPLESDIR_REL</code> 会展开成
+	      <code class="filename">share/examples/PORTNAME</code>。</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="varname">NOPORTDOCS</code> 只控制将要安装到 <code class="varname">DOCSDIR</code>
+	    的那些文档， 而不应影响标准的联机手册以及 info 手册的安装。 安装到
+	    <code class="varname">DATADIR</code> 和 <code class="varname">EXAMPLESDIR</code>
+	    的文件则相应地受 <code class="varname">NOPORTDATA</code> 和
+	    <code class="varname">NOPORTEXAMPLES</code> 控制。</p></div><p>这些变量也会被导出到 <code class="varname">PLIST_SUB</code> 中。
+	  只要可能， 它们的值就将在那里以相对于
+	  <code class="filename">PREFIX</code> 的路径形式出现。
+	  也就是说， <code class="filename">share/doc/PORTNAME</code>
+	  在装箱单中默认情况下会替换掉 <code class="literal">%%DOCSDIR%%</code>， 等等。
+	  (更多的 <code class="filename">pkg-plist</code> 代换可以在
+	  <a class="link" href="plist.html#plist-sub" title="7.1. 根据 make 变量对 pkg-plist 进行修改">这里</a> 找到。)</p><p>所有非无条件安装的文档文件和目录，
+	  都应在 <code class="filename">pkg-plist</code> 出现， 并且使用
+	  <code class="literal">%%PORTDOCS%%</code> 前缀， 例如：</p><pre class="programlisting">%%PORTDOCS%%%%DOCSDIR%%/AUTHORS
+%%PORTDOCS%%%%DOCSDIR%%/CONTACT
+%%PORTDOCS%%@dirrm %%DOCSDIR%%</pre><p>如果不希望在 <code class="filename">pkg-plist</code> 中逐个列举文档文件， port
+	  也可以将 <code class="varname">PORTDOCS</code> 设置为一组文件及其 shell glob
+	  模式， 通过这种方式来加入到最终的装箱单中。
+	  这些名字应是相对于 <code class="varname">DOCSDIR</code> 的。
+	  因此， 使用了 <code class="varname">PORTDOCS</code>，
+	  并将文档安装到非标准位置的 port， 应相应地设置
+	  <code class="varname">DOCSDIR</code>。
+	  如果有在 <code class="varname">PORTDOCS</code> 中列出目录，
+	  或者这一变量中的 glob 模式匹配到了目录， 则整个子树中的文件和目录，
+	  都将被注册到最终的装箱单中。 如果定义了 <code class="varname">NOPORTDOCS</code>， 则
+	  <code class="varname">PORTDOCS</code> 中定义的文件和目录将不被安装或加入装箱单。
+	  是否安装文档到前面所说的 <code class="varname">PORTDOCS</code> 仍取决于 port 本身。
+	  下面是一个典型的使用 <code class="varname">PORTDOCS</code> 的例子：</p><pre class="programlisting">PORTDOCS=       README.* ChangeLog docs/*</pre><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">与 <code class="varname">PORTDOCS</code> 类似，
+	  对应于 <code class="varname">DATADIR</code> 和
+	  <code class="varname">EXAMPLESDIR</code> 的变量分别是 <code class="varname">PORTDATA</code>
+	  和 <code class="varname">PORTEXAMPLES</code>。</p><p xmlns="http://www.w3.org/1999/xhtml">您也可以使用 <code class="filename">pkg-message</code> 这个文件，
+	    来在安装时显示一些信息。 参见 <a class="link" href="pkg-files.html#porting-message" title="8.1. pkg-message (安装预编译包时显示的消息文件)">关于使用
+	    <code class="filename">pkg-message</code> 的这一节</a> 以了解进一步的详情。
+	    需要说明的是， 并不需要把 <code class="filename">pkg-message</code> 加到
+	    <code class="filename">pkg-plist</code> 中。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="install-subdirs"></a>5.14.5. 子目录</h3></div></div></div><p>尽可能让 port 将它创建的文件， 放置到
+	  <code class="varname">PREFIX</code> 中正确的位置。 一些 port
+	  会把各式各样的东西混在一起， 并放到一个同名的目录中， 这是不对的。
+	  另外， 许多 port 会把除了可执行文件、 头文件和联机手册之外的所有文件，
+	  全都一股脑地放到 <code class="filename">lib</code> 中， 这在和 BSD
+	  配合使用时会有问题。 多数文件，
+	  应被放到下列位置之一： <code class="filename">etc</code>
+	  (安装/配置文件)、 <code class="filename">libexec</code>
+	  (由系统内部调用的可执行文件)、 <code class="filename">sbin</code>
+	  (为超级用户/管理员提供的可执行文件)、 <code class="filename">info</code>
+	  (用于 info 浏览器的文档) 或  <code class="filename">share</code>
+	  (平台无关的其它文件)。 请参见 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hier&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">hier</span>(7)</span></a> 以了解进一步的详情； 针对
+	  <code class="filename">/usr</code> 的那些规则， 同样也适用于
+	  <code class="filename">/usr/local</code>。 例外情况是那些需要和 USENET
+	  <span class="quote">“<span class="quote">news</span>”</span> 打交道的 port， 它们可以选择采用
+	  <code class="filename">PREFIX/news</code>
+	  作为文件的目的地。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="conflicts.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="makefile.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="special.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">5.13. 处理冲突 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 第 6 章 特殊情况</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

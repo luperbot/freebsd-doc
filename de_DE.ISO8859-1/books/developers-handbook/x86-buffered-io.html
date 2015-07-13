@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.8. Gepufferte Eingabe und Ausgabe</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="x86.html" title="Kapitel 11. x86-Assembler-Programmierung" /><link rel="prev" href="x86-unix-filters.html" title="11.7. UNIX®-Filter schreiben" /><link rel="next" href="x86-command-line.html" title="11.9. Kommandozeilenparameter" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.8. Gepufferte Eingabe und Ausgabe</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="x86-unix-filters.html">Zurück</a> </td><th width="60%" align="center">Kapitel 11. x86-Assembler-Programmierung</th><td width="20%" align="right"> <a accesskey="n" href="x86-command-line.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="x86-buffered-io"></a>11.8. Gepufferte Eingabe und Ausgabe</h2></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Hagen</span> <span class="surname">Kühl</span></span>. </span></div></div></div><p>Wir können die Effizienz unseres Codes erhöhen,
+      indem wir die Ein- und Ausgabe puffern. Wir erzeugen einen
+      Eingabepuffer und lesen dann eine Folge von Bytes auf einmal.
+      Danach holen wir sie Byte für Byte aus dem Puffer.</p><p>Wir erzeugen ebenfalls einen Ausgabepuffer. Darin speichern
+      wir unsere Ausgabe bis er voll ist. Dann bitten wir den Kernel
+      den Inhalt des Puffers nach <code class="filename">stdout</code> zu
+      schreiben.</p><p>Diese Programm endet, wenn es keine weitere Eingaben gibt.
+      Aber wir müssen den Kernel immernoch bitten den Inhalt des
+      Ausgabepuffers ein letztes Mal nach <code class="filename">stdout</code>
+      zu schreiben, denn sonst würde ein Teil der Ausgabe zwar im
+      Ausgabepuffer landen, aber niemals ausgegeben werden. Bitte
+      vergessen Sie das nicht, sonst fragen Sie sich später warum
+      ein Teil Ihrer Ausgabe verschwunden ist.</p><pre class="programlisting">%include	'system.inc'
+
+%define	BUFSIZE	2048
+
+section	.data
+hex	db	'0123456789ABCDEF'
+
+section .bss
+ibuffer	resb	BUFSIZE
+obuffer	resb	BUFSIZE
+
+section	.text
+global	_start
+_start:
+	sub	eax, eax
+	sub	ebx, ebx
+	sub	ecx, ecx
+	mov	edi, obuffer
+
+.loop:
+	; read a byte from stdin
+	call	getchar
+
+	; convert it to hex
+	mov	dl, al
+	shr	al, 4
+	mov	al, [hex+eax]
+	call	putchar
+
+	mov	al, dl
+	and	al, 0Fh
+	mov	al, [hex+eax]
+	call	putchar
+
+	mov	al, ' '
+	cmp	dl, 0Ah
+	jne	.put
+	mov	al, dl
+
+.put:
+	call	putchar
+	jmp	short .loop
+
+align 4
+getchar:
+	or	ebx, ebx
+	jne	.fetch
+
+	call	read
+
+.fetch:
+	lodsb
+	dec	ebx
+	ret
+
+read:
+	push	dword BUFSIZE
+	mov	esi, ibuffer
+	push	esi
+	push	dword stdin
+	sys.read
+	add	esp, byte 12
+	mov	ebx, eax
+	or	eax, eax
+	je	.done
+	sub	eax, eax
+	ret
+
+align 4
+.done:
+	call	write		; flush output buffer
+	push	dword 0
+	sys.exit
+
+align 4
+putchar:
+	stosb
+	inc	ecx
+	cmp	ecx, BUFSIZE
+	je	write
+	ret
+
+align 4
+write:
+	sub	edi, ecx	; start of buffer
+	push	ecx
+	push	edi
+	push	dword stdout
+	sys.write
+	add	esp, byte 12
+	sub	eax, eax
+	sub	ecx, ecx	; buffer is empty now
+	ret</pre><p>Als dritten Abschnitt im Quelltext haben wir
+      <code class="varname">.bss</code>. Dieser Abschnitt wird nicht in unsere
+      ausführbare Datei eingebunden und kann daher nicht
+      initialisiert werden. Wir verwenden <code class="function">resb</code> anstelle von <code class="function">db</code>. Dieses reserviert einfach die
+      angeforderte Menge an uninitialisiertem Speicher zu unserer
+      Verwendung.</p><p>Wir nutzen, die Tatsache, dass das System die Register nicht
+      verändert: Wir benutzen Register, wo wir anderenfalls
+      globale Variablen im Abschnitt <code class="varname">.data</code>
+      verwenden müssten. Das ist auch der Grund, warum die
+      <span class="trademark">UNIX</span>®-Konvention, Parameter auf dem Stack zu übergeben,
+      der von Microsoft, hierfür Register zu verwenden,
+      überlegen ist: Wir können Register für unsere
+      eigenen Zwecke verwenden.</p><p>Wir verwenden <code class="varname">EDI</code> und
+      <code class="varname">ESI</code> als Zeiger auf das
+      nächste zu lesende oder schreibende Byte. Wir verwenden
+      <code class="varname">EBX</code> und <code class="varname">ECX</code>, um die Anzahl der Bytes in den
+      beiden Puffern zu zählen, damit wir wissen, wann wir die
+      Ausgabe an das System übergeben, oder neue Eingabe vom
+      System entgegen nehmen müssen.</p><p>Lassen Sie uns sehen, wie es funktioniert:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>nasm -f elf hex.asm</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ld -s -o hex hex.o</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>./hex</code></strong>
+<strong class="userinput"><code>Hello, World!</code></strong>
+<strong class="userinput"><code>Here I come!</code></strong>
+48 65 6C 6C 6F 2C 20 57 6F 72 6C 64 21 0A
+48 65 72 65 20 49 20 63 6F 6D 65 21 0A
+<strong class="userinput"><code>^D</code></strong> <code class="prompt">%</code></pre><p>Nicht was Sie erwartet haben? Das Programm hat die Ausgabe
+      nicht auf dem Bildschirm ausgegeben bis sie
+      <strong class="userinput"><code>^D</code></strong> gedrückt haben. Das kann man
+      leicht zu beheben indem man drei Zeilen Code einfügt,
+      welche die Ausgabe jedesmal schreiben, wenn wir einen
+      Zeilenumbruch in <code class="constant">0A</code> umgewandelt haben. Ich
+      habe die betreffenden Zeilen mit &gt; markiert (kopieren Sie die
+      &gt; bitte nicht mit in Ihre
+      <code class="filename">hex.asm</code>).</p><pre class="programlisting">%include    'system.inc'
+
+%define	BUFSIZE	2048
+
+section	.data
+hex	db	'0123456789ABCDEF'
+
+section .bss
+ibuffer	resb	BUFSIZE
+obuffer	resb	BUFSIZE
+
+section	.text
+global	_start
+_start:
+	sub	eax, eax
+	sub	ebx, ebx
+	sub	ecx, ecx
+	mov	edi, obuffer
+
+.loop:
+	; read a byte from stdin
+	call	getchar
+
+	; convert it to hex
+	mov	dl, al
+	shr	al, 4
+	mov	al, [hex+eax]
+	call	putchar
+
+	mov	al, dl
+	and	al, 0Fh
+	mov	al, [hex+eax]
+	call	putchar
+
+	mov	al, ' '
+	cmp	dl, 0Ah
+	jne	.put
+	mov	al, dl
+
+.put:
+	call	putchar
+&gt;	cmp	al, 0Ah
+&gt;	jne	.loop
+&gt;	call	write
+	jmp	short .loop
+
+align 4
+getchar:
+	or	ebx, ebx
+	jne	.fetch
+
+	call	read
+
+.fetch:
+	lodsb
+	dec	ebx
+	ret
+
+read:
+	push	dword BUFSIZE
+	mov	esi, ibuffer
+	push	esi
+	push	dword stdin
+	sys.read
+	add	esp, byte 12
+	mov	ebx, eax
+	or	eax, eax
+	je	.done
+	sub	eax, eax
+	ret
+
+align 4
+.done:
+	call	write		; flush output buffer
+	push	dword 0
+	sys.exit
+
+align 4
+putchar:
+	stosb
+	inc	ecx
+	cmp	ecx, BUFSIZE
+	je	write
+	ret
+
+align 4
+write:
+	sub	edi, ecx	; start of buffer
+	push	ecx
+	push	edi
+	push	dword stdout
+	sys.write
+	add	esp, byte 12
+	sub	eax, eax
+	sub	ecx, ecx	; buffer is empty now
+	ret</pre><p>Lassen Sie uns jetzt einen Blick darauf werfen, wie es
+      funktioniert.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>nasm -f elf hex.asm</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ld -s -o hex hex.o</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>./hex</code></strong>
+<strong class="userinput"><code>Hello, World!</code></strong>
+48 65 6C 6C 6F 2C 20 57 6F 72 6C 64 21 0A
+<strong class="userinput"><code>Here I come!</code></strong>
+48 65 72 65 20 49 20 63 6F 6D 65 21 0A
+<strong class="userinput"><code>^D</code></strong> <code class="prompt">%</code></pre><p>Nicht schlecht für eine 644 Byte große
+      Binärdatei, oder?</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Dieser Ansatz für gepufferte Ein- und Ausgabe
+        enthält eine Gefahr, auf die ich im Abschnitt <a class="link" href="x86-one-pointed-mind.html#x86-buffered-dark-side" title="11.12.1.1. Die dunkle Seite des Buffering">Die dunkle Seite des
+        Buffering</a> eingehen werde.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="x86-ungetc"></a>11.8.1. Ein Zeichen ungelesen machen</h3></div></div></div><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Das ist vielleicht ein etwas fortgeschrittenes Thema,
+	  das vor allem für Programmierer interessant ist, die
+	  mit der Theorie von Compilern vertraut sind. Wenn Sie
+	  wollen, können Sie <a class="link" href="x86-command-line.html" title="11.9. Kommandozeilenparameter">zum
+	  nächsten Abschnitt springen</a> und das hier
+	  vielleicht später lesen.</p></div><p>Unser Beispielprogramm benötigt es zwar nicht, aber
+	etwas anspruchsvollere Filter müssen häufig
+	vorausschauen. Mit anderen Worten, sie müssen wissen was
+	das nächste Zeichen ist (oder sogar mehrere Zeichen).
+	Wenn das nächste Zeichen einen bestimmten Wert hat, ist
+	es Teil des aktuellen Tokens, ansonsten nicht.</p><p>Zum Beispiel könnten Sie den Eingabestrom für
+	eine Text-Zeichenfolge parsen (z.B. wenn Sie einen Compiler
+	einer Sprache implementieren): Wenn einem Buchstaben ein
+	anderer Buchstabe oder vielleicht eine Ziffer folgt, ist er
+	ein Teil des Tokens, das Sie verarbeiten. Wenn ihm ein
+	Leerzeichen folgt, oder ein anderer Wert, ist er nicht Teil
+	des aktuellen Tokens.</p><p>Das führt uns zu einem interessanten Problem: Wie
+	kann man ein Zeichen zurück in den Eingabestrom geben,
+	damit es später noch einmal gelesen werden kann?</p><p>Eine mögliche Lösung ist, das Zeichen in einer
+	Variable zu speichern und ein Flag zu setzen. Wir können
+	<code class="function">getchar</code> so anpassen, dass es das Flag
+	überprüft und, wenn es gesetzt ist, das Byte aus der
+	Variable anstatt dem Eingabepuffer liest und das Flag
+	zurück setzt. Aber natürlich macht uns das
+	langsamer.</p><p>Die Sprache C hat eine Funktion
+	<code class="function">ungetc()</code> für genau diesen Zweck.
+	Gibt es einen schnellen Weg, diese in unserem Code zu
+	implementieren? Ich möchte Sie bitten nach oben zu
+	scrollen und sich die Prozedur <code class="function">getchar</code>
+	anzusehen und zu versuchen eine schöne und schnelle
+	Lösung zu finden, bevor Sie den nächsten Absatz
+	lesen. Kommen Sie danach hierher zurück und schauen sich
+	meine Lösung an.</p><p>Der Schlüssel dazu ein Zeichen an den Eingabestrom
+	zurückzugeben, liegt darin, wie wir das Zeichen
+	bekommen:</p><p>Als erstes überprüfen wir, ob der Puffer leer
+	ist, indem wir den Wert von <code class="varname">EBX</code> testen. Wenn er null ist, rufen
+	wir die Prozedur <code class="function">read</code> auf.</p><p>Wenn ein Zeichen bereit ist verwenden wir <code class="function">lodsb</code>, dann verringern wir den Wert
+	von <code class="varname">EBX</code>. Die Anweisung
+	<code class="function">lodsb</code> ist letztendlich
+	identisch mit:</p><pre class="programlisting">	mov	al, [esi]
+	  inc	esi</pre><p>Das Byte, welches wir abgerufen haben, verbleibt im Puffer
+	bis <code class="function">read</code> zum nächsten Mal aufgerufen
+	wird. Wir wissen nicht wann das passiert, aber wir wissen,
+	dass es nicht vor dem nächsten Aufruf von
+	<code class="function">getchar</code> passiert. Daher ist alles was wir
+	tun müssen um das Byte in den Strom "zurückzugeben"
+	ist den Wert von <code class="varname">ESI</code> zu
+	verringern und den von <code class="varname">EBX</code>
+	zu erhöhen:</p><pre class="programlisting">ungetc:
+	  dec	esi
+	  inc	ebx
+	  ret</pre><p>Aber seien Sie vorsichtig! Wir sind auf der sicheren Seite,
+	solange wir immer nur ein Zeichen im Voraus lesen. Wenn wir
+	mehrere kommende Zeichen betrachten und
+	<code class="function">ungetc</code> mehrmals hintereinander aufrufen,
+	wird es meistens funktionieren, aber nicht immer (und es wird
+	ein schwieriger Debug). Warum?</p><p>Solange <code class="function">getchar</code>
+	<code class="function">read</code> nicht aufrufen muss, befinden sich
+	alle im Voraus gelesenen Bytes noch im Puffer und
+	<code class="function">ungetc</code> arbeitet fehlerfrei. Aber sobald
+	<code class="function">getchar</code> <code class="function">read</code> aufruft
+	verändert sich der Inhalt des Puffers.</p><p>Wir können uns immer darauf verlassen, dass
+	<code class="function">ungetc</code> auf dem zuletzt mit
+	<code class="function">getchar</code> gelesenen Zeichen korrekt
+	arbeitet, aber nicht auf irgendetwas, das davor gelesen
+	wurde.</p><p>Wenn Ihr Programm mehr als ein Byte im Voraus lesen soll,
+	haben Sie mindestens zwei Möglichkeiten:</p><p>Die einfachste Lösung ist, Ihr Programm so zu
+	ändern, dass es immer nur ein Byte im Voraus liest, wenn
+	das möglich ist.</p><p>Wenn Sie diese Möglichkeit nicht haben, bestimmen Sie
+	zuerst die maximale Anzahl an Zeichen, die Ihr Programm auf
+	einmal an den Eingabestrom zurückgeben muss. Erhöhen
+	Sie diesen Wert leicht, nur um sicherzugehen, vorzugsweise auf
+	ein Vielfaches von 16&#8212;damit er sich schön
+	ausrichtet. Dann passen Sie den <code class="varname">.bss</code>
+	Abschnitt Ihres Codes an und erzeugen einen kleinen
+	Reserver-Puffer, direkt vor ihrem Eingabepuffer, in etwa
+	so:</p><pre class="programlisting">section	.bss
+	  resb	16	; or whatever the value you came up with
+  ibuffer	resb	BUFSIZE
+  obuffer	resb	BUFSIZE</pre><p>Außerdem müssen Sie <code class="function">ungetc</code>
+	anpassen, sodass es den Wert des Bytes, das zurückgegeben
+	werden soll, in <code class="varname">AL</code>
+	übergibt:</p><pre class="programlisting">ungetc:
+	  dec	esi
+	  inc	ebx
+	  mov	[esi], al
+	  ret</pre><p>Mit dieser Änderung können Sie sicher
+	<code class="function">ungetc</code> bis zu 17 Mal hintereinander
+	gqapaufrufen (der erste Aufruf erfolgt noch im Puffer, die
+	anderen 16 entweder im Puffer oder in der Reserve).</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="x86-unix-filters.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="x86.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="x86-command-line.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">11.7. <span class="trademark">UNIX</span>®-Filter schreiben </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 11.9. Kommandozeilenparameter</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

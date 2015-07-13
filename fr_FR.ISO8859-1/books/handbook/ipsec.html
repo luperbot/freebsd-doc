@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>15.10. IPsec</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="security.html" title="Chapitre 15. Sécurité" /><link rel="prev" href="openssl.html" title="15.9. OpenSSL" /><link rel="next" href="openssh.html" title="15.11. OpenSSH" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.10. IPsec</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="openssl.html">Précédent</a> </td><th width="60%" align="center">Chapitre 15. Sécurité</th><td width="20%" align="right"> <a accesskey="n" href="openssh.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ipsec"></a>15.10. IPsec</h2></div><div><span class="authorgroup">Contribution de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Yoshinobu</span> <span class="surname">Inoue</span></span>. </span></div></div></div><a id="idp78825936" class="indexterm"></a><a id="idp78826448" class="indexterm"></a><div xmlns="" class="note"><h3 class="admontitle">Caractères de terminaison: </h3><p xmlns="http://www.w3.org/1999/xhtml">Dans tous les exemples de cette section, et d'autres
+	sections, vous remarquerez qu'il y aura un &#8220;^D&#8221;
+	à la fin de certains exemples.  Cela signifie qu'il faut
+	maintenir la touche <span class="keycap"><strong>Ctrl</strong></span> enfoncée
+	et appuyer sur la touche <span class="keycap"><strong>D</strong></span>.  Un autre
+	caractère couramment utilisé est &#8220;^C&#8221;,
+	qui signifie de maintenir enfoncé la touche
+	<span class="keycap"><strong>Ctrl</strong></span> et d'appuyer sur
+	<span class="keycap"><strong>C</strong></span>.</p></div><div xmlns="" class="tip"><h3 class="admontitle">Astuce: </h3><p xmlns="http://www.w3.org/1999/xhtml">Pour d'autres documents détaillant
+	l'implémentation d'IPsec, jetez un oeil à
+        <code class="uri"><a class="uri" href="http://www.daemonnews.org/200101/ipsec-howto.html" target="_top">http://www.daemonnews.org/200101/ipsec-howto.html</a></code>
+        et <code class="uri"><a class="uri" href="http://www.freebsddiary.org/ipsec.php" target="_top">http://www.freebsddiary.org/ipsec.php</a></code>.</p></div><p>Le mécanisme IPsec fournit des communications
+      sécurisées sur couche IP ou à travers les
+      <span class="emphasis"><em>sockets</em></span>.  Cette section explique comment
+      l'utiliser.  Pour des détails concernant
+      l'implémentation d'IPsec, reportez-vous au
+      <a class="link" href="../developers-handbook/ipv6.html" target="_top">Manuel du
+      développeur</a>.</p><p>L'implémentation actuelle d'IPsec supporte le mode
+      transport et le mode tunnel.  Cependant, il y a des restrictions
+      au mode tunnel.  <code class="uri"><a class="uri" href="http://www.kame.net/newsletter/" target="_top">http://www.kame.net/newsletter/</a></code> fournit des
+      exemples plus exhaustifs.</p><p>Soyez informé que pour utiliser cette fonctionnalité,
+      vous devez avoir les options suivantes présentes dans
+      votre fichier de configuration du noyau:</p><pre class="programlisting">options          IPSEC              #IP security
+options          IPSEC_ESP          #IP security (crypto; define w/IPSEC)</pre><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78835280"></a>15.10.1. Exemple en mode transport avec IPv4</h3></div></div></div><p>Configurons une association de sécurité
+	pour déployer un canal sécurisé entre la Machine A
+	(<code class="systemitem">10.2.3.4</code>) et la Machine B
+	(<code class="systemitem">10.6.7.8</code>).  Notre exemple est
+	un peu compliqué.  De A vers B, nous n'utilisons que
+	l'ancien AH.  De B vers A, le nouvel AH et le nouvel ESP sont
+	combinés.</p><p>Nous devons maintenant choisir les algorithmes
+	correspondant à
+        &#8220;AH&#8221;/&#8220;nouvel AH&#8221;/&#8220;ESP&#8221;/
+	&#8220;nouvel ESP&#8221;.  Reportez-vous à la page de manuel
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a> pour connaître les noms des algorithmes.
+	Nous utiliserons MD5 pour AH, new-HMAC-SHA1 pour le nouvel AH,
+	et new-DES-expIV avec 8 octets IV pour le nouvel ESP.</p><p>La longueur de la clé dépend de chaque algorithme.
+	Par exemple, elle doit être égale à 16 octets
+	pour MD5, 20 pour new-HMAC-SHA1, et 8 pour new-DES-expIV.
+	Nous choisissons maintenant &#8220;MYSECRETMYSECRET&#8221;,
+        &#8220;KAMEKAMEKAMEKAMEKAME&#8221;, &#8220;PASSWORD&#8221;,
+	respectivement.</p><p>Définissons maintenant le SPI (<span class="emphasis"><em>Security Parameter
+	Index</em></span>) pour chaque protocole.  Remarquez qu'il nous
+	faut 3 SPIs pour ce canal sécurisé puisqu'il y aura
+	trois entêtes de sécurité (une de la Machine A vers la
+	Machine B et deux de la Machine B vers la Machine A).  Notez
+	également que les SPIs doivent être supérieurs
+	à 256.  Nous choisirions 1000, 2000 et 3000
+	respectivement.</p><pre class="screen">
+	          (1)
+	Machine A ------&gt; Machine B
+
+	(1)PROTO=AH
+		ALG=MD5(RFC1826)
+		KEY=MYSECRETMYSECRET
+		SPI=1000
+
+	           (2.1)
+	Machine A &lt;------ Machine B
+	          &lt;------
+	           (2.2)
+
+	(2.1)
+	PROTO=AH
+		ALG=new-HMAC-SHA1(new AH)
+		KEY=KAMEKAMEKAMEKAMEKAME
+		SPI=2000
+
+	(2.2)
+	PROTO=ESP
+		ALG=new-DES-expIV(new ESP)
+			IV length = 8
+		KEY=PASSWORD
+		SPI=3000
+</pre><p>Maintenant, définissons l'association de
+	sécurité.  Exécutons <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setkey&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setkey</span>(8)</span></a> sur
+	la Machine A et la Machine B:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c
+    add 10.2.3.4 10.6.7.8 ah-old  1000 -m transport -A keyed-md5 "MYSECRETMYSECRET" ;
+    add 10.6.7.8 10.2.3.4 ah  2000 -m transport -A hmac-sha1 "KAMEKAMEKAMEKAMEKAME" ;
+    add 10.6.7.8 10.2.3.4 esp 3000 -m transport -E des-cbc "PASSWORD" ;
+    ^D</code></strong></pre><p>En fait, la communication IPsec n'aura pas lieu avant que
+	les entrées de politique de sécurité
+	ne soient définies.  Dans notre cas, il faut le faire sur les
+	deux machines.</p><pre class="screen">
+Côté A:
+
+<code class="prompt">#</code> <strong class="userinput"><code>setkey -c
+    spdadd 10.2.3.4 10.6.7.8 any -P out ipsec
+	ah/transport/10.2.3.4-10.6.7.8/require ;
+    ^D</code></strong>
+
+Côté B:
+
+<code class="prompt">#</code> <strong class="userinput"><code>setkey -c
+    spdadd 10.6.7.8 10.2.3.4 any -P out ipsec
+	esp/transport/10.6.7.8-10.2.3.4/require ;
+    spdadd 10.6.7.8 10.2.3.4 any -P out ipsec
+	ah/transport/10.6.7.8-10.2.3.4/require ;
+    ^D</code></strong>
+
+
+   Machine A --------------------------&gt; Machine E
+   10.2.3.4                               10.6.7.8
+      |                                     |
+      ========= ancien AH keyed-md5 ========&gt;
+
+      &lt;======== nouveau AH hmac-sha1 ========
+      &lt;======== nouveau ESP des-cbc =========
+</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78844624"></a>15.10.2. Exemple en mode transport avec IPv6</h3></div></div></div><p>Un autre exemple utilisant IPv6.</p><p>Le mode de transport ESP est recommandé pour le
+	port TCP numéro 110 entre la Machine-A et la
+	Machine-B.</p><pre class="screen">
+              ============ ESP ============
+              |                           |
+          Machine-A                   Machine-B
+          fec0::10 -------------------- fec0::11
+</pre><p>L'algorithme de chiffrement est blowfish-cbc avec la
+	clé &#8220;kamekame&#8221;, et l'algorithme
+	d'authentification est hmac-sha1 avec la clé
+	&#8220;this is the test key&#8221;.  Configuration de la
+	Machine-A:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c &lt;&lt;EOF
+    spdadd fec0::10[any] fec0::11[110] tcp -P out ipsec
+	esp/transport/fec0::10-fec0::11/use ;
+    spdadd fec0::11[110] fec0::10[any] tcp -P in ipsec
+	esp/transport/fec0::11-fec0::10/use ;
+    add fec0::10 fec0::11 esp 0x10001
+	-m transport
+	-E blowfish-cbc "kamekame"
+	-A hmac-sha1 "this is the test key" ;
+    add fec0::11 fec0::10 esp 0x10002
+	-m transport
+	-E blowfish-cbc "kamekame"
+	-A hmac-sha1 "this is the test key" ;
+    EOF</code></strong></pre><p>et de la Machine-B:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c &lt;&lt;EOF
+    spdadd fec0::11[110] fec0::10[any] tcp -P out ipsec
+	esp/transport/fec0::11-fec0::10/use ;
+    spdadd fec0::10[any] fec0::11[110] tcp -P in ipsec
+	esp/transport/fec0::10-fec0::11/use ;
+    add fec0::10 fec0::11 esp 0x10001 -m transport
+	-E blowfish-cbc "kamekame"
+	-A hmac-sha1 "this is the test key" ;
+    add fec0::11 fec0::10 esp 0x10002 -m transport
+	-E blowfish-cbc "kamekame"
+	-A hmac-sha1 "this is the test key" ;
+    EOF</code></strong></pre><p>Remarquez la direction de SP.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78861904"></a>15.10.3. Exemple en mode tunnel avec IPv4</h3></div></div></div><p>Mode tunnel entre deux passerelles de
+	sécurité</p><p>Le protocole de sécurité est l'ancien mode
+	tunnel AH, i.e. spécifié par la RFC1826,
+	avec keyed-md5 comme algorithme d'authentification
+	et &#8220;this is the test&#8221; comme clé.</p><pre class="screen">
+                             ======= AH =======
+                             |                |
+         Réseau-A       Passerelle-A     Passerelle-B       Réseau-B
+        10.0.1.0/24 ---- 172.16.0.1 ----- 172.16.0.2 ---- 10.0.2.0/24
+</pre><p>Configuration de la Passerelle-A:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c &lt;&lt;EOF
+    spdadd 10.0.1.0/24 10.0.2.0/24 any -P out ipsec
+	ah/tunnel/172.16.0.1-172.16.0.2/require ;
+    spdadd 10.0.2.0/24 10.0.1.0/24 any -P in ipsec
+	ah/tunnel/172.16.0.2-172.16.0.1/require ;
+    add 172.16.0.1 172.16.0.2 ah-old 0x10003 -m any
+	-A keyed-md5 "this is the test" ;
+    add 172.16.0.2 172.16.0.1 ah-old 0x10004 -m any
+	-A keyed-md5 "this is the test" ;
+
+EOF</code></strong></pre><p>Si le numéro de port n'est pas précisé
+	comme ci-dessus, alors <code class="literal">[any]</code> est
+	utilisé.  <code class="literal">-m</code> définit le mode
+	de SA à utiliser. <code class="literal">-m any</code> signifie
+	tout mode de protocole de sécurité.  Vous
+	pouvez utiliser cette SA à la fois en mode transport
+	et en mode tunnel.</p><p>et de la Passerelle-B:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c &lt;&lt;EOF
+    spdadd 10.0.2.0/24 10.0.1.0/24 any -P out ipsec
+	ah/tunnel/172.16.0.2-172.16.0.1/require ;
+    spdadd 10.0.1.0/24 10.0.2.0/24 any -P in ipsec
+	ah/tunnel/172.16.0.1-172.16.0.2/require ;
+    add 172.16.0.1 172.16.0.2 ah-old 0x10003 -m any
+	-A keyed-md5 "this is the test" ;
+    add 172.16.0.2 172.16.0.1 ah-old 0x10004 -m any
+	-A keyed-md5 "this is the test" ;
+
+EOF</code></strong></pre><p>Etablir une SA regroupée entre deux passerelles
+	de sécurité</p><p>On désire le mode de transport AH et le mode
+	tunnel ESP entre Passerelle-A et Passerelle-B.  Dans ce
+	cas, on applique d'abord le mode tunnel ESP puis le mode
+	de transport AH.</p><pre class="screen">
+                            ========== AH =========
+                            |  ======= ESP =====  |
+                            |  |               |  |
+       Réseau-A         Passerelle-A        Passerelle-B        Réseau-B
+    fec0:0:0:1::/64 --- fec0:0:0:1::1 ---- fec0:0:0:2::1 --- fec0:0:0:2::/64
+</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78869328"></a>15.10.4. Exemple en mode tunnel avec IPv6</h3></div></div></div><p>L'algorithme de chiffrement est 3des-cbc, et l'algorithme
+	d'authentification est hmac-sha1.  L'algorithme
+	d'authentification pour AH est hmac-md5.  Configuration de la
+	Passerelle-A:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c &lt;&lt;EOF
+    spdadd fec0:0:0:1::/64 fec0:0:0:2::/64 any -P out ipsec
+	esp/tunnel/fec0:0:0:1::1-fec0:0:0:2::1/require
+	ah/transport/fec0:0:0:1::1-fec0:0:0:2::1/require ;
+    spdadd fec0:0:0:2::/64 fec0:0:0:1::/64 any -P in ipsec
+	esp/tunnel/fec0:0:0:2::1-fec0:0:0:1::1/require
+	ah/transport/fec0:0:0:2::1-fec0:0:0:1::1/require ;
+    add fec0:0:0:1::1 fec0:0:0:2::1 esp 0x10001 -m tunnel
+	-E 3des-cbc "kamekame12341234kame1234"
+	-A hmac-sha1 "this is the test key" ;
+    add fec0:0:0:1::1 fec0:0:0:2::1 ah 0x10001 -m transport
+	-A hmac-md5 "this is the test" ;
+    add fec0:0:0:2::1 fec0:0:0:1::1 esp 0x10001 -m tunnel
+	-E 3des-cbc "kamekame12341234kame1234"
+	-A hmac-sha1 "this is the test key" ;
+    add fec0:0:0:2::1 fec0:0:0:1::1 ah 0x10001 -m transport
+	-A hmac-md5 "this is the test" ;
+
+    EOF</code></strong></pre><p>Etablir des SAs avec les différentes
+	extrémités</p><p>On désire un mode tunnel ESP entre Machine-A et
+	Passerelle-A.  L'algorithme de chiffrement est cast128-cbc,
+	et l'algorithme d'authentification pour ESP est hmac-sha1.
+	Le mode de transport ESP est recommandé entre Machine-A
+	et Machine-B.  L'algorithme de chiffrement est rc5-cbc, et
+	l'algorithme d'authentification pour ESP est hmac-md5.</p><pre class="screen">
+              ================== ESP =================
+              |  ======= ESP =======                 |
+              |  |                 |                 |
+            Machine-A        Passerelle-A         Machine-B
+          fec0:0:0:1::1 ---- fec0:0:0:2::1 ---- fec0:0:0:2::2
+</pre><p>Configuration de la Machine-A:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setkey -c &lt;&lt;EOF
+    spdadd fec0:0:0:1::1[any] fec0:0:0:2::2[80] tcp -P out ipsec
+	esp/transport/fec0:0:0:1::1-fec0:0:0:2::2/use
+	esp/tunnel/fec0:0:0:1::1-fec0:0:0:2::1/require ;
+    spdadd fec0:0:0:2::1[80] fec0:0:0:1::1[any] tcp -P in ipsec
+	esp/transport/fec0:0:0:2::2-fec0:0:0:l::1/use
+	esp/tunnel/fec0:0:0:2::1-fec0:0:0:1::1/require ;
+    add fec0:0:0:1::1 fec0:0:0:2::2 esp 0x10001
+	-m transport
+	-E cast128-cbc "12341234"
+	-A hmac-sha1 "this is the test key" ;
+    add fec0:0:0:1::1 fec0:0:0:2::1 esp 0x10002
+	-E rc5-cbc "kamekame"
+	-A hmac-md5 "this is the test" ;
+    add fec0:0:0:2::2 fec0:0:0:1::1 esp 0x10003
+	-m transport
+	-E cast128-cbc "12341234"
+	-A hmac-sha1 "this is the test key" ;
+    add fec0:0:0:2::1 fec0:0:0:1::1 esp 0x10004
+	-E rc5-cbc "kamekame"
+	-A hmac-md5 "this is the test" ;
+
+    EOF</code></strong></pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="openssl.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="openssh.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">15.9. OpenSSL </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 15.11. OpenSSH</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

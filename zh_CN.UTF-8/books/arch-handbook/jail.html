@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>第 4 章 Jail子系统</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="kernel.html" title="部分 I. 内核" /><link rel="prev" href="kernel-objects-using.html" title="3.3. 使用Kobj" /><link rel="next" href="jail-restrictions.html" title="4.2. 系统对被囚禁程序的限制" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第 4 章 Jail子系统</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="kernel-objects-using.html">上一页</a> </td><th width="60%" align="center">部分 I. 内核</th><td width="20%" align="right"> <a accesskey="n" href="jail-restrictions.html">下一页</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jail"></a>第 4 章 Jail子系统</h2></div><div><span class="authorgroup">翻译：<span xmlns="http://www.w3.org/1999/xhtml" class="author"></span>. </span></div><div><span xmlns="http://www.w3.org/1999/xhtml" class="personname"><span class="firstname">Evan</span> <span class="surname">Sarmiento</span></span><span xmlns="http://www.w3.org/1999/xhtml" class="affiliation"></span></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">版权 © 2001 Evan Sarmiento</p></div></div></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="jail.html#jail-arch">4.1. Jail的系统结构</a></span></dt><dt><span class="sect1"><a href="jail-restrictions.html">4.2. 系统对被囚禁程序的限制</a></span></dt></dl></div><a id="idp64800848" class="indexterm"></a><a id="idp64801744" class="indexterm"></a><a id="idp64802768" class="indexterm"></a><p>在大多数<span class="trademark">UNIX</span>®系统中，用户<code class="literal">root</code>是万能的。这也就增加了许多危险。
+    如果一个攻击者获得了一个系统中的<code class="literal">root</code>，就可以在他的指尖掌握系统中所有的功能。
+    在FreeBSD里，有一些sysctl项削弱了<code class="literal">root</code>的权限，
+    这样就可以将攻击者造成的损害减小到最低限度。这些安全功能中，有一种叫安全级别。
+    另一种在FreeBSD 4.0及以后版本中提供的安全功能，就是<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>。
+    <span class="application">Jail</span>将一个运行环境的文件树根切换到某一特定位置，
+    并且对这样环境中叉分生成的进程做出限制。例如，
+    一个被监禁的进程不能影响这个<span class="application">jail</span>之外的进程、不能使用一些特定的系统调用，
+    也就不能对主计算机造成破坏。</p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">英文单词“jail”的中文意思是“囚禁、监禁”。</p></div><p><span class="application">Jail</span>已经成为一种新型的安全模型。
+    人们可以在jail中运行各种可能很脆弱的服务器程序，如<span class="application">Apache</span>、
+    <span class="application">BIND</span>和<span class="application">sendmail</span>。
+    这样一来，即使有攻击者取得了<span class="application">jail</span>中的<code class="literal">root</code>，
+    这最多让人们皱皱眉头，而不会使人们惊慌失措。
+    本文主要关注<span class="application">jail</span>的内部原理(源代码)。
+    如果你正在寻找设置<span class="application">Jail</span>的指南性文档，
+    我建议你阅读我的另一篇文章，发表在Sys Admin Magazine, May 2001,
+    《Securing FreeBSD using <span class="application">Jail</span>》。</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="jail-arch"></a>4.1. Jail的系统结构</h2></div></div></div><p><span class="application">Jail</span>由两部分组成：用户级程序，
+      也就是<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>；还有在内核中Jail的实现代码：<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>
+      系统调用和相关的约束。我将讨论用户级程序和<span class="application">jail</span>在内核中的实现原理。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64839632"></a>4.1.1. 用户级代码</h3></div></div></div><a id="idp64841040" class="indexterm"></a><p><span class="application">Jail</span>的用户级源代码在<code class="filename">/usr/src/usr.sbin/jail</code>，
+        由一个文件<code class="filename">jail.c</code>组成。这个程序有这些参数：<span class="application">jail</span>的路径，
+        主机名，IP地址，还有需要执行的命令。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64847952"></a>4.1.1.1. 数据结构</h4></div></div></div><p>在<code class="filename">jail.c</code>中，我将最先注解的是一个重要结构体
+          <code class="literal">struct jail j;</code>的声明，这个结构类型的声明包含在
+          <code class="filename">/usr/include/sys/jail.h</code>之中。</p><p><code class="literal">jail</code>结构的定义是：</p><pre class="programlisting"><code class="filename">/usr/include/sys/jail.h</code>:
+
+struct jail {
+        u_int32_t       version;
+        char            *path;
+        char            *hostname;
+        u_int32_t       ip_number;
+};</pre><p>正如你所见，传送给命令<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>的每个参数都在这里有对应的一项。
+          事实上，当命令<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>被执行时，这些参数才由命令行真正传入：</p><pre class="programlisting"><code class="filename">/usr/src/usr.sbin/jail.c</code>
+char path[PATH_MAX];
+...
+if(realpath(argv[0], path) == NULL)
+    err(1, "realpath: %s", argv[0]);
+if (chdir(path) != 0)
+    err(1, "chdir: %s", path);
+memset(&amp;j, 0, sizeof(j));
+j.version = 0;
+j.path = path;
+j.hostname = argv[1];</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67228240"></a>4.1.1.2. 网络</h4></div></div></div><p>传给<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>的参数中有一个是IP地址。这是在网络上访问<span class="application">jail</span>时的地址。
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>将IP地址翻译成网络字节顺序，并存入<code class="literal">j</code>(<code class="literal">jail</code>类型的结构体)。</p><pre class="programlisting"><code class="filename">/usr/src/usr.sbin/jail/jail.c</code>:
+struct in_addr in;
+...
+if (inet_aton(argv[2], &amp;in) == 0)
+    errx(1, "Could not make sense of ip-number: %s", argv[2]);
+j.ip_number = ntohl(in.s_addr);</pre><p>函数<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inet_aton&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">inet_aton</span>(3)</span></a>“将指定的字符串解释为一个Internet地址，
+          并将其转存到指定的结构体中”。<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inet_aton&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">inet_aton</span>(3)</span></a>设定了结构体in，
+          之后in中的内容再用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ntohl&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">ntohl</span>(3)</span></a>转换成主机字节顺序，
+          并置入<code class="literal">jail</code>结构体的<code class="literal">ip_number</code>成员。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67236432"></a>4.1.1.3. 囚禁进程</h4></div></div></div><p>最后，用户级程序囚禁进程。现在Jail自身变成了一个被囚禁的进程，
+          并使用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=execv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">execv</span>(3)</span></a>执行用户指定的命令。</p><pre class="programlisting"><code class="filename">/usr/src/usr.sbin/jail/jail.c</code>
+i = jail(&amp;j);
+...
+if (execv(argv[3], argv + 3) != 0)
+    err(1, "execv: %s", argv[3]);</pre><p>正如你所见，函数<code class="literal">jail()</code>被调用，参数是结构体<code class="literal">jail</code>中被填入数据项，
+         而如前所述，这些数据项又来自<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>的命令行参数。
+         最后，执行了用户指定的命令。下面我将开始讨论<code class="literal">jail</code>在内核中的实现。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67241424"></a>4.1.2. 相关的内核源代码</h3></div></div></div><a id="idp67242064" class="indexterm"></a><p>现在我们来看文件<code class="filename">/usr/src/sys/kern/kern_jail.c</code>。
+        在这里定义了<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>的系统调用、相关的sysctl项，还有网络函数。</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67252816"></a>4.1.2.1. sysctl项</h4></div></div></div><a id="idp67253456" class="indexterm"></a><p>在<code class="filename">kern_jail.c</code>里定义了如下sysctl项:</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_jail.c:</code>
+
+int     jail_set_hostname_allowed = 1;
+SYSCTL_INT(_security_jail, OID_AUTO, set_hostname_allowed, CTLFLAG_RW,
+    &amp;jail_set_hostname_allowed, 0,
+    "Processes in jail can set their hostnames");
+    /* Jail中的进程可设定自身的主机名 */
+
+int     jail_socket_unixiproute_only = 1;
+SYSCTL_INT(_security_jail, OID_AUTO, socket_unixiproute_only, CTLFLAG_RW,
+    &amp;jail_socket_unixiproute_only, 0,
+    "Processes in jail are limited to creating UNIX/IPv4/route sockets only");
+    /* Jail中的进程被限制只能建立UNIX套接字、IPv4套接字、路由套接字 */
+
+int     jail_sysvipc_allowed = 0;
+SYSCTL_INT(_security_jail, OID_AUTO, sysvipc_allowed, CTLFLAG_RW,
+    &amp;jail_sysvipc_allowed, 0,
+    "Processes in jail can use System V IPC primitives");
+    /* Jail中的进程可以使用System V进程间通讯原语 */
+
+static int jail_enforce_statfs = 2;
+SYSCTL_INT(_security_jail, OID_AUTO, enforce_statfs, CTLFLAG_RW,
+    &amp;jail_enforce_statfs, 0,
+    "Processes in jail cannot see all mounted file systems");
+    /* jail 中的进程查看系统中挂接的文件系统时受到何种限制 */
+
+int    jail_allow_raw_sockets = 0;
+SYSCTL_INT(_security_jail, OID_AUTO, allow_raw_sockets, CTLFLAG_RW,
+    &amp;jail_allow_raw_sockets, 0,
+    "Prison root can create raw sockets");
+    /* jail 中的 root 用户是否可以创建 raw socket */
+
+int    jail_chflags_allowed = 0;
+SYSCTL_INT(_security_jail, OID_AUTO, chflags_allowed, CTLFLAG_RW,
+    &amp;jail_chflags_allowed, 0,
+    "Processes in jail can alter system file flags");
+    /* jail 中的进程是否可以修改系统级文件标记 */
+
+int     jail_mount_allowed = 0;
+SYSCTL_INT(_security_jail, OID_AUTO, mount_allowed, CTLFLAG_RW,
+    &amp;jail_mount_allowed, 0,
+    "Processes in jail can mount/unmount jail-friendly file systems");
+    /* jail 中的进程是否可以挂载或卸载对jail友好的文件系统 */</pre><p>这些sysctl项中的每一个都可以用命令<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a>访问。在整个内核中，
+          这些sysctl项按名称标识。例如，上述第一个sysctl项的名字是
+          <code class="literal">security.jail.set_hostname_allowed</code>。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67257040"></a>4.1.2.2. <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>系统调用</h4></div></div></div><p>像所有的系统调用一样，系统调用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>带有两个参数，
+          <code class="literal">struct thread *td</code>和<code class="literal">struct jail_args *uap</code>。
+          <code class="literal">td</code>是一个指向<code class="literal">thread</code>结构体的指针，该指针用于描述调用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>的线程。
+          在这个上下文中，<code class="literal">uap</code>指向一个结构体，这个结构体中包含了一个指向从用户级
+          <code class="filename">jail.c</code>传送过来的<code class="literal">jail</code>结构体的指针。
+          在前面我讲述用户级程序时，你已经看到过一个<code class="literal">jail</code>结构体被作为参数传送给系统调用
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>。</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_jail.c:</code>
+/*
+ * struct jail_args {
+ *      struct jail *jail;
+ * };
+ */
+int
+jail(struct thread *td, struct jail_args *uap)</pre><p>于是<code class="literal">uap-&gt;jail</code>可以用于访问被传递给<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>的<code class="literal">jail</code>结构体。
+          然后，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>使用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=copyin&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">copyin</span>(9)</span></a>将<code class="literal">jail</code>结构体复制到内核内存空间中。
+                    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=copyin&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">copyin</span>(9)</span></a>需要三个参数：要复制进内核内存空间的数据的地址
+                    <code class="literal">uap-&gt;jail</code>，在内核内存空间存放数据的<code class="literal">j</code>，
+          以及数据的大小。<code class="literal">uap-&gt;jail</code>指向的Jail结构体被复制进内核内存空间，
+          并被存放在另一个<code class="literal">jail</code>结构体<code class="literal">j</code>里。</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_jail.c: </code>
+error = copyin(uap-&gt;jail, &amp;j, sizeof(j));</pre><p>在jail.h中定义了另一个重要的结构体型prison。
+          结构体<code class="literal">prison</code>只被用在内核空间中。
+          下面是<code class="literal">prison</code>结构体的定义。</p><pre class="programlisting"><code class="filename">/usr/include/sys/jail.h</code>:
+struct prison {
+        LIST_ENTRY(prison) pr_list;                     /* (a) all prisons */
+        int              pr_id;                         /* (c) prison id */
+        int              pr_ref;                        /* (p) refcount */
+        char             pr_path[MAXPATHLEN];           /* (c) chroot path */
+        struct vnode    *pr_root;                       /* (c) vnode to rdir */
+        char             pr_host[MAXHOSTNAMELEN];       /* (p) jail hostname */
+        u_int32_t        pr_ip;                         /* (c) ip addr host */
+        void            *pr_linux;                      /* (p) linux abi */
+        int              pr_securelevel;                /* (p) securelevel */
+        struct task      pr_task;                       /* (d) destroy task */
+        struct mtx       pr_mtx;
+        void            **pr_slots;                     /* (p) additional data */
+};</pre><p>然后，系统调用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>为一个<code class="literal">prison</code>结构体分配一块内存，
+          并在<code class="literal">jail</code>和<code class="literal">prison</code>结构体之间复制数据。</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_jail.c</code>:
+MALLOC(pr, struct prison *, sizeof(*pr), M_PRISON, M_WAITOK | M_ZERO);
+...
+error = copyinstr(j.path, &amp;pr-&gt;pr_path, sizeof(pr-&gt;pr_path), 0);
+if (error)
+    goto e_killmtx;
+...
+error = copyinstr(j.hostname, &amp;pr-&gt;pr_host, sizeof(pr-&gt;pr_host), 0);
+if (error)
+        goto e_dropvnref;
+pr-&gt;pr_ip = j.ip_number;</pre><p>下面，我们将讨论另外一个重要的系统调用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail_attach&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail_attach</span>(2)</span></a>，它实现了将进程监禁的功能。</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_jail.c</code>
+/*
+ * struct jail_attach_args {
+ *      int jid;
+ * };
+ */
+int
+jail_attach(struct thread *td, struct jail_attach_args *uap)</pre><p>这个系统调用做出一些可以用于区分被监禁和未被监禁的进程的改变。
+          要理解<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail_attach&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail_attach</span>(2)</span></a>为我们做了什么，我们首先要理解一些背景信息。</p><p>在FreeBSD中，每个对内核可见的线程是通过其<code class="literal">thread</code>结构体来识别的，
+          同时，进程都由它们自己的<code class="literal">proc</code>结构体描述。
+          你可以在<code class="filename">/usr/include/sys/proc.h</code>中找到<code class="literal">thread</code>和<code class="literal">proc</code>结构体的定义。
+          例如，在任何系统调用中，参数<code class="literal">td</code>实际上是个指向调用线程的<code class="literal">thread</code>结构体的指针，
+          正如前面所说的那样。<code class="literal">td</code>所指向的<code class="literal">thread</code>结构体中的<code class="literal">td_proc</code>成员是一个指针，
+          这个指针指向<code class="literal">td</code>所表示的线程所属进程的<code class="literal">proc</code>结构体。
+          结构体<code class="literal">proc</code>包含的成员可以描述所有者的身份
+          (<code class="literal">p_ucred</code>)，进程资源限制(<code class="literal">p_limit</code>)，
+          等等。在由<code class="literal">proc</code>结构体的<code class="literal">p_ucred</code>成员所指向的ucred结构体的定义中，
+          还有一个指向<code class="literal">prison</code>结构体的指针(<code class="literal">cr_prison</code>)。</p><pre class="programlisting"><code class="filename">/usr/include/sys/proc.h: </code>
+struct thread {
+    ...
+    struct proc *td_proc;
+    ...
+};
+struct proc {
+    ...
+    struct ucred *p_ucred;
+    ...
+};
+<code class="filename">/usr/include/sys/ucred.h</code>
+struct ucred {
+    ...
+    struct prison *cr_prison;
+    ...
+};</pre><p>在<code class="filename">kern_jail.c</code>中，函数<code class="literal">jail()</code>以给定的<code class="literal">jid</code>
+          调用函数<code class="literal">jail_attach()</code>。随后<code class="literal">jail_attach()</code>调用函数<code class="literal">change_root()</code>以改变
+          调用进程的根目录。接下来，<code class="literal">jail_attach()</code>创建一个新的<code class="literal">ucred</code>结构体，并在
+          成功地将<code class="literal">prison</code>结构体连接到这个<code class="literal">ucred</code>结构体后，将这个<code class="literal">ucred</code>结构体连接
+          到调用进程上。从此时起，这个调用进程就会被识别为被监禁的。
+          当我们以新创建的这个<code class="literal">ucred</code>结构体为参数调用内核路径<code class="literal">jailed()</code>时，
+          它将返回1来说明这个用户身份是和一个<span class="application">jail</span>相连的。
+          在<span class="application">jail</span>中叉分出来的所有进程的的公共祖先进程就是这个执行了<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>的进程，
+          因为正是它调用了<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a>系统调用。当一个程序通过<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=execve&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">execve</span>(2)</span></a>而被执行时，
+          它将从其父进程的<code class="literal">ucred</code>结构体继承被监禁的属性，
+          因而它也会拥有一个被监禁的<code class="literal">ucred</code>结构体。</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_jail.c</code>
+int
+jail(struct thread *td, struct jail_args *uap)
+{
+...
+    struct jail_attach_args jaa;
+...
+    error = jail_attach(td, &amp;jaa);
+    if (error)
+        goto e_dropprref;
+...
+}
+
+int
+jail_attach(struct thread *td, struct jail_attach_args *uap)
+{
+    struct proc *p;
+    struct ucred *newcred, *oldcred;
+    struct prison *pr;
+...
+    p = td-&gt;td_proc;
+...
+    pr = prison_find(uap-&gt;jid);
+...
+    change_root(pr-&gt;pr_root, td);
+...
+    newcred-&gt;cr_prison = pr;
+    p-&gt;p_ucred = newcred;
+...
+}</pre><p>当一个进程被从其父进程叉分来的时候，
+          系统调用<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fork&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">fork</span>(2)</span></a>将用<code class="literal">crhold()</code>来维护其身份凭证。
+          这样，很自然的就保持了子进程的身份凭证于其父进程一致，所以子进程也是被监禁的。</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/kern_fork.c</code>:
+p2-&gt;p_ucred = crhold(td-&gt;td_ucred);
+...
+td2-&gt;td_ucred = crhold(p2-&gt;p_ucred);</pre></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="kernel-objects-using.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="kernel.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="jail-restrictions.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">3.3. 使用Kobj </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 4.2. 系统对被囚禁程序的限制</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

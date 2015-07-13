@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>11.2. 总线资源</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="pci.html" title="第 11 章 PCI设备" /><link rel="prev" href="pci.html" title="第 11 章 PCI设备" /><link rel="next" href="scsi.html" title="第 12 章 通用访问方法SCSI控制器" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.2. 总线资源</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pci.html">上一页</a> </td><th width="60%" align="center">第 11 章 PCI设备</th><td width="20%" align="right"> <a accesskey="n" href="scsi.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pci-bus"></a>11.2. 总线资源</h2></div></div></div><a id="idp72002384" class="indexterm"></a><p>FreeBSD为从父总线请求资源提供了一种面向对象的机制。几乎所有设备
+      都是某种类型的总线（PCI, ISA, USB, SCSI等等）的孩子成员，并且这些设备
+      需要从他们的父总线获取资源（例如内存段, 中断线, 或者DMA通道）。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72003536"></a>11.2.1. 基地址寄存器</h3></div></div></div><a id="idp72004176" class="indexterm"></a><p>为了对PCI设备做些有用的事情，你需要从PCI配置空间获取
+        <span class="emphasis"><em>Base Address Registers</em></span> (BARs)。获取BAR时的
+        PCI特定的细节被抽象在函数<code class="function">bus_alloc_resource()</code>中。
+      </p><p>例如，一个典型的驱动程序可能在<code class="function">attach()</code>
+        函数中有些类似下面的东西：</p><pre class="programlisting">    sc-&gt;bar0id = PCIR_BAR(0);
+    sc-&gt;bar0res = bus_alloc_resource(dev, SYS_RES_MEMORY, &amp;sc-&gt;bar0id,
+				  0, ~0, 1, RF_ACTIVE);
+    if (sc-&gt;bar0res == NULL) {
+        printf("Memory allocation of PCI base register 0 failed!\n");
+        error = ENXIO;
+        goto fail1;
+    }
+
+    sc-&gt;bar1id = PCIR_BAR(1);
+    sc-&gt;bar1res = bus_alloc_resource(dev, SYS_RES_MEMORY, &amp;sc-&gt;bar1id,
+				  0, ~0, 1, RF_ACTIVE);
+    if (sc-&gt;bar1res == NULL) {
+        printf("Memory allocation of PCI base register 1 failed!\n");
+        error =  ENXIO;
+        goto fail2;
+    }
+    sc-&gt;bar0_bt = rman_get_bustag(sc-&gt;bar0res);
+    sc-&gt;bar0_bh = rman_get_bushandle(sc-&gt;bar0res);
+    sc-&gt;bar1_bt = rman_get_bustag(sc-&gt;bar1res);
+    sc-&gt;bar1_bh = rman_get_bushandle(sc-&gt;bar1res);</pre><p>每个基址寄存器的句柄被保存在<code class="varname">softc</code>
+        结构中，以便以后可以使用它们向设备写入。</p><p>然后就能使用这些句柄与<code class="function">bus_space_*</code>函数一起
+        读写设备寄存器。例如，驱动程序可能包含如下的快捷函数，用来读取板子
+        特定的寄存器：</p><pre class="programlisting">uint16_t
+board_read(struct ni_softc *sc, uint16_t address)
+{
+    return bus_space_read_2(sc-&gt;bar1_bt, sc-&gt;bar1_bh, address);
+}
+</pre><p>类似的，可以用下面的函数写寄存器：</p><pre class="programlisting">void
+board_write(struct ni_softc *sc, uint16_t address, uint16_t value)
+{
+    bus_space_write_2(sc-&gt;bar1_bt, sc-&gt;bar1_bh, address, value);
+}
+</pre><p>这些函数以8位，16位和32位的版本存在，你应当相应地使用
+        <code class="function">bus_space_{read|write}_{1|2|4}</code>。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">在 FreeBSD 7.0 和更高版本中， 可以用
+	  <code class="function">bus_*</code> 函数来代替
+	  <code class="function">bus_space_*</code>。
+	  <code class="function">bus_*</code> 函数使用的参数是 <span class="type">struct
+	  resource *</span> 指针， 而不是 bus tag 和句柄。
+	  这样， 您就可以将 <code class="varname">softc</code>
+	  中的 bus tag 和 bus 句柄这两个成员变量去掉， 并将
+	  <code class="function">board_read()</code> 函数改写为：</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">uint16_t
+board_read(struct ni_softc *sc, uint16_t address)
+{
+	return (bus_read(sc-&gt;bar1res, address));
+}
+</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72014672"></a>11.2.2. 中断</h3></div></div></div><a id="idp72015312" class="indexterm"></a><p>中断按照和分配内存资源相似的方式从面向对象的总线代码分配。首先，
+        必须从父总线分配IRQ资源，然后必须设置中断处理函数来处理这个IRQ。
+      </p><p>再一次，来自设备<code class="function">attach()</code>函数的例子比文字
+        更具说明性。</p><pre class="programlisting">/* 取得IRQ资源 */
+
+    sc-&gt;irqid = 0x0;
+    sc-&gt;irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &amp;(sc-&gt;irqid),
+				  0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+    if (sc-&gt;irqres == NULL) {
+	printf("IRQ allocation failed!\n");
+	error = ENXIO;
+	goto fail3;
+    }
+
+    /* 现在我们应当设置中断处理函数 */
+
+    error = bus_setup_intr(dev, sc-&gt;irqres, INTR_TYPE_MISC,
+			   my_handler, sc, &amp;(sc-&gt;handler));
+    if (error) {
+	printf("Couldn't set up irq\n");
+	goto fail4;
+    }
+</pre><p>在设备的分离例程中必须注意一些问题。你必须停顿设备的中断流，
+        并移除中断处理函数。一旦<code class="function">bus_teardown_intr()</code>
+        返回，你知道你的中断处理函数不会再被调用，并且所有可能已经执行了
+        这个中断处理函数的线程都已经返回。由于此函数可以睡眠，调用此函数时
+        你必须不能拥有任何互斥体。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72018640"></a>11.2.3. DMA</h3></div></div></div><a id="idp72019280" class="indexterm"></a><p>本节已废弃，只是由于历史原因而给出。处理这些问题的适当方法是
+        使用<code class="function">bus_space_dma*()</code>函数。当更新这一节以反映
+        那样用法时，这段就可能被去掉。然而，目前API还不断有些变动，因此一旦
+        它们固定下来后，更新这一节来反映那些改动就很好了。</p><p>在PC上，想进行总线主控DMA的外围设备必须处理物理地址，由于
+        FreeBSD使用虚拟内存并且只处理虚地址，这仍是个问题。幸运的是，有个
+        函数，<code class="function">vtophys()</code>可以帮助我们。</p><pre class="programlisting">#include &lt;vm/vm.h&gt;
+#include &lt;vm/pmap.h&gt;
+
+#define vtophys(virtual_address) (...)
+</pre><p>然而这个解决办法在alpha上有点不一样，并且我们真正想要的是一个
+        称为<code class="function">vtobus()</code>的函数。</p><pre class="programlisting">#if defined(__alpha__)
+#define vtobus(va)      alpha_XXX_dmamap((vm_offset_t)va)
+#else
+#define vtobus(va)      vtophys(va)
+#endif
+</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72023248"></a>11.2.4. 取消分配资源</h3></div></div></div><p>取消<code class="function">attach()</code>期间分配的所有资源非常重要。
+        必须小心谨慎，即使在失败的条件下也要保证取消分配那些正确的东西，
+        这样当你的驱动程序去掉后系统仍然可以使用。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pci.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="pci.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="scsi.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 11 章 PCI设备 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 第 12 章 通用访问方法SCSI控制器</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>6.23. 启动和停止服务 (rc 脚本)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter 手册" /><link rel="up" href="special.html" title="第 6 章 特殊情况" /><link rel="prev" href="using-databases.html" title="6.22. 使用数据库" /><link rel="next" href="users-and-groups.html" title="6.24. 添加用户和用户组" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6.23. 启动和停止服务 (rc 脚本)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="using-databases.html">上一页</a> </td><th width="60%" align="center">第 6 章 特殊情况</th><td width="20%" align="right"> <a accesskey="n" href="users-and-groups.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rc-scripts"></a>6.23. 启动和停止服务 (rc 脚本)</h2></div></div></div><p><code class="filename">rc.d</code> 脚本在系统启动时用于启动服务，
+	并为管理员提供停止、 启动和重新启动某个服务的标准方法。 Ports
+	安装的脚本会集成到系统的 <code class="filename">rc.d</code> 框架中。
+	关于如何使用它的说明， 可以在
+	<a class="link" href="../../../../doc/en_US.ISO8859-1/books/handbook/configtuning-rcd.html" target="_top">使用手册的 rc.d
+	章节</a> 找到。 关于可用命令的详细解释， 则可以在
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc</span>(8)</span></a> 和 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 找到。 最后， 您可以参阅
+	<a class="link" href="../../../../doc/en_US.ISO8859-1/articles/rc-scripting" target="_top">这篇文章</a>
+	了解撰写 <code class="filename">rc.d</code> 脚本的最佳实践。</p><p>可以安装一或多个 <code class="filename">rc.d</code> 脚本：</p><pre class="programlisting">USE_RC_SUBR=	doormand</pre><p>这些脚本必须放到 <code class="filename">files</code>
+	目录， 并附加 <code class="literal">.in</code>。
+	这个文件中可以使用标准的
+	<code class="varname">SUB_LIST</code> 替换展开。 除此之外，
+	我们还强烈推荐使用 <code class="literal">%%PREFIX%%</code> 和
+	<code class="literal">%%LOCALBASE%%</code> 替换展开。 关于
+	<code class="varname">SUB_LIST</code> 的介绍可以在 <a class="link" href="using-sub-files.html" title="8.6. 使用 SUB_FILES 和 SUB_LIST">本书的相关章节</a> 找到。</p><p>在 FreeBSD 6.1-RELEASE 之前， 与 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 的集成是通过
+	<code class="varname">USE_RCORDER</code> 而不是
+	<code class="varname">USE_RC_SUBR</code> 来完成的。 不过，
+	除非 port 需要提供安装进基本系统这样的选项，
+	或者服务需要在 <code class="filename">rc.d</code> 脚本
+	<code class="filename">FILESYSTEMS</code> 之前运行这类特殊情况，
+	一般来说是不需要使用这个功能的。</p><p>从 FreeBSD 6.1-RELEASE 开始， 本地安装的 <code class="filename">rc.d</code>
+	脚本 (包括由 port 安装的脚本) 会纳入基本系统的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>。</p><p>以下是一个简单的 <code class="filename">rc.d</code> 脚本：</p><pre class="programlisting">#!/bin/sh
+
+# $FreeBSD$
+#
+# PROVIDE: doormand
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+#
+# 在 /etc/rc.conf.local 或 /etc/rc.conf 中增加下述设置可以启用这一服务：
+#
+# doormand_enable (bool):	默认设为 NO。
+#				设为 YES 可以启用 doormand。
+# doormand_config (path):	默认设为 %%PREFIX%%/etc/doormand/doormand.cf。
+#
+
+. /etc/rc.subr
+
+name="doormand"
+rcvar=${name}_enable
+
+command=%%PREFIX%%/sbin/${name}
+pidfile=/var/run/${name}.pid
+
+load_rc_config $name
+
+: ${doormand_enable="NO"}
+: ${doormand_config="%%PREFIX%%/etc/doormand/doormand.cf"}
+
+command_args="-p $pidfile -f $doormand_config"
+
+run_rc_command "$1"</pre><p>除非有很站得住脚的理由提前启动服务，所有的 ports 脚本应使用
+	</p><pre class="programlisting">REQUIRE: LOGIN</pre><p>。
+	如果服务需要以特定用户 (除 root 之外) 身份启动， 则必须这样做。
+	在前面的例子中， 我们还使用了
+	</p><pre class="programlisting">KEYWORD: shutdown</pre><p>
+	以便让 mythical port 在系统停机的过程中以正常的方式终止，
+	因为它需要在系统引导过程中启动服务。 如果脚本没有启动任何服务，
+	则并不需要这样做。</p><p>这里， 对变量的默认赋值方法应采用 "="，
+	而非 ":=" 这样的形式。 这是因为，
+	前一种赋值方法只有在变量未被设置时才设置默认值，
+	而后一种方法则会在变量没有设置，
+	<span class="emphasis"><em>或者</em></span> 其值为空时都设置默认值。
+	用户非常可能在其
+	<code class="filename">rc.conf.local</code> 中使用类似
+	</p><pre class="programlisting">doormand_flags=""</pre><p> 这样的设置，
+	而采用 ":=" 来进行赋值，
+	则会在不经意间覆盖用户所希望的设置。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">新增的脚本均不应使用 <code class="filename">.sh</code>
+	  后缀。 未来， 仍然包含这一后缀的脚本将被批量改名。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp69599312"></a>6.23.1. 卸载时停止服务</h3></div></div></div><p>可以在卸载的过程中自动地停止服务。 我们建议只有在绝对必要，
+	  例如必须在删除文件之前停止服务这类的情况下才使用这一功能。
+	  通常来说， 决定是否在卸载时停止服务是系统管理员需要考虑的事情。
+	  另外要注意， 这个功能也会影响升级过程。</p><p>需要时可以在 <code class="filename">pkg-plist</code> 中加入：</p><pre class="programlisting">@stopdaemon doormand</pre><p>这里的参数必须与
+	  <code class="varname">USE_RC_SUBR</code> 变量的内容匹配。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="using-databases.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="special.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="users-and-groups.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">6.22. 使用数据库 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 6.24. 添加用户和用户组</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

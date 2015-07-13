@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>21.5. トラブルシュート</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="mail.html" title="第21章 電子メール" /><link rel="prev" href="mail-changingmta.html" title="21.4. MTA の変更" /><link rel="next" href="mail-advanced.html" title="21.6. 先進的なトピックス" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.5. トラブルシュート</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mail-changingmta.html">戻る</a>〓</td><th width="60%" align="center">第21章 電子メール</th><td width="20%" align="right">〓<a accesskey="n" href="mail-advanced.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mail-trouble"></a>21.5. トラブルシュート</h2></div></div></div><a id="idp95030352" class="indexterm"></a><div class="qandaset"><a id="idp95031504"></a><dl><dt>21.5.1. <a href="mail-trouble.html#idp95031888">どうして自分のサイトのホストなのに FQDN を使わなければいけないのですか?</a></dt><dt>21.5.2. <a href="mail-trouble.html#idp95041360">sendmail が mail loops back to
+	      myself というメッセージを出すのですが。</a></dt><dt>21.5.3. <a href="mail-trouble.html#idp95047120">ダイアルアップ PPP
+	    ホストでメールサーバを実行するにはどうしたらいいの?</a></dt><dt>21.5.4. <a href="mail-trouble.html#idp95070800">なぜ他のホストにメールを送ろうとすると、いつも
+	    Relaying Denied と怒られてしまうの ?</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp95031888"></a><a id="idp95032144"></a><p><strong>21.5.1.</strong></p></td><td align="left" valign="top"><p>どうして自分のサイトのホストなのに FQDN を使わなければいけないのですか?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>恐らく、そのホストは実際には別のドメインにあるのでしょう。
+	    例えば <code class="systemitem">foo.bar.edu</code> ドメインにいて、
+	    <code class="systemitem">bar.edu</code> というドメイン内の
+	    <code class="systemitem">mumble</code> というホストにアクセスしたいとします。
+	    この時は単に <code class="systemitem">mumble</code> ではなく
+	    <code class="systemitem">mumble.bar.edu</code> と FQDN で参照しなければなりません。</p><p>そもそも、BSD BIND<a id="idp95036112" class="indexterm"></a>
+	    のリゾルバー (resolver) ではこのようなことが可能でしたが、
+	    FreeBSD に入っている最新版の <span class="application">BIND</span>
+	    では自分のドメイン以外に対する FQDN でない省略形は許されません。
+	    従ってホストを <code class="systemitem">mumble</code> と曖昧に指定した場合は
+	    <code class="systemitem">mumble.foo.bar.edu</code> という名前があればそれになり、
+	    そうでなければ root ドメインから検索されます。</p><p>これは、
+	    <code class="systemitem">mumble.bar.edu</code> と
+	    <code class="systemitem">mumble.edu</code>
+	    ということなったドメイン名に対してホスト名のサーチがおこなわれていた以前の振る舞いとは異なったものです。
+	    このような事が悪い例もしくはセキュリティホールとみなされる理由については
+	    RFC 1535 を見てください。</p><p><code class="filename">/etc/resolv.conf</code> で
+
+	    </p><pre class="programlisting">domain foo.bar.edu</pre><p>
+
+	    と書いてある行を
+
+	    </p><pre class="programlisting">search foo.bar.edu bar.edu</pre><p>
+
+	    と書き換えることで上のようなことができます。
+	    しかし、RFC 1535 にあるように検索順序が
+	    <span class="quote">「<span class="quote">内部 (local) と外部 (public) の管理の境界</span>」</span>
+	    をまたがないようにしてください。</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp95041360"></a><a id="idp95041616"></a><p><strong>21.5.2.</strong></p></td><td align="left" valign="top"><p><span class="application">sendmail</span> が <span class="errorname">mail loops back to
+	      myself</span> というメッセージを出すのですが。</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p><span class="application">sendmail</span>
+	    FAQ に次のように書いてあります。</p><pre class="programlisting"><span class="quote">「<span class="quote">Local configuration error</span>」</span> というメッセージが出ます。例えば、
+
+553 relay.domain.net config error: mail loops back to myself
+554 &lt;user@domain.net&gt;... Local configuration error
+
+のような感じですが、どうしたら解決できますか?
+
+これは、例えば domain.net のようなドメイン宛てのメールを
+<code class="literal">MX</code> レコードで特定のホスト(ここでは
+relay.domain.net) に送ろうとしたのに、
+そのホストでは domain.net
+宛てのメールを受け取れるような設定になっていない場合です。
+設定の際に
+FEATURE(use_cw_file) を指定してある場合には
+/etc/mail/local-host-names の中に domain.net を追加してください。
+もしくは、/etc/mail/sendmail.cf の中に <span class="quote">「<span class="quote">Cw domain.net</span>」</span>
+を追加してください。</pre><p><span class="application">sendmail</span> FAQ は
+	    <code class="uri"><a class="uri" href="http://www.sendmail.org/faq" target="_top">http://www.sendmail.org/faq</a></code> にありますので、
+	    メールの設定に <span class="quote">「<span class="quote">おかしなこと</span>」</span> があれば常に読んでください。</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp95047120"></a><a id="idp95047376"></a><p><strong>21.5.3.</strong></p></td><td align="left" valign="top"><p>ダイアルアップ PPP<a id="idp95047888" class="indexterm"></a>
+	    ホストでメールサーバを実行するにはどうしたらいいの?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>LAN 上にある FreeBSD マシンを、
+	    インターネットに接続したいとします。FreeBSD マシンは、その
+	    LAN でのメールゲートウェイになります。FreeBSD
+	    マシンは専用線接続ではありません (訳注: ダイアルアップ接続など)。</p><p>これには、少なくとも二つの方法があります。
+	    一つは UUCP<a id="idp95057872" class="indexterm"></a>
+	    を使うことです。</p><p>もう一つの方法は、あなたのドメインに対するセカンダリ
+	    MX サービスを提供する常時稼働のインターネットサーバを用意することです。
+	    たとえば、あなたの会社のドメインが
+	    <code class="systemitem">example.com</code> で、
+	    ISP があなたのドメインに セカンダリ MX サービスを提供するために
+	    <code class="systemitem">example.net</code> ドメインを
+	    用意するとしたら次のようにします。</p><pre class="programlisting">example.com.	MX	10	example.com.
+MX	20	example.net.</pre><p>最終的なメール受信先としては、
+	    一つのホストだけが定義されるべきです
+	    (<code class="systemitem">example.com</code> 上の
+	    <code class="filename">/etc/mail/sendmail.cf</code> ファイルに、
+	    <code class="literal">Cw example.com</code> を追加します)。</p><p>送信側の <code class="command">sendmail</code> が、
+	    メールを配送しようとしている時、モデムの接続を介してあなたのところ
+	    (<code class="systemitem">example.com</code>)
+	    に接続しようとします。大抵の場合、
+	    あなたのマシンがオンラインでないために、
+	    接続はタイムアウトしてしまうでしょう。
+	    <code class="command">sendmail</code> プログラムは自動的に、
+	    たとえばあなたのインターネットプロバイダなどのセカンダリの
+	    MX サイト (<code class="systemitem">example.net</code>)
+	    にメールを配送するでしょう。
+	    セカンダリ MX サイトは定期的にあなたのホストに接続し、
+	    プライマリ MX ホスト
+	    (<code class="systemitem">example.com</code>)
+	    にメールを配送しようとするでしょう。</p><p>ログインスクリプトとして、
+	    このようなものを使うとよいでしょう。</p><pre class="programlisting">#!/bin/sh
+# Put me in /usr/local/bin/pppmyisp
+( sleep 60 ; /usr/sbin/sendmail -q ) &amp;
+/usr/sbin/ppp -direct pppmyisp</pre><p>ユーザごとにログインスクリプトを作りたい場合には、
+	    上記のスクリプトの代わりに、
+	    <code class="command">sendmail -qRexample.com</code>
+	    を使用することもできます。
+	    このようにすると、
+	    キューの中の <code class="systemitem">example.com</code>
+	    に対するすべてのメールは、すぐに強制的に処理されます。</p><p>さらに、次のような改良もできます。</p><p>以下は、<a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-isp" target="_top">FreeBSD Internet service provider's メーリングリスト</a>
+	    から抜粋してきたメッセージです。</p><pre class="programlisting">&gt; 私たちはお客様に対して、セカンダリ MX を提供しています。
+&gt; お客様は一日に何回か私たちのサービスに接続し、メールを彼らのプライマリ MX
+&gt; に受け取ります (彼らのドメインに対するメールが到着した時には、
+&gt; 私たちは彼らのサイトを呼び出しません)。
+&gt; 私たちの sendmail は、30 分ごとにメールキューに溜っているメールを配送します。
+&gt; ちょうどその時に、すべてのメールがプライマリ MX に送られたかどうかを確かめるためには、
+&gt; 彼らは 30 分は オンラインでいなければなりません。
+&gt;
+&gt; すべてのメールを今すぐ送るために sendmail を初期化するコマンドはあるでしょうか?
+&gt; もちろん私たちのマシン上には、ユーザはルート (root) 権限を持っていません。
+
+sendmail.cf の <span class="quote">「<span class="quote">privacy flags</span>」</span> セクションに、
+Opgoaway,restrictqrun の定義があります。
+
+root 以外のユーザがキューを処理できるようにするには、
+restrictqrun を削除してください。また、MX の再調整が必要かもしれません。
+あなたがたは、顧客のサイトに対する一番優先度の高い MX なので、
+次のように定義します。
+
+# If we are the best MX for a host, try directly instead of generating
+# local config error.
+OwTrue
+
+このようにすると、リモートサイトからのメールが、
+顧客のマシンと接続しようとせず、直接あなたがたのホストマシンに配送されるようになります。
+ホストマシンに配送されたメールは、続いて顧客のマシンに送られます。
+これはホスト名にのみ有効なので、顧客のメールマシンに、
+<span class="quote">「<span class="quote">host.customer.com</span>」</span> とは別に、<span class="quote">「<span class="quote">customer.com</span>」</span> も定義する必要があります。
+DNS 上で、<span class="quote">「<span class="quote">customer.com</span>」</span> に対する A レコードを定義してください。</pre></td></tr><tr class="question"><td align="left" valign="top"><a id="idp95070800"></a><a id="idp95071056"></a><p><strong>21.5.4.</strong></p></td><td align="left" valign="top"><p>なぜ他のホストにメールを送ろうとすると、いつも
+	    <span class="errorname">Relaying Denied</span> と怒られてしまうの ?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>FreeBSD がインストールされたデフォルトの状態では、
+	    <span class="application">sendmail</span>
+	    は動作しているホストからのメールだけを送るように設定されています。
+	    たとえば POP3 サーバがインストールされているとすると、
+	    ユーザは学校や職場など他のリモートの場所からメールを確認することが
+	    できます。しかし、彼らは外部からそのホスト以外へのメールを
+	    送ることはやはりできません。
+	    通常、メールを送ろうとしてから少しすると、
+	    <span class="errorname">5.7 Relaying Denied</span>
+	    というエラーメッセージの書かれたメールが
+	    <span class="application">MAILER-DAEMON</span> から送られてくるでしょう。</p><p>これを解決する方法はいくつかあります。
+	    一番の正攻法は <code class="filename">/etc/mail/relay-domains</code>
+	    リレードメインファイルにあなたの ISP のアドレスを書くことです。
+	    これをするのに簡単な方法は次のとおりです。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "your.isp.example.com" &gt; /etc/mail/relay-domains</code></strong></pre><p>このファイルを作成または編集したら、
+	    <span class="application">sendmail</span> を再起動してください。
+	    もしあなたがサーバ管理者でメールをローカルに送りたくないか、
+	    ポイントを使用して他のマシン (や、さらに他の ISP) の
+	    クライアントまたはシステムへ送りたい時は、とても効果があります。
+	    さらに、あなたが一つあるいは二つだけのメールアカウントを
+	    設定している場合でもこれは非常に有用です。
+	    追加すべきアドレスがたくさんある場合には、
+	    単にこのファイルをあなたの好きなテキストエディタで開いて、
+	    そして一行に一つずつドメインを追加してください。</p><pre class="programlisting">your.isp.example.com
+other.isp.example.net
+users-isp.example.org
+www.example.org</pre><p>これで、リストに掲載されているすべてのホスト
+	    (ユーザがあなたのシステムにアカウントを持っていると規定する)
+	    からあなたのシステムを通るすべてのメールは送信に成功するでしょう。
+	    これはあなたのシステムから SPAM を送ることを認めることなく、
+	    リモートであなたのシステムからメールを送ることをユーザに
+	    認めるためのとてもよい方法です。</p></td></tr></tbody></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mail-changingmta.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="mail.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="mail-advanced.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">21.4. MTA の変更〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓21.6. 先進的なトピックス</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="koi8-r"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Создание класса GEOM</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Эта статья документирует некоторые начальные выкладки в разработке GEOM-классов, а также модулей ядра в общем. Предполагается, что читатель близко знаком с программированием на Си в контексте пространства пользовательских процессов (userland)." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="ru" class="article" lang="ru"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp69919824"></a>Создание класса GEOM</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Ivan</span> <span class="surname">Voras</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:ivoras@FreeBSD.org">ivoras@FreeBSD.org</a>&gt;</code><br />
+	  </p></div></div></div></div></div><div>Издание: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD это зарегистрированная торговая
+  марка FreeBSD Foundation.</p><p>Intel, Celeron, EtherExpress, i386,
+  i486, Itanium, Pentium и Xeon это торговые марки или зарегистрированные
+  торговые марки Intel Corporation или ее дочерних компаний в Соединенных
+  Штатах и других странах.</p><p>Многие из обозначений, используемые
+  производителями и продавцами для обозначения своих продуктов, заявляются
+  в качестве торговых марок.  Когда такие обозначения появляются в этом
+  документе, и Проекту FreeBSD известно о торговой марке, к обозначению
+  добавляется знак <span class="quote"><<<span class="quote">TM</span>>></span> или
+  <span class="quote"><<<span class="quote">(R)</span>>></span>.</p></div></div><div>    .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Аннотация</div><p>Эта статья документирует некоторые начальные выкладки
+	в разработке GEOM-классов, а также модулей ядра в общем.
+	Предполагается, что читатель близко знаком с программированием
+	на Си в контексте пространства пользовательских процессов
+	(userland).</p></div></div></div><hr /></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="sect1"><a href="#intro">1. Вступление</a></span></dt><dt><span class="sect1"><a href="#prelim">2. Подготовка</a></span></dt><dt><span class="sect1"><a href="#kernelprog">3. Программирование в ядре FreeBSD</a></span></dt><dt><span class="sect1"><a href="#geom">4. Программирование в системе GEOM</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="intro"></a>1. Вступление</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="intro-docs"></a>1.1. Документация</h3></div></div></div><p>Документация по программированию для ядра скудная, это одна из
+	немногих областей программирования, где почти нет хороших учебных
+	пособий, и совет <span class="quote"><<<span class="quote">читай исходники!</span>>></span> -
+	сохраняет свою справедливость. Однако, существует несколько
+	статей и книг разной актуальности, которые рекомендуются к изучению
+	перед тем, как начать программировать:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="link" href="../../../../doc/en_US.ISO8859-1/books/developers-handbook/index.html" target="_top">
+	    Руководство FreeBSD для разработчиков</a> - часть
+	    Проекта Документации FreeBSD, ничего специфичного
+	    о программировании ядра в нем нет, зато есть немного общей
+	    полезной информации.</p></li><li class="listitem"><p><a class="link" href="../../../../doc/en_US.ISO8859-1/books/arch-handbook/index.html" target="_top">
+	    Руководство по Архитектуре FreeBSD</a> - также
+	    является частью Проекта Документации FreeBSD, содержит описания
+	    некоторых низкоуровневых средств и процедур. Уделите внимание
+	    разделу номер 13 -
+	    <a class="link" href="../../../../doc/en_US.ISO8859-1/books/arch-handbook/driverbasics.html" target="_top">
+	    Написание драйверов устройств для FreeBSD</a>.</p></li><li class="listitem"><p>Несколько интересных статей об устройстве ядра
+	    можно найти на сайте
+	    <a class="link" href="http://www.freebsddiary.com" target="_top">FreeBSD
+	    Diary</a>.</p></li><li class="listitem"><p>Страницы из раздела номер 9 системного справочника,
+	    содержат важную документацию по функциям ядра.</p></li><li class="listitem"><p>Страница справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">geom</span>(4)</span></a>, а также <a class="link" href="http://phk.freebsd.dk/pubs/" target="_top">слайды Пола-Хеннинга Кампа
+	    </a> - общее представление о подсистеме GEOM.</p></li><li class="listitem"><p>Страницы справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_bio&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_bio</span>(9)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_event&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_event</span>(9)</span></a>,
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_data&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_data</span>(9)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_geom&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_geom</span>(9)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_provider&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_provider</span>(9)</span></a>,
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_consumer&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_consumer</span>(9)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_access&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_access</span>(9)</span></a>, а также другие,
+	    связанные с вышеупомянутыми и раскрывающие специфический
+	    функционал подсистемы GEOM.</p></li><li class="listitem"><p>Страница справочника <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=style&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">style</span>(9)</span></a> - документирует
+	    соглашения о стиле оформления кода, которые обязаны быть соблюдены
+	    если вы планируете передать ваш код в Subversion репозиторий
+	    FreeBSD.</p></li></ul></div></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="prelim"></a>2. Подготовка</h2></div></div></div><p>Для того, чтоб заниматься разработками для ядра, желательно
+      иметь два отдельных компьютера. Один из них предназначен для среды
+      разработки и исходных кодов, а второй - для запуска тестов
+      отлаживаемого кода. Второму компьютеру для работы достаточно
+      иметь возможность выполнять начальную загрузку по сети и монтирование
+      файловых систем по сети. В этой ситуации, если отлаживаемый код
+      содержит ошибки и вызовет аварийную остановку системы, то это не
+      повлечет порчу или утерю исходного кода
+      .
+      Второму компьютеру даже не потребуется иметь свой монитор,
+      достаточно будет соединения асинхронных портов кабелем RS-232 или
+      соединения при помощи KVM-устройства.</p><p>Но так как далеко не у каждого есть два или более компьютеров
+      под рукой, есть пара способов подготовить иную <span class="quote"><<<span class="quote">живую</span>>></span>
+      систему для разработки кода для ядра. Один из них - это
+      разработка в <a class="link" href="http://www.vmware.com/" target="_top">VMWare</a>
+      или <a class="link" href="http://www.qemu.org/" target="_top">QEmu</a> виртуальной машине
+      (это лучшее из доступного, после, конечно-же, выделенного для тестов
+      компьютера).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="prelim-system"></a>2.1. Настройка системы для разработки</h3></div></div></div><p>Прежде всего необходимо иметь в ядре поддержку
+	<code class="option">INVARIANTS</code>. Добавьте следующие строки в
+	файл конфигурации ядра:</p><pre class="programlisting">options INVARIANT_SUPPORT
+options INVARIANTS</pre><p>Для большей информативности при отладке включите поддержку
+	WITNESS, которая будет предупреждать вас в случае возникновения
+	взаимоблокировок:</p><pre class="programlisting">options WITNESS_SUPPORT
+options WITNESS
+</pre><p>Также включите отладочные символы, если планируете
+	выполнять отладку по дампам аварийных отказов</p><pre class="programlisting">  makeoptions    DEBUG=-g</pre><p>Установка отладочного ядра обычным способом (<code class="command">make
+	installkernel</code>) не даст привычного результата:
+	файл ядра будет называться <code class="filename">kernel.debug</code>
+	и будет находиться в
+	<code class="filename">/usr/obj/usr/src/sys/KERNELNAME/</code>.
+	Для удобства, отладочное ядро необходимо скопировать в
+	<code class="filename">/boot/kernel/</code>.</p><p>Также удобно иметь включенный отладчик ядра, так вы сможете
+	исследовать паники сразу-же после их возникновения. Для включения
+	отладчика добавьте следующие строки в файл конфигурации ядра:</p><pre class="programlisting">options KDB
+options DDB
+options KDB_TRACE</pre><p>Для автоматического запуска отладчика ядра после возникновения
+	паники может понадобиться установить переменную sysctl:</p><pre class="programlisting">  debug.debugger_on_panic=1</pre><p>Паники системы будут происходить, поэтому уделите внимание
+	кэшу файловой системы. Обычно, при включенном механизме
+	softupdates, последняя версия файла может быть утеряна если
+	паника произошла раньше сбрасывания кэша на устройство хранения.
+	Выключение механизма softupdates (посредством монтирования файловой
+	системы с опцией <span class="quote"><<<span class="quote">sync</span>>></span>) значительно сказывается на
+	производительности и, опять-же, не гарантирует целостности
+	данных. Как компромисс, можно сократить задержки сбрасывания
+	кэша механизма softupdates. Есть три переменных sysctl, значения
+	которых необходимо изменить (лучше всего - прописав их в
+	<code class="filename">/etc/sysctl.conf</code>):</p><pre class="programlisting">kern.filedelay=5
+kern.dirdelay=4
+kern.metadelay=3</pre><p>Значения этих переменных - секунды.</p><p>Для отладки паник ядра необходимы дампы памяти.
+	Так как паника ядра может <span class="quote"><<<span class="quote">сломать</span>>></span> файловую
+	систему, дамп сначала сохраняется в <span class="quote"><<<span class="quote">сырой</span>>></span>
+	раздел. Обычно, это своп-раздел. Поэтому, размер своп-раздела
+	должен быть не меньше размера ОЗУ компьютера. При последующей
+	загрузке дамп копируется в обычный файл. Это происходит сразу-же
+	после проверки и монтирования файловых систем, но перед
+	активированием раздела свопа. Такое поведение контролируется
+	следующими переменными <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">dumpdev="/dev/ad0s4b"
+dumpdir="/usr/core" </pre><p>Переменная <code class="varname">dumpdev</code> указывает на раздел
+	подкачки, а <code class="varname">dumpdir</code> сообщает системе куда
+	перемещать дамп ядра при следующей загрузке.</p><p>Сохранение дампа ядра - процесс медленный, и, если
+	у вашего компьютера много оперативной памяти (&gt;256M) и если
+	паники случаются часто, то ожидание сохранения дампов может начать
+	раздражать (вспомним, что над дампом происходит две операции:
+	сохранение в своп-файл и перемещение на файловую систему).
+	В таком случае может оказаться удобным ограничивание объема
+	используемой системой памяти путем установки переменной в
+	<code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">  hw.physmem="256M"</pre><p>Если паники случаются часто и размер файловых систем большой
+	(или же вы просто не доверяете softupdates и фоновой проверке
+	файловых систем), рекомендуется отключить фоновую проверку файловых
+	систем посредством установки переменной в
+	<code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">  background_fsck="NO"</pre><p>В этом случае файловые системы будут проверяться только при
+	необходимости. Также заметьте, что в случае использования фоновой
+	проверки, новая паника может случиться в то время, когда
+	проверяются диски. Другими словами, наиболее безопасный способ
+	- не иметь много локальных файловых систем, а использовать
+	второй компьютер в качестве NFS-сервера.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="prelim-starting"></a>2.2. Начало проекта</h3></div></div></div><p>Для написания нового класса GEOM необходимо создать поддиректорию
+	в любой доступной пользователю директории. Совсем не обязательно,
+	чтоб ваш модуль изначально размещался в
+	<code class="filename">/usr/src</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="prelim-makefile"></a>2.3. Makefile</h3></div></div></div><p>Правилом хорошего тона является создание
+	<code class="filename">Makefile</code>-ов для каждого нетривиального
+	проекта, примером которого конечно-же является создание
+	модулей ядра.</p><p>Создание <code class="filename">Makefile</code> - дело
+	не сложное благодаря исчерпывающему набору вспомогательных средств,
+	предоставляемых системой. В вкратце, вот как должен выглядеть
+	<code class="filename">Makefile</code> для модуля ядра:</p><pre class="programlisting">SRCS=g_journal.c
+KMOD=geom_journal
+
+.include &lt;bsd.kmod.mk&gt;</pre><p>Этот <code class="filename">Makefile</code> (с измененными именами
+	файлов) подойдет к любому модулю ядра. Класс GEOM может размещаться
+	в одном единственном модуле ядра. Если для сборки вашего модуля
+	требуется больше, чем один файл, то перечислите их имена,
+	разделенные пробельными символами, в переменной <code class="envar">SRCS</code>.
+	</p></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kernelprog"></a>3. Программирование в ядре FreeBSD</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kernelprog-memalloc"></a>3.1. Выделение памяти</h3></div></div></div><p>Прочитайте <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=malloc&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">malloc</span>(9)</span></a> - выделение памяти лишь
+	немного отличается от своего эквивалента, используемого в пространстве
+	пользовательских процессов (userland). Наиболее приметно то, что
+	<code class="function">malloc</code>() и <code class="function">free</code>()
+	принимают дополнительные параметры, которые описаны в странице
+	справочника.</p><p>Тип <span class="quote"><<<span class="quote">malloc_type</span>>></span> необходимо объявить в секции
+	деклараций файла с исходным кодом, например:</p><pre class="programlisting">  static MALLOC_DEFINE(M_GJOURNAL, "gjournal data", "GEOM_JOURNAL Data");</pre><p>Для того, чтобы можно было использовать этот макрос,
+	необходимо включить следующие заголовочные файлы:
+	<code class="filename">sys/param.h</code>,
+	<code class="filename">sys/kernel.h</code> и
+	<code class="filename">sys/malloc.h</code></p><p>Существует еще один механизм выделения памяти - UMA
+	(Universal Memory Allocator), описанный в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=uma&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">uma</span>(9)</span></a>.
+	Это специфический метод, преимущественно предназначенный для
+	быстрого выделения памяти под списки, состоящие из элементов
+	одинакового размера (например, динамические массивы структур).</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kernelprog-lists"></a>3.2. Очереди и списки</h3></div></div></div><p>Ознакомьтесь с <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=queue&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">queue</span>(3)</span></a>
+	Во множестве случаев вам необходимо будет организовывать и
+	управлять такой структурой данных, как списки. К счастью, эта
+	структура данных реализована несколькими способами в виде макросов
+	на Си, а также включена в систему. Наиболее гибкий и часто
+	употребляемый тип списка - TAILQ. Этот тип списка также один
+	из наиболее требовательных к памяти (его элементы - с двойными
+	связями), а также - наиболее медленный (однако счет идет
+	на несколько инструкций ЦПУ, поэтому последнее утверждение не следует
+	воспринимать в всерьез).</p><p>Если важна скорость получения данных, то возьмите на вооружение
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tree&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">tree</span>(3)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hashinit&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">hashinit</span>(9)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kernelprog-bios"></a>3.3. BIOs</h3></div></div></div><p>Структура <code class="varname">bio</code> используется для всех
+	операций ввода/вывода, касающихся GEOM. Она содержит
+	информацию о том, какое устройство ('поставщик geom') должно ответить
+	на запрос, тип запроса, смещение, длину и указатель на буфер,
+	а также набор <span class="quote"><<<span class="quote">определенных пользователем</span>>></span> флагов и
+	полей
+	.
+	</p><p>Важным моментом является то, что <code class="varname">bio</code>
+	обрабатываются асинхронно. Это значит, что во многих частях кода
+	нет аналога к <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=read&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">read</span>(2)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=write&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">write</span>(2)</span></a> функциям из пространства
+	пользовательских процессов, которые не возвращают управление пока
+	не выполнится системный вызов. Скорее, по завершении обработки
+	запроса (или в случае ошибки при обработке) как извещение вызывается
+	определенная пользователем функция.</p><p>Асинхронная модель программирования в чем-то сложней,
+	нежели чаще используемая императивная модель, используемая в
+	пространстве пользовательских процессов; в любом случае, привыкание
+	займет некоторое время. В некоторых случаях могут быть использованы
+	вспомогательные функции <code class="function">g_write_data</code>() и
+	<code class="function">g_read_data</code>(), но <span class="emphasis"><em>далеко не
+	всегда</em></span>. В частности, эти функции не могут использоваться
+	когда захвачен мьютекс; например, мьютекс GEOM-топологии или
+	внутренний мьютекс, удерживаемый в ходе выполнения
+	<code class="function">.start</code>() или <code class="function">.stop</code>().</p></div></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="geom"></a>4. Программирование в системе GEOM</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-ggate"></a>4.1. Ggate</h3></div></div></div><p>Если максимальная производительность не требуется,
+	то более простой способ совершать преобразования данных -
+	это выполнять их в пространстве пользовательских процессов
+	посредством ggate (GEOM gate). К недостаткам следует отнести
+	невозможность простого переноса кода в ядро.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-class"></a>4.2. Класс GEOM</h3></div></div></div><p>Класс GEOM выполняет преобразования данных. Эти преобразования
+	могут быть скомпонованы друг с другом в виде дерева. Экземпляр
+	класса GEOM называют <span class="emphasis"><em>geom</em></span>.</p><p>В каждом классе GEOM есть несколько <span class="quote"><<<span class="quote">методов класса</span>>></span>,
+	которые вызываются когда экземпляра класса нет в наличии (или же
+	они не привязаны к конкретному экземпляру класса).</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">.init</code> вызывается тогда, когда
+	    системе GEOM становится известно о классе GEOM (например,
+	    когда загружается модуль ядра).</p></li><li class="listitem"><p><code class="function">.fini</code> будет вызван в случае отказа
+	    GEOM системы от класса (например, при выгрузке модуля).</p></li><li class="listitem"><p><code class="function">.taste</code> вызывается, когда в
+	    системе появляется новый класс или поставщик geom
+	    (<span class="quote"><<<span class="quote">provider</span>>></span>). Если соответствие найдено, то эта
+	    функция обычно создает и запускает экземпляр geom.</p></li><li class="listitem"><p><code class="function">.destroy_geom</code> вызывается при
+	    необходимости разрушить экземпляр geom.</p></li><li class="listitem"><p><code class="function">.ctlconf</code> будет вызван, когда
+	    пользователь запросит изменение конфигурации существующего
+	    экземпляра geom</p></li></ul></div><p>Также определены функции событий GEOM, которые копируются
+	в экземпляр geom.</p><p>Поле <code class="function">.geom</code> в структуре
+	<code class="varname">g_class</code> - это список (LIST) экземпляров
+	geom, реализованных из класса.</p><p>Эти функции вызываются из g_event потока ядра.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-softc"></a>4.3. Softc</h3></div></div></div><p><span class="quote"><<<span class="quote">softc</span>>></span> - это устаревший термин
+	для <span class="quote"><<<span class="quote">приватных данных драйвера</span>>></span> (<span class="quote"><<<span class="quote">driver
+	private data</span>>></span>). Название вероятней всего происходит от
+	устаревшего термина <span class="quote"><<<span class="quote">software control block</span>>></span>.
+	В системе GEOM softc это структура (точнее: указатель на
+	структуру) которая может быть присоединена к экземпляру geom
+	и может содержать приватные данные экземпляра. У большинства
+	классов GEOM есть следующие члены:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="varname">struct g_provider *provider</code> :
+	    <span class="quote"><<<span class="quote">поставщик geom</span>>></span> предоставляемый данным экземпляром
+	    geom</p></li><li class="listitem"><p><code class="varname">uint16_t n_disks</code> : Количество
+	    потребителей geom (<span class="quote"><<<span class="quote">consumer</span>>></span>), обслуживаемых данным
+	    экземпляром geom</p></li><li class="listitem"><p><code class="varname">struct g_consumer **disks</code> :
+	    Массив <code class="varname">struct g_consumer*</code>. (Невозможно
+	    обойтись одинарным указателем, потому что система GEOM создает
+	    для нас структуры struct g_consumer*)</p></li></ul></div><p>Структура <code class="varname">softc</code> содержит состояние
+	экземпляра geom. У каждого экземпляра есть свой softc.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-metadata"></a>4.4. Метаданные</h3></div></div></div><p>Формат метаданных в той или иной мере зависит от конкретного
+	класса, но <span class="emphasis"><em>обязан</em></span> начинаться с:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>16-байтного буфера для подписи - строки с
+	    завершающим нулем (обычно это имя класса)</p></li><li class="listitem"><p>uint32 идентификатора версии</p></li></ul></div><p>Подразумевается, что классы geom знают как обращаться с
+	метаданными с идентификаторами версий ниже, чем их собственные.</p><p>Метаданные размещаются в последнем секторе поставщика geom
+	(поэтому обязаны целиком умещаться в нем).</p><p>(Все это зависит от реализации, но весь существующий код работает
+	подобно описанному и поддерживается библиотеками.)</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-creating"></a>4.5. Маркирование/создание экземпляра geom</h3></div></div></div><p>Последовательность событий следующая:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>пользователь запускает служебную программу <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geom</span>(8)</span></a></p></li><li class="listitem"><p>программа решает каким классом geom ей придется
+	    управлять и ищет библиотеку
+	    <code class="filename">geom_<em class="replaceable"><code>CLASSNAME</code></em>.so</code>
+	    (которая обычно находится в <code class="filename">/lib/geom</code>).</p></li><li class="listitem"><p>она открывает библиотеку при помощи <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dlopen&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">dlopen</span>(3)</span></a>,
+	    извлекает вспомогательные функции и определения параметров
+	    командной строки.</p></li></ul></div><p>Вот так происходит создание/маркирование нового экземпляра
+	geom:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geom</span>(8)</span></a> ищет команду в аргументах командной
+	    строки (обычно это <code class="option">label</code>) и вызывает
+	    вспомогательную функцию.</p></li><li class="listitem"><p>Вспомогательная функция проверяет параметры и
+	    собирает метаданные, которые записываются во все вовлеченные
+	    поставщики geom.</p></li><li class="listitem"><p>Это <span class="quote"><<<span class="quote">повреждает (spoil)</span>>></span> существующие
+	    экземпляры geom (если они были) и порождает новый виток
+	    <span class="quote"><<<span class="quote">тестирования</span>>></span> поставщиков geom. Целевой класс geom
+	    опознает метаданные и активирует экземпляр geom.</p></li></ul></div><p>(Приведенная выше последовательность событий зависит от
+	конкретной реализации, но весь существующий код работает
+	подобно описанному и поддерживается библиотеками.)</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-command"></a>4.6. Структура команд geom</h3></div></div></div><p>Вспомогательная библиотека <code class="filename">geom_CLASSNAME.so</code>
+	экспортирует структуру <code class="varname">class_commands</code>,
+	которая является массивом элементов
+	<code class="varname">struct g_command</code>. Эти команды одинакового
+	формата и выглядят следующим образом:</p><pre class="programlisting">  команда [-опции] имя_geom [другие]</pre><p>Общими командами являются:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>label - записать метаданные в устройства,
+	    чтобы они могли быть опознаны в процессе тестирования
+	    и использованы в соответствующих экземплярах geom</p></li><li class="listitem"><p>destroy - разрушить метаданные, за которым
+	    последует разрушение экземпляров geom</p></li></ul></div><p>Общие опции:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">-v</code> : детальный вывод</p></li><li class="listitem"><p><code class="literal">-f</code> : принудить</p></li></ul></div><p>Некоторые операции, к примеру маркирование метаданными и
+	разрушение метаданных могут быть выполнены из пространства
+	пользовательских процессов. Для этого, структура
+	<code class="varname">g_command</code> содержит поле
+	<code class="varname">gc_func</code>, которое может быть установлено на
+	функцию (в том-же <code class="filename">.so</code>), которая будет вызвана
+	для обработки команды. В случае, когда <code class="varname">gc_func</code>
+	равно NULL, команда будет передана модулю ядра: функции
+	<code class="function">.ctlreq</code> класса GEOM.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-geoms"></a>4.7. Экземпляры geom</h3></div></div></div><p>У экземпляров классов GEOM есть внутренние данные, которые
+	хранятся в структурах softc, а также есть некоторые функции,
+	посредством которых они реагируют на внешние события.</p><p>Функции событий:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">.access</code> : просчитывает
+	    права доступа (чтение/запись/исключительный доступ)</p></li><li class="listitem"><p><code class="function">.dumpconf</code> : возвращает
+	    информацию о экземпляре geom; формат XML</p></li><li class="listitem"><p><code class="function">.orphan</code> : вызывается, когда
+	    отсоединяется любой из низлежащих поставщиков geom</p></li><li class="listitem"><p><code class="function">.spoiled</code> : вызывается, когда
+	    производится запись в низлежащий поставщик geom</p></li><li class="listitem"><p><code class="function">.start</code> : обрабатывает ввод/вывод</p></li></ul></div><p>Эти функции вызываются из ядерного потока
+	<code class="function">g_down</code> и в этом контексте не может быть
+	блокировок (поищите определение <span class="quote"><<<span class="quote">блокировка</span>>></span> в других
+	источниках), что немного ограничивает свободу действий, но
+	способствует быстроте обработки.</p><p>Из вышеупомянутых, наиболее важной и выполняющей полезную работу
+	функцией является <code class="function">.start</code>(), которая вызывается
+	всякий раз, когда поставщику geom, управляемому экземпляром класса,
+	приходит запрос BIO.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-threads"></a>4.8. Потоки выполнения системы geom</h3></div></div></div><p>Системой GEOM в ядре ОС создаются и используются три
+	потока выполнения (kernel threads):</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">g_down</code> : Обрабатывает запросы,
+	    приходящие от высокоуровневых сущностей (таких, как запросы из
+	    пространства пользовательских процессов) на пути к физическим
+	    устройствам</p></li><li class="listitem"><p><code class="literal">g_up</code> : Обрабатывает ответы от
+	    драйверов устройств на запросы, выполненные высокоуровневыми
+	    сущностями</p></li><li class="listitem"><p><code class="literal">g_event</code> : Отрабатывает в остальных
+	    случаях, как-то создание экземпляра geom, просчитывание прав
+	    доступа, события <span class="quote"><<<span class="quote">повреждения</span>>></span> и т.п.</p></li></ul></div><p>Когда пользовательский процесс запрашивает <span class="quote"><<<span class="quote">прочитать
+	данные X по смещению Y файла</span>>></span>, происходит следующее:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Файловая система преобразует запрос в экземпляр
+	    структуры bio и передает его системе GEOM. Файловая система
+	    <span class="quote"><<<span class="quote">знает</span>>></span>, что экземпляр geom должен обработать запрос,
+	    так как файловые системы размещаются непосредственно
+	    над экземпляром geom.</p></li><li class="listitem"><p>Запрос завершается вызовом функции
+	    <code class="function">.start</code>() в потоке g_down и достигает
+	    верхнего экземпляра geom.</p></li><li class="listitem"><p>Верхний экземпляр geom (например, это секционировщик
+	    разделов (partition slicer)) определяет, что запрос должен быть
+	    переадресован нижестоящему экземпляру geom (к примеру, драйверу
+	    диска). Вышестоящий экземпляр geom создает копию запроса bio
+	    (запросы bio <span class="emphasis"><em>ВСЕГДА</em></span> копируются при передаче
+	    между экземплярами geom при помощи
+	    <code class="function">g_clone_bio</code>()!),
+	    изменяет поля смещения и целевого поставщика geom и запускает
+	    на обработку копию при помощи функции
+	    <code class="function">g_io_request</code>()</p></li><li class="listitem"><p>Драйвер диска также получает запрос bio, как вызов
+	    функции <code class="function">.start</code>() в потоке
+	    <code class="literal">g_down</code>. Драйвер обращается к контроллеру диска,
+	    получает блок данных и вызывает функцию
+	    <code class="function">g_io_deliver</code>() используя копию запроса bio
+	    </p></li><li class="listitem"><p>Теперь, извещение о завершении bio
+	    <span class="quote"><<<span class="quote">всплывает</span>>></span> в потоке <code class="literal">g_up</code>.
+	    Сначала в потоке <code class="literal">g_up</code> вызывается функция
+	    <code class="function">.done</code>() секционировщика разделов,
+	    последний использует полученную информацию, разрушает
+	    клонированный экземпляр структуры bio посредством
+	    <code class="function">g_destroy_bio</code>() и вызывает
+	    <code class="function">g_io_deliver</code>() используя
+	    первоначальный запрос</p></li><li class="listitem"><p>Файловая система получает данные и передает их
+	    пользовательскому процессу</p></li></ul></div><p>За информацией о том, как данные передаются в структуре
+	<code class="varname">bio</code> между экземплярами geom,
+	смотрите <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=g_bio&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">g_bio</span>(9)</span></a> (обратите внимание на использование полей
+	<code class="varname">bio_parent</code> и <code class="varname">bio_children</code>).
+	</p><p>Важный момент в том, что <span class="emphasis"><em>НЕЛЬЗЯ ДОПУСКАТЬ БЛОКИРОВОК
+	В ПОТОКАХ G_UP И G_DOWN</em></span>. Вот неполный перечень того,
+	что нельзя делать в этих потоках:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Вызывать функции <code class="function">msleep</code>() или
+	    <code class="function">tsleep</code>().</p></li><li class="listitem"><p>Использовать функции
+	    <code class="function">g_write_data</code>() и
+	    <code class="function">g_read_data</code>(), так как они блокируются
+	    в момент обмена данными с потребителями geom.</p></li><li class="listitem"><p>Ожидать ввод/вывод.</p></li><li class="listitem"><p>Вызывать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=malloc&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">malloc</span>(9)</span></a> и
+	    <code class="function">uma_zalloc</code>() с установленным флагом
+	    <code class="varname">M_WAITOK</code>.</p></li><li class="listitem"><p>Использовать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sx&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">sx</span>(9)</span></a> 
+	    </p></li></ul></div><p>Это ограничение на код GEOM призвано избежать от
+	<span class="quote"><<<span class="quote">засорения</span>>></span> пути запроса ввода/вывода, так как
+	блокировки обычно не имеют четких временных границ, и нет гарантий
+	на занимаемое время (также на то есть и другие технические причины).
+	Это также значит, что в вышеупомянутых потоках сколь-нибудь сложные
+	операции выполнить нельзя, например: любое сложное преобразование
+	требует выделения памяти. К счастью решение есть: создание
+	дополнительных ядерных потоков.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="geom-kernelthreads"></a>4.9. Ядерные потоки выполнения, предназначенные для использования
+	в коде geom</h3></div></div></div><p>Ядерные потоки выполнения создаются функцией
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kthread_create&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">kthread_create</span>(9)</span></a>, в своем поведении они схожи с потоками,
+	созданными в пространстве пользовательских процессов, но есть одно
+	отличие: они не могут известить вызвавший их поток о своем завершении;
+	по завершению - необходимо вызывать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kthread_exit&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">kthread_exit</span>(9)</span></a></p><p>В коде GEOM обычное назначение этих потоков - разгрузить
+	поток <code class="literal">g_down</code>
+	(функцию <code class="function">.start</code>() ) от обработки запросов. Эти
+	потоки подобны <span class="quote"><<<span class="quote">обработчикам событий</span>>></span>
+	(<span class="quote"><<<span class="quote">event handlers</span>>></span>):
+	у них есть очередь событий (которая наполняется событиями от разных
+	функций из разных потоков; очередь необходимо защищать мьютексом),
+	события из очереди выбираются одно за другим и обрабатываются
+	в большом блоке <code class="literal">switch</code>().</p><p>Основное преимущество использования отдельного потока, который
+	обрабатывает запросы ввода/вывода, то, что он может блокироваться по
+	мере необходимости. Это, несомненно, привлекательно, но должно быть
+	хорошо обдумано. Блокирование - хорошо и удобно, но может
+	существенно снизить производительность преобразований данных в
+	системе GEOM. Особо требовательные к производительности классы
+	могут делать всю работу в функции <code class="function">.start</code>(),
+	уделяя особое внимание ошибкам при работе с памятью.</p><p>Еще одно преимущество потока <span class="quote"><<<span class="quote">обработчика событий</span>>></span>
+	это сериализация всех запросов и ответов, приходящих с разных
+	потоков geom в один поток. Это также удобно, но может быть медленным.
+	В большинстве случаев, обработка запросов функцией
+	<code class="function">.done</code>() может быть оставлена потоку
+	<code class="literal">g_up</code>.</p><p>У мьютексов в ядре FreeBSD (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mutex&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">mutex</span>(9)</span></a>) есть одно различие
+	с их аналогами из пространства пользовательских процессов -
+	во время удержания мьютекса в коде не должно быть блокировки. Если
+	в коде необходимо блокирование, то лучше использовать <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sx&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">sx</span>(9)</span></a>.
+	С другой стороны, если вся ваша работа выполняется в одном потоке,
+	вы можете обойтись вообще без мьютексов.</p></div></div></div></body></html>

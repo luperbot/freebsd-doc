@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>11.9. Kommandozeilenparameter</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Developers' Handbook" /><link rel="up" href="x86.html" title="Kapitel 11. x86-Assembler-Programmierung" /><link rel="prev" href="x86-buffered-io.html" title="11.8. Gepufferte Eingabe und Ausgabe" /><link rel="next" href="x86-environment.html" title="11.10. Die UNIX®-Umgebung" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">11.9. Kommandozeilenparameter</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="x86-buffered-io.html">Zurück</a> </td><th width="60%" align="center">Kapitel 11. x86-Assembler-Programmierung</th><td width="20%" align="right"> <a accesskey="n" href="x86-environment.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="x86-command-line"></a>11.9. Kommandozeilenparameter</h2></div><div><span class="authorgroup">Übersetzt von <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Fabian</span> <span class="surname">Ruch</span></span>. </span></div></div></div><p>Unser <span class="application">hex</span>-Programm wird
+      nützlicher, wenn es die Dateinamen der Ein- und Ausgabedatei
+      über die Kommandozeile einlesen kann, d.h., wenn es
+      Kommandozeilenparameter verarbeiten kann. Aber... Wo sind
+      die?</p><p>Bevor ein <span class="trademark">UNIX</span>®-System ein Programm ausführt, legt es
+      einige Daten auf dem Stack ab (<code class="function">push</code>) und springt dann an das
+      <code class="varname">_start</code>-Label des Programms. Ja, ich sagte
+      springen, nicht aufrufen. Das bedeutet, dass auf die Daten
+      zugegriffen werden kann, indem <code class="varname">[esp+offset]</code>
+      ausgelesen wird oder die Daten einfach vom Stack genommen werden
+      (<code class="function">pop</code>).</p><p>Der Wert ganz oben auf dem Stack enthält die Zahl der
+      Kommandozeilenparameter. Er wird traditionell
+      <code class="varname">argc</code> wie "argument count" genannt.</p><p>Die Kommandozeilenparameter folgen einander, alle
+      <code class="varname">argc</code>. Von diesen wird üblicherweise als
+      <code class="varname">argv</code> wie "argument value(s)" gesprochen. So
+      erhalten wir <code class="varname">argv[0]</code>,
+      <code class="varname">argv[1]</code>, <code class="varname">...</code> und
+      <code class="varname">argv[argc-1]</code>. Dies sind nicht die eigentlichen
+      Parameter, sondern Zeiger (Pointer) auf diese, d.h.,
+      Speicheradressen der tatsächlichen Parameter. Die Parameter
+      selbst sind durch NULL beendete Zeichenketten.</p><p>Der <code class="varname">argv</code>-Liste folgt ein NULL-Zeiger, was
+      einfach eine <code class="constant">0</code> ist. Es gibt noch mehr, aber
+      dies ist erst einmal genug für unsere Zwecke.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Falls Sie von der
+	<acronym class="acronym"><span class="trademark">MS-DOS</span>®</acronym>-Programmierumgebung kommen, ist
+	der größte Unterschied die Tatsache, dass jeder
+	Parameter eine separate Zeichenkette ist. Der zweite
+	Unterschied ist, dass es praktisch keine Grenze gibt, wie
+	viele Parameter vorhanden sein können.</p></div><p>Ausgerüstet mit diesen Kenntnissen, sind wir beinahe
+      bereit für eine weitere Version von
+      <code class="filename">hex.asm</code>. Zuerst müssen wir jedoch
+      noch ein paar Zeilen zu <code class="filename">system.inc</code>
+      hinzufügen:</p><p>Erstens benötigen wir zwei neue Einträge in unserer
+      Liste mit den Systemaufrufnummern:</p><pre class="programlisting">%define	SYS_open	5
+%define	SYS_close	6</pre><p>Zweitens fügen wir zwei neue Makros am Ende der Datei
+      ein:</p><pre class="programlisting">%macro	sys.open	0
+	system	SYS_open
+%endmacro
+
+%macro	sys.close	0
+	system	SYS_close
+%endmacro</pre><p>Und hier ist schließlich unser veränderter
+      Quelltext:</p><pre class="programlisting">%include	'system.inc'
+
+%define	BUFSIZE	2048
+
+section	.data
+fd.in	dd	stdin
+fd.out	dd	stdout
+hex	db	'0123456789ABCDEF'
+
+section .bss
+ibuffer	resb	BUFSIZE
+obuffer	resb	BUFSIZE
+
+section	.text
+align 4
+err:
+	push	dword 1		; return failure
+	sys.exit
+
+align 4
+global	_start
+_start:
+	add	esp, byte 8	; discard argc and argv[0]
+
+	pop	ecx
+	jecxz	.init		; no more arguments
+
+	; ECX contains the path to input file
+	push	dword 0		; O_RDONLY
+	push	ecx
+	sys.open
+	jc	err		; open failed
+
+	add	esp, byte 8
+	mov	[fd.in], eax
+
+	pop	ecx
+	jecxz	.init		; no more arguments
+
+	; ECX contains the path to output file
+	push	dword 420	; file mode (644 octal)
+	push	dword 0200h | 0400h | 01h
+	; O_CREAT | O_TRUNC | O_WRONLY
+	push	ecx
+	sys.open
+	jc	err
+
+	add	esp, byte 12
+	mov	[fd.out], eax
+
+.init:
+	sub	eax, eax
+	sub	ebx, ebx
+	sub	ecx, ecx
+	mov	edi, obuffer
+
+.loop:
+	; read a byte from input file or stdin
+	call	getchar
+
+	; convert it to hex
+	mov	dl, al
+	shr	al, 4
+	mov	al, [hex+eax]
+	call	putchar
+
+	mov	al, dl
+	and	al, 0Fh
+	mov	al, [hex+eax]
+	call	putchar
+
+	mov	al, ' '
+	cmp	dl, 0Ah
+	jne	.put
+	mov	al, dl
+
+.put:
+	call	putchar
+	cmp	al, dl
+	jne	.loop
+	call	write
+	jmp	short .loop
+
+align 4
+getchar:
+	or	ebx, ebx
+	jne	.fetch
+
+	call	read
+
+.fetch:
+	lodsb
+	dec	ebx
+	ret
+
+read:
+	push	dword BUFSIZE
+	mov	esi, ibuffer
+	push	esi
+	push	dword [fd.in]
+	sys.read
+	add	esp, byte 12
+	mov	ebx, eax
+	or	eax, eax
+	je	.done
+	sub	eax, eax
+	ret
+
+align 4
+.done:
+	call	write		; flush output buffer
+
+	; close files
+	push	dword [fd.in]
+	sys.close
+
+	push	dword [fd.out]
+	sys.close
+
+	; return success
+	push	dword 0
+	sys.exit
+
+align 4
+putchar:
+	stosb
+	inc	ecx
+	cmp	ecx, BUFSIZE
+	je	write
+	ret
+
+align 4
+write:
+	sub	edi, ecx	; start of buffer
+	push	ecx
+	push	edi
+	push	dword [fd.out]
+	sys.write
+	add	esp, byte 12
+	sub	eax, eax
+	sub	ecx, ecx	; buffer is empty now
+	ret</pre><p>In unserem <code class="varname">.data</code>-Abschnitt befinden
+      sich nun die zwei neuen Variablen <code class="varname">fd.in</code> und
+      <code class="varname">fd.out</code>. Hier legen wir die Dateideskriptoren
+      der Ein- und Ausgabedatei ab.</p><p>Im <code class="varname">.text</code>-Abschnitt haben wir die
+      Verweise auf <code class="varname">stdin</code> und
+      <code class="varname">stdout</code> durch <code class="varname">[fd.in]</code> und
+      <code class="varname">[fd.out]</code> ersetzt.</p><p>Der <code class="varname">.text</code>-Abschnitt beginnt nun mit
+      einer einfachen Fehlerbehandlung, welche nur das Programm mit
+      einem Rückgabewert von <code class="constant">1</code> beendet. Die
+      Fehlerbehandlung befindet sich vor <code class="varname">_start</code>,
+      sodass wir in geringer Entfernung von der Stelle sind, an der
+      der Fehler auftritt.</p><p>Selbstverständlich beginnt die
+      Programmausführung immer noch bei
+      <code class="varname">_start</code>. Zuerst entfernen wir
+      <code class="varname">argc</code> und <code class="varname">argv[0]</code> vom
+      Stack: Sie sind für uns nicht von Interesse (sprich, in
+      diesem Programm).</p><p>Wir nehmen <code class="varname">argv[1]</code> vom Stack und legen
+      es in <code class="varname">ECX</code> ab. Dieses Register
+      ist besonders für Zeiger geeignet, da wir mit <code class="function">jecxz</code> NULL-Zeiger verarbeiten
+      können. Falls <code class="varname">argv[1]</code> nicht NULL ist,
+      versuchen wir, die Datei zu öffnen, die der erste Parameter
+      festlegt. Andernfalls fahren wir mit dem Programm fort wie
+      vorher: Lesen von <code class="varname">stdin</code> und Schreiben nach
+      <code class="varname">stdout</code>. Falls wir die Eingabedatei nicht
+      öffnen können (z.B. sie ist nicht vorhanden), springen
+      wir zur Fehlerbehandlung und beenden das Programm.</p><p>Falls es keine Probleme gibt, sehen wir nun nach dem
+      zweiten Parameter. Falls er vorhanden ist, öffnen wir die
+      Ausgabedatei. Andernfalls schreiben wir die Ausgabe nach
+      <code class="varname">stdout</code>. Falls wir die Ausgabedatei nicht
+      öffnen können (z.B. sie ist zwar vorhanden, aber wir
+      haben keine Schreibberechtigung), springen wir auch wieder in
+      die Fehlerbehandlung.</p><p>Der Rest des Codes ist derselbe wie vorher, außer
+      dem Schließen der Ein- und Ausgabedatei vor dem Verlassen
+      des Programms und, wie bereits erwähnt, die Benutzung von
+      <code class="varname">[fd.in]</code> und
+      <code class="varname">[fd.out]</code>.</p><p>Unsere Binärdatei ist nun kolossale 768 Bytes
+      groß.</p><p>Können wir das Programm immer noch verbessern?
+      Natürlich! Jedes Programm kann verbessert werden. Hier
+      finden sich einige Ideen, was wir tun könnten:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Die Fehlerbehandlung eine Warnung auf
+	  <code class="varname">stderr</code> ausgeben lassen.</p></li><li class="listitem"><p>Den <code class="function">Lese</code>- und
+	  <code class="function">Schreib</code>funkionen eine Fehlerbehandlung
+	  hinzufügen.</p></li><li class="listitem"><p>Schließen von <code class="varname">stdin</code>, sobald wir
+	  eine Eingabedatei öffnen, von <code class="varname">stdout</code>,
+	  sobald wir eine Ausgabedatei öffnen.</p></li><li class="listitem"><p>Hinzufügen von Kommandozeilenschaltern wie zum
+	  Beispiel <em class="parameter"><code>-i</code></em> und
+	  <em class="parameter"><code>-o</code></em>, sodass wir die Ein- und
+	  Ausgabedatei in irgendeiner Reihenfolge angeben oder
+	  vielleicht von <code class="varname">stdin</code> lesen und in eine
+	  Datei schreiben können.</p></li><li class="listitem"><p>Ausgeben einer Gebrauchsanweisung, falls die
+	  Kommandozeilenparameter fehlerhaft sind.</p></li></ul></div><p>Ich beabsichtige, diese Verbesserungen dem Leser als
+      Übung zu hinterlassen: Sie wissen bereits alles, das Sie
+      wissen müssen, um die Verbesserungen
+      durchzuführen.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="x86-buffered-io.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="x86.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="x86-environment.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">11.8. Gepufferte Eingabe und Ausgabe </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 11.10. Die <span class="trademark">UNIX</span>®-Umgebung</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>
