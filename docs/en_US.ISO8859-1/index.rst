@@ -9,7 +9,7 @@ Welcome to FreeBSD's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :glob:
 
    htdocs/*
