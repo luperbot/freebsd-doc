@@ -60,7 +60,7 @@ def convert_dir(dir_path):
 def create_htdocs(dir_path):
     htdocs_path = "%s%s" % (dir_path, 'htdocs/')
     print "Making htdocs."
-    call(['cd', htdocs_path, '&&', 'make all'])
+    call("cd %s && make all" % htdocs_path, shell=True)
     print "Done making htdocs."
 
 if __name__ == '__main__':
