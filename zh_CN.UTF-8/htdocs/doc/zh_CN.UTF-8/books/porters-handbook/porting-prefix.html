@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>9.4. PREFIX (安装时的顶级目录名) 和 DESTDIR</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD Porter 手册" /><link rel="up" href="testing.html" title="第 9 章 测试您的 port" /><link rel="prev" href="testing-porttools.html" title="9.3. 使用 Port Tools 来完成测试" /><link rel="next" href="testing-tinderbox.html" title="9.5. Tinderbox" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">9.4. <code class="varname">PREFIX</code> (安装时的顶级目录名) 和 <code class="varname">DESTDIR</code></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="testing-porttools.html">上一页</a> </td><th width="60%" align="center">第 9 章 测试您的 port</th><td width="20%" align="right"> <a accesskey="n" href="testing-tinderbox.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="porting-prefix"></a>9.4. <code class="varname">PREFIX</code> (安装时的顶级目录名) 和 <code class="varname">DESTDIR</code></h2></div></div></div><p><code class="varname">PREFIX</code> 能够决定 port 安装时的目的位置。
+	  一般情况下这个位置是 <code class="filename">/usr/local</code>
+	  或 <code class="filename">/opt</code>， 但也可以设为其它的任意值。
+	  您的 port 则必须遵循这个变量。</p><p>除此之外， 如果用户配置了 <code class="varname">DESTDIR</code>，
+	  则表示希望将 port 安装到另一个环境， 通常是 jail
+	  或在 <code class="filename">/</code> 以外的其他位置挂接的系统中。
+	  实际上， port 会安装到
+	  <code class="varname">DESTDIR</code>/<code class="varname">PREFIX</code>，
+	  并注册到位于 <code class="varname">DESTDIR</code>/var/db/pkg
+	  的预编译包数据库中。 由于 <code class="varname">DESTDIR</code> 是由
+	  ports 框架藉由 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a> 来实现的， 您在撰写符合
+	  <code class="varname">DESTDIR</code> 规范的 ports 时并不需要什么额外的工作。</p><p>一般而言 <code class="varname">PREFIX</code> 会设为
+	  <code class="varname">LOCALBASE_REL</code> (默认是
+	  <code class="filename">/usr/local</code>)。 如果设置了
+	  <code class="varname">USE_LINUX_PREFIX</code>， 则 <code class="varname">PREFIX</code>
+	  会设为 <code class="varname">LINUXBASE_REL</code> (默认是
+	  <code class="filename">/compat/linux</code>)。</p><p>避免将 <code class="filename">/usr/local</code> 或
+	  <code class="filename">/usr/X11R6</code> 硬编码到源代码中，
+	  能够大大提高 port 的灵活性， 并适应不同环境的需要。
+	  对于使用 <code class="command">imake</code> 的 X port，
+	  这一工作是自动完成的； 其他情况下， 通常可以简单地将 port
+	  所用到的 <code class="filename">Makefile</code> 脚本中出现的
+	  <code class="filename">/usr/local</code> (或对于没有使用 imake 的 X port 而言，
+	  <code class="filename">/usr/X11R6</code>) 替换为读取
+	  <code class="varname">${PREFIX}</code> 变量就能达到目的了，
+	  因为这个变量在联编和安装的过程中， 会自动向下传递。</p><p>一定要避免让您的 port 在
+	<code class="filename">/usr/local</code> 而不是正确的 <code class="varname">PREFIX</code>
+	中安装文件。 简单的测试方法是：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make clean; make package PREFIX=/var/tmp/`make -V PORTNAME`</code></strong></pre><p>如果有文件安装到了 <code class="varname">PREFIX</code> 以外的地方，
+	打包过程将抱怨找不到这些文件。</p><p>这一步骤并不能帮助发现内部引用， 或纠正在引用其它 port
+	中的文件时使用的 <code class="varname">LOCALBASE</code>。 您需要在
+	<code class="filename">/var/tmp/`make -V PORTNAME`</code>
+	中测试安装好的软件， 才能够达到这样的目的。</p><p>您可以在自己的 <code class="filename">Makefile</code> 中改变
+	  <code class="varname">PREFIX</code> 变量的值， 也可以通过用户环境变量来影响它。
+	  然而， 一般情况下决不应该在 <code class="filename">Makefile</code>
+	  中明确设置它的值。</p><p>此外， 引用其它 port 中的文件时， 应使用前面介绍的变量，
+	  而不要直接指定它们的路径名。 例如， 如果您的 port
+	  需要使用 <code class="literal">PAGER</code> 这个宏来指明
+	  <code class="command">less</code> 的完整路径， 应使用下面的编译选项：
+
+	  </p><pre class="programlisting">-DPAGER=\"${LOCALBASE}/bin/less\"</pre><p>
+
+	  而非
+	  <code class="literal">-DPAGER=\"/usr/local/bin/less\"</code>。
+	  这种方法能够增加在系统管理员把整个 <code class="filename">/usr/local</code>
+	  目录挪到其它位置时安装成功的机会。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="testing-porttools.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="testing.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="testing-tinderbox.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">9.3. 使用 Port Tools 来完成测试 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 9.5. Tinderbox</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

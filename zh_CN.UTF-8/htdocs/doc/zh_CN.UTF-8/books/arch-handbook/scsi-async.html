@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>12.4. 异步事件</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="scsi.html" title="第 12 章 通用访问方法SCSI控制器" /><link rel="prev" href="scsi-polling.html" title="12.3. 轮询" /><link rel="next" href="scsi-interrupts.html" title="12.5. 中断" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.4. 异步事件</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="scsi-polling.html">上一页</a> </td><th width="60%" align="center">第 12 章 通用访问方法SCSI控制器</th><td width="20%" align="right"> <a accesskey="n" href="scsi-interrupts.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="scsi-async"></a>12.4. 异步事件</h2></div></div></div><p>如果建立了异步事件回调，则应当定义回调函数。</p><pre class="programlisting">static void
+ahc_async(void *callback_arg, u_int32_t code, struct cam_path *path, void *arg)</pre><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>callback_arg - 注册回调时提供的值
+      </p></li><li class="listitem"><p>code - 标识事件类型</p></li><li class="listitem"><p>path - 标识事件作用于其上的设备
+      </p></li><li class="listitem"><p>arg - 事件特定的参量</p></li></ul></div><p>单一类型事件的实现，AC_LOST_DEVICE，看起来如下：</p><pre class="programlisting">    struct xxx_softc *softc;
+    struct cam_sim *sim;
+    int targ;
+    struct ccb_trans_settings neg;
+
+    sim = (struct cam_sim *)callback_arg;
+    softc = (struct xxx_softc *)cam_sim_softc(sim);
+    switch (code) {
+    case AC_LOST_DEVICE:
+        targ = xpt_path_target_id(path);
+        if(targ &lt;= OUR_MAX_SUPPORTED_TARGET) {
+            clean_negotiations(softc, targ);
+            /* send indication to CAM */
+            neg.bus_width = 8;
+            neg.sync_period = neg.sync_offset = 0;
+            neg.valid = (CCB_TRANS_BUS_WIDTH_VALID
+                | CCB_TRANS_SYNC_RATE_VALID | CCB_TRANS_SYNC_OFFSET_VALID);
+            xpt_async(AC_TRANSFER_NEG, path, &amp;neg);
+        }
+        break;
+    default:
+        break;
+    }</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="scsi-polling.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="scsi.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="scsi-interrupts.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">12.3. 轮询 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 12.5. 中断</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

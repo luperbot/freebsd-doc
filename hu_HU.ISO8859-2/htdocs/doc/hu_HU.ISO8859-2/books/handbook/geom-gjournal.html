@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>19.7. Naplózó UFS GEOM-on keresztül</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="GEOM.html" title="19. fejezet - GEOM: A moduláris lemezszervező rendszer" /><link rel="prev" href="geom-glabel.html" title="19.6. A lemezes eszközök címkézése" /><link rel="next" href="filesystems.html" title="20. fejezet - Támogatott állományrendszerek" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.7. Naplózó UFS GEOM-on keresztül</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="geom-glabel.html">Vissza</a> </td><th width="60%" align="center">19. fejezet - GEOM: A moduláris lemezszervező rendszer</th><td width="20%" align="right"> <a accesskey="n" href="filesystems.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="geom-gjournal"></a>19.7. Naplózó UFS GEOM-on keresztül</h2></div></div></div><a id="idp91595472" class="indexterm"></a><a id="idp91595984" class="indexterm"></a><p>A FreeBSD 7.0-ás verziójának
+      megjelenésével egy rég várt
+      kiegészítés, a naplózás
+      vált végre elérhetővé
+      vált.  Maga az implementáció a
+      <acronym class="acronym">GEOM</acronym> alrendszeren keresztül
+      érhető el, és a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a>
+      segédprogram segítségével
+      könnyedén beállítható.</p><p>Mit is jelent a naplózás?  A
+      naplózás támogatásával a
+      rendszer egy naplót vezet az
+      állományrendszert érintő
+      tranzakciókról - például az
+      olyan változtatásokról, amelyek egy komplett
+      írási műveletet eredményeznek -
+      mielőtt még a metaadatok és
+      lemezírási műveletek szabályosan
+      befejeződnének.  Ez a könyvelés
+      később visszajátszható az
+      állományrendszerben lezajlott tranzakciók
+      reprodukálásához, és ezzel
+      megelőzhetőek az állományrendszerben
+      keletkező esetleges ellentmondások.</p><p>Ez egy újabb módszer az adatvesztés
+      és az állományrendszerben
+      előforduló ellentmondások
+      elkerülésére.  Eltérően a Soft
+      Updates módszertől, ahol a metaadatok
+      frissítését biztosítják
+      és követik nyomon, vagy a Snapshots
+      módszertől, ahol pillanatképeket
+      tárolunk az állományrendszerről, itt egy
+      konkrét naplót tárolunk a lemez erre a
+      célra fenntartott részén, amely bizonyos
+      esetekben akár egy teljes külön merevlemez is
+      lehet.</p><p>Ellentétben a többi naplózó
+      állományrendszertől, a
+      <code class="command">gjournal</code> módszere blokk alapú
+      és nem az állományrendszer
+      részeként került implementálásra
+      - csupán a <acronym class="acronym">GEOM</acronym> egyik
+      bővítménye.</p><p>A <code class="command">gjournal</code>
+      támogatásához a FreeBSD rendszermag
+      konfigurációs állományában be
+      kell állítani a következő opciót
+      - amely a 7.0 és későbbi rendszereken
+      alapbeállítás:</p><pre class="programlisting">options	UFS_GJOURNAL</pre><p>Amennyiben naplózással rendelkező
+      köteteket szeretnénk a rendszerindítás
+      során csatlakoztatni, a
+      <code class="filename">/boot/loader.conf</code> állományban
+      következő sor hozzáadásával
+      töltessük be a <code class="filename">geom_journal.ko</code>
+      modult:</p><pre class="programlisting">geom_journal_load="YES"</pre><p>Szükség esetén ezt a funkciót
+      akár a rendszermagba is beépíthetjük, ha
+      felvesszük a következő sort a rendszermag
+      konfigurációs
+      állományába:</p><pre class="programlisting">options	GEOM_JOURNAL</pre><p>Ha ezt aktiváltuk, egy szabad
+      állományrendszeren az alábbi
+      lépéseken keresztül tudunk létrehozni
+      egy naplót, feltéve, hogy a
+      <code class="filename">da4</code> egy új
+      <acronym class="acronym">SCSI</acronym>-meghajtó:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal label /dev/ad4</code></strong></pre><p>Ennél a pontnál lennie kell egy
+      <code class="filename">/dev/da4</code> és egy
+      <code class="filename">/dev/da4.journal</code>
+      eszközleírónak.  Hozzunk létre egy
+      állományrendszert ezen az eszközön:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -O 2 -J /dev/da4.journal</code></strong></pre><p>Ez a parancs létrehoz egy <acronym class="acronym">UFS</acronym>2
+      állományrendszert a naplóval rendelkező
+      eszközön.</p><p>Csatoljuk is be a <code class="command">mount</code>
+      segítségével az eszközt
+      kívánt csatlakozási pontra:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da4.journal /mnt</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ha több slice-unk is van, akkor a napló
+	mindegyik slice-hoz külön létrejön.
+	Például, ha az <code class="filename">ad4s1</code>
+	és <code class="filename">ad4s2</code> egyaránt
+	slice-ok, akkor a <code class="command">gjournal</code> legyártja
+	az <code class="filename">ad4s1.journal</code> és
+	<code class="filename">ad4s2.journal</code>
+	eszközleírókat.</p></div><p>A jobb teljesítmény elérése
+      érdekében kívánatos lehet a
+      naplót egy másik lemezen tartani.  Ilyen esetekben a
+      naplózás bekapcsolásához a
+      naplót biztosító szolgáltatót
+      vagy tárolóeszközt a naplózni
+      kívánt eszköz után kell szerepeltetni.
+      A naplózás akár az aktuálisan
+      használt állományrendszeren is
+      aktiválható a <code class="command">tunefs</code>
+      használatával.  Az állományrendszer
+      módosításakor viszont mindig érdemes
+      biztonsági másolatot készíteni!  Az
+      esetek többségében a
+      <code class="command">gjournal</code> hibát fog jelezni, mivel nem
+      tudja létrehozni a naplót, azonban ez nem
+      védi meg az adatainkat a <code class="command">tunefs</code>
+      helytelen használata által okozott
+      sérülésektől.</p><p>A rendszerindító lemezen is lehet
+      naplózást használni.  Ennek részleit a
+      <a class="link" href="../../../../doc/hu_HU.ISO8859-2/articles/gjournal-desktop" target="_top">Naplózó UFS használata asztali számítógépeken</a>
+      című cikkből ismerhetjük meg.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="geom-glabel.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="filesystems.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">19.6. A lemezes eszközök
+      címkézése </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 20. fejezet - Támogatott állományrendszerek</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

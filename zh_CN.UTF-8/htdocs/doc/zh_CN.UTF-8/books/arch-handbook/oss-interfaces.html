@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>15.4. 接口</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="oss.html" title="第 15 章 声音子系统" /><link rel="prev" href="pcm-probe-and-attach.html" title="15.3. 探测，连接等" /><link rel="next" href="pccard.html" title="第 16 章 PC Card" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.4. 接口</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pcm-probe-and-attach.html">上一页</a> </td><th width="60%" align="center">第 15 章 声音子系统</th><td width="20%" align="right"> <a accesskey="n" href="pccard.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="oss-interfaces"></a>15.4. 接口</h2></div></div></div><p><code class="filename">pcm</code>核心与声音驱动程序之间的接口以术语
+      <a class="link" href="kernel-objects.html" title="第 3 章 内核对象">内核对象</a>的叫法来定义。</p><p>声音驱动程序通常提供两种主要的接口：
+      <span class="emphasis"><em>CHANNEL</em></span>以及
+      <span class="emphasis"><em>MIXER</em></span>或<span class="emphasis"><em>AC97</em></span>。</p><p><span class="emphasis"><em>AC97</em></span>是一个很小的硬件访问（寄存器读/写）
+      接口，由驱动程序为带AC97编码解码器的硬件来实现。这种情况下，实际的
+      MIXER接口由<code class="filename">pcm</code>中共享的AC97代码提供。
+      </p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72903120"></a>15.4.1. CHANNEL接口</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72903760"></a>15.4.1.1. 函数参数的通常注意事项</h4></div></div></div><p>声音驱动程序通常用一个私有数据结构来描述他们的设备，驱动
+	  程序所支持的播放和录音数据通道各有一个。</p><p>对于所有的CHANNEL接口函数，第一个参数是一个不透明的指针。
+	  </p><p>第二个参数是指向私有的通道数据结构的指针，
+          <code class="function">channel_init()</code>是个例外，它的指针指向私有
+	  设备结构（并返回由<code class="filename">pcm</code>以后使用的通道指针）。
+	  </p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72906576"></a>15.4.1.2. 数据传输操作概览</h4></div></div></div><p>对于声音数据传输，<code class="filename">pcm</code>核心与声音驱动
+	  程序是通过一个由<code class="varname">struct snd_dbuf</code>描述的
+	  共享内存区域进行通信的。</p><p><code class="varname">struct snd_dbuf</code>是
+          <code class="filename">pcm</code>私有的，声音驱动程序通过调用访问者
+	  函数（<code class="function">sndbuf_getxxx()</code>）来获得感兴趣的值。
+	  </p><p>共享内存区域的大小等于
+          <code class="function">sndbuf_getsize()</code>，并被分割为大小固定，且等于
+          <code class="function">sndbuf_getblksz()</code>字节的很多块。</p><p>当播放时，常规的传输机制如下（将意思反过来就是录音）：
+          </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="filename">pcm</code>开始时填充缓冲区，然后以
+	      参数PCMTRIG_START调用声音驱动程序的<a class="link" href="oss-interfaces.html#channel-trigger" title="15.4.1.7. channel_trigger">
+              <code class="function">xxxchannel_trigger()</code></a>
+              。</p></li><li class="listitem"><p>声音驱动程序接着安排以
+	      <code class="function">sndbuf_getblksz()</code>字节大小为块，重复将
+	      整个内存区域（<code class="function">sndbuf_getbuf()</code>，
+              <code class="function">sndbuf_getsize()</code>）传输到设备。对于每个
+	      传输块回调<code class="filename">pcm</code>函数
+	      <code class="function">chn_intr()</code>（这通常在中断时间发生）。
+              </p></li><li class="listitem"><p><code class="function">chn_intr()</code>安排将新数据拷贝到那些
+	      数据已传输到设备（现在空闲）的区域，并对
+              <code class="varname">snd_dbuf</code>结构进行适当的更新。</p></li></ul></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="xxxchannel-init"></a>15.4.1.3. channel_init</h4></div></div></div><p>调用<code class="function">xxxchannel_init()</code>来初始化每个播放
+	  和录音通道。这个调用从声音驱动程序的连接例程中发起。（参看
+          <a class="link" href="pcm-probe-and-attach.html" title="15.3. 探测，连接等">探测和连接</a>一节）。</p><pre class="programlisting">          static void *
+          xxxchannel_init(kobj_t obj, void *data,
+             struct snd_dbuf *b, struct pcm_channel *c, int dir)<a id="co-chinit-params"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+          {
+              struct xxx_info *sc = data;
+              struct xxx_chinfo *ch;
+               ...
+              return ch;<a id="co-chinit-return"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+           }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-chinit-params"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p><code class="varname">b</code>为通道
+	      <code class="varname">struct snd_dbuf</code>的地址。它应当在
+	      函数中通过调用<code class="function">sndbuf_alloc()</code>来初始化。
+	      所用的缓冲区大小通常是设备'典型'传输大小的一个较小的倍数。
+              </p><p><code class="varname">c</code>为
+              <code class="filename">pcm</code>通道控制结构的指针。这是个不透明
+	      指针。函数应当将它保存到局部通道结构中，在后面调用
+              <code class="filename">pcm</code>函数（例如：
+              <code class="function">chn_intr(c)</code>）时会使用它。</p><p><code class="varname">dir</code>指示通道方向
+              （<code class="literal">PCMDIR_PLAY</code>或
+	      <code class="literal">PCMDIR_REC</code>）。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-chinit-return"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>函数应当返回一个指针，此指针指向用于控制此通道的私有
+	      区域。它将作为参数被传递到对其他通道接口的调用。
+              </p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72936784"></a>15.4.1.4. channel_setformat</h4></div></div></div><p><code class="function">xxxchannel_setformat()</code>应当按特定通道，
+	  特定声音格式设置硬件。</p><pre class="programlisting">          static int
+          xxxchannel_setformat(kobj_t obj, void *data, u_int32_t format)<a id="co-chsetformat-params"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+          {
+              struct xxx_chinfo *ch = data;
+               ...
+              return 0;
+           }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-chsetformat-params"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p><code class="varname">format</code>为
+              <code class="literal">AFMT_XXX value</code>值之一
+              （<code class="filename">soundcard.h</code>）。</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72941520"></a>15.4.1.5. channel_setspeed</h4></div></div></div><p><code class="function">xxxchannel_setspeed()</code>按指定的取样速度
+	  设置通道硬件，并返回返回可能调整过的速度。</p><pre class="programlisting">          static int
+          xxxchannel_setspeed(kobj_t obj, void *data, u_int32_t speed)
+          {
+              struct xxx_chinfo *ch = data;
+               ...
+              return speed;
+           }</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72943312"></a>15.4.1.6. channel_setblocksize</h4></div></div></div><p><code class="function">xxxchannel_setblocksize()</code>设置块大小，
+	  这是<code class="filename">pcm</code>与声音驱动程序，以及声音驱动
+	  程序与设备之间的传输单位的大小。传输期间，每次传输这样大小的
+	  数据后，声音驱动程序都应当调用<code class="filename">pcm</code>的
+          <code class="function">chn_intr()</code>。</p><p>大多数驱动程序只注意这儿的块大小，因为当实际传输开始时应该
+	  使用这个值。</p><pre class="programlisting">          static int
+          xxxchannel_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
+          {
+              struct xxx_chinfo *ch = data;
+                ...
+              return blocksize;<a id="co-chsetblocksize-return"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+           }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-chsetblocksize-return"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>函数返回可能调整过的块大小。如果块大小真的变化了，
+              这种情况下应当调用<code class="function">sndbuf_resize()</code>调整
+	      缓冲区的大小。</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="channel-trigger"></a>15.4.1.7. channel_trigger</h4></div></div></div><p><code class="function">xxxchannel_trigger()</code>由
+          <code class="filename">pcm</code>来控制驱动程序中的实际传输操作。
+          </p><pre class="programlisting">          static int
+          xxxchannel_trigger(kobj_t obj, void *data, int go)<a id="co-chtrigger-params"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+          {
+              struct xxx_chinfo *ch = data;
+               ...
+              return 0;
+           }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-chtrigger-params"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p><code class="varname">go</code>定义当前调用的动作。可能的值为：
+              </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">PCMTRIG_START</code>：驱动程序应当
+		  启动从/到通道缓冲区的数据传输。如果需要，应当通过
+                  <code class="function">sndbuf_getbuf()</code>和
+                  <code class="function">sndbuf_getsize()</code>检取缓冲区的
+		  基地址和大小。</p></li><li class="listitem"><p><code class="literal">PCMTRIG_EMLDMAWR</code> /
+                  <code class="literal">PCMTRIG_EMLDMARD</code>：告诉驱动程序，
+		  输入或输出缓冲区可能已被更新过了。大多数驱动程序只是
+		  忽略这些调用。</p></li><li class="listitem"><p><code class="literal">PCMTRIG_STOP</code> /
+                  <code class="literal">PCMTRIG_ABORT</code>：驱动程序应当停止当前
+		  的传输。</p></li></ul></div></td></tr></table></div><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">如果驱动程序使用ISA DMA，则应当在设备上执行动作前
+	  调用<code class="function">sndbuf_isadma()</code>，并处理DMA芯片一方的
+	  事情。</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72975952"></a>15.4.1.8. channel_getptr</h4></div></div></div><p><code class="function">xxxchannel_getptr()</code>返回传输缓冲区中
+	  当前的缓冲。它通常由<code class="function">chn_intr()</code>调用，而且
+          这也是为什么<code class="filename">pcm</code>知道它应当往哪儿传送
+	  新数据。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72978128"></a>15.4.1.9. channel_free</h4></div></div></div><p>调用<code class="function">xxxchannel_free()</code>来释放通道资源，
+	  例如当驱动程序卸载时，并且如果通道数据结构是动态分配的，或者
+	  如果不使用<code class="function">sndbuf_alloc()</code>进行缓冲区分配，
+	  则应当实现这个函数。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72980176"></a>15.4.1.10. channel_getcaps</h4></div></div></div><pre class="programlisting">          struct pcmchan_caps *
+          xxxchannel_getcaps(kobj_t obj, void *data)
+          {
+              return &amp;xxx_caps;<a id="co-chgetcaps-return"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+           }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-chgetcaps-return"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>这个例程返回指向（通常静态定义的）
+              <code class="varname">pcmchan_caps</code>结构的指针（在
+              <code class="filename">sound/pcm/channel.h</code>中定义）。这个结构
+	      保存着最小和最大采样频率和被接受的声音格式。任何声音驱动
+	      程序都可以作为一个范例。</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72983888"></a>15.4.1.11. 更多函数</h4></div></div></div><p><code class="function">channel_reset()</code>,
+          <code class="function">channel_resetdone()</code>和
+          <code class="function">channel_notify()</code>用于特殊目的，未与权威人士
+          (Cameron Grant)进行探讨之前不应当在驱动程序中实现它。</p><p>不赞成使用<code class="function">channel_setdir()</code>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72987216"></a>15.4.2. MIXER接口</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="xxxmixer-init"></a>15.4.2.1. mixer_init</h4></div></div></div><p><code class="function">xxxmixer_init()</code>初始化硬件，并告诉
+          <code class="filename">pcm</code>什么混音器设备可用来播放和录音。
+          </p><pre class="programlisting">          static int
+          xxxmixer_init(struct snd_mixer *m)
+          {
+              struct xxx_info   *sc = mix_getdevinfo(m);
+              u_int32_t v;
+
+              [初始化硬件]
+
+              [为播放混音器设置v中适当的位]<a id="co-mxini-sd"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+              mix_setdevs(m, v);
+              [为录音混音器设置v中适当的位]
+              mix_setrecdevs(m, v)
+
+              return 0;
+          }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-mxini-sd"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>设置一个整数值中的位，并调用
+              <code class="function">mix_setdevs()</code>和
+              <code class="function">mix_setrecdevs()</code>来告诉
+              <code class="filename">pcm</code>存在什么设备。</p></td></tr></table></div><p>混音器的位定义可以在<code class="filename">soundcard.h</code>中
+	  找到。（<code class="literal">SOUND_MASK_XXX</code>值和
+          <code class="literal">SOUND_MIXER_XXX</code>移位）。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72994512"></a>15.4.2.2. mixer_set</h4></div></div></div><p><code class="function">xxxmixer_set()</code>为混音器设备设置音量级别
+          (level)。</p><pre class="programlisting">          static int
+          xxxmixer_set(struct snd_mixer *m, unsigned dev,
+                           unsigned left, unsigned right)<a id="co-mxset-params"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+          {
+              struct sc_info *sc = mix_getdevinfo(m);
+              [设置音量级别(level)]
+              return left | (right &lt;&lt; 8);<a id="co-mxset-return"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+          }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-mxset-params"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>设备被指定为 <code class="literal">SOUND_MIXER_XXX</code> 值</p><p>在范围[0-100]之间指定音量值。零值应当让设备静音。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-mxset-return"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>由于硬件(音量)级别(level)可能不匹配输入比例，会出现
+	      某些圆整，例程返回如上面所示的实际级别值（范围0-100内）。</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp73000144"></a>15.4.2.3. mixer_setrecsrc</h4></div></div></div><p><code class="function">xxxmixer_setrecsrc()</code>设定录音源设备。
+          </p><pre class="programlisting">          static int
+          xxxmixer_setrecsrc(struct snd_mixer *m, u_int32_t src)<a id="co-mxsr-params"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+          {
+              struct xxx_info *sc = mix_getdevinfo(m);
+
+              [查看src中的非零位, 设置硬件]
+
+              [更新src反映实际动作]
+              return src;<a id="co-mxsr-return"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+           }</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-mxsr-params"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>期望的录音设备由一个位域指定. </p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-mxsr-return"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>返回设置用来录音的实际设备。一些驱动程序只能设置一个
+	      录音设备。如果出现错误，函数应当返回-1。</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp73009104"></a>15.4.2.4. mixer_uninit, mixer_reinit</h4></div></div></div><p><code class="function">xxxmixer_uninit()</code>应当确保不会发出任何
+	  声音，并且如果可能则应当让混音器硬件断电。</p><p><code class="function">xxxmixer_reinit()</code>应当确保混音器硬件
+	  加电，并且恢复所有不受<code class="function">mixer_set()</code>或
+          <code class="function">mixer_setrecsrc()</code>控制的设置。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp73012048"></a>15.4.3. AC97接口</h3></div></div></div><a id="idp73012688" class="indexterm"></a><p><span class="emphasis"><em>AC97</em></span>由带有AC97编码解码器的驱动程序实现。
+        它只有三个方法：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">xxxac97_init()</code>返回找到的
+          ac97编码解码器的数目。</p></li><li class="listitem"><p><code class="function">ac97_read()</code>与
+          <code class="function">ac97_write()</code>读写指定的寄存器。</p></li></ul></div><p>The <span class="emphasis"><em>AC97</em></span>接口由
+        <code class="filename">pcm</code>中的AC97代码来执行高层操作。参看
+        <code class="filename">sound/pci/maestro3.c</code>或
+        <code class="filename">sound/pci/</code>下很多其他内容作为范例。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pcm-probe-and-attach.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="oss.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="pccard.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">15.3. 探测，连接等 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 第 16 章 PC Card</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

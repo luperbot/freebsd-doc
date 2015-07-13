@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>10.21. Combien d'overhead, IPFW implique-t-il ?</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Questions Fréquemment Posées sur FreeBSD 2.X, 3.X et 4.X" /><link rel="up" href="network.html" title="Chapitre 10. Réseaux. **Mise à jour en cours**" /><link rel="prev" href="ch10s20.html" title="10.20. ``Permission denied'' pour toutes les opérations réseaux." /><link rel="next" href="ch10s22.html" title="10.22. Comment puis-je rediriger les requêtes de services d'une machine vers une autre ?" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.21. Combien d'overhead, IPFW implique-t-il ?</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch10s20.html">Précédent</a> </td><th width="60%" align="center">Chapitre 10. Réseaux. **Mise à jour en cours**</th><td width="20%" align="right"> <a accesskey="n" href="ch10s22.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp68287824"></a>10.21. Combien d'overhead, IPFW implique-t-il ?</h2></div></div></div><p>
+La réponse à ceci dépend pour la plupart à votre ensemble de règle et à
+votre vitesse de processeur. Pour la plupart des applications
+utilisant ethernet et de petits ensembles de règles, la réponse est :
+négligeable. Pour tous ceux d'entre vous qui veulent des mesures
+actuelles pour satisfaire leur curiosité, continuez à lire :
+
+      </p><p>
+Les mesures suivantes ont été réalisées en utilisant 2.2.5-STABLE sur
+un 486-66.  IPFW a été modifié pour mesurer le temps écoulé par
+l'intermédiaire de la routine <span class="emphasis"><em>ip_fw_chk</em></span>
+en affichant les résultats sur la console tous les 1000 paquets.
+
+      </p><p>
+2 ensembles de règles, chacun avec 1000 règles ont été testés.
+Le premier ensemble a été conçu pour démontrer le scénario du pire des
+cas en répétant la règle :
+
+      </p><pre class="programlisting">
+ipfw add deny tcp from any to any 55555
+      </pre><p>
+
+      </p><p>
+Cela démontre le pire des cas en faisant que chaque paquet IPFW entraine l'exécution de
+la routine de vérification qui finallement décide que le
+paquet ne correspond pas aux règles (en vertu du numéro de port)?
+Apès la 999eme itération de cette règle, il y avait un
+<span class="emphasis"><em>allow ip from any to any</em></span>.
+
+      </p><p>
+Le second ensemble de règles a été conçu pour annuler la vérification de
+règle très rapidement :
+
+      </p><pre class="programlisting">
+ipfw add deny ip from 1.2.3.4 to 1.2.3.4
+      </pre><p>
+
+      </p><p>
+Les adresses IP des sources non correspondantes aux règles énoncées
+ci-dessus font que ces règles sont sautées très rapidement. Comme
+auparavant, la 1000eme règle était un
+<span class="emphasis"><em>allow ip from any to any</em></span>.
+
+      </p><p>
+L'étude par paquet dans le premier cas a été approximativement de
+2.703ms/paquet, soit en gros 2.7 microseconds par règle
+.
+Ainsi, la limite théorique d'étude de paquet avec ces règles est de 370
+paquets par secondes. En supposant un éthernet 10Mbps et des paquets
+d'environ 1500 bytes, nous ne pourrons être capable que d'obtenir une
+utilisation de la bande passante de 55.5%
+      </p><p>
+Pour le dernier cas, chaque paquet a été étudié en approximativement
+1.172ms, soit en gros 1.2 microseconds par règle.
+La limite théorique de l'étude des paquets ici, serait d'environ de 853
+paquets par secondes, ce qui pourrait consommer une bande passante
+d'un éthernet 10Mbps.
+
+      </p><p>
+Le nombre excessif de règle testés, et la nature de ces règles ne
+fournissent pas un scénario du monde réel -- ils ont été utilisés que
+pour générer les informations de temps présentés ici.Voici certaines
+choses à garder à l'esprit pour construire un ensemble de règles
+efficaces :
+
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>
+Placer une règle d'`établissement' très tôt afin de pouvoir
+gérer la majorité du trafic TCP. Ne  mettre aucun
+<span class="emphasis"><em>allow tcp</em></span>
+avant cette règle.
+		</p></li><li class="listitem"><p>
+Placer les règles souvent sollicitées le plus au début de l'ensemble
+des règles plutôt que celles rarement utilisées
+(<span class="emphasis"><em>sans changer la permissivité du firewall </em></span>, bien sûr).
+Vous pourrez voir quels sont  les règles les plus souvent utilisées en
+examinant les statistiques des comptages des paquets  avec
+<span class="emphasis"><em>ipfw -a l</em></span>.
+		</p></li></ul></div><p>
+</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch10s20.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="network.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch10s22.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">10.20. ``Permission denied'' pour toutes les opérations réseaux. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 10.22. Comment puis-je rediriger les requêtes de services d'une machine vers une autre ?  </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.6. 总线内存映射</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver-resources.html" title="10.5. 资源" /><link rel="next" href="isa-driver-dma.html" title="10.7. DMA" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.6. 总线内存映射</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-resources.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-dma.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-busmem"></a>10.6. 总线内存映射</h2></div></div></div><p>很多情况下设备驱动程序和设备之间的数据交换是通过内存
+        进行的。有两种可能的变体：</p><p>(a) 内存位于设备卡上</p><p>(b) 内存为计算机的主内存</p><p>情况(a)中，驱动程序可能需要在卡上的内存与主存之间来回
+        拷贝数据。为了将卡上的内存映射到内核的虚地址空间，卡上内存的
+        物理地址和长度必须被定义为<code class="literal">SYS_RES_MEMORY</code>资源。
+        然后资源就可以被分配并激活，它的虚地址通过使用
+        <code class="function">rman_get_virtual()</code>获取。较老的驱动程序
+        将函数<code class="function">pmap_mapdev()</code>用于此目的，现在
+        不应当再直接使用此函数。它已成为资源激活的一个内部步骤。</p><p>大多数ISA卡的内存配置为物理地位于640KB-1MB范围之间的
+        某个位置。某些ISA卡需要更大的内存范围，位于16M以下的某个
+        位置（由于ISA总线上24位地址限制）。这种情况下，如果机器有
+        比设备内存的起始地址更多的内存（换句话说，它们重叠），则
+        必须在被设备使用的内存起始地址处配置一个内存空洞。许多
+        BIOS允许在起始于14MB或15MB处配置1M的内存空洞。如果BIOS
+        正确地报告内存空洞，FreeBSD就能够正确处理它们（此特性
+        在老BIOS上可能会出问题）。</p><p>情况(b)中，只是数据的地址被发送到设备，设备使用DMA实际
+        访问主存中的数据。存在两个限制：首先，ISA卡只能访问16MB以下
+        的内存。其次，虚地址空间中连续的页面在物理地址空间中可能不
+        连续，设备可能不得不进行分散/收集操作。总线子系统为这些问题
+        提供现成现成的解决办法，剩下的必须由驱动程序自己完成。</p><p>DMA内存分配使用了两个结构， <code class="varname">bus_dma_tag_t</code>
+	和 <code class="varname">bus_dmamap_t</code>。
+        标签（tag）描述了DMA内存要求的特性。映射（map）表示按照这些
+        特性分配的内存块。多个映射可以与同一标签关联。</p><p>标签按照对特性的继承而被组织成树型层次结构。子标签继承父
+        标签的所有要求，可以令其更严格，但不允许放宽要求。</p><p>一般地，每个设备单元创建一个顶层标签（没有父标签）。如果
+        每个设备需要不同要求的内存区，则为每个内存区都会创建一个标签，这些
+        标签作为父标签的孩子。</p><p>使用标签创建映射的方法有两种。</p><p>其一，分配一大块符合标签要求的连续内存（以后可以被释放）。
+        这一般用于分配为了与设备通信而存在相对较长时间的那些内存区。
+        将这样的内存加载到映射中非常容易：它总是被看作位于适当物理
+        内存范围的一整块。</p><p>其二，将虚拟内存中的任意区域加载到映射中。这片内存的
+        每一页都被检查，看是否符合映射的要求。如何符合则留在原始位置。
+        如果不符合则分配一个新的符合要求的
+        <span class="quote">“<span class="quote">反弹页面(bounce page)</span>”</span>，用作中间存储。
+        当从不符合的原始页面写入数据时，数据首先被拷贝到反弹页面，
+        然后从反弹页面传递到设备。当读取时，数据将会从设备到反弹页面，
+        然后被拷贝到它们不符合的原始页面。原始和反弹页面之间的拷贝
+        处理被称作同步。这一般用于单次传输的基础之上：每次传输时
+        加载缓冲区，完成传输，卸载缓冲区。</p><p>工作在DMA内存上的函数有：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="function">int bus_dma_tag_create(bus_dma_tag_t parent,
+          bus_size_t alignment, bus_size_t boundary, bus_addr_t
+          lowaddr, bus_addr_t highaddr, bus_dma_filter_t *filter, void
+          *filterarg, bus_size_t maxsize, int nsegments, bus_size_t
+          maxsegsz, int flags, bus_dma_tag_t *dmat)</code></p><p>创建新标签。成功则返回0，否则返回错误码。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><span class="emphasis"><em>parent</em></span> - 父标签或者NULL，
+              NULL用于创建顶层标签。</p></li><li class="listitem"><p><span class="emphasis"><em>alignment</em></span> -
+              对将要分配给标签的内存区的对齐要求。<span class="quote">“<span class="quote">no specific
+              alignment</span>”</span>时值为1。仅应用于以后的
+              <code class="function">bus_dmamem_alloc()</code>而不是
+              <code class="function">bus_dmamap_create()</code>调用。</p></li><li class="listitem"><p><span class="emphasis"><em>boundary</em></span> - 物理地址边界，
+                分配内存时不能穿过。对于<span class="quote">“<span class="quote">no boundary</span>”</span>
+                使用0。仅应用于以后的
+                <code class="function">bus_dmamem_alloc()</code>而不是
+                <code class="function">bus_dmamap_create()</code>调用。
+                必须为2的乘方。如果计划以非层叠DMA方式使用内存（也就是说，
+                DMA地址由ISA DMA控制器提供而不是设备自身），则由于DMA硬件
+                限制，边界必须不能大于64KB (64*1024)。</p></li><li class="listitem"><p><span class="emphasis"><em>lowaddr, highaddr</em></span> - 名字稍微
+              有些误导。这些值用于限制可用于内存分配的物理地址的允许
+              范围。其确切含义根据以后不同的使用而有所不同。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; "><li class="listitem"><p>对于<code class="function">bus_dmamem_alloc()</code>，
+                  从0到lowaddr-1的所有地址被视为允许，更高的地址不允许
+                  使用。</p></li><li class="listitem"><p>对于<code class="function">bus_dmamap_create()</code>，
+                  闭区间[lowaddr; highaddr]之外的所有地址被视为可访问。
+                  范围之内的地址页面被传递给过滤函数，由它决定是否可访问。
+                  如果没有提供过滤函数，则整个区间被视为不可访问。</p></li><li class="listitem"><p>对于ISA设备，正常值（没有过滤函数）为：</p><p>lowaddr = BUS_SPACE_MAXADDR_24BIT</p><p>highaddr = BUS_SPACE_MAXADDR</p></li></ul></div></li><li class="listitem"><p><span class="emphasis"><em>filter, filterarg</em></span> - 过滤函数及其
+              参数。如果filter为NULL，则当调用
+              <code class="function">bus_dmamap_create()</code>时，整个区间
+              [lowaddr, highaddr]被视为不可访问。
+              否则，区间[lowaddr; highaddr]内的每个被试图访问的页面的
+              物理地址被传递给过滤函数，由它决定是否可访问。过滤函数的
+              原型为：<code class="function">int filterfunc(void *arg,
+              bus_addr_t paddr)</code>。当页面可以被访问时它必须
+              返回0，否则返回非零值。</p></li><li class="listitem"><p><span class="emphasis"><em>maxsize</em></span> - 通过此标签可以分配的
+              最大内存值（以字节计）。有时这个值很难估算，或者可以任意大，
+              这种情况下，对于ISA设备这个值可以设为
+              <code class="literal">BUS_SPACE_MAXSIZE_24BIT</code>。</p></li><li class="listitem"><p><span class="emphasis"><em>nsegments</em></span> - 设备支持的分散/收集段
+              的最大数目。如果不加限制，则使用应当使用值
+              <code class="literal">BUS_SPACE_UNRESTRICTED</code>。
+              建议对父标签使用这个值，而为子孙标签指定实际限制。
+              nsegments值等于 <code class="literal">BUS_SPACE_UNRESTRICTED</code>
+              的标签不能用于实际加载映射，仅可以将它们作为父标签。 nsetments
+              的实际限制大约为250-300，再高的值将导致内核堆栈溢出（硬件
+              无法正常支持那么多的分散/收集缓冲区）。</p></li><li class="listitem"><p><span class="emphasis"><em>maxsegsz</em></span> - 设备支持的分散/收集段
+              的最大尺寸。对于ISA设备的最大值为
+              <code class="literal">BUS_SPACE_MAXSIZE_24BIT</code>。</p></li><li class="listitem"><p><span class="emphasis"><em>flags</em></span> - 	旗标的位图。感兴趣的旗标
+              只有：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; "><li class="listitem"><p><span class="emphasis"><em>BUS_DMA_ALLOCNOW</em></span> - 创建标签时
+                  请求分配所有可能用到的反射页面。</p></li><li class="listitem"><p><span class="emphasis"><em>BUS_DMA_ISA</em></span> - 比较神秘的一个标志，
+                  仅用于Alpha机器。i386机器没有定义它。Alpha机器的所有ISA设备
+                  都应当使用这个标志，但似乎还没有这样的驱动程序。</p></li></ul></div></li><li class="listitem"><p><span class="emphasis"><em>dmat</em></span> - 指向返回的新标签的存储的
+              指针。</p></li></ul></div></li><li class="listitem"><p><code class="function">int bus_dma_tag_destroy(bus_dma_tag_t
+          dmat)</code></p><p>销毁标签。成功则返回0，否则返回错误码。</p><p>dmat - 被销毁的标签。</p></li><li class="listitem"><p><code class="function">int bus_dmamem_alloc(bus_dma_tag_t dmat,
+          void** vaddr, int flags, bus_dmamap_t
+          *mapp)</code></p><p>分配标签所描述的一块连续内存区。被分配的内存的大小为标签的
+          maxsize。成功则返回0，否则返回错误码。调用结果被用于获取内存的
+          物理地址，但在此之前必须用<code class="function">bus_dmamap_load()</code>
+          将其加载。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>dmat</em></span> - 标签
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>vaddr</em></span> - 指向存储的指针，该存储空间
+                  用于返回的分配区域的内核虚地址。
+                 </p></li><li class="listitem"><p>
+                  flags - 旗标的位图。唯一感兴趣的旗标为：
+                </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; "><li class="listitem"><p>
+                      <span class="emphasis"><em>BUS_DMA_NOWAIT</em></span> - 如果内存不能
+                      立即可用则返回错误。如果此标志没有设置，则允许例程
+                      睡眠，直到内存可用为止。
+                    </p></li></ul></div></li><li class="listitem"><p>
+                  <span class="emphasis"><em>mapp</em></span> - 指向返回的新映射的存储的指针。
+                </p></li></ul></div></li><li class="listitem"><p>
+              <code class="function">void bus_dmamem_free(bus_dma_tag_t dmat, void
+              *vaddr, bus_dmamap_t map)</code>
+            </p><p>
+              释放由<code class="function">bus_dmamem_alloc()</code>分配的内存。
+              目前，对分配的带有ISA限制的内存的释放没有实现。因此，建议的
+              使用模型为尽可能长时间地保持和重用分配的区域。不要轻易地
+              释放某些区域，然后再短时间地分配它。这并不意味着不应当使用
+              <code class="function">bus_dmamem_free()</code>：希望很快它就会被
+              完整地实现。
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><span class="emphasis"><em>dmat</em></span> - 标签
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>vaddr</em></span> - 内存的内核虚地址
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>map</em></span> - 内存的映射（跟
+                  <code class="function">bus_dmamem_alloc()</code>返回的一样）
+                </p></li></ul></div></li><li class="listitem"><p>
+              <code class="function">int bus_dmamap_create(bus_dma_tag_t dmat, int
+              flags, bus_dmamap_t *mapp)</code>
+            </p><p>
+              为标签创建映射，以后用于
+              <code class="function">bus_dmamap_load()</code>。成功则返回0，否则
+              返回错误码。
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>dmat</em></span> - 标签
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>flags</em></span> - 理论上是旗标的位图。但还
+                  从未定义过任何旗标，因此目前总是0。
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>mapp</em></span> - 指向返回的新映射的存储的指针。
+                </p></li></ul></div></li><li class="listitem"><p>
+              <code class="function">int bus_dmamap_destroy(bus_dma_tag_t dmat,
+              bus_dmamap_t map)</code>
+            </p><p>
+              销毁映射。成功则返回0，否则返回错误码。
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  dmat - 与映射关联的标签
+                </p></li><li class="listitem"><p>
+                  map - 将要被销毁的映射
+                </p></li></ul></div></li><li class="listitem"><p>
+              <code class="function">int bus_dmamap_load(bus_dma_tag_t dmat,
+              bus_dmamap_t map, void *buf, bus_size_t buflen,
+              bus_dmamap_callback_t *callback, void *callback_arg, int
+              flags)</code>
+            </p><p>
+              加载缓冲区到映射中(映射必须事先由
+              <code class="function">bus_dmamap_create()</code>或者
+              <code class="function">bus_dmamem_alloc()</code>)创建。缓冲区的所有
+              页面都会被检查，看是否符合标签的要求，并为那些不符合的分配
+              反弹页面。会创建物理段描述符的数组，并将其传递给回调函数。
+              回调函数以某种方式处理这个数组。系统中的反弹缓冲区是受限的，
+              因此如果需要的反弹缓冲区不能立即获得，则将请求入队，当反弹
+              缓冲区可用时再调用回调函数。如果回调函数立即执行则返回0，
+              如果请求被排队，等待将来执行，则返回
+              <span class="errorname">EINPROGRESS</span>。后一种情况下，
+              与排队的回调函数之间的同步由驱动程序负责。
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>dmat</em></span> - 标签
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>map</em></span> - 映射
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>buf</em></span> - 缓冲区的内核虚地址
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>buflen</em></span> - 缓冲区的长度
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>callback</em></span>,<code class="function">
+                  callback_arg</code> - 回调函数及其参数
+                </p></li></ul></div><p>
+              回调函数的原型为：
+            </p><p>
+              <code class="function">void callback(void *arg, bus_dma_segment_t
+              *seg, int nseg, int error)</code>
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>arg</em></span> - 与传递给
+                  <code class="function">bus_dmamap_load()</code>的callback_arg
+                  相同。
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>seg</em></span> - 段描述符的数组
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>nseg</em></span> - 数组中的描述符个数
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>error</em></span> - 表示段数目溢出：如被设为
+                  <span class="errorname">EFBIG</span>，
+                  则标签允许的最大数目的段无法容纳缓冲区。
+                  这种情况下数组中的描述符的数目只有标签许可的那么多。
+                  对这种情况的处理由驱动程序决定：根据希望的语义，驱动
+                  程序可以视其为错误，或将缓冲区分为两个并单独处理第二个。
+                </p></li></ul></div><p>
+              段数组中的每一项包含如下字段：
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>ds_addr</em></span> - 段物理地址
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>ds_len</em></span> - 段长度
+                </p></li></ul></div></li><li class="listitem"><p>
+              <code class="function">void bus_dmamap_unload(bus_dma_tag_t dmat,
+              bus_dmamap_t map)</code>
+            </p><p>unload the map.
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>dmat</em></span> - 标签
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>map</em></span> - 已加载的映射
+                </p></li></ul></div></li><li class="listitem"><p>
+              <code class="function">void bus_dmamap_sync (bus_dma_tag_t dmat,
+              bus_dmamap_t map, bus_dmasync_op_t op)</code>
+            </p><p>
+              与设备进行物理传输前后，将加载的缓冲区与其反弹页面进行同步。
+              此函数完成原始缓冲区与其映射版本之间所有必需的数据拷贝工作。
+              进行传输之前和之后必须对缓冲区进行同步。
+            </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <span class="emphasis"><em>dmat</em></span> - 标签
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>map</em></span> - 已加载的映射
+                </p></li><li class="listitem"><p>
+                  <span class="emphasis"><em>op</em></span> - 要执行的同步操作的类型：
+                </p></li></ul></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p>
+                  <code class="function">BUS_DMASYNC_PREREAD</code> - 从设备到
+                  缓冲区的读操作之前
+                </p></li><li class="listitem"><p>
+                  <code class="function">BUS_DMASYNC_POSTREAD</code> - 从设备到
+                  缓冲区的读操作之后
+                </p></li><li class="listitem"><p>
+                  <code class="function">BUS_DMASYNC_PREWRITE</code> - 从缓冲区到
+                  设备的写操作之前
+                </p></li><li class="listitem"><p>
+                  <code class="function">BUS_DMASYNC_POSTWRITE</code> - 从缓冲区到
+                  设备的写操作之后
+                </p></li></ul></div></li></ul></div><p>
+          当前PREREAD和POSTWRITE为空操作，但将来可能会改变，因此驱动程序
+          中不能忽略它们。由<code class="function">bus_dmamem_alloc()</code>
+          获得的内存不需要同步。
+        </p><p>
+          从<code class="function">bus_dmamap_load()</code>中调用回调函数之前，
+          段数组是存储在栈中的。并且是按标签允许的最大数目的段预先分配
+          好的。这样由于i386体系结构上对段数目的实际限制约为250-300
+          （内核栈为4KB减去用户结构的大小，段数组条目的大小为8字节，和
+          其它必须留出来的空间）。由于数组基于最大数目而分配，因此这个值
+          必须不能设置成超出实际需要。幸运的是，对于大多数硬件而言，
+          所支持的段的最大数目低很多。但如果驱动程序想处理具有非常多
+          分散/收集段的缓冲区，则应当一部分一部分地处理：加载缓冲区的
+          一部分，传输到设备，然后加载缓冲区的下一部分，如此反复。
+        </p><p>
+          另一个实践结论是段数目可能限制缓冲区的大小。如果缓冲区中的
+          所有页面碰巧物理上不连续，则分片情况下支持的最大缓冲区尺寸
+          为(nsegments * page_size)。例如，如果支持的段的最大数目为10，
+          则在i386上可以确保支持的最大缓冲区大小为40K。如果希望更大的
+          则需要在驱动程序中使用一些特殊技巧。
+        </p><p>
+          如果硬件根本不支持分散/收集，或者驱动程序希望即使在严重分片的
+          情况下仍然支持某种缓冲区大小，则解决办法是：如果无法容纳下原始
+          缓冲区，就在驱动程序中分配一个连续的缓冲区作为中间存储。
+        </p><p>
+          下面是当使用映射时的典型调用顺序，根据对映射的具体使用而不同。
+          字符-&gt;用于显示时间流。
+        </p><p>
+          对于从连接到分离设备，这期间位置一直不变的缓冲区：</p><p>
+          bus_dmamem_alloc -&gt; bus_dmamap_load -&gt; ...use buffer... -&gt;
+          -&gt; bus_dmamap_unload -&gt; bus_dmamem_free
+        </p><p>对于从驱动程序外部传递进去，并且经常变化的缓冲区：
+
+        
+        </p><pre class="programlisting">          bus_dmamap_create -&gt;
+          -&gt; bus_dmamap_load -&gt; bus_dmamap_sync(PRE...) -&gt; do transfer -&gt;
+          -&gt; bus_dmamap_sync(POST...) -&gt; bus_dmamap_unload -&gt;
+          ...
+          -&gt; bus_dmamap_load -&gt; bus_dmamap_sync(PRE...) -&gt; do transfer -&gt;
+          -&gt; bus_dmamap_sync(POST...) -&gt; bus_dmamap_unload -&gt;
+          -&gt; bus_dmamap_destroy        </pre><p>
+
+        </p><p>
+          当加载由<code class="function">bus_dmamem_alloc()</code>创建的映射时，传递
+          进去的缓冲区的地址和大小必须和
+          <code class="function">bus_dmamem_alloc()</code>中使用的一样。这种情况下就
+          可以保证整个缓冲区被作为一个段而映射（因而回调可以基于此假设），
+          并且请求被立即执行（永远不会返回EINPROGRESS）。这种情况下回调函数
+          需要作的只是保存物理地址。
+        </p><p>
+          典型示例如下：
+        </p><pre class="programlisting">          static void
+        alloc_callback(void *arg, bus_dma_segment_t *seg, int nseg, int error)
+        {
+          *(bus_addr_t *)arg = seg[0].ds_addr;
+        }
+
+          ...
+          int error;
+          struct somedata {
+            ....
+          };
+          struct somedata *vsomedata; /* 虚地址 */
+          bus_addr_t psomedata; /* 物理总线相关的地址 */
+          bus_dma_tag_t tag_somedata;
+          bus_dmamap_t map_somedata;
+          ...
+
+          error=bus_dma_tag_create(parent_tag, alignment,
+           boundary, lowaddr, highaddr, /*filter*/ NULL, /*filterarg*/ NULL,
+           /*maxsize*/ sizeof(struct somedata), /*nsegments*/ 1,
+           /*maxsegsz*/ sizeof(struct somedata), /*flags*/ 0,
+           &amp;tag_somedata);
+          if(error)
+          return error;
+
+          error = bus_dmamem_alloc(tag_somedata, &amp;vsomedata, /* flags*/ 0,
+             &amp;map_somedata);
+          if(error)
+             return error;
+
+          bus_dmamap_load(tag_somedata, map_somedata, (void *)vsomedata,
+             sizeof (struct somedata), alloc_callback,
+             (void *) &amp;psomedata, /*flags*/0);        </pre><p>
+          代码看起来有点长，也比较复杂，但那是正确的使用方法。实际结果是：
+          如果分配多个内存区域，则总将它们组合成一个结构并作为整体分配
+          （如果对齐和边界限制允许的话）是一个很好的主意。
+        </p><p>
+          当加载任意缓冲区到由<code class="function">bus_dmamap_create()</code>
+          创建的映射时，由于回调可能被延迟，因此必须采取特殊措施与回调
+          函数进行同步。代码看起来像下面的样子：
+        </p><pre class="programlisting">          {
+           int s;
+           int error;
+
+           s = splsoftvm();
+           error = bus_dmamap_load(
+               dmat,
+               dmamap,
+               buffer_ptr,
+               buffer_len,
+               callback,
+               /*callback_arg*/ buffer_descriptor,
+               /*flags*/0);
+           if (error == EINPROGRESS) {
+               /*
+                * 执行必要的操作以确保与回调的同步。
+                * 回调被确保直到我们执行了splx()或tsleep()才会被调用。
+                */
+              }
+           splx(s);
+          }        </pre><p>
+          处理请求的两种方法分别是：
+        </p><p>
+          1. 如果通过显式地标记请求已经结束来完成请求（例如CAM请求），则
+          将所有进一步的处理放入回调驱动程序中会比较简单，回调结束后会
+          标记请求。之后不需要太多额外的同步。由于流控制的原因，冻结请求
+          队列直到请求完成才释放可能是个好主意。
+        </p><p>
+          2. 如果请求是在函数返回时完成（例如字符设备上传统的读写请求），
+          则需要在缓冲区描述符上设置同步标志，并调用
+          <code class="function">tsleep()</code>。后面当回调函数被调用时，它将
+          执行处理并检查同步标志。如果设置了同步标志，它应该发出一个
+          唤醒操作。在这种方法中，回调函数或者进行所由必需的处理（就像
+          前面的情况），或者简单在缓冲区描述符中存储段数组。回调完成
+          后，回调函数就能使用这个存储的段数组并进行所有的处理。
+        </p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-resources.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-dma.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.5. 资源 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.7. DMA</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

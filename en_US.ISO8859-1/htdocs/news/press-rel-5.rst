@@ -1,0 +1,394 @@
+=======================================
+FreeBSD Press Release: October 18, 2000
+=======================================
+
+.. raw:: html
+
+   <div id="containerwrap">
+
+.. raw:: html
+
+   <div id="container">
+
+`Skip site navigation <#content>`__ (1) `Skip section
+navigation <#contentwrap>`__ (2)
+
+.. raw:: html
+
+   <div id="headercontainer">
+
+.. raw:: html
+
+   <div id="header">
+
+Header And Logo
+---------------
+
+.. raw:: html
+
+   <div id="headerlogoleft">
+
+|FreeBSD|
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div id="headerlogoright">
+
+.. raw:: html
+
+   <div class="frontdonateroundbox">
+
+.. raw:: html
+
+   <div class="frontdonatetop">
+
+.. raw:: html
+
+   <div>
+
+**.**
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="frontdonatecontent">
+
+`Donate to FreeBSD <https://www.FreeBSDFoundation.org/donate/>`__
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="frontdonatebot">
+
+.. raw:: html
+
+   <div>
+
+**.**
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Peripheral Links
+----------------
+
+.. raw:: html
+
+   <div id="searchnav">
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div id="search">
+
+Search
+------
+
+?
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Site Navigation
+---------------
+
+.. raw:: html
+
+   <div id="menu">
+
+-  `Home <../>`__
+
+-  `About <../about.html>`__
+
+   -  `Introduction <../projects/newbies.html>`__
+   -  `Features <../features.html>`__
+   -  `Advocacy <../advocacy/>`__
+   -  `Marketing <../marketing/>`__
+   -  `Privacy Policy <../privacy.html>`__
+
+-  `Get FreeBSD <../where.html>`__
+
+   -  `Release Information <../releases/>`__
+   -  `Release Engineering <../releng/>`__
+
+-  `Documentation <../docs.html>`__
+
+   -  `FAQ <../doc/en_US.ISO8859-1/books/faq/>`__
+   -  `Handbook <../doc/en_US.ISO8859-1/books/handbook/>`__
+   -  `Porter's
+      Handbook <../doc/en_US.ISO8859-1/books/porters-handbook>`__
+   -  `Developer's
+      Handbook <../doc/en_US.ISO8859-1/books/developers-handbook>`__
+   -  `Manual Pages <//www.FreeBSD.org/cgi/man.cgi>`__
+   -  `Documentation Project
+      Primer <../doc/en_US.ISO8859-1/books/fdp-primer>`__
+   -  `All Books and Articles <../docs/books.html>`__
+
+-  `Community <../community.html>`__
+
+   -  `Mailing Lists <../community/mailinglists.html>`__
+   -  `Forums <https://forums.FreeBSD.org>`__
+   -  `User Groups <../usergroups.html>`__
+   -  `Events <../events/events.html>`__
+   -  `Q&A
+      (external) <http://serverfault.com/questions/tagged/freebsd>`__
+
+-  `Developers <../projects/index.html>`__
+
+   -  `Project Ideas <https://wiki.FreeBSD.org/IdeasPage>`__
+   -  `SVN Repository <https://svnweb.FreeBSD.org>`__
+   -  `Perforce Repository <http://p4web.FreeBSD.org>`__
+
+-  `Support <../support.html>`__
+
+   -  `Vendors <../commercial/commercial.html>`__
+   -  `Security Information <../security/>`__
+   -  `Bug Reports <https://bugs.FreeBSD.org/search/>`__
+   -  `Submitting Bug Reports <https://www.FreeBSD.org/support.html>`__
+
+-  `Foundation <https://www.freebsdfoundation.org/>`__
+
+   -  `Monetary Donations <https://www.freebsdfoundation.org/donate/>`__
+   -  `Hardware Donations <../donations/>`__
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div id="content">
+
+.. raw:: html
+
+   <div id="sidewrap">
+
+.. raw:: html
+
+   <div id="sidenav">
+
+Section Navigation
+------------------
+
+-  `About <../about.html>`__
+-  `Features <../features.html>`__
+-  `Applications <../applications.html>`__
+-  `Advocacy <../advocacy/>`__
+-  `Marketing <../marketing/>`__
+-  `Administration <../administration.html>`__
+-  `News <../news/newsflash.html>`__
+-  `Events <../events/events.html>`__
+-  `Press <../news/press.html>`__
+-  `Multimedia <../multimedia/multimedia.html>`__
+-  `Artwork <../art.html>`__
+-  `Logo <../logo.html>`__
+-  `Donations <../donations/>`__
+-  `Legal Notices <../copyright/>`__
+-  `Privacy Policy <../privacy.html>`__
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div id="contentwrap">
+
+FreeBSD Press Release: October 18, 2000
+=======================================
+
+New FreeBSD Core Team Elected
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**BSD Conference, Monterey, CA, October 18, 2000** The FreeBSD Project
+announced today the election of a new Core Team, the project's
+management board. This marks the first occasion on which the team has
+been selected by means of an election among the project's developers.
+Joining the Core team as new members are Greg Lehey, Warner Losh, Mike
+Smith, and Robert Watson. Re-elected members are Satoshi Asami, David
+Greenman, Jordan Hubbard, Doug Rabson, and Peter Wemm.
+
+FreeBSD Project co-founder and continuing Core Team member Jordan
+Hubbard expressed excitement over the results, "For the first time since
+the FreeBSD project was formed, open elections have determined the
+composition of its core team and set an important precedent whereby any
+developer can now become part of the project's leadership." The new core
+team also well-represents FreeBSD's diverse and highly skilled group of
+international developers, with expertise ranging from RAID filesystem
+and device-driver development to extensive security backgrounds.
+
+New Core Team members were elected from and by the FreeBSD committers
+team, the formal development staff of the FreeBSD project. Committers
+have direct access to the FreeBSD source repository, and perform the
+majority of software development associated with the project. Until this
+point, the Core Team was a self-selected board providing architectural
+and administrative direction.
+
+This summer, the committers voted to move to a democratic model allowing
+the project to adapt to the changing development requirements of the
+open source operating system community. However, with over half of the
+prior Core Team re-elected from the old team, strong continuity exists.
+
+Departing Core Team member Poul-Henning Kamp said, "I'm very proud of
+what we have done together in the Core Team over the last 8 years. The
+new Core, and the fact that they are elected by the committers, means
+that the project will be much more responsive to change in the future."
+
+The changing of the guard in project leadership comes amid good
+feelings, Kamp indicated: all past Core members will continue on with
+the project with increased emphasis on development, "Now I get to spend
+more time on the FreeBSD source code instead of on project management."
+
+Elected Core Team Members
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Satoshi Asami** is a co-founder and CTO of DecorMagic, Inc., and
+manages the FreeBSD Ports Collection.
+
+**David Greenman** is a co-founder of the FreeBSD Project and is
+currently President of TeraSolutions, Inc., a company that manufactures
+Internet servers and RAID storage systems.
+
+**Jordan Hubbard** is a co-founder of the FreeBSD Project as well as its
+public relations officer and release engineer. He is also Vice President
+for Open Source Solutions at BSDi.
+
+**Greg Lehey** is an Open Source Researcher with Linuxcare; he has spent
+most of his professional career in Germany, where he worked for computer
+manufacturers such as Univac, Tandem, and Siemens-Nixdorf. He is the
+author of the Vinum volume management and RAID software for FreeBSD, has
+been involved in the FreeBSD SMPng project, and is the author of Porting
+Unix Software and The Complete FreeBSD.
+
+**Warner Losh** has been porting NetBSD's pccard code to FreeBSD and has
+been FreeBSD Security Officer for the past two years.
+
+**Doug Rabson** is a co-founder of Qube Software Ltd., which specializes
+in 3D graphics technology. His work on FreeBSD includes the alpha and
+ia64 ports, and he was the main architect for FreeBSD's device driver
+framework.
+
+**Mike Smith** is Principal Engineer in BSDi's Open Source Solutions
+group and has been active in the FreeBSD developer community as a
+developer resource, OEM liaison, sometime architect and device driver
+author.
+
+**Robert Watson** is a research scientist at NAI Labs, working on
+network and operating system security research. His contributions to the
+FreeBSD Project include work on trusted operating system extensions
+(`TrustedBSD <http://www.trustedbsd.org>`__), security architecture, and
+work on the security-officer team.
+
+**Peter Wemm** has been involved with FreeBSD since the early days of
+the ISP Industry in Australia and has since relocated to the US to work
+as a Software Engineer for Yahoo!, Inc. His involvement in FreeBSD
+includes management of the FreeBSD source code repository and kernel
+development.
+
+About FreeBSD
+~~~~~~~~~~~~~
+
+FreeBSD is a liberally-licensed open source operating system with its
+origins in BSD Net/2 and 4.4 Lite, the Berkeley Software Distributions
+developed at the University of California at Berkeley until 1994. It is
+developed and maintained by a global organization of paid and volunteer
+contributors. FreeBSD is distinguished by its high performance
+networking and filesystem support, and is widely used among Internet
+service providers, including industry-recognized companies such as
+**Yahoo!**, **above.net**, and **Verio**. FreeBSD is also frequently
+used as a platform for embedded networking devices, including products
+from **IBM**, **Inktomi**, **Juniper Networks**, and **Network Alchemy -
+a Nokia Company**.
+
+More information may be found at
+`http://www.FreeBSD.org/ <http://www.FreeBSD.org>`__.
+
+Press Contact
+~~~~~~~~~~~~~
+
+| Jordan Hubbard
+|  The FreeBSD Project
+|  925-682-7859
+|  jkh@FreeBSD.org
+
+# # #
+~~~~~
+
+BSD is a registered trademark of Berkeley Software Design, Inc. Other
+trademarks are property of their respective owners. BSD technologies
+were originally developed by the University of California, Berkeley and
+its contributors.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div id="footer">
+
+`Site Map <../search/index-site.html>`__ \| `Legal
+Notices <../copyright/>`__ \| ? 1995–2015 The FreeBSD Project. All
+rights reserved.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. |FreeBSD| image:: ../layout/images/logo-red.png
+   :target: ..

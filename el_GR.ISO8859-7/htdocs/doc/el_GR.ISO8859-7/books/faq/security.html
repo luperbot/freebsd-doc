@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>Κεφάλαιο 13. Ασφάλεια</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Συχνές Ερωτήσεις για το FreeBSD 6.X και 7.X" /><link rel="up" href="index.html" title="Συχνές Ερωτήσεις για το FreeBSD 6.X και 7.X" /><link rel="prev" href="networking.html" title="Κεφάλαιο 12. Δικτύωση" /><link rel="next" href="ppp.html" title="Κεφάλαιο 14. PPP" /><link rel="copyright" href="legalnotice.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Κεφάλαιο 13. Ασφάλεια</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="networking.html">Προηγ</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ppp.html">Επόμενο</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="security"></a>Κεφάλαιο 13. Ασφάλεια</h1></div></div></div><div class="qandaset"><a id="idp78143952"></a><dl><dt>13.1. <a href="security.html#idp78144208">What is a sandbox?</a></dt><dt>13.2. <a href="security.html#idp78163920">What is securelevel?</a></dt><dt>13.3. <a href="security.html#idp78192464">BIND (named) is listening on port 53 and
+	    some other high-numbered port.  What is going on?</a></dt><dt>13.4. <a href="security.html#idp78201808">Sendmail is listening on port 587 as well as the
+            standard port 25! What is going on?</a></dt><dt>13.5. <a href="security.html#idp78203856">What is this UID 0 toor account? Have I
+            been compromised?</a></dt><dt>13.6. <a href="security.html#idp78214864">Why is suidperl not working
+            properly?</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp78144208"></a><a id="sandbox"></a><p><strong>13.1.</strong></p></td><td align="left" valign="top"><p>What is a sandbox?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p><span class="quote">«<span class="quote">Sandbox</span>»</span> is a security term.  It can
+            mean two things:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>A process which is placed inside a set of virtual
+                  walls that are designed to prevent someone who breaks
+                  into the process from being able to break into the wider
+                  system.</p><p>The process is said to be able to
+                  <span class="quote">«<span class="quote">play</span>»</span> inside the walls.  That is,
+                  nothing the process does in regards to executing code is
+                  supposed to be able to breech the walls so you do not
+                  have to do a detailed audit of its code to be able to
+                  say certain things about its security.</p><p>The walls might be a userid, for example.  This is
+                  the definition used in the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=security&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">security</span>(7)</span></a> and <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> man
+                  pages.</p><p>Take the <code class="literal">ntalk</code> service, for
+                  example (see /etc/inetd.conf). This service used to run
+                  as userid <code class="systemitem">root</code>. Now it runs as userid
+		  <code class="systemitem">tty</code>. The <code class="systemitem">tty</code> user
+                  is a sandbox designed to make it more difficult for
+                  someone who has successfully hacked into the system via
+                  ntalk from being able to hack beyond that user id.</p></li><li class="listitem"><p>A process which is placed inside a simulation of the
+                  machine. This is more hard-core. Basically it means that
+                  someone who is able to break into the process may believe
+                  that he can break into the wider machine but is, in fact,
+                  only breaking into a simulation of that machine and not
+                  modifying any real data.</p><p>The most common way to accomplish this is to build a
+                  simulated environment in a subdirectory and then run the
+                  processes in that directory chroot'd (i.e.
+                  <code class="filename">/</code> for that process is this
+                  directory, not the real <code class="filename">/</code> of the
+                  system).</p><p>Another common use is to mount an underlying
+                  filesystem read-only and then create a filesystem layer
+                  on top of it that gives a process a seemingly writeable
+                  view into that filesystem. The process may believe it is
+                  able to write to those files, but only the process sees
+                  the effects - other processes in the system do not,
+                  necessarily.</p><p>An attempt is made to make this sort of sandbox so
+                  transparent that the user (or hacker) does not realize
+                  that he is sitting in it.</p></li></ul></div><p><span class="trademark">UNIX</span>(R) implements two core sandboxes.  One is at the
+            process level, and one is at the userid level.</p><p>Every <span class="trademark">UNIX</span>(R) process is completely firewalled off from every
+            other <span class="trademark">UNIX</span>(R) process.  One process cannot modify the address
+            space of another.  This is unlike <span class="trademark">Windows</span>(R) where a process
+            can easily overwrite the address space of any other, leading
+            to a crash.</p><p>A <span class="trademark">UNIX</span>(R) process is owned by a particular userid.  If
+            the userid is not the <code class="systemitem">root</code> user, it
+            serves to firewall the process off from processes owned by
+            other users.  The userid is also used to firewall off
+            on-disk data.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp78163920"></a><a id="securelevel"></a><p><strong>13.2.</strong></p></td><td align="left" valign="top"><p>What is securelevel?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>The securelevel is a security mechanism implemented in the
+            kernel.  Basically, when the securelevel is positive, the
+            kernel restricts certain tasks; not even the superuser (i.e.,
+            <code class="systemitem">root</code>) is allowed to do them.  At the time
+            of this writing, the securelevel mechanism is capable of, among
+            other things, limiting the ability to,</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>unset certain file flags, such as
+                <code class="literal">schg</code> (the system immutable flag),</p></li><li class="listitem"><p>write to kernel memory via
+                <code class="filename">/dev/mem</code> and
+                <code class="filename">/dev/kmem</code>,</p></li><li class="listitem"><p>load kernel modules, and</p></li><li class="listitem"><p>alter firewall rules.</p></li></ul></div><p>To check the status of the securelevel on a running system,
+            simply execute the following command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl kern.securelevel</code></strong></pre><p>The output will contain the name of the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a>
+            variable (in this case, <code class="varname">kern.securelevel</code>)
+            and a number.  The latter is the current value of the
+            securelevel.  If it is positive (i.e., greater than 0), at
+            least some of the securelevel's protections are enabled.</p><p>You cannot lower the securelevel of a running system; being
+            able to do that would defeat its purpose.  If you need to do a
+            task that requires that the securelevel be non-positive (e.g.,
+            an <code class="buildtarget">installworld</code> or changing the date),
+            you will have to change the securelevel setting in
+            <code class="filename">/etc/rc.conf</code> (you want to look for the
+            <code class="varname">kern_securelevel</code> and
+            <code class="varname">kern_securelevel_enable</code> variables) and
+            reboot.</p><p>For more information on securelevel and the specific things
+            all the levels do, please consult the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> manual
+            page.</p><div xmlns="" class="warning"><h3 class="admontitle">Προειδοποίηση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Securelevel is not a silver bullet; it has many known
+                deficiencies.  More often than not, it provides a false
+                sense of security.</p><p xmlns="http://www.w3.org/1999/xhtml">One of its biggest problems is that in order for it to
+                be at all effective, all files used in the boot process up
+                until the securelevel is set must be protected.  If an
+                attacker can get the system to execute their code prior to
+                the securelevel being set (which happens quite late in the
+                boot process since some things the system must do at
+                start-up cannot be done at an elevated securelevel), its
+                protections are invalidated.  While this task of protecting
+                all files used in the boot process is not technically
+                impossible, if it is achieved, system maintenance will
+                become a nightmare since one would have to take the system
+                down, at least to single-user mode, to modify a
+                configuration file.</p><p xmlns="http://www.w3.org/1999/xhtml">This point and others are often discussed on the
+                mailing lists, particularly the <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-security" target="_top">ηλεκτρονική λίστα του FreeBSD για θέματα ασφάλειας</a>. Please search
+                the archives <a class="link" href="../../../../search/index.html" target="_top">here</a> for an
+                extensive discussion.  Some people are hopeful that
+                securelevel will soon go away in favor of a more
+                fine-grained mechanism, but things are still hazy in this
+                respect.</p><p xmlns="http://www.w3.org/1999/xhtml">Consider yourself warned.</p></div></td></tr><tr class="question"><td align="left" valign="top"><a id="idp78192464"></a><a id="extra-named-port"></a><p><strong>13.3.</strong></p></td><td align="left" valign="top"><p>BIND (<code class="command">named</code>) is listening on port 53 and
+	    some other high-numbered port.  What is going on?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>BIND uses a random high-numbered port for outgoing
+	    queries.  If you want to use port 53 for outgoing queries,
+	    either to get past a firewall or to make yourself feel
+	    better, you can try the following in
+	    <code class="filename">/etc/namedb/named.conf</code>:</p><pre class="programlisting">options {
+        query-source address * port 53;
+};</pre><p>You can replace the <code class="literal">*</code> with a single IP
+	    address if you want to tighten things further.</p><p>Congratulations, by the way.  It is good practice to read
+	    your <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sockstat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sockstat</span>(1)</span></a> output and notice odd
+	    things!</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp78201808"></a><a id="sendmail-port-587"></a><p><strong>13.4.</strong></p></td><td align="left" valign="top"><p>Sendmail is listening on port 587 as well as the
+            standard port 25! What is going on?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Recent versions of Sendmail support a
+            mail submission feature that runs over port 587.  This is
+            not yet widely supported, but is growing in
+            popularity.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp78203856"></a><a id="toor-account"></a><p><strong>13.5.</strong></p></td><td align="left" valign="top"><p>What is this UID 0 <code class="systemitem">toor</code> account? Have I
+            been compromised?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Do not worry. <code class="systemitem">toor</code> is an
+            <span class="quote">«<span class="quote">alternative</span>»</span> superuser account (toor is root
+            spelt backwards). Previously it was created when the
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bash&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">bash</span>(1)</span></a> shell was installed but now it is created by
+            default. It is intended to be used with a non-standard shell so
+            you do not have to change <code class="systemitem">root</code>'s default
+            shell. This is important as shells which are not part of the
+            base distribution (for example a shell installed from ports or
+            packages) are likely to be installed in
+            <code class="filename">/usr/local/bin</code> which, by default, resides
+            on a different filesystem. If <code class="systemitem">root</code>'s shell
+            is located in <code class="filename">/usr/local/bin</code> and
+            <code class="filename">/usr</code> (or whatever filesystem contains
+            <code class="filename">/usr/local/bin</code>) is not mounted for some
+            reason, <code class="systemitem">root</code> will not be able to log in to
+            fix a problem (although if you reboot into single user mode
+            you will be prompted for the path to a shell).</p><p>Some people use <code class="systemitem">toor</code> for
+            day-to-day <code class="systemitem">root</code> tasks with a
+            non-standard shell, leaving <code class="systemitem">root</code>,
+            with a standard shell, for single user mode or
+            emergencies. By default you cannot log in using
+            <code class="systemitem">toor</code> as it does not have a password,
+            so log in as <code class="systemitem">root</code> and set a password
+            for <code class="systemitem">toor</code> if you want to use
+            it.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp78214864"></a><a id="suidperl"></a><p><strong>13.6.</strong></p></td><td align="left" valign="top"><p>Why is <code class="command">suidperl</code> not working
+            properly?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>For security reasons, <code class="command">suidperl</code> is
+            installed without the suid bit by default.  The system
+            administrator can enable suid behavior with the following
+            command.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chmod u+s /usr/bin/suidperl</code></strong></pre><p>If you want <code class="command">suidperl</code> to be built
+            suid during upgrades from source, edit
+            <code class="filename">/etc/make.conf</code> and add
+            <code class="varname">ENABLE_SUIDPERL=true</code> before you run
+            <code class="command">make buildworld</code>.</p></td></tr></tbody></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="networking.html">Προηγ</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ppp.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top">Κεφάλαιο 12. Δικτύωση </td><td width="20%" align="center"><a accesskey="h" href="index.html">Αρχή</a></td><td width="40%" align="right" valign="top"> Κεφάλαιο 14. PPP</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

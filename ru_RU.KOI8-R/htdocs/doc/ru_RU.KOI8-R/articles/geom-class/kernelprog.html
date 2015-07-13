@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>3. Программирование в ядре FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Создание класса GEOM" /><link rel="up" href="index.html" title="Создание класса GEOM" /><link rel="prev" href="prelim.html" title="2. Подготовка" /><link rel="next" href="geom.html" title="4. Программирование в системе GEOM" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">3. Программирование в ядре FreeBSD</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="prelim.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="geom.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kernelprog"></a>3. Программирование в ядре FreeBSD</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kernelprog-memalloc"></a>3.1. Выделение памяти</h3></div></div></div><p>Прочитайте <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=malloc&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">malloc</span>(9)</span></a> - выделение памяти лишь
+	немного отличается от своего эквивалента, используемого в пространстве
+	пользовательских процессов (userland). Наиболее приметно то, что
+	<code class="function">malloc</code>() и <code class="function">free</code>()
+	принимают дополнительные параметры, которые описаны в странице
+	справочника.</p><p>Тип <span class="quote"><<<span class="quote">malloc_type</span>>></span> необходимо объявить в секции
+	деклараций файла с исходным кодом, например:</p><pre class="programlisting">  static MALLOC_DEFINE(M_GJOURNAL, "gjournal data", "GEOM_JOURNAL Data");</pre><p>Для того, чтобы можно было использовать этот макрос,
+	необходимо включить следующие заголовочные файлы:
+	<code class="filename">sys/param.h</code>,
+	<code class="filename">sys/kernel.h</code> и
+	<code class="filename">sys/malloc.h</code></p><p>Существует еще один механизм выделения памяти - UMA
+	(Universal Memory Allocator), описанный в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=uma&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">uma</span>(9)</span></a>.
+	Это специфический метод, преимущественно предназначенный для
+	быстрого выделения памяти под списки, состоящие из элементов
+	одинакового размера (например, динамические массивы структур).</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kernelprog-lists"></a>3.2. Очереди и списки</h3></div></div></div><p>Ознакомьтесь с <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=queue&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">queue</span>(3)</span></a>
+	Во множестве случаев вам необходимо будет организовывать и
+	управлять такой структурой данных, как списки. К счастью, эта
+	структура данных реализована несколькими способами в виде макросов
+	на Си, а также включена в систему. Наиболее гибкий и часто
+	употребляемый тип списка - TAILQ. Этот тип списка также один
+	из наиболее требовательных к памяти (его элементы - с двойными
+	связями), а также - наиболее медленный (однако счет идет
+	на несколько инструкций ЦПУ, поэтому последнее утверждение не следует
+	воспринимать в всерьез).</p><p>Если важна скорость получения данных, то возьмите на вооружение
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tree&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">tree</span>(3)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hashinit&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">hashinit</span>(9)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="kernelprog-bios"></a>3.3. BIOs</h3></div></div></div><p>Структура <code class="varname">bio</code> используется для всех
+	операций ввода/вывода, касающихся GEOM. Она содержит
+	информацию о том, какое устройство ('поставщик geom') должно ответить
+	на запрос, тип запроса, смещение, длину и указатель на буфер,
+	а также набор <span class="quote"><<<span class="quote">определенных пользователем</span>>></span> флагов и
+	полей
+	.
+	</p><p>Важным моментом является то, что <code class="varname">bio</code>
+	обрабатываются асинхронно. Это значит, что во многих частях кода
+	нет аналога к <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=read&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">read</span>(2)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=write&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">write</span>(2)</span></a> функциям из пространства
+	пользовательских процессов, которые не возвращают управление пока
+	не выполнится системный вызов. Скорее, по завершении обработки
+	запроса (или в случае ошибки при обработке) как извещение вызывается
+	определенная пользователем функция.</p><p>Асинхронная модель программирования в чем-то сложней,
+	нежели чаще используемая императивная модель, используемая в
+	пространстве пользовательских процессов; в любом случае, привыкание
+	займет некоторое время. В некоторых случаях могут быть использованы
+	вспомогательные функции <code class="function">g_write_data</code>() и
+	<code class="function">g_read_data</code>(), но <span class="emphasis"><em>далеко не
+	всегда</em></span>. В частности, эти функции не могут использоваться
+	когда захвачен мьютекс; например, мьютекс GEOM-топологии или
+	внутренний мьютекс, удерживаемый в ходе выполнения
+	<code class="function">.start</code>() или <code class="function">.stop</code>().</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="prelim.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="geom.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">2. Подготовка </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 4. Программирование в системе GEOM</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

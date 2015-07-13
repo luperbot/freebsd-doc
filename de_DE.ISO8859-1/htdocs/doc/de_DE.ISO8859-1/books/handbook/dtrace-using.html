@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>27.4. DTrace verwenden</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="dtrace.html" title="Kapitel 27. DTrace" /><link rel="prev" href="dtrace-enable.html" title="27.3. Die DTrace Unterstützung aktivieren" /><link rel="next" href="network-communication.html" title="Teil IV. Netzwerke" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.4. DTrace verwenden</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="dtrace-enable.html">Zurück</a> </td><th width="60%" align="center">Kapitel 27. DTrace</th><td width="20%" align="right"> <a accesskey="n" href="network-communication.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="dtrace-using"></a>27.4. DTrace verwenden</h2></div></div></div><p>DTrace-Skripte bestehen aus einer Liste von einer oder
+      mehreren <em class="firstterm">Sonden</em> oder
+      Instrumentationspunkten, an denen jede Sonde mit einer Aktion
+      verknüpft ist. Jedesmal, wenn die Bedingung für eine Sonde
+      zutrifft, wird die verknüpfte Aktion ausgeführt. Beispielsweise
+      könnte eine Aktion ausgeführt werden, wenn eine Datei geöffnet,
+      ein Prozess gestartet oder eine Codezeile ausgeführt wird.  Die
+      Aktion könnte die Protokollierung von Informationen sein oder
+      die Änderung von Kontextvariablen. Das Lesen und Schreiben von
+      Kontextvariablen erlaubt es den Sonden, Informationen
+      auszutauschen und kooperativ die Korrelation bestimmter
+      Ereignisse zu analysieren.</p><p>Um alle Sonden anzuzeigen, kann der Administrator nun den
+      folgenden Befehl eingeben:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dtrace -l | more</code></strong></pre><p>Jede Sonde besitzt eine <code class="literal">ID</code>, einen
+      <code class="literal">PROVIDER</code> (dtrace oder fbt), ein
+      <code class="literal">MODULE</code> und einen <code class="literal">FUNCTION
+      NAME</code>. Lesen Sie für weitere Informationen zu diesem
+      Kommando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dtrace&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">dtrace</span>(1)</span></a>.</p><p>Die Beispiele in diesem Abschnitt geben einen Überblick, wie
+      man zwei dieser voll funktionsfähigen Skripte aus der
+      DTrace-Werkzeugsammlung verwendet: die Skripte
+      <code class="filename">hotkernel</code> und
+      <code class="filename">procsystime</code>.</p><p>Das <code class="filename">hotkernel</code> Skript wurde entworfen,
+      um zu identifizieren, welche Funktion die meiste Kernelzeit
+      beansprucht.  Es wird es Ausgaben ähnlich der Folgenden
+      produzieren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/share/dtrace/toolkit</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>./hotkernel</code></strong>
+Sampling... Hit Ctrl-C to end.</pre><p>Verwenden Sie wie angegeben die Tastenkombination <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>C</strong></span>
+      drücken, um den Prozess zu stoppen.  Nach dem Abbruch wird das
+      Skript eine Liste von Kernelfunktionen und Zeitmessungen
+      ausgeben, aufsteigend sortiert nach den Zeiten:</p><pre class="screen">kernel`_thread_lock_flags                                   2   0.0%
+0xc1097063                                                  2   0.0%
+kernel`sched_userret                                        2   0.0%
+kernel`kern_select                                          2   0.0%
+kernel`generic_copyin                                       3   0.0%
+kernel`_mtx_assert                                          3   0.0%
+kernel`vm_fault                                             3   0.0%
+kernel`sopoll_generic                                       3   0.0%
+kernel`fixup_filename                                       4   0.0%
+kernel`_isitmyx                                             4   0.0%
+kernel`find_instance                                        4   0.0%
+kernel`_mtx_unlock_flags                                    5   0.0%
+kernel`syscall                                              5   0.0%
+kernel`DELAY                                                5   0.0%
+0xc108a253                                                  6   0.0%
+kernel`witness_lock                                         7   0.0%
+kernel`read_aux_data_no_wait                                7   0.0%
+kernel`Xint0x80_syscall                                     7   0.0%
+kernel`witness_checkorder                                   7   0.0%
+kernel`sse2_pagezero                                        8   0.0%
+kernel`strncmp                                              9   0.0%
+kernel`spinlock_exit                                       10   0.0%
+kernel`_mtx_lock_flags                                     11   0.0%
+kernel`witness_unlock                                      15   0.0%
+kernel`sched_idletd                                       137   0.3%
+0xc10981a5                                              42139  99.3%</pre><p>Dieses Skript funktioniert auch mit Kernelmodulen.  Um diese
+      Eigenschaft zu verwenden, starten Sie das Skript mit
+      <code class="option">-m</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>./hotkernel -m</code></strong>
+Sampling... Hit Ctrl-C to end.
+^C
+MODULE                                                  COUNT   PCNT
+0xc107882e                                                  1   0.0%
+0xc10e6aa4                                                  1   0.0%
+0xc1076983                                                  1   0.0%
+0xc109708a                                                  1   0.0%
+0xc1075a5d                                                  1   0.0%
+0xc1077325                                                  1   0.0%
+0xc108a245                                                  1   0.0%
+0xc107730d                                                  1   0.0%
+0xc1097063                                                  2   0.0%
+0xc108a253                                                 73   0.0%
+kernel                                                    874   0.4%
+0xc10981a5                                             213781  99.6%</pre><p>Das <code class="filename">procsystime</code> Skript fängt die
+      Systemaufruf-Zeiten für eine gegebene
+      Prozess-<acronym class="acronym">ID</acronym> (<acronym class="acronym">PID</acronym>) oder
+      einen Prozessnamen ab und gibt diese aus.  Im folgenden Beispiel
+      wurde eine neue Instanz von <code class="filename">/bin/csh</code>
+      erzeugt. Dann wurde <code class="filename">procsystime</code> ausgeführt
+      und verbleibt so, während ein paar Befehle in die andere Instanz
+      von <code class="command">csh</code> eingegeben werden.  Dies sind die
+      Ergebnisse dieses Versuchs:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>./procsystime -n csh</code></strong>
+Tracing... Hit Ctrl-C to end...
+^C
+
+Elapsed Times for processes csh,
+
+         SYSCALL          TIME (ns)
+          getpid               6131
+       sigreturn               8121
+           close              19127
+           fcntl              19959
+             dup              26955
+         setpgid              28070
+            stat              31899
+       setitimer              40938
+           wait4              62717
+       sigaction              67372
+     sigprocmask             119091
+    gettimeofday             183710
+           write             263242
+          execve             492547
+           ioctl             770073
+           vfork            3258923
+      sigsuspend            6985124
+            read         3988049784</pre><p>Wie aus der Ausgabe ersichtlich ist, verbraucht der
+      <code class="function">read()</code>-Systemaufruf die meiste Zeit in
+      Nanosekunden, während der Systemaufruf
+      <code class="function">getpid()</code> hingegen am schnellsten
+      läuft.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="dtrace-enable.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="dtrace.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="network-communication.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">27.3. Die DTrace Unterstützung aktivieren </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Teil IV. Netzwerke</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

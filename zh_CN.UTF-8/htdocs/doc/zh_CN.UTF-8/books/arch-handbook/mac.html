@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>第 6 章 TrustedBSD MAC 框架</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="kernel.html" title="部分 I. 内核" /><link rel="prev" href="sysinit-using.html" title="5.3. 使用SYSINIT" /><link rel="next" href="mac-synopsis.html" title="6.2. 术语解析" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第 6 章 TrustedBSD MAC 框架</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="sysinit-using.html">上一页</a> </td><th width="60%" align="center">部分 I. 内核</th><td width="20%" align="right"> <a accesskey="n" href="mac-synopsis.html">下一页</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac"></a>第 6 章 TrustedBSD MAC 框架</h2></div><div><span class="authorgroup"><span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Chris</span> <span class="surname">Costello</span></span> 和 <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Robert</span> <span class="surname">Watson</span></span>. </span></div><div><span class="authorgroup">翻译：<span xmlns="http://www.w3.org/1999/xhtml" class="author"></span>. </span></div></div></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="mac.html#mac-copyright">6.1. MAC 文档版权声明</a></span></dt><dt><span class="sect1"><a href="mac-synopsis.html">6.2. 术语解析</a></span></dt><dt><span class="sect1"><a href="mac-introduction.html">6.3. 概述</a></span></dt><dt><span class="sect1"><a href="mac-background.html">6.4. 安全策略背景知识</a></span></dt><dt><span class="sect1"><a href="mac-framework-kernel-arch.html">6.5. MAC 框架的内核体系结构</a></span></dt><dt><span class="sect1"><a href="mac-policy-architecture.html">6.6. MAC策略模块体系结构</a></span></dt><dt><span class="sect1"><a href="mac-entry-point-reference.html">6.7. MAC策略入口函数参考</a></span></dt><dt><span class="sect1"><a href="mac-userland-arch.html">6.8. 应用层体系结构</a></span></dt><dt><span class="sect1"><a href="mac-conclusion.html">6.9. 小结</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-copyright"></a>6.1. MAC 文档版权声明</h2></div></div></div><p>本文档是作为 DARPA CHATS 研究计划的一部分，由供职于 Security Research Division of Network Associates
+      公司Safeport Network Services and Network Associates Laboratories 的Chris Costello依据 DARPA/SPAWAR 合同
+      N66001-01-C-8035 (<span class="quote">“<span class="quote">CBOSS</span>”</span>)，为 FreeBSD 项目编写的。</p><p>Redistribution and use in source (SGML DocBook) and
+      'compiled' forms (SGML, HTML, PDF, PostScript, RTF and so forth)
+      with or without modification, are permitted provided that the
+      following conditions are met:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Redistributions of source code (SGML DocBook) must
+          retain the above copyright notice, this list of conditions
+          and the following disclaimer as the first lines of this file
+          unmodified.</p></li><li class="listitem"><p>Redistributions in compiled form (transformed to other
+          DTDs, converted to PDF, PostScript, RTF and other formats)
+          must reproduce the above copyright notice, this list of
+          conditions and the following disclaimer in the documentation
+          and/or other materials provided with the
+          distribution.</p></li></ol></div><div xmlns="" class="important"><h3 class="admontitle">重要: </h3><p xmlns="http://www.w3.org/1999/xhtml">THIS DOCUMENTATION IS PROVIDED BY THE NETWORKS ASSOCIATES
+        TECHNOLOGY, INC "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+        INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+        MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+        DISCLAIMED. IN NO EVENT SHALL NETWORKS ASSOCIATES TECHNOLOGY,
+        INC BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+        EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+        LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+        OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+        CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+        STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+        ARISING IN ANY WAY OUT OF THE USE OF THIS DOCUMENTATION, EVEN
+        IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</p></div><div xmlns="" class="important"><h3 class="admontitle">重要: </h3><p xmlns="http://www.w3.org/1999/xhtml">本文中许可证的非官方中文翻译仅供参考，
+      不作为判定任何责任的依据。如与英文原文有出入，则以英文原文为准。</p></div><p>在满足下列许可条件的前提下，允许再分发或以源代码 (SGML DocBook) 或 “编译” (SGML, HTML, PDF, PostScript, RTF 等)
+      的经过修改或未修改的形式：</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>再分发源代码 (SGML DocBook) 必须不加修改的保留上述版权告示、本条件清单和下述弃权书作为该文件的最先若干行。</p></li><li class="listitem"><p>再分发编译的形式 (转换为其它DTD、 PDF、 PostScript、 RTF 或其它形式)，必须将上述版权告示、
+          本条件清单和下述弃权书复制到与分发品一同提供的文件，以及其它材料中。</p></li></ol></div><div xmlns="" class="important"><h3 class="admontitle">重要: </h3><p xmlns="http://www.w3.org/1999/xhtml">本文档由 NETWORKS ASSOCIATES TECHNOLOGY, INC “按现状条件”提供，并在此明示不提供任何明示或暗示的保障，
+        包括但不限于对商业适销性、对特定目的的适用性的暗示保障。任何情况下，
+        NETWORKS ASSOCIATES TECHNOLOGY, INC 均不对任何直接、 间接、 偶然、 特殊、 惩罚性的，
+        或必然的损失 (包括但不限于替代商品或服务的采购、 使用、 数据或利益的损失或营业中断) 负责，
+        无论是如何导致的并以任何有责任逻辑的， 无论是否是在本文档使用以外以任何方式产生的契约、严格责任或是民事侵权行为(包括疏忽或其它)中的，
+        即使已被告知发生该损失的可能性。</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="sysinit-using.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="kernel.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-synopsis.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">5.3. 使用SYSINIT </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 6.2. 术语解析</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

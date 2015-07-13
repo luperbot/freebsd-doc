@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Элементы архитектуры системы виртуальной памяти во FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Название статьи говорит лишь о том, что я попытаюсь описать в целом VM-систему понятным языком. Последний год я сосредоточил усилия в работе над несколькими основными подсистемами ядра FreeBSD, среди которых подсистемы VM и подкачки были самыми интересными, а NFS оказалась необходимой рутиной. Я переписал лишь малую часть кода. Что касается VM, то я единственным большим обновлением, которое я сделал, является переделка подсистемы подкачки. Основная часть моей работы заключалась в зачистке и поддержке кода, с единственной заметной переделкой кода и без значительной переделки алгоритмов в VM-подсистеме. В основном теоретическая база работы VM-подсистемы осталась неизменной, а большинство благодарностей за современных нововведения за последние несколько лет принадлежат John Dyson и David Greenman. Не являясь историком, как Керк, я не буду пытаться связать различные возможности системы с именами, потому что обязательно ошибусь." /><link rel="home" href="index.html" title="Элементы архитектуры системы виртуальной памяти во FreeBSD" /><link rel="next" href="vm-objects.html" title="2. Объекты VM" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Элементы архитектуры системы виртуальной памяти во FreeBSD</th></tr><tr><td width="20%" align="left"> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="vm-objects.html">След.</a></td></tr></table><hr /></div><div xml:lang="ru" class="article" lang="ru"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71564368"></a>Элементы архитектуры системы виртуальной памяти во FreeBSD</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></h3><div class="affiliation"><div class="address"><p><br />
+	    <code class="email">&lt;<a xmlns="" class="email" href="mailto:dillon@apollo.backplane.com">dillon@apollo.backplane.com</a>&gt;</code><br />
+	  </p></div></div></div></div></div><div>Издание: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="trademarks.html">Юридическое уведомление</a></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="legalnotice.html">Юридическое уведомление</a></div><div>    .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Аннотация</div><p>Название статьи говорит лишь о том, что я попытаюсь описать в целом
+        VM-систему понятным языком.  Последний год я сосредоточил усилия в
+        работе над несколькими основными подсистемами ядра FreeBSD, среди
+        которых подсистемы VM и подкачки были самыми интересными, а NFS
+        оказалась <span class="quote"><<<span class="quote">необходимой рутиной</span>>></span>.  Я переписал лишь малую
+        часть кода.  Что касается VM, то я единственным большим обновлением,
+        которое я сделал, является переделка подсистемы подкачки.  Основная
+        часть моей работы заключалась в зачистке и поддержке кода, с
+        единственной заметной переделкой кода и без значительной переделки
+        алгоритмов в VM-подсистеме.  В основном теоретическая база работы
+        VM-подсистемы осталась неизменной, а большинство благодарностей за
+        современных нововведения за последние несколько лет принадлежат
+	John Dyson и David Greenman.  Не являясь историком, как Керк, я не буду
+        пытаться связать различные возможности системы с именами, потому что
+        обязательно ошибусь.</p></div></div></div><div class="docformatnavi">
+      [
+      
+	  По разделам
+	
+      /
+      <a href="article.html">Одним файлом</a>
+      ]
+    </div><hr /></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="sect1"><a href="index.html#introduction">1. Введение</a></span></dt><dt><span class="sect1"><a href="vm-objects.html">2. Объекты VM</a></span></dt><dt><span class="sect1"><a href="swap-layers.html">3. Уровни области подкачки</a></span></dt><dt><span class="sect1"><a href="freeing-pages.html">4. Когда освобождать страницу</a></span></dt><dt><span class="sect1"><a href="prefault-optimizations.html">5. Оптимизация ошибок доступа к страницам и их обнуления</a></span></dt><dt><span class="sect1"><a href="pre-table-optimizations.html">6. Оптимизация таблицы страниц</a></span></dt><dt><span class="sect1"><a href="page-coloring-optimizations.html">7. Подгонка страниц</a></span></dt><dt><span class="sect1"><a href="conclusion.html">8. Заключение</a></span></dt><dt><span class="sect1"><a href="allen-briggs-qa.html">9. Дополнительный сеанс вопросов и ответов от Аллена Бриггса (Allen
+      Briggs) <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="introduction"></a>1. Введение</h2></div></div></div><p>Перед тем, как перейти непосредственно к существующей архитектуре,
+      потратим немного времени на рассмотрение вопроса о необходимости
+      поддержки и модернизации любого длительно живущего кода.  В мире
+      программирования алгоритмы становятся более важными, чем код, и именно
+      из-за академических корней BSD изначально большое внимание уделялось
+      проработке алгоритмов.  Внимание, уделенное архитектуре, в общем
+      отражается на ясности и гибкости кода, который может быть достаточно
+      легко изменен, расширен или с течением времени заменен.  Хотя некоторые
+      считают BSD <span class="quote"><<<span class="quote">старой</span>>></span> операционной системой, те их нас, кто
+      работает над ней, видят ее скорее системой со <span class="quote"><<<span class="quote">зрелым</span>>></span> кодом
+      с различными компонентами, которые были заменены, расширены или изменены
+      современным кодом.  Он развивается, и FreeBSD остается передовой
+      системой, вне зависимости от того, насколько старой может быть часть
+      кода.  Это важное отличие, которое, к сожалению, не всеми понимается.
+      Самой большой ошибкой, которую может допустить программист, является
+      игнорирование истории, и это именно та ошибка, которую сделали многие
+      другие современные операционные системы.  Самым ярки примером здесь
+      является <span class="trademark">Windows NT</span>(R), и последствия ужасны.  Linux также в некоторой
+      степени совершил эту ошибку-достаточно, чтобы мы, люди BSD, по
+      крайней
+      мере по разу отпустили по этому поводу шутку.  Проблема Linux заключается
+      просто в отсутствии опыта и истории для сравнения идей, проблема, которая
+      легко и быстро решается сообществом Linux точно так же, как она решается
+      в сообществе BSD-постоянной работой над кодом.  Разработчики <span class="trademark">Windows NT</span>(R),
+      с другой стороны, постоянно совершают те же самые ошибки, что были
+      решены в <span class="trademark">UNIX</span>(R) десятки лет назад, а затем тратят годы на их устранение.
+      Снова и снова.  Есть несколько случаев <span class="quote"><<<span class="quote">проработка архитектуры
+      отсутствует</span>>></span> и <span class="quote"><<<span class="quote">мы всегда правы, потому что так говорит наш
+      отдел продаж</span>>></span>. Я плохо переношу тех, кого не учит история.</p><p>Большинство очевидной сложности архитектуры FreeBSD, особенно в
+      подсистеме VM/Swap, является прямым следствием того, что она решает
+      серьезные проблемы с производительностью, которые проявляются при
+      различных условиях.  Эти проблемы вызваны не плохой проработкой
+      алгоритмов, а возникают из окружающих факторов.  В любом прямом сравнении
+      между платформами эти проблемы проявляются, когда системные ресурсы
+      начинают истощаться.  Так как я описываю подсистему VM/Swap во FreeBSD,
+      то читатель должен всегда иметь в виду два обстоятельства:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Самым важным аспектом при проектировании производительности
+	  является то, что называется "оптимизацией критического
+	  маршрута".  Часто случается, что оптимизация производительности
+	  дает прирост объема кода ради того, чтобы критический маршрут
+	  работал быстрее.</p></li><li class="listitem"><p>Четкость общей архитектуры оказывается лучше сильно
+	  оптимизированной архитектуры с течением времени.  Когда как
+	  обобщенная архитектура может быть медленнее, чем оптимизированная
+	  архитектура, при первой реализации, при обобщенной архитектуре легче
+	  подстраиваться под изменяющиеся условия и чрезмерно оптимизированная
+	  архитектура оказывается непригодной.</p></li></ol></div><p>Любой код, который должен выжить и поддаваться поддержке
+      годы, должен поэтому быть тщательно продуман с самого начала, даже если
+      это стоит потери производительности.  Двадцать лет назад были те, кто
+      отстаивал преимущество программирования на языке ассемблера перед
+      программированием на языке высокого уровня, потому что первый генерировал
+      в десять раз более быстрый код.  В наши дни ошибочность этого аргумента
+      очевидна - можно провести параллели с построением
+      алгоритмов и обобщением кода.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="vm-objects.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"> </td><td width="40%" align="right" valign="top"> 2. Объекты VM</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

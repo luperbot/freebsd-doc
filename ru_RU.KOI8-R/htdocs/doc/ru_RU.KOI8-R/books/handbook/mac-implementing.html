@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>15.14. Реализация защищенной среды с MAC</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="mac.html" title="Глава 15. Принудительный контроль доступа (MAC)" /><link rel="prev" href="mac-lomac.html" title="15.13. Модуль MAC LOMAC" /><link rel="next" href="MAC-examplehttpd.html" title="15.15. Другой пример: Использование MAC для защиты веб сервера" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.14. Реализация защищенной среды с MAC</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-lomac.html">Пред.</a> </td><th width="60%" align="center">Глава 15. Принудительный контроль доступа (MAC)</th><td width="20%" align="right"> <a accesskey="n" href="MAC-examplehttpd.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-implementing"></a>15.14. Реализация защищенной среды с MAC</h2></div></div></div><a id="idp90360400" class="indexterm"></a><a id="idp90361168" class="indexterm"></a><p>Нижеследующая демонстрация реализует защищенную среду
+      с использованием различных <acronym class="acronym">MAC</acronym> модулей
+      с соответственно настроенными политиками.  Используйте
+      этот пример только для тестирования, он не предназначен
+      для удовлетворения всех требований к защите.  Реализация
+      этих политик без понимания принципа их работы неприменима
+      в реальных задачах.</p><p>Перед началом процесса настройки, на каждую файловую
+      систему необходимо установить параметр <code class="literal">multilabel</code>,
+      который упоминался в начале этой главы.  Невыполнение
+      этого требования приведет к ошибкам.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90363472"></a>15.14.1. Создание insecure класса пользователя</h3></div></div></div><p>Начните процедуру добавлением следующего класса
+	пользователя к файлу
+	<code class="filename">/etc/login.conf</code>:</p><pre class="programlisting">insecure:\
+:copyright=/etc/COPYRIGHT:\
+:welcome=/etc/motd:\
+:setenv=MAIL=/var/mail/$,BLOCKSIZE=K:\
+:path=~/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+:manpath=/usr/share/man /usr/local/man:\
+:nologin=/usr/sbin/nologin:\
+:cputime=1h30m:\
+:datasize=8M:\
+:vmemoryuse=100M:\
+:stacksize=2M:\
+:memorylocked=4M:\
+:memoryuse=8M:\
+:filesize=8M:\
+:coredumpsize=8M:\
+:openfiles=24:\
+:maxproc=32:\
+:priority=0:\
+:requirehome:\
+:passwordtime=91d:\
+:umask=022:\
+:ignoretime@:\
+:label=partition/13,mls/5:</pre><p>и добавлением следующей строки к default классу
+	пользователя:</p><pre class="programlisting">:label=mls/equal,biba/equal,partition/equal:</pre><p>После завершения этих действий, для пересборки базы данных
+	должна быть выполнена следующая команда:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90371664"></a>15.14.2. Загрузка с необходимыми модулями</h3></div></div></div><p>Добавьте к
+	<code class="filename">/boot/loader.conf</code> следующие строки,
+	чтобы необходимые модули были загружены при старте
+	системы:</p><pre class="programlisting">mac_biba_load="YES"
+mac_mls_load="YES"
+mac_seeotheruids_load="YES"
+mac_partition_load="YES"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90373584"></a>15.14.3. Установка всех пользователей в insecure</h3></div></div></div><p>Всем учетным записям, кроме <code class="systemitem">root</code>
+	или системных пользователей теперь потребуется присвоить
+	класс (login class).  При отсутствии класса пользователи
+	не смогут получить доступа к обычным командам, таким как
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a>.  Следующий скрипт <code class="command">sh</code>
+	сделает все необходимое:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>for x in `awk -F: '($3 &gt;= 1001) &amp;&amp; ($3 != 65534) { print $1 }' \</code></strong>
+	<strong class="userinput"><code>/etc/passwd`; do pw usermod $x -L insecure; done;</code></strong></pre><p>После этого изменения необходимо запустить команду
+	<code class="command">cap_mkdb</code> на файле
+	<code class="filename">/etc/master.passwd</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90378960"></a>15.14.4. Завершение настройки</h3></div></div></div><p>Должен быть создан файл контекста; следующий пример
+	взят из примера политики от Robert Watson, он может быть
+	помещен в <code class="filename">/etc/policy.contexts</code>:</p><pre class="programlisting"># This is the default BIBA/MLS policy for this system.
+
+.*                              biba/high,mls/high
+/sbin/dhclient                  biba/high(low),mls/high(low)
+/dev(/.*)?                      biba/equal,mls/equal
+# This is not an exhaustive list of all "privileged" devices.
+/dev/mdctl                      biba/high,mls/high
+/dev/pci                        biba/high,mls/high
+/dev/k?mem                      biba/high,mls/high
+/dev/io                         biba/high,mls/high
+/dev/agp.*                      biba/high,mls/high
+(/var)?/tmp(/.*)?               biba/equal,mls/equal
+/tmp/\.X11-unix                 biba/high(equal),mls/high(equal)
+/tmp/\.X11-unix/.*              biba/equal,mls/equal
+/proc(/.*)?                     biba/equal,mls/equal
+/mnt.*                          biba/low,mls/low
+(/usr)?/home                    biba/high(low),mls/high(low)
+(/usr)?/home/.*                 biba/low,mls/low
+/var/mail(/.*)?                 biba/low,mls/low
+/var/spool/mqueue(/.*)?         biba/low,mls/low
+(/mnt)?/cdrom(/.*)?             biba/high,mls/high
+(/usr)?/home/(ftp|samba)(/.*)?  biba/high,mls/high
+/var/log/sendmail\.st           biba/low,mls/low
+/var/run/utmp                   biba/equal,mls/equal
+/var/log/(lastlog|wtmp)         biba/equal,mls/equal</pre><p>Эта политика обеспечит безопасность путем применения
+	ограничений на нисходящий и восходящий потоки информации
+	в применении к каталогам и утилитам, приведенным в левой
+	части файла.</p><p>Он может быть внесен в систему следующими
+	командами:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /usr</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Раскладка вышеприведенной файловой системы может быть
+	  различной для разных систем.</p></div><p>Файл <code class="filename">/etc/mac.conf</code> требует
+	следующих изменений в основном разделе:</p><pre class="programlisting">default_labels file ?biba,?mls
+default_labels ifnet ?biba,?mls
+default_labels process ?biba,?mls,?partition
+default_labels socket ?biba,?mls</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90385232"></a>15.14.5. Тестирование настройки</h3></div></div></div><a id="idp90385872" class="indexterm"></a><p>Добавьте пользователя с помощью команды
+	<code class="command">adduser</code> и поместите его в класс
+	<code class="literal">insecure</code> для этих тестов.</p><p>В примерах ниже тестирование <code class="systemitem">root</code>
+	и обычных пользователей будет смешиваться; форма
+	приглашения поможет различить этих пользователей.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90392912"></a>15.14.5.1. Основное тестирование меток</h4></div></div></div><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>getpmac</code></strong>
+biba/15(15-15),mls/15(15-15),partition/15
+<code class="prompt">#</code> <strong class="userinput"><code>setpmac partition/15,mls/equal top</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Процесс top будет уничтожен перед тем, как мы запустим
+	    другой процесс top.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90396112"></a>15.14.5.2. Тестирование MAC seeotheruids</h4></div></div></div><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+biba/15(15-15),mls/15(15-15),partition/15  1096 #C:  S      0:00.03 -su (bash)
+biba/15(15-15),mls/15(15-15),partition/15  1101 #C:  R+     0:00.01 ps Zax</pre><p>Просмотр процессов всех других пользователей должен
+	  быть запрещен.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90398416"></a>15.14.5.3. Тестирование MAC partition</h4></div></div></div><p>Отключите политику <acronym class="acronym">MAC</acronym>
+	  <code class="literal">seeotheruids</code> для остальных тестов:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl security.mac.seeotheruids.enabled=0</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+LABEL                                                   PID  TT  STAT      TIME COMMAND
+  biba/equal(low-high),mls/equal(low-high),partition/15  1122 #C:  S+     0:00.02 top
+  biba/15(15-15),mls/15(15-15),partition/15              1096 #C:  S      0:00.05 -su (bash)
+  biba/15(15-15),mls/15(15-15),partition/15              1123 #C:  R+     0:00.01 ps Zax</pre><p>Все пользователи должны видеть каждый процесс в своем
+	  разделе (partition).</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90402640"></a>15.14.5.4. Тестирование меток Biba и MLS</h4></div></div></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac partition/15,mls/equal,biba/high\(high-high\) top</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+LABEL                                                   PID  TT  STAT    TIME   COMMAND
+  biba/high(high-high),mls/equal(low-high),partition/15   1251 #C:  S+     0:00.02 top
+  biba/15(15-15),mls/15(15-15),partition/15               1096 #C:  S      0:00.06 -su (bash)
+  biba/15(15-15),mls/15(15-15),partition/15               1157 #C:  R+     0:00.00 ps Zax</pre><p>Политика Biba позволяет чтение объектов с более высокими
+	  метками.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac partition/15,mls/equal,biba/low top</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ps Zax</code></strong>
+LABEL                                       PID  TT  STAT      TIME COMMAND
+  biba/15(15-15),mls/15(15-15),partition/15  1096 #C:  S      0:00.07 -su (bash)
+  biba/15(15-15),mls/15(15-15),partition/15  1226 #C:  R+     0:00.01 ps Zax</pre><p>Политика Biba не позволяет чтение объектов с более низкими
+	  метками; тем не менее, <acronym class="acronym">MLS</acronym> разрешает это.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ifconfig bge0 | grep maclabel</code></strong>
+maclabel biba/low(low-low),mls/low(low-low)
+<code class="prompt">%</code> <strong class="userinput"><code>ping -c 1 192.0.34.166</code></strong>
+PING 192.0.34.166 (192.0.34.166): 56 data bytes
+ping: sendto: Permission denied</pre><p>Пользователи не могут выполнить ping на
+	  <code class="systemitem">example.com</code>, или на любой
+	  домен по этой причине.</p><p>Для устранения этой ошибки, запустите следующую
+	  команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl security.mac.biba.trust_all_interfaces=1</code></strong></pre><p>Она устанавливает метку интерфейса по умолчанию в
+	  незащищенный режим, так что политика Biba по умолчанию не
+	  будет применена.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bge0 maclabel biba/equal\(low-high\),mls/equal\(low-high\)</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>ping -c 1 192.0.34.166</code></strong>
+PING 192.0.34.166 (192.0.34.166): 56 data bytes
+64 bytes from 192.0.34.166: icmp_seq=0 ttl=50 time=204.455 ms
+--- 192.0.34.166 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 204.455/204.455/204.455/0.000 ms</pre><p>Установив более корректную метку, мы можем использовать
+	  <code class="command">ping</code>.</p><p>Теперь создадим файлы для процедуры тестирования чтения
+	  и записи:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch test1 test2 test3 test4 test5</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>getfmac test1</code></strong>
+test1: biba/equal,mls/equal
+<code class="prompt">#</code> <strong class="userinput"><code>setfmac biba/low test1 test2; setfmac biba/high test4 test5; \
+  setfmac mls/low test1 test3; setfmac mls/high test2 test4</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfmac mls/equal,biba/equal test3 &amp;&amp; getfmac test?</code></strong>
+test1: biba/low,mls/low
+test2: biba/low,mls/high
+test3: biba/equal,mls/equal
+test4: biba/high,mls/high
+test5: biba/high,mls/equal
+<code class="prompt">#</code> <strong class="userinput"><code>chown testuser:testuser test?</code></strong></pre><p>Все эти файлы должны принадлежать пользователю
+	  <code class="systemitem">testuser</code>.  Тесты на чтение:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>ls</code></strong>
+test1   test2   test3   test4   test5
+<code class="prompt">%</code> <strong class="userinput"><code>ls test?</code></strong>
+ls: test1: Permission denied
+ls: test2: Permission denied
+ls: test4: Permission denied
+test3   test5</pre><p>Доступ на чтение не должен быть разрешен для пар:
+	  <code class="literal">(biba/low,mls/low)</code>,
+	  <code class="literal">(biba/low,mls/high)</code> и
+	  <code class="literal">(biba/high,mls/high)</code>.
+	  Теперь несколько тестов на запись:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>for i in `echo test*`; do echo 1 &gt; $i; done</code></strong>
+-su: test1: Permission denied
+-su: test4: Permission denied
+-su: test5: Permission denied</pre><p>Подобно тестам на чтение, доступ на запись должен быть
+	  запрещен для пар:
+	  <code class="literal">(biba/low,mls/high)</code> и
+	  <code class="literal">(biba/equal,mls/equal)</code>.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cat test?</code></strong>
+cat: test1: Permission denied
+cat: test2: Permission denied
+1
+cat: test4: Permission denied</pre><p>А теперь от <code class="systemitem">root</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat test2</code></strong>
+1</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-lomac.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="MAC-examplehttpd.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">15.13. Модуль MAC LOMAC </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 15.15. Другой пример: Использование MAC для защиты веб сервера</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

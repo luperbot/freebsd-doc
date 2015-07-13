@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>28.7. SMTP met UUCP</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="mail.html" title="Hoofdstuk 28. Elektronische mail" /><link rel="prev" href="mail-advanced.html" title="28.6. Geavanceerde onderwerpen" /><link rel="next" href="outgoing-only.html" title="28.8. Instellen om alleen te versturen" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">28.7. SMTP met UUCP</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mail-advanced.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 28. Elektronische mail</th><td width="20%" align="right"> <a accesskey="n" href="outgoing-only.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-UUCP"></a>28.7. SMTP met UUCP</h2></div></div></div><p>De instellingen van <span class="application">sendmail</span> die
+      met FreeBSD worden geleverd zijn ontworpen voor sites die een directe
+      verbinding met het Internet hebben.  Sites waarvoor de mail via
+      UUCP willen uitwisselen dienen een ander instellingenbestand voor
+      <span class="application">sendmail</span> te installeren.</p><p>Het handmatig bijstellen van
+      <code class="filename">/etc/mail/sendmail.cf</code> is een geavanceerd onderwerp.
+      Versie 8 van <span class="application">sendmail</span> genereert
+      instellingenbestanden via <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a> preprocessing, waarbij het
+      eigenlijke instellen op een hoger abstractieniveau plaatsvindt.
+      De instellingenbestanden voor <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a> kunnen onder <code class="filename">
+	/usr/share/sendmail/cf</code> gevonden worden.  Het bestand
+      <code class="filename">README</code> in de map <code class="filename">cf</code> kan
+      dienen als een basisintroductie tot het instellen van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=m4&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">m4</span>(1)</span></a>.</p><p>De beste manier om UUCP te ondersteunen is het gebruiken van
+      de eigenschap <code class="literal">mailertable</code>.  Dit maakt een
+      database aan die <span class="application">sendmail</span> kan gebruiken
+      om beslissingen over routes te nemen.</p><p>Als eerste dient het <code class="filename">.mc</code>-bestand
+      aangemaakt te worden.  De map
+      <code class="filename">/usr/share/sendmail/cf/cf</code> bevat enkele
+      voorbeelden.  Indien het bestand <code class="filename">foo.mc</code> heet,
+      hoeft slechts het volgende gedaan te worden om het in een geldig
+      <code class="filename">sendmail.cf</code> om te zetten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make foo.cf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp foo.cf /etc/mail/sendmail.cf</code></strong></pre><p>Een typisch <code class="filename">.mc</code>-bestand kan er als volgt
+      uitzien:</p><pre class="programlisting">VERSIONID(`<em class="replaceable"><code>Uw versienummer</code></em>') OSTYPE(bsd4.4)
+
+FEATURE(accept_unresolvable_domains)
+FEATURE(nocanonify)
+FEATURE(mailertable, `hash -o /etc/mail/mailertable')
+
+define(`UUCP_RELAY', <em class="replaceable"><code>uw.uucp.relay</code></em>)
+define(`UUCP_MAX_SIZE', 200000)
+define(`confDONT_PROBE_INTERFACES')
+
+MAILER(local)
+MAILER(smtp)
+MAILER(uucp)
+
+Cw	<em class="replaceable"><code>uw.alias.host.naam</code></em>
+Cw	<em class="replaceable"><code>uwuucpnodenaam.UUCP</code></em></pre><p>De regels die de eigenschappen
+      <code class="literal">accept_unresolvable_domains</code>,
+      <code class="literal">nocanonify</code>, en
+      <code class="literal">confDONT_PROBE_INTERFACES</code> bevatten zorgen
+      ervoor dat er geen gebruik wordt gemaakt van het DNS tijdens het
+      afleveren van mail.  De clausule <code class="literal">UUCP_REPLAY</code> is
+      nodig om UUCP-aflevering te ondersteunen.  Hier dient een hostnaam
+      op het Internet ingevuld te worden die .UUCP pseudo-domeinadressen
+      kan afhandelen, waarschijnlijk zal dit de mailrelay van de
+      Internetprovider zijn.</p><p>Nadat dit gedaan is, is er een bestand <code class="filename">
+	/etc/mail/mailertable</code> nodig.  Indien er slechts
+      één verbinding naar buiten is die voor alle mails
+      gebruikt wordt, zal het volgende bestand volstaan:</p><pre class="programlisting">#
+# makemap hash /etc/mail/mailertable.db &lt; /etc/mail/mailertable
+.				uucp-dom:<em class="replaceable"><code>uw.uucp.relay</code></em></pre><p>Een complexer voorbeeld kan er als volgt uitzien:</p><pre class="programlisting">#
+# makemap hash /etc/mail/mailertable.db &lt; /etc/mail/mailertable
+#
+horus.interface-business.de    uucp-dom:horus
+.interface-business.de         uucp-dom:if-bus
+interface-business.de          uucp-dom:if-bus
+.heep.sax.de                   smtp8:%1
+horus.UUCP                     uucp-dom:horus
+if-bus.UUCP                    uucp-dom:if-bus
+.                              uucp-dom:</pre><p>De eerste drie regels behandelen speciale gevallen waarbij
+      domein-geadresseerde mail niet naar de standaardroute verzonden
+      dient te worden, maar in plaats daarvan naar een UUCP-buur om het
+      afleverpad <span class="quote">&#8220;<span class="quote">af te snijden</span>&#8221;</span>.  De volgende regel
+      handelt mail naar het lokale Ethernetdomein die met SMTP
+      afgeleverd kan worden af.  Als laatste worden UUCP-buren in de
+      .UUCP-pseudodomeinnotatie genoemd, om een <code class="literal">
+	uucp-buur!ontvanger
+      </code>-overname toe te staan.  De laatste regel bestaat altijd
+      uit een enkele punt, dat met al het andere matcht, met
+      UUCP-aflevering naar een UUCP-buur die als universele mail-gateway
+      naar de wereld dient.  Alle nodenamen achter het sleutelwoord
+      <code class="literal">uucp-dom:</code> dienen geldige UUCP-buren te zijn,
+      dat met het commando <code class="literal">uuname</code> gecontroleerd kan
+      worden.</p><p>Dit bestand dient naar een DBM-database omgezet te worden voor
+      gebruik.  De opdrachtregel om dit te doen kan het beste als
+      commentaar bovenaan het bestand <code class="filename">mailertable</code>
+      gezet worden.  Deze opdracht dient telkens wanneer het bestand
+      <code class="filename">mailertable</code> wordt gewijzigd uitgevoerd te
+      worden.</p><p>Laatste tip: indien de werking van een zekere mailroute niet
+      zeker is, kan de optie <code class="option">-bt</code> van
+      <span class="application">sendmail</span> gebruikt worden.  Het start
+      <span class="application">sendmail</span> in <span class="emphasis"><em>adrestestmodus</em></span>
+      op; voer <code class="literal">3,0</code> gevolgd door het adres dat voor de
+      mailrouting getest dient te worden in.  De laatste regel bevat de
+      gebruikte interne mailagent, de bestemmingshost waarmee deze agent
+      aangeroepen wordt, en het (mogelijk vertaalde) adres.  Deze modus
+      kan door het typen van <span class="keycap"><strong>Ctrl</strong></span>+<span class="keycap"><strong>D</strong></span>
+      verlaten worden.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>sendmail -bt</code></strong>
+ADDRESS TEST MODE (ruleset 3 NOT automatically invoked)
+Enter &lt;ruleset&gt; &lt;address&gt;
+<code class="prompt">&gt;</code> <strong class="userinput"><code>3,0 foo@example.com</code></strong>
+canonify           input: foo @ example . com
+...
+parse            returns: $# uucp-dom $@ <em class="replaceable"><code>uw.uucp.relay</code></em> $: foo &lt; @ example . com . &gt;
+<code class="prompt">&gt;</code> <strong class="userinput"><code>^D</code></strong></pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mail-advanced.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="outgoing-only.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">28.6. Geavanceerde onderwerpen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 28.8. Instellen om alleen te versturen</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

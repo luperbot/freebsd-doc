@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>2. Подготовка</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Создание класса GEOM" /><link rel="up" href="index.html" title="Создание класса GEOM" /><link rel="prev" href="index.html" title="Создание класса GEOM" /><link rel="next" href="kernelprog.html" title="3. Программирование в ядре FreeBSD" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2. Подготовка</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="index.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="kernelprog.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="prelim"></a>2. Подготовка</h2></div></div></div><p>Для того, чтоб заниматься разработками для ядра, желательно
+      иметь два отдельных компьютера. Один из них предназначен для среды
+      разработки и исходных кодов, а второй - для запуска тестов
+      отлаживаемого кода. Второму компьютеру для работы достаточно
+      иметь возможность выполнять начальную загрузку по сети и монтирование
+      файловых систем по сети. В этой ситуации, если отлаживаемый код
+      содержит ошибки и вызовет аварийную остановку системы, то это не
+      повлечет порчу или утерю исходного кода
+      .
+      Второму компьютеру даже не потребуется иметь свой монитор,
+      достаточно будет соединения асинхронных портов кабелем RS-232 или
+      соединения при помощи KVM-устройства.</p><p>Но так как далеко не у каждого есть два или более компьютеров
+      под рукой, есть пара способов подготовить иную <span class="quote"><<<span class="quote">живую</span>>></span>
+      систему для разработки кода для ядра. Один из них - это
+      разработка в <a class="link" href="http://www.vmware.com/" target="_top">VMWare</a>
+      или <a class="link" href="http://www.qemu.org/" target="_top">QEmu</a> виртуальной машине
+      (это лучшее из доступного, после, конечно-же, выделенного для тестов
+      компьютера).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="prelim-system"></a>2.1. Настройка системы для разработки</h3></div></div></div><p>Прежде всего необходимо иметь в ядре поддержку
+	<code class="option">INVARIANTS</code>. Добавьте следующие строки в
+	файл конфигурации ядра:</p><pre class="programlisting">options INVARIANT_SUPPORT
+options INVARIANTS</pre><p>Для большей информативности при отладке включите поддержку
+	WITNESS, которая будет предупреждать вас в случае возникновения
+	взаимоблокировок:</p><pre class="programlisting">options WITNESS_SUPPORT
+options WITNESS
+</pre><p>Также включите отладочные символы, если планируете
+	выполнять отладку по дампам аварийных отказов</p><pre class="programlisting">  makeoptions    DEBUG=-g</pre><p>Установка отладочного ядра обычным способом (<code class="command">make
+	installkernel</code>) не даст привычного результата:
+	файл ядра будет называться <code class="filename">kernel.debug</code>
+	и будет находиться в
+	<code class="filename">/usr/obj/usr/src/sys/KERNELNAME/</code>.
+	Для удобства, отладочное ядро необходимо скопировать в
+	<code class="filename">/boot/kernel/</code>.</p><p>Также удобно иметь включенный отладчик ядра, так вы сможете
+	исследовать паники сразу-же после их возникновения. Для включения
+	отладчика добавьте следующие строки в файл конфигурации ядра:</p><pre class="programlisting">options KDB
+options DDB
+options KDB_TRACE</pre><p>Для автоматического запуска отладчика ядра после возникновения
+	паники может понадобиться установить переменную sysctl:</p><pre class="programlisting">  debug.debugger_on_panic=1</pre><p>Паники системы будут происходить, поэтому уделите внимание
+	кэшу файловой системы. Обычно, при включенном механизме
+	softupdates, последняя версия файла может быть утеряна если
+	паника произошла раньше сбрасывания кэша на устройство хранения.
+	Выключение механизма softupdates (посредством монтирования файловой
+	системы с опцией <span class="quote"><<<span class="quote">sync</span>>></span>) значительно сказывается на
+	производительности и, опять-же, не гарантирует целостности
+	данных. Как компромисс, можно сократить задержки сбрасывания
+	кэша механизма softupdates. Есть три переменных sysctl, значения
+	которых необходимо изменить (лучше всего - прописав их в
+	<code class="filename">/etc/sysctl.conf</code>):</p><pre class="programlisting">kern.filedelay=5
+kern.dirdelay=4
+kern.metadelay=3</pre><p>Значения этих переменных - секунды.</p><p>Для отладки паник ядра необходимы дампы памяти.
+	Так как паника ядра может <span class="quote"><<<span class="quote">сломать</span>>></span> файловую
+	систему, дамп сначала сохраняется в <span class="quote"><<<span class="quote">сырой</span>>></span>
+	раздел. Обычно, это своп-раздел. Поэтому, размер своп-раздела
+	должен быть не меньше размера ОЗУ компьютера. При последующей
+	загрузке дамп копируется в обычный файл. Это происходит сразу-же
+	после проверки и монтирования файловых систем, но перед
+	активированием раздела свопа. Такое поведение контролируется
+	следующими переменными <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">dumpdev="/dev/ad0s4b"
+dumpdir="/usr/core" </pre><p>Переменная <code class="varname">dumpdev</code> указывает на раздел
+	подкачки, а <code class="varname">dumpdir</code> сообщает системе куда
+	перемещать дамп ядра при следующей загрузке.</p><p>Сохранение дампа ядра - процесс медленный, и, если
+	у вашего компьютера много оперативной памяти (&gt;256M) и если
+	паники случаются часто, то ожидание сохранения дампов может начать
+	раздражать (вспомним, что над дампом происходит две операции:
+	сохранение в своп-файл и перемещение на файловую систему).
+	В таком случае может оказаться удобным ограничивание объема
+	используемой системой памяти путем установки переменной в
+	<code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">  hw.physmem="256M"</pre><p>Если паники случаются часто и размер файловых систем большой
+	(или же вы просто не доверяете softupdates и фоновой проверке
+	файловых систем), рекомендуется отключить фоновую проверку файловых
+	систем посредством установки переменной в
+	<code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">  background_fsck="NO"</pre><p>В этом случае файловые системы будут проверяться только при
+	необходимости. Также заметьте, что в случае использования фоновой
+	проверки, новая паника может случиться в то время, когда
+	проверяются диски. Другими словами, наиболее безопасный способ
+	- не иметь много локальных файловых систем, а использовать
+	второй компьютер в качестве NFS-сервера.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="prelim-starting"></a>2.2. Начало проекта</h3></div></div></div><p>Для написания нового класса GEOM необходимо создать поддиректорию
+	в любой доступной пользователю директории. Совсем не обязательно,
+	чтоб ваш модуль изначально размещался в
+	<code class="filename">/usr/src</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="prelim-makefile"></a>2.3. Makefile</h3></div></div></div><p>Правилом хорошего тона является создание
+	<code class="filename">Makefile</code>-ов для каждого нетривиального
+	проекта, примером которого конечно-же является создание
+	модулей ядра.</p><p>Создание <code class="filename">Makefile</code> - дело
+	не сложное благодаря исчерпывающему набору вспомогательных средств,
+	предоставляемых системой. В вкратце, вот как должен выглядеть
+	<code class="filename">Makefile</code> для модуля ядра:</p><pre class="programlisting">SRCS=g_journal.c
+KMOD=geom_journal
+
+.include &lt;bsd.kmod.mk&gt;</pre><p>Этот <code class="filename">Makefile</code> (с измененными именами
+	файлов) подойдет к любому модулю ядра. Класс GEOM может размещаться
+	в одном единственном модуле ядра. Если для сборки вашего модуля
+	требуется больше, чем один файл, то перечислите их имена,
+	разделенные пробельными символами, в переменной <code class="envar">SRCS</code>.
+	</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="index.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="kernelprog.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Создание класса GEOM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 3. Программирование в ядре FreeBSD</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

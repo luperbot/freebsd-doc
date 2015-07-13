@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>2.6. I/O システム</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="4.4BSD オペレーティングシステムの設計と実装" /><link rel="up" href="overview.html" title="第2章 4.4BSD の設計の概要" /><link rel="prev" href="overview-memory-management.html" title="2.5. メモリ管理" /><link rel="next" href="overview-filesystem.html" title="2.7. ファイルシステム" /><link rel="copyright" href="legalnotice.html" title="法律上の通知" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.6. I/O システム</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="overview-memory-management.html">戻る</a>〓</td><th width="60%" align="center">第2章 4.4BSD の設計の概要</th><td width="20%" align="right">〓<a accesskey="n" href="overview-filesystem.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="overview-io-system"></a>2.6. I/O システム</h2></div></div></div><p>基本的な UNIX の I/O システムモデルは、ランダムアクセスおよび
+        シーケンシャルアクセスの可能なバイト列です。
+        通常の UNIX ユーザープロセスには、
+        <span class="emphasis"><em>アクセスメソッド</em></span> や
+        <span class="emphasis"><em>コントロールブロック</em></span> は存在しません。</p><p>I/O にさまざまなレベルの構造を期待するプログラムは各種ありますが、
+        カーネルは I/O に構造を課しません。
+        たとえば、テキストファイルは改行文字
+        (ASCII LF 文字) で区切られた
+        ASCII 文字の行の集まりですが、
+        カーネルはそのような構造を関知しません。
+        ほとんどのプログラムにとって、
+        このモデルはデータバイトのストリームもしくは
+        <span class="emphasis"><em>I/O ストリーム</em></span>
+        にすぎません。
+        このような単一のデータ構造が、UNIX
+        のツールベースのアプローチ (tool-based approach)
+        を可能にしているのです<a class="xref" href="overview.html#biblio-kernighan">[<abbr class="abbrev">Kernighan &amp; Pike, 1984</abbr>]</a>。
+        あるプログラムの出力ストリームは、他のほとんどのプログラムの入力
+        ストリームとしてそのまま与える事ができます (このような伝統的な
+        UNIX の I/O ストリームを、Eighth Edition
+        のストリーム I/O システムや、
+        System V Release 3 の STREAMS と混同すべきではありませんが、
+        どちらのストリームも伝統的な I/O
+        ストリームと同じようにアクセスすることが可能です)。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76661712"></a>2.6.1. 記述子と I/O</h3></div></div></div><p>UNIX のプロセスは、I/O ストリームを参照するのに
+          <span class="emphasis"><em>記述子(descriptor)</em></span>を使用します。
+          記述子は
+          <span class="emphasis"><em>open</em></span> または <span class="emphasis"><em>socket</em></span>
+          システムコールにより取得される符号無しの小さな整数です。
+          <span class="emphasis"><em>open</em></span>システムコールは、
+          引数にファイル名および許可モードをとり、
+          それぞれ開くファイルおよび、モード
+          (読み込み、書き込みまたは読み書き)
+          を指定します。
+          <span class="emphasis"><em>open</em></span>
+          システムコールは、新しい空のファイルの作成にも使用できます。
+          <span class="emphasis"><em>read</em></span>および
+          <span class="emphasis"><em>write</em></span>システムコールを記述子に対して使用し、
+          データの転送を行います。
+          <span class="emphasis"><em>close</em></span>システムコールは、任意の記述子を開放します。</p><p>記述子は、カーネルでサポートされるオブジェクトを表します。
+          4.4BSD では、ファイル、パイプ、ソケットの 3 つのオブジェクトを
+          表すことができます。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>ファイル</em></span>は、少なくとも
+              1 個の名前を持つバイト列です。
+              ファイルは、すべての名前を明示的に削除し、
+              その記述子を持つすべてのプロセスが消滅するまで存在します。
+              プロセスは、<span class="emphasis"><em>open</em></span>
+              システムコールにより、
+              指定されたファイル名を持つファイルのファイル記述子を取得します。
+              I/O デバイスはファイルとしてアクセスされます。</p></li><li class="listitem"><p><span class="emphasis"><em>パイプ</em></span>とは、
+              ファイルと同じくバイト列ですが
+              I/O ストリームとしてのみ使われ、単一方向にのみ使われます。
+              パイプには名前がないので、<span class="emphasis"><em>open</em></span>
+              システムコールでは開くことができません。
+              パイプを開くには、<span class="emphasis"><em>pipe</em></span>
+              システムコールを使用します。
+              <span class="emphasis"><em>pipe</em></span>システムコールは 2 つの記述子を返します。
+              ひとつの記述子に入力されたデータは、
+              もう一方の記述子にそのまま順序を変えずに出力されます。
+              名前付きパイプ (FIFO) も使用できます。
+              名前があるのでファイルシステム上に配置され、
+              <span class="emphasis"><em>open</em></span> システムコールでアクセスできる以外は、
+              パイプと同一の機能を持ちます。
+              FIFO を使用してプロセス間通信を行いたい場合は、
+              片方のプロセスが FIFO を書き込み用に開き、
+              もう片方では読み込み用に開きます。</p></li><li class="listitem"><p><span class="emphasis"><em>ソケット</em></span>は、
+              プロセス間通信のために使用されるオブジェクトで、
+              ソケットを参照する記述子を持つプロセスが存在する間のみ存在します。
+              ソケットは
+              <span class="emphasis"><em>socket</em></span> システムコールで作成します。
+              <span class="emphasis"><em>socket</em></span> システムコールは、
+              作成したソケットの記述子を返します。
+              さまざまな通信方法を実現するために、
+              各種のソケットがあります。
+              たとえば、信頼性の高いデータ転送を目的としたソケット、
+              メッセージの順番を保持するソケット、
+              メッセージの境界を保護するソケットなどがあります。</p></li></ul></div><p>4.2BSD でソケットが導入されるまで、
+          パイプはファイルシステムを用いて実装されていました。
+          4.2BSD 以降では、ソケットを使用して実装されています。</p><p>カーネルはそれぞれのプロセスの<span class="emphasis"><em>記述子テーブル</em></span>を保持しており、
+          記述子の外部表現を内部表現に変換するために用いられます
+          (記述子そのものはこのテーブルへのインデックス値にすぎません)。
+          記述子テーブルは、親プロセスから子プロセスに継承されます。
+          そのため、記述子の参照先も同じく継承されます。
+          記述子を得るためには、オブジェクトを開いたり、
+          作成したりする以外に、
+          このような親プロセスからの継承による方法があります。
+          また IPC ソケットを使用すれば、
+          同一マシン上で動作している無関係なプロセス間で、
+          記述子のやりとりが可能です。</p><p>すべての有効な記述子は、
+          オブジェクトの先頭からの位置を
+          <span class="emphasis"><em>ファイルオフセット</em></span>
+          としてバイト単位で保持しています。
+          読み込みおよび書き込み動作は、
+          このオフセット位置から行われ、
+          データが転送される毎にオフセットの位置は更新されます。
+          ランダムアクセスを許可しているオブジェクトの場合、
+          ファイルオフセットは、<span class="emphasis"><em>lseek</em></span>
+          システムコールを利用して移動することもできます。
+          通常のファイルやある種のデバイスはランダムアクセス可能です。
+          パイプ、ソケットはランダムアクセスできません。</p><p>プロセスが終了すると、
+          カーネルはそのプロセスに使用されていたすべての識別子を回収します。
+          プロセスがオブジェクトへの参照を保持したまま終了した場合は、
+          オブジェクトマネージャに通知し、ファイルの削除、
+          ソケットの開放などの必要なクリーンアップを行わせます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76705616"></a>2.6.2. 記述子の管理</h3></div></div></div><p>ほとんどの場合、プロセスが起動されると、
+          3 つの記述子がすでに開かれています。
+          それらの記述子は、0、1、2 で、それぞれ一般的には、
+          <span class="emphasis"><em>標準入力</em></span>、
+          <span class="emphasis"><em>標準出力</em></span>、
+          <span class="emphasis"><em>標準エラー出力</em></span>
+          として知られています。
+          通常これらの識別子は、
+          ログインプロセスによりユーザの端末に割り当てられています
+          (14.6 節参照)。すなわち、キーボードからの入力を標準入力として受け取り、
+          標準出力への出力は端末の画面に表示されます。
+          標準エラー出力もエラー出力用に書き込み用に開かれていますが、
+          通常の出力には標準出力が利用されます。</p><p>これらの記述子を
+          (他の記述子も)
+          端末以外のオブジェクトに割り当てることも可能です。
+          このような割り当てを、
+          <span class="emphasis"><em>I/O リダイレクト</em></span>と呼びます。
+          すべての標準シェルでは、ユーザが I/O リダイレクトを行うことができます。
+          記述子 1 (標準出力) を閉じ、
+          指定したファイルを記述子 1 として開くことで、
+          シェルは出力をファイルに送ることができます。
+          同様に、記述子 0 を閉じ、
+          指定したファイルを開くことで、
+          ファイルから標準入力を受け取るようにできます。</p><p>パイプは、プログラムの変更をまったく行わず
+          (再リンクも必要ありません)、あるプログラムの出力を
+          他のプログラムに入力することを可能にします。
+          出力側のプログラムの記述子 1 (標準出力)
+          は、端末出力の代わりにパイプの入力記述子に割り当てられます。
+          同様に入力側のプログラムの記述子 0 (標準入力) は、
+          端末からのキーボード入力ではなくパイプの出力記述子に割り当てられます。</p><p><span class="emphasis"><em>open</em></span>、
+	  <span class="emphasis"><em>pipe</em></span>、
+	  <span class="emphasis"><em>socket</em></span>
+	  システムコールは、新しい記述子を生成し、
+          使用できる最も小さい番号を割り当てます。
+          パイプを動作させるためには、そのように生成された記述子を
+          0 や 1 にマップする仕組みが必要になります。
+	  <span class="emphasis"><em>dup</em></span>
+	  システムコールは、
+          同一のファイルテーブルエントリを指す記述子のコピーを作成します。
+          新しい記述子も同じく使用可能な最小の番号が使われるため、
+          <span class="emphasis"><em>dup</em></span>システムコールを使用して、
+          必要なマップを行えます。
+          ただ、記述子 1 が必要な場合でも、記述子 0 が既に閉じられていると、
+          記述子 0 が割り当てられてしまいますので注意が必要です。
+          この問題を避けるため、
+	  <span class="emphasis"><em>dup2</em></span> システムコールがあります。
+	  <span class="emphasis"><em>dup</em></span> に引数が 1 つ追加され、
+          割り当てたい記述子の番号を指定することができます
+          (もし、指定された番号の記述子が使用中の場合、
+          <span class="emphasis"><em>dup2</em></span> は、まずその記述子を閉じたのち、
+          再割り当てします)。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76730832"></a>2.6.3. デバイス</h3></div></div></div><p>ハードウェアデバイスはファイル名を持ち、通常のファイルと
+	  同一のシステムコールでアクセスできます。カーネルは、
+	  <span class="emphasis"><em>デバイス特殊ファイル</em></span> や
+          <span class="emphasis"><em>特殊ファイル</em></span>を区別し、
+          参照しているデバイスを特定できますが、
+          ほとんどのプロセスにとって、このような区別は必要ありません。
+          端末、プリンタ、テープデバイスは、4.4BSD のディスクファイルと同様、
+          バイト列としてアクセスされます。そのため、デバイス依存部分や特殊部分は、
+          可能な限りカーネルに隠蔽され、さらにカーネル内でも、
+          それらの大部分がデバイスドライバ内に分離されています。</p><p>ハードウェアデバイスは、
+	  <span class="emphasis"><em>構造を持つ</em></span>デバイスと
+	  <span class="emphasis"><em>構造を持たない</em></span>デバイスに分けられます。
+	  それぞれ、
+	  <span class="emphasis"><em>ブロック</em></span>デバイス、
+	  <span class="emphasis"><em>キャラクタ</em></span>デバイスと呼ばれます。
+	  それらのデバイスファイルへのアクセスは、カーネル内の
+	  <span class="emphasis"><em>デバイスドライバ</em></span>
+          と呼ばれるソフトウェアモジュールによって処理されます。
+          ほとんどのネットワーク通信ハードウェアデバイスは、
+          ファイルシステム上に特殊ファイルを持たず、
+	  プロセス間通信機能によってのみアクセスできます。
+          それは、<span class="emphasis"><em>raw-socket</em></span>の方が特殊ファイルより、
+          より自然なインタフェースを提供できるためです。</p><p>典型的なブロックデバイス (構造を持つデバイス) としては、
+          ディスク、磁気テープがあげられますが、
+          ほとんどのランダムアクセスデバイスがそれに該当します。
+          カーネルは、読み込み-変更-書き込みに対してバッファリングを提供し、
+          通常ファイルと同様の、
+          完全なバイトアドレス指定のランダムアクセスを提供します。
+          ファイルシステムは、ブロックデバイス上に構築されます。</p><p>構造を持たないデバイスは、
+          ブロック構造をサポートしないデバイスで、通信線、ラスタプロッタ、
+          バッファのない磁気ディスクやテープなどです。
+          構造を持たないデバイスは通常、
+          大容量のブロック I/O 転送をサポートします。</p><p>構造を持たないファイルは<span class="emphasis"><em>キャラクタデバイス</em></span>と呼ばれます。
+          これは最初に実装されたこの種類のデバイスが、
+          端末デバイスドライバだったからです。
+          このようなデバイスに対するカーネルのインタフェースは、
+          他のブロック構造を持たないデバイスに対しても有用であることが証明されました。</p><p>デバイス特殊ファイルは、
+          <span class="emphasis"><em>mknod</em></span>システムコールにより作成されます。
+          <span class="emphasis"><em>ioctl</em></span>システムコールは、
+          特殊ファイルに対応するデバイスのパラメータを操作するのに使われます。
+          このシステムコールは、他のシステムコールに新たな機能を追加せずに、
+          デバイスの特殊な機能を操作することを可能にします。
+          たとえば、<span class="emphasis"><em>ioctl</em></span>を使用して、
+          終了マークをテープデバイスに書き込むことができます。
+          <span class="emphasis"><em>write</em></span> に変更を加えたり、
+          特殊なバージョンを用意する必要はありません。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76766160"></a>2.6.4. ソケット IPC</h3></div></div></div><p>4.2BSD カーネルはソケットを利用して、パイプより柔軟な
+          IPC 機能を導入しました。ソケットは、ファイルやパイプと同様、
+          記述子により参照される、通信の末端点です。
+          2 つのプロセスがそれぞれ、ソケットを作成して接続することにより、
+          信頼性の高いバイトストリームを作成できます。
+          接続されれば、それぞれのプロセスは、パイプと同じように、
+          読み込み書き込みをソケットに対して行えます。
+          ソケットの透明性により、カーネルはプロセスの出力を、
+          別のマシン上のプロセスの入力に送ることも可能です。
+          パイプとソケットの大きな違いは、
+          パイプは共通の親プロセスが設定する必要があるのに対して、
+          ソケットはまったく無関係の
+          (異なるマシン上で動作する)
+          プロセス間でも使用できる点です。</p><p>System V は、FIFO
+          もしくは<span class="emphasis"><em>名前付きパイプ</em></span>と呼ばれる
+          ローカルプロセス間通信の仕組みを備えています。
+	  FIFO はファイルシステム上のオブジェクトとして現われ、
+          パイプと同様な方法でオープンし、データを送ることができます。
+          そのため、FIFO は共通の親プロセスによって設定される必要はなく、
+          プロセス同士が起動し動作開始してから接続することが可能です。
+	  しかしソケットとは異なり、
+          異なるマシン上で動作するプロセスに対しては使用できません。
+          4.4BSD で、FIFO が実装されているのは、
+          POSIX.1 標準に準拠するためのみです。
+          FIFO の機能は、ソケットの機能の一部になっています。</p><p>ソケット機構を実現するには、
+          伝統的な UNIX の I/O システムコールに名前付けや接続機能を追加する必要がありました。
+          開発者は、既存のインタフェースへの拡張は既存のシステムコールが変更なしに使用できる範囲にとどめ、
+          追加機能を扱う新しいインタフェースを設計しました。
+          バイトストリーム型の接続の読み込み書き込みを行う
+          <span class="emphasis"><em>read</em></span>と
+          <span class="emphasis"><em>write</em></span> システムコールに加え、
+          ネットワークダイアグラムのような宛名付きメッセージを読み込むため、
+          新たに 6 つのシステムコールが追加されました。
+          メッセージ書き込み用の
+          <span class="emphasis"><em>send</em></span>、
+          <span class="emphasis"><em>sendto</em></span>、
+          <span class="emphasis"><em>sendmsg</em></span> システムコールと、
+          メッセージの読み込み用の
+          <span class="emphasis"><em>recv</em></span>、
+          <span class="emphasis"><em>recvfrom</em></span>、
+          <span class="emphasis"><em>recvmsg</em></span> システムコールです。
+          考え直して見ると、
+          それぞれの読み書き用のシステムコールのうち最初の 2
+          つは次のシステムコールの特殊な場合であるので、
+          <span class="emphasis"><em>recvfrom</em></span> と
+          <span class="emphasis"><em>sendto</em></span> システムコールは、それぞれ
+          <span class="emphasis"><em>recvmsg</em></span> と
+          <span class="emphasis"><em>sendmsg</em></span> のライブラリインタフェースとし
+          て追加すべきだったかも知れません。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76782800"></a>2.6.5. Scatter/Gather I/O</h3></div></div></div><p>既存の
+	  <span class="emphasis"><em>read</em></span> および
+	  <span class="emphasis"><em>write</em></span> システムコールに加え、
+          4.2BSD で scatter/gather I/O 機能が導入されました。
+          scatter 入力は
+	  <span class="emphasis"><em>readv</em></span>
+          システムコールによって行われ、
+          複数の異なるバッファに対して単一の読み込みを実行できます。
+	  逆に <span class="emphasis"><em>writev</em></span>
+          システムコールは、複数の異なるバッファに対してアトミックな書き込みを実行できます。
+	  <span class="emphasis"><em>read</em></span> や
+	  <span class="emphasis"><em>write</em></span> によって行われるように、
+          単一のバッファと長さをパラメータとして渡す代わりに、
+          バッファと長さの配列へのポインタとそのサイズを渡します。</p><p>この機能により、
+          プロセスアドレス空間の異なる場所にあるバッファに対してアトミックな単一の書き込みを行え、
+          隣接するバッファにコピーする必要もありません。
+          テープデバイスのように、それぞれの要求に対し、
+          テープブロックを出力をする必要があるようなレコードベースのデバイスを抽象化した場合、
+          アトミックな書き込みが必要になります。
+          また、単一の読み込みリクエストで複数のバッファに読み込めるのは非常に便利です
+          (たとえばレコードヘッダとデータをそれぞれ別のバッファに読み込む場合など)。
+	  もちろん単一の大きなバッファにデータを読み込み、
+          読み込んだデータを必要な場所に移動することで
+          scatter 動作をシミュレートすることは可能です。
+          ただし、このようなメモリ間のコピーのコストは、
+          アプリケーションの動作に必要な時間を 2 倍以上にしてしまうことも良くあります。</p><p><span class="emphasis"><em>send</em></span> と
+          <span class="emphasis"><em>recv</em></span> がそれぞれ、
+          <span class="emphasis"><em>sendto</em></span> と
+          <span class="emphasis"><em>recvfrom</em></span>
+          のライブラリインタフェースとして実装可能であったのと同じく、
+          <span class="emphasis"><em>read</em></span> と
+          <span class="emphasis"><em>write</em></span> をそれぞれ、
+          <span class="emphasis"><em>readv</em></span> と
+          <span class="emphasis"><em>writev</em></span>
+          のライブラリインタフェースとして実装も可能であったでしょう。
+          しかし、
+          <span class="emphasis"><em>read</em></span> と
+          <span class="emphasis"><em>write</em></span> はより頻繁に使われるため、
+          シミュレートするための追加コストを考えると
+          ライブラリインタフェースとしての実装は割に合わなかったでしょう。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76810448"></a>2.6.6. 複数のファイルシステムのサポート</h3></div></div></div><p>ネットワークコンピューティングの発達により、
+          ローカルおよびリモートファイルシステムへの対応が望まれるようになりました。
+          複数のファイルシステムのサポートを簡単にするために、
+          開発者は
+          <span class="emphasis"><em>vnode</em></span>
+	  インタフェースをカーネルに追加しました。
+          vnode インタフェースから提供される操作は、
+          以前にローカルファイルシステムでサポートされていたファイルシステム操作とほぼ同じですが、
+          幅広いファイルシステムにより使用ができるようになっています。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>ローカルのディスクファイルシステム</p></li><li class="listitem"><p>各種リモートファイルシステムプロトコルによりインポートされたファイル</p></li><li class="listitem"><p>読み込み専用 CD-ROM ファイルシステム</p></li><li class="listitem"><p>特殊機能を提供するファイルシステム。
+              たとえば <code class="filename">/proc</code>
+              ファイルシステムなど</p></li></ul></div><p>4.4BSD 由来の OS の中には FreeBSD のように、
+          <span class="emphasis"><em>mount</em></span>
+          でファイルシステムが初めて参照された時にファイルシステムを動的に読み込むことが
+          できるものもあります。
+          vnode インタフェースについては 6.5 節、
+          補助サポートルーチンについては 6.6 節、
+          特殊機能ファイルシステムについては 6.7 節に記載されています。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="overview-memory-management.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="overview.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="overview-filesystem.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">2.5. メモリ管理〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓2.7. ファイルシステム</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

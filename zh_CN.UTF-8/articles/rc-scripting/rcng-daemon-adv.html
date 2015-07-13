@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>6. 启动并停止高级守护进程</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="up" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="prev" href="rcng-daemon.html" title="5. 启动并停止简单守护进程" /><link rel="next" href="rcng-hookup.html" title="7. 链接脚本到 rc.d 框架" /><link rel="copyright" href="trademarks.html" title="法律通告" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6. 启动并停止高级守护进程</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="rcng-daemon.html">上一页</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="rcng-hookup.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rcng-daemon-adv"></a>6. 启动并停止高级守护进程</h2></div></div></div><p>我们来给之前的 <span class="quote">“<span class="quote">骨架</span>”</span>
+      脚本加点 <span class="quote">“<span class="quote">血肉</span>”</span>，并让它更复杂更富有特性吧。
+      默认的方法已能够为我们做很好的工作了，
+      但是我们可能会需要它们一些方面的调整。
+      现在我们将学习如何调整默认方法来符合我们的需要。</p><div class="informalexample"><pre class="programlisting">#!/bin/sh
+
+. /etc/rc.subr
+
+name=mumbled
+rcvar=mumbled_enable
+
+command="/usr/sbin/${name}"
+command_args="mock arguments &gt; /dev/null 2&gt;&amp;1"<a id="rcng-daemon-adv-args"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+
+pidfile="/var/run/${name}.pid"<a id="rcng-daemon-adv-pid"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+
+required_files="/etc/${name}.conf /usr/share/misc/${name}.rules"<a id="rcng-daemon-adv-reqfiles"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+
+sig_reload="USR1"<a id="rcng-daemon-adv-sig"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+
+start_precmd="${name}_prestart"<a id="rcng-daemon-adv-precmd"></a><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span>
+stop_postcmd="echo Bye-bye"<a id="rcng-daemon-adv-postcmd"></a><span><img src="./imagelib/callouts/6.png" alt="6" border="0" /></span>
+
+extra_commands="reload plugh xyzzy"<a id="rcng-daemon-adv-extra"></a><span><img src="./imagelib/callouts/7.png" alt="7" border="0" /></span>
+
+plugh_cmd="mumbled_plugh"<a id="rcng-daemon-adv-methods"></a><span><img src="./imagelib/callouts/8.png" alt="8" border="0" /></span>
+xyzzy_cmd="echo 'Nothing happens.'"
+
+mumbled_prestart()
+{
+	if checkyesno mumbled_smart; then<a id="rcng-daemon-adv-yn"></a><span><img src="./imagelib/callouts/9.png" alt="9" border="0" /></span>
+		rc_flags="-o smart ${rc_flags}"<a id="rcng-daemon-adv-rcflags"></a><span><img src="./imagelib/callouts/10.png" alt="10" border="0" /></span>
+	fi
+	case "$mumbled_mode" in
+	foo)
+		rc_flags="-frotz ${rc_flags}"
+		;;
+	bar)
+		rc_flags="-baz ${rc_flags}"
+		;;
+	*)
+		warn "Invalid value for mumbled_mode"<a id="rcng-daemon-adv-warn"></a><span><img src="./imagelib/callouts/11.png" alt="11" border="0" /></span>
+		return 1<a id="rcng-daemon-adv-preret"></a><span><img src="./imagelib/callouts/12.png" alt="12" border="0" /></span>
+		;;
+	esac
+	run_rc_command xyzzy<a id="rcng-daemon-adv-run"></a><span><img src="./imagelib/callouts/13.png" alt="13" border="0" /></span>
+	return 0
+}
+
+mumbled_plugh()<a id="rcng-daemon-adv-plugh"></a><span><img src="./imagelib/callouts/14.png" alt="14" border="0" /></span>
+{
+	echo 'A hollow voice says "plugh".'
+}
+
+load_rc_config $name
+run_rc_command "$1"</pre></div><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-args"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>附加给 <code class="envar">$command</code> 的参数在
+          <code class="envar">command_args</code> 中进行传递。它们在
+          <code class="envar">$mumbled_flags</code> 之后将被添加到命令行。
+          其实际的执行便是此后最终的命令行传递给
+          <code class="command">eval</code> 运算，输入和输出以及重定向都可以在
+          <code class="envar">command_args</code> 中指定。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="emphasis"><em>永远不要</em></span> 在
+            <code class="envar">command_args</code> 包含破折号选项，
+            类似 <code class="option">-X</code> 或 <code class="option">--foo</code>
+            这样的。<code class="envar">command_args</code>
+            的内容将出现在最终命令行的末尾，因此它们可能是紧接在
+            <code class="envar">${name}_flags</code> 中所列出的参数后面；
+            但大多的命令将不能识别出普通参数后的破折号选项。
+            更好的传递附加给 <code class="envar">$command</code>
+            的选项的方式是添加它们到 <code class="envar">${name}_flags</code>
+            的起始处。另一种方法是像后文所示的那样来修改
+            <code class="envar">rc_flags</code>。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-pid"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>一个得体的守护进程会创建一个
+          <span class="emphasis"><em>pidfile</em></span> 进程文件，
+          以使其进程能够更容易更可靠地被找到。如果设置了
+          <code class="envar">pidfile</code> 变量，告诉 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+          哪里能找到供其默认方法所使用的
+          <code class="envar">pidfile</code> 进程文件。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">事实上，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+            在启动一个守护进程前还会使用 pidfile
+            进程文件来查看它是否已经在运行。使用了
+            <code class="option">faststart</code> 参数可以跳过这个检查步骤。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-reqfiles"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>如果守护进程只有在确定的文件存在的情况下才可以运行，
+          那就将它们列到 <code class="envar">required_files</code> 中，而
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 将在启动守护进程之前检查那些文件是否存在。
+          还有相关的分别用来检查目录和环境变量的
+          <code class="envar">required_dirs</code> 和 <code class="envar">required_vars</code>
+          可供使用。它们都在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 中有详细的说明。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">来自 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 的默认方法，通过使用
+            <code class="option">forcestart</code> 作为脚本的参数，
+            可以强制性地跳过预先需要的检查。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-sig"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>我们可以在守护进程有异常的时候，自定义发送给守护进程的信号。
+          特别是，<code class="envar">sig_reload</code>
+          指定了使守护进程重新装载其配置的信号；默认情况也就是
+          <span class="symbol">SIGHUP</span> 信号。
+          另一个信号是发送给守护进程以停止该进程；默认情况下是
+          <span class="symbol">SIGTERM</span> 信号，但这是可以通过设置
+          <code class="envar">sig_stop</code> 来进行适当更改的。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">信号名称应当以不包含 <code class="literal">SIG</code>
+            前缀的形式指定给 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>，就如范例中所示的那样。
+            FreeBSD 版本的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=kill&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">kill</span>(1)</span></a> 程序能够识别出
+            <code class="literal">SIG</code> 前缀，不过其它系统版本的就不一定了。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-precmd"><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></a> <a href="#rcng-daemon-adv-postcmd"><span><img src="./imagelib/callouts/6.png" alt="6" border="0" /></span></a> </p></td><td valign="top" align="left"><p>在默认的方法前面或后面执行附加任务是很容易的。
+          对于我们脚本所支持的每条命令参数而言，我们可以定义
+          <code class="envar"><em class="replaceable"><code>argument</code></em>_precmd</code> 和
+          <code class="envar"><em class="replaceable"><code>argument</code></em>_postcmd</code>
+          来完成。这些 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 命令分别在它们各自的方法前后被调用，
+          显然，从它们各自的名字就能看出来。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">如果我们需要的话，用自定义的
+            <code class="envar"><em class="replaceable"><code>argument</code></em>_cmd</code>
+            改写默认的方法，并不妨碍我们仍然使用
+            <code class="envar"><em class="replaceable"><code>argument</code></em>_precmd</code> 和
+            <code class="envar"><em class="replaceable"><code>argument</code></em>_postcmd</code>。
+            特别是，前者便于检查自定义的方法，
+            以及执行自身命令之前所遇到更严密的条件。于是，将
+            <code class="envar"><em class="replaceable"><code>argument</code></em>_precmd</code> 和
+            <code class="envar"><em class="replaceable"><code>argument</code></em>_cmd</code>
+            一起使用，使我们合理地将检查从动作中独立了出来。</p><p xmlns="http://www.w3.org/1999/xhtml">别忘了你可以将任意的有效的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>
+            表达式插入到方法和你定义的 pre- 与 post-commands 命令中。
+            在大部分情况下，调用函数使实际任务有好的风格，
+            但千万不要让风格限制了你对其幕后到底是怎么回事的思考。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-extra"><span><img src="./imagelib/callouts/7.png" alt="7" border="0" /></span></a> </p></td><td valign="top" align="left"><p>如果我们愿意实现一些自定义参数，
+          这些参数也可被认作为我们脚本的 <span class="emphasis"><em>命令</em></span>，我们需要在
+          <code class="envar">extra_commands</code> 中将它们列出并提供方法以处理它们。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="option">reload</code> 是个特别的命令。一方面，
+            它有一个在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 中预置的方法。另一方面，
+            <code class="option">reload</code> 命令默认是不被提供的。
+            理由是并非所有的守护进程都使用同样的重载方法，
+            并且有些守护进程根本没有任何东西可重载的。所以显而易见，
+            我们需要去询问都提供了哪些的内建功能。我们可以通过
+            <code class="envar">extra_commands</code> 来这样做。</p><p xmlns="http://www.w3.org/1999/xhtml">我们从 <code class="option">reload</code> 的默认方法得到了什么呢？
+            守护进程常常在收到一个信号后重新载入它们的配置 ──
+            一般来说，也就是 <span class="symbol">SIGHUP</span> 信号。因此
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 尝试发送一个信号给守护进程来重载它。
+            该信号一般预设为 <span class="symbol">SIGHUP</span>，
+            但是如果必要的话可以通过 <code class="envar">sig_reload</code>
+            变量来自定义它。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-methods"><span><img src="./imagelib/callouts/8.png" alt="8" border="0" /></span></a> <a href="#rcng-daemon-adv-plugh"><span><img src="./imagelib/callouts/14.png" alt="14" border="0" /></span></a> </p></td><td valign="top" align="left"><p>我们的脚本提供了两个非标准的命令，
+          <code class="option">plugh</code> 和 <code class="option">xyzzy</code>。
+          我们看到它们在 <code class="envar">extra_commands</code> 中被列出来了，
+          并且现在是时候给它们提供方法了。<code class="option">xyzzy</code>
+          的方法是内联的而 <code class="option">plugh</code> 的是以
+          <code class="function">mumbled_plugh</code> 形式完成的函数。</p><p>非标准命令在启动或停止的时候不被调用。
+          通常它们是为了系统管理员的方便。它们还能被其它的子系统所使用，
+          例如，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a>，前提是 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devd.conf</span>(5)</span></a> 中已经指定了。</p><p>全部可用命令的列表，当脚本不加参数地调用时，在
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 打印出的使用方法中能够找到。例如，
+          这就是供学习的脚本用法的内容：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/mumbled</code></strong>
+Usage: /etc/rc.d/mumbled [fast|force|one](start|stop|restart|rcvar|reload|plugh|xyzzy|status|poll)</pre></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-run"><span><img src="./imagelib/callouts/13.png" alt="13" border="0" /></span></a> </p></td><td valign="top" align="left"><p>如果脚本需要的话，它可以调用自己的标准或非标准的命令。
+          这可能看起来有点像函数的调用，但我们知道，命令和 shell
+          函数并非一直都是同样的东西。举个例子，<code class="command">xyzzy</code>
+          在这里不是以函数来实现的。另外，还有应该被有序调用的
+          pre-command 预置命令和 post-command 后置命令。
+          所以脚本运行自己命令的合适方式就是利用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>，
+          就像范例中展示的那样。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-yn"><span><img src="./imagelib/callouts/9.png" alt="9" border="0" /></span></a> </p></td><td valign="top" align="left"><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 提供了一个方便的函数叫做
+          <code class="function">checkyesno</code>。
+          它以一个变量名作为参数并返回一个为零的退出值，
+          当且仅当该变量设置为 <code class="literal">YES</code>，或
+          <code class="literal">TRUE</code>，或 <code class="literal">ON</code>，或
+          <code class="literal">1</code>，区分大小写；否则返回一个非零的退出值。
+          在第二种情况中，函数测试变量的设置为 <code class="literal">NO</code>，
+          <code class="literal">FALSE</code>，<code class="literal">OFF</code>，或
+          <code class="literal">0</code>，区分大小写；
+          如果变量包含别的内容的话它打印一条警告信息，例如，垃圾。</p><p>切记对 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 而言零值意味着真而非零值意味着假。</p><div xmlns="" class="important"><h3 class="admontitle">重要: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="function">checkyesno</code> 函数使用一个
+            <span class="emphasis"><em>变量名</em></span>。不要扩大含义将变量的
+            <span class="emphasis"><em>值</em></span> 传递给它；
+            否则它不会如你预期那样的工作。</p><p xmlns="http://www.w3.org/1999/xhtml">下面是 <code class="function">checkyesno</code>
+            的合理使用范围：</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">if checkyesno mumbled_enable; then
+        foo
+fi</pre><p xmlns="http://www.w3.org/1999/xhtml">相反地，以下面的方式调用 <code class="function">checkyesno</code>
+            是不会工作的 -- 至少是不会如你预期的那样：</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">if checkyesno "${mumbled_enable}"; then
+        foo
+fi</pre></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-rcflags"><span><img src="./imagelib/callouts/10.png" alt="10" border="0" /></span></a> </p></td><td valign="top" align="left"><p>我们可以通过修改 <code class="envar">$start_precmd</code> 中的
+          <code class="envar">rc_flags</code> 来影响传递到
+          <code class="envar">$command</code> 的标帜。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-warn"><span><img src="./imagelib/callouts/11.png" alt="11" border="0" /></span></a> </p></td><td valign="top" align="left"><p>某种情况下我们可能需要发出一条重要的信息，那样的话
+          <span class="application">syslog</span> 可以很好地记录日志。
+          这可以使用下列 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 函数来轻松完成：
+          <code class="function">debug</code>，<code class="function">info</code>，
+          <code class="function">warn</code>，以及 <code class="function">err</code>。
+          后者以指定的代码值退出脚本。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-adv-preret"><span><img src="./imagelib/callouts/12.png" alt="12" border="0" /></span></a> </p></td><td valign="top" align="left"><p>方法的退出值和它们的 pre-commands 预命令不只是默认被忽略掉。如果
+          <code class="envar"><em class="replaceable"><code>argument</code></em>_precmd</code>
+          返回了一个非零退出值，主方法将不会被执行。依次地是，
+          <code class="envar"><em class="replaceable"><code>argument</code></em>_postcmd</code>
+          将不会被调用，除非主方法返回的是一个为零的退出值。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">然而，当给一个参数使用 <code class="literal">force</code>
+            前缀的时候，如 <code class="option">forcestart</code>，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+            会听从命令行指示而忽略那些退出值最后仍然调用所有的命令。</p></div></td></tr></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="rcng-daemon.html">上一页</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="rcng-hookup.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">5. 启动并停止简单守护进程 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 7. 链接脚本到 rc.d 框架</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

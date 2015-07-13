@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>5. 启动并停止简单守护进程</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="up" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="prev" href="rcng-confdummy.html" title="4. 可配置的虚拟脚本" /><link rel="next" href="rcng-daemon-adv.html" title="6. 启动并停止高级守护进程" /><link rel="copyright" href="trademarks.html" title="法律通告" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5. 启动并停止简单守护进程</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="rcng-confdummy.html">上一页</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="rcng-daemon-adv.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rcng-daemon"></a>5. 启动并停止简单守护进程</h2></div></div></div><p>我们早先说过 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 是能够提供默认方法的。
+      显然，这些默认方法并不是太通用的。
+      它们都是适用于大多数情况下来启动和停止一个简单的守护进程况。
+      我们来假设现在需要为一个叫做 <code class="command">mumbled</code>
+      的守护进程编写一个 <code class="filename">rc.d</code>脚本，
+      在这里：</p><div class="informalexample"><pre class="programlisting">#!/bin/sh
+
+. /etc/rc.subr
+
+name=mumbled
+rcvar=mumbled_enable
+
+command="/usr/sbin/${name}"<a id="rcng-daemon-basic-cmd"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+
+load_rc_config $name
+run_rc_command "$1"</pre></div><p>感到很简单吧，不是么？我们来检查下我们这个小脚本。
+      只需要注意下面的这些新知识点：</p><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-daemon-basic-cmd"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>这个 <code class="envar">command</code> 变量对于
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 来说是有意义的。当它被设置时，
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 将根据提供传统守护进程的情形而生效。
+          特别是，将为这些参数提供默认的方法：
+          <code class="option">start</code>，<code class="option">stop</code>，
+          <code class="option">restart</code>，<code class="option">poll</code>，
+          以及 <code class="option">status</code>。</p><p>该守护进程将会由运行中的 <code class="envar">$command</code>
+          配合由 <code class="envar">$mumbled_flags</code> 所指定的命令行标帜来启动。
+          因此，对默认的 <code class="option">start</code> 方法来说，
+          所有的输入数据在我们脚本变量集合中都可用。与
+          <code class="option">start</code> 不同的是，
+          其他方法可能需要与进程启动相关的额外信息。举个例子，
+          <code class="option">stop</code> 必须知道进程的 PID 号来终结进程。
+          在目前的情况中，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 将扫描全部进程的清单，
+          查找一个名字等同于 <code class="envar">$procname</code> 的进程。
+          后者是另一个对 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 有意义的变量，
+          并且默认它的值跟 <code class="envar">command</code> 一样。
+          换而言之，当我们给 <code class="envar">command</code> 设置值后，
+          <code class="envar">procname</code> 实际上也设置了同样的值。
+          这启动我们的脚本来杀死守护进程并检查它是否正在第一个位置运行。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">某些程序实际上是可执行的脚本。
+            系统启动脚本的解释器以传递脚本名为命令行参数的形式来运行脚本。
+            然后被映射到进程列表中，这会使 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 迷惑。因此，当
+            <code class="envar">$command</code> 是一个脚本的时，你应该额外地设置
+            <code class="envar">command_interpreter</code> 来让 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+            知晓进程的实际名字。</p><p xmlns="http://www.w3.org/1999/xhtml">对每个 <code class="filename">rc.d</code> 脚本而言，
+            有一个可选的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量给
+            <code class="envar">command</code> 指示其优先级。
+            它的名字是下面这样的形式：<code class="envar">${name}_program</code>，
+            <code class="envar">name</code> 是我们 <a class="link" href="rcng-dummy.html#name-var">之前</a>
+            讨论过的必须性变量。如，在这个案例中它应该命名为
+            <code class="envar">emumbled_program</code>。这其实是 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+            分配 <code class="envar">${name}_program</code> 来改写
+            <code class="envar">command</code> 的。</p><p xmlns="http://www.w3.org/1999/xhtml">当然，即使 <code class="envar">command</code> 未被设置，
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 也将允许你从 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 或自身来设置
+            <code class="envar">${name}_program</code>。在那种情况下，
+            <code class="envar">${name}_program</code> 的特定属性丢失了，
+            并且它成为了一个能供你的脚本用于其自身目的的普通变量。
+            然而，单独使用 <code class="envar">${name}_program</code>
+            是并不是我们所寄望的，因为同时使用它和 <code class="envar">command</code>
+            已成为了 <code class="filename">rc.d</code> 脚本编程的一个惯用的约定。</p></div><p>关于默认方法的更详细的信息，请参考
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>。</p></td></tr></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="rcng-confdummy.html">上一页</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="rcng-daemon-adv.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">4. 可配置的虚拟脚本 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 6. 启动并停止高级守护进程</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

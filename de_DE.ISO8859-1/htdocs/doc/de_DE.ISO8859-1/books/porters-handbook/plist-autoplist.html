@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>7.5. Automatisiertes Erstellen von Paketlisten</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD Porter-Handbuch" /><link rel="up" href="plist.html" title="Kapitel 7. Fortgeschrittene pkg-plist-Methoden" /><link rel="prev" href="plist-dynamic.html" title="7.4. Dynamische oder statische Paketliste" /><link rel="next" href="pkg-files.html" title="Kapitel 8. Die pkg-* Dateien" /><link rel="copyright" href="trademarks.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">7.5. Automatisiertes Erstellen von Paketlisten</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="plist-dynamic.html">Zurück</a> </td><th width="60%" align="center">Kapitel 7. Fortgeschrittene
+      <code class="filename">pkg-plist</code>-Methoden</th><td width="20%" align="right"> <a accesskey="n" href="pkg-files.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="plist-autoplist"></a>7.5. Automatisiertes Erstellen von Paketlisten</h2></div></div></div><p>Als Erstes sollten Sie sich vergewissern, dass der Port
+	bis auf <code class="filename">pkg-plist</code> vollständig
+	ist.</p><p>Als Nächstes erstellen Sie einen temporären
+	Verzeichnisbaum, in welchem Ihr Port installiert werden kann,
+	und installieren Sie alle Abhängigkeiten.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /var/tmp/`make -V PORTNAME`</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mtree -U -f `make -V MTREE_FILE` -d -e -p /var/tmp/`make -V PORTNAME`</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make depends PREFIX=/var/tmp/`make -V PORTNAME`</code></strong></pre><p>Speichern Sie die Verzeichnisstruktur in einer neuen
+	Datei.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>(cd /var/tmp/`make -V PORTNAME` &amp;&amp; find -d * -type d) | sort &gt; OLD-DIRS</code></strong></pre><p>Erstellen Sie eine leere
+	<code class="filename">pkg-plist</code>-Datei:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>:&gt;pkg-plist</code></strong></pre><p>Wenn Ihr Port auf <code class="varname">PREFIX</code> achtet (was
+	er machen sollte), so kann der Port nun installiert und die
+	Paketliste erstellt werden.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make install PREFIX=/var/tmp/`make -V PORTNAME`</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>(cd /var/tmp/`make -V PORTNAME` &amp;&amp; find -d * \! -type d) | sort &gt; pkg-plist</code></strong></pre><p>Sie müssen auch alle neu erstellten Verzeichnisse in
+	die Paketliste aufnehmen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>(cd /var/tmp/`make -V PORTNAME` &amp;&amp; find -d * -type d) | sort | comm -13 OLD-DIRS - | sort -r | sed -e 's#^#@dirrm #' &gt;&gt; pkg-plist</code></strong></pre><p>Zu guter Letzt muss die Paketliste noch manuell
+	aufgeräumt werden - es funktioniert eben nicht
+	<span class="emphasis"><em>alles</em></span> automatisch. Manualpages sollten im
+	<code class="filename">Makefile</code> des Ports unter
+	<code class="varname">MAN<em class="replaceable"><code>n</code></em></code>
+	aufgeführt sein und nicht in der Paketliste.
+	Konfigurationsdateien des Benutzers sollten entfernt oder als
+	<code class="filename">filename.sample</code>
+	installiert werden. Die <code class="filename">info/dir</code>-Datei
+	sollte nicht aufgeführt sein und die zugehörigen
+	<code class="filename">install-info</code>-Zeilen sollten
+	hinzugefügt werden, wie im <a class="link" href="makefile-info.html" title="5.10. Info-Dateien">info files</a>-Abschnitt
+	beschrieben. Alle Bibliotheken, die der Port installiert,
+	sollten aufgelistet werden, wie es im <a class="link" href="special.html#porting-shlibs" title="6.1. Shared-Libraries">Shared Libraries</a>-Abschnitt
+	festgelegt ist.</p><p>Alternativ dazu können Sie das
+	<code class="command">plist</code>-Skript in
+	<code class="filename">/usr/ports/Tools/scripts/</code> verwenden, um
+	die Paketliste automatisch zu erstellen. Das
+	<code class="filename">plist</code>-Skript ist ein
+	<span class="application">Ruby</span>-Skript, das die meisten der in
+	den vorangehenden Absätzen kurz dargestellten manuellen
+	Schritte automatisiert.</p><p>Der erste Schritt ist
+	derselbe wie oben: Nehmen Sie die ersten drei Zeilen, also
+	<code class="command">mkdir</code>, <code class="command">mtree</code> und
+	<code class="command">make depends</code>. Installieren und bauen Sie
+	dann den Port:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make install PREFIX=/var/tmp/`make -V PORTNAME`</code></strong></pre><p>Und lassen Sie <code class="command">plist</code> die
+	<code class="filename">pkg-plist</code>-Datei erstellen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/ports/Tools/scripts/plist -Md -m `make -V MTREE_FILE` /var/tmp/`make -V PORTNAME` &gt; pkg-plist</code></strong></pre><p>Die Paketliste muss immer noch von Hand aufgeräumt
+	werden, wie es oben erklärt wurde.</p><p>Ein weiteres Werkzeug zur Erzeugung einer ersten
+	<code class="filename">pkg-plist</code>-Datei ist <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/ports-mgmt/genplist/pkg-descr">ports-mgmt/genplist</a>. Wie bei jedem
+	automatisierten Hilfswerkzeug, sollte die erzeugte
+	<code class="filename">pkg-plist</code>-Datei überprüft und
+	bei Bedarf von Hand nachbearbeitet werden.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="plist-dynamic.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="plist.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="pkg-files.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">7.4. Dynamische oder statische Paketliste </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> Kapitel 8. Die <code class="filename">pkg-*</code>
+      Dateien</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

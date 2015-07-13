@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>15.7. KerberosIV</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Εγχειρίδιο του FreeBSD" /><link rel="up" href="security.html" title="Κεφάλαιο 15. Ασφάλεια" /><link rel="prev" href="tcpwrappers.html" title="15.6. TCP Wrappers" /><link rel="next" href="kerberos5.html" title="15.8. Kerberos5" /><link rel="copyright" href="legalnotice.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.7. <span class="application">KerberosIV</span></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="tcpwrappers.html">Προηγ</a> </td><th width="60%" align="center">Κεφάλαιο 15. Ασφάλεια</th><td width="20%" align="right"> <a accesskey="n" href="kerberos5.html">Επόμενο</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kerberosIV"></a>15.7. <span class="application">KerberosIV</span></h2></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Mark</span> <span class="surname">Murray</span></span>. </span></div><div><span class="authorgroup">Based on a contribution by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Mark</span> <span class="surname">Dapoz</span></span>. </span></div></div></div><p>Kerberos is a network add-on system/protocol that allows users to
+      authenticate themselves through the services of a secure server.
+      Services such as remote login, remote copy, secure inter-system file
+      copying and other high-risk tasks are made considerably safer and more
+      controllable.</p><p>The following instructions can be used as a guide on how to set up
+      Kerberos as distributed for FreeBSD. However, you should refer to the
+      relevant manual pages for a complete description.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87675856"></a>15.7.1. Installing <span class="application">KerberosIV</span></h3></div></div></div><a id="idp87676752" class="indexterm"></a><a id="idp87677264" class="indexterm"></a><p>Kerberos is an optional component of FreeBSD.  The easiest
+        way to install this software is by selecting the <code class="literal">krb4</code> or
+        <code class="literal">krb5</code> distribution in <span class="application">sysinstall</span>
+        during the initial installation of FreeBSD. This will install
+        the <span class="quote">«<span class="quote">eBones</span>»</span> (KerberosIV) or <span class="quote">«<span class="quote">Heimdal</span>»</span> (Kerberos5)
+        implementation of Kerberos.  These implementations are
+        included because they are developed outside the USA/Canada and
+        were thus available to system owners outside those countries
+        during the era of restrictive export controls on cryptographic
+        code from the USA.</p><p>Alternatively, the MIT implementation of Kerberos is
+        available from the Ports Collection as
+        <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/krb5/pkg-descr">security/krb5</a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87685968"></a>15.7.2. Creating the Initial Database</h3></div></div></div><p>This is done on the Kerberos server only.  First make sure that
+	you do not have any old Kerberos databases around.  You should change
+	to the directory <code class="filename">/etc/kerberosIV</code> and check that
+	only the following files are present:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/kerberosIV</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls</code></strong>
+README		krb.conf        krb.realms</pre><p>If any additional files (such as <code class="filename">principal.*</code>
+	or <code class="filename">master_key</code>) exist, then use the
+	<code class="command">kdb_destroy</code> command to destroy the old Kerberos
+	database, or if Kerberos is not running, simply delete the extra
+	files.</p><p>You should now edit the <code class="filename">krb.conf</code> and
+	<code class="filename">krb.realms</code> files to define your Kerberos realm.
+	In this case the realm will be <code class="literal">EXAMPLE.COM</code> and the
+	server is <code class="systemitem">grunt.example.com</code>.  We edit
+	or create the <code class="filename">krb.conf</code> file:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat krb.conf</code></strong>
+EXAMPLE.COM
+EXAMPLE.COM grunt.example.com admin server
+CS.BERKELEY.EDU okeeffe.berkeley.edu
+ATHENA.MIT.EDU kerberos.mit.edu
+ATHENA.MIT.EDU kerberos-1.mit.edu
+ATHENA.MIT.EDU kerberos-2.mit.edu
+ATHENA.MIT.EDU kerberos-3.mit.edu
+LCS.MIT.EDU kerberos.lcs.mit.edu
+TELECOM.MIT.EDU bitsy.mit.edu
+ARC.NASA.GOV trident.arc.nasa.gov</pre><p>In this case, the other realms do not need to be there.  They are
+	here as an example of how a machine may be made aware of multiple
+	realms.  You may wish to not include them for simplicity.</p><p>The first line names the realm in which this system works.  The
+	other lines contain realm/host entries.  The first item on a line is a
+	realm, and the second is a host in that realm that is acting as a
+	<span class="quote">«<span class="quote">key distribution center</span>»</span>.  The words <code class="literal">admin
+	  server</code> following a host's name means that host also
+	provides an administrative database server.  For further explanation
+	of these terms, please consult the Kerberos manual pages.</p><p>Now we have to add <code class="systemitem">grunt.example.com</code>
+	to the <code class="literal">EXAMPLE.COM</code> realm and also add an entry to
+	put all hosts in the <code class="systemitem">.example.com</code>
+	domain in the <code class="literal">EXAMPLE.COM</code> realm.  The
+	<code class="filename">krb.realms</code> file would be updated as
+	follows:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat krb.realms</code></strong>
+grunt.example.com EXAMPLE.COM
+.example.com EXAMPLE.COM
+.berkeley.edu CS.BERKELEY.EDU
+.MIT.EDU ATHENA.MIT.EDU
+.mit.edu ATHENA.MIT.EDU</pre><p>Again, the other realms do not need to be there.  They are here as
+	an example of how a machine may be made aware of multiple realms.  You
+	may wish to remove them to simplify things.</p><p>The first line puts the <span class="emphasis"><em>specific</em></span> system into
+	the named realm.  The rest of the lines show how to default systems of
+	a particular subdomain to a named realm.</p><p>Now we are ready to create the database.  This only needs to run
+	on the Kerberos server (or Key Distribution Center).  Issue the
+	<code class="command">kdb_init</code> command to do this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_init</code></strong>
+<code class="prompt">Realm name [default  ATHENA.MIT.EDU ]:</code> <strong class="userinput"><code>EXAMPLE.COM</code></strong>
+You will be prompted for the database Master Password.
+It is important that you NOT FORGET this password.
+
+<code class="prompt">Enter Kerberos master key:</code> </pre><p>Now we have to save the key so that servers on the local machine
+	can pick it up.  Use the <code class="command">kstash</code> command to do
+	this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kstash</code></strong>
+
+<code class="prompt">Enter Kerberos master key:</code>
+
+Current Kerberos master key version is 1.
+
+Master key entered. BEWARE!</pre><p>This saves the encrypted master password in
+	<code class="filename">/etc/kerberosIV/master_key</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87710928"></a>15.7.3. Making It All Run</h3></div></div></div><a id="idp87711568" class="indexterm"></a><p>Two principals need to be added to the database for
+	<span class="emphasis"><em>each</em></span> system that will be secured with Kerberos.
+	Their names are <code class="literal">kpasswd</code> and <code class="literal">rcmd</code>.
+	These two principals are made for each system, with the instance being
+	the name of the individual system.</p><p>These daemons, <span class="application">kpasswd</span> and
+	<span class="application">rcmd</span> allow other systems to change Kerberos
+	passwords and run commands like <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcp&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rcp</span>(1)</span></a>,
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rlogin&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rlogin</span>(1)</span></a> and <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rsh</span>(1)</span></a>.</p><p>Now let us add these entries:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_edit</code></strong>
+Opening database...
+
+<code class="prompt">Enter Kerberos master key:</code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Previous or default values are in [brackets] ,
+enter return to leave the same, or new value.
+
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>passwd</code></strong>
+<code class="prompt">Instance:</code> <strong class="userinput"><code>grunt</code></strong>
+
+&lt;Not found&gt;, <code class="prompt">Create [y] ?</code> <strong class="userinput"><code>y</code></strong>
+
+Principal: passwd, Instance: grunt, kdc_key_ver: 1
+<code class="prompt">New Password:</code>                    &lt;---- enter RANDOM here
+Verifying password
+
+<code class="prompt">New Password:</code> &lt;---- enter RANDOM here
+
+<code class="prompt">Random password [y] ?</code> <strong class="userinput"><code>y</code></strong>
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ?</code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ?</code>
+<code class="prompt">Attributes [ 0 ] ?</code>
+Edit O.K.
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>rcmd</code></strong>
+<code class="prompt">Instance:</code> <strong class="userinput"><code>grunt</code></strong>
+
+&lt;Not found&gt;, <code class="prompt">Create [y] ?</code>
+
+Principal: rcmd, Instance: grunt, kdc_key_ver: 1
+<code class="prompt">New Password:</code>		&lt;---- enter RANDOM here
+Verifying password
+
+<code class="prompt">New Password:</code>           &lt;---- enter RANDOM here
+
+<code class="prompt">Random password [y] ?</code>
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ?</code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ?</code>
+<code class="prompt">Attributes [ 0 ] ?</code>
+Edit O.K.
+<code class="prompt">Principal name:</code>         &lt;---- null entry here will cause an exit</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87737936"></a>15.7.4. Creating the Server File</h3></div></div></div><p>We now have to extract all the instances which define the
+	services on each machine.  For this we use the
+	<code class="command">ext_srvtab</code> command.  This will create a file
+	which must be copied or moved <span class="emphasis"><em>by secure
+	  means</em></span> to each Kerberos client's
+	<code class="filename">/etc</code> directory.  This file must
+	be present on each server and client, and is crucial to the
+	operation of Kerberos.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ext_srvtab grunt</code></strong>
+<code class="prompt">Enter Kerberos master key:</code>
+
+Current Kerberos master key version is 1.
+
+Master key entered. BEWARE!
+Generating 'grunt-new-srvtab'....</pre><p>Now, this command only generates a temporary file which must be
+	renamed to <code class="filename">srvtab</code> so that all the servers can pick
+	it up.  Use the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mv&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">mv</span>(1)</span></a> command to move it into place on
+	the original system:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mv grunt-new-srvtab srvtab</code></strong></pre><p>If the file is for a client system, and the network is not deemed
+	safe, then copy the
+	<code class="filename">client-new-srvtab</code> to
+	removable media and transport it by secure physical means.  Be sure to
+	rename it to <code class="filename">srvtab</code> in the client's
+	<code class="filename">/etc</code> directory, and make sure it is
+	mode 600:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mv grumble-new-srvtab srvtab</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 600 srvtab</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87751632"></a>15.7.5. Populating the Database</h3></div></div></div><p>We now have to add some user entries into the database.  First
+	let us create an entry for the user <code class="systemitem">jane</code>.  Use the
+	<code class="command">kdb_edit</code> command to do this:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_edit</code></strong>
+Opening database...
+
+<code class="prompt">Enter Kerberos master key:</code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Previous or default values are in [brackets] ,
+enter return to leave the same, or new value.
+
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>jane</code></strong>
+<code class="prompt">Instance:</code>
+
+&lt;Not found&gt;, <code class="prompt">Create [y] ?</code> <strong class="userinput"><code>y</code></strong>
+
+Principal: jane, Instance: , kdc_key_ver: 1
+<code class="prompt">New Password:</code>                &lt;---- enter a secure password here
+Verifying password
+
+<code class="prompt">New Password:</code>                &lt;---- re-enter the password here
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ?</code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ?</code>
+<code class="prompt">Attributes [ 0 ] ?</code>
+Edit O.K.
+<code class="prompt">Principal name:</code>		   &lt;---- null entry here will cause an exit</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87763536"></a>15.7.6. Testing It All Out</h3></div></div></div><p>First we have to start the Kerberos daemons.  Note that if you
+	have correctly edited your <code class="filename">/etc/rc.conf</code> then this
+	will happen automatically when you reboot.  This is only necessary on
+	the Kerberos server.  Kerberos clients will automatically get what
+	they need from the <code class="filename">/etc/kerberosIV</code>
+	directory.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kerberos &amp;</code></strong>
+Kerberos server starting
+Sleep forever on error
+Log file is /var/log/kerberos.log
+Current Kerberos master key version is 1.
+
+Master key entered. BEWARE!
+
+Current Kerberos master key version is 1
+Local realm: EXAMPLE.COM
+<code class="prompt">#</code> <strong class="userinput"><code>kadmind -n &amp;</code></strong>
+KADM Server KADM0.0A initializing
+Please do not use 'kill -9' to kill this job, use a
+regular kill instead
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!</pre><p>Now we can try using the <code class="command">kinit</code> command to get a
+	ticket for the ID <code class="systemitem">jane</code> that we created
+	above:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kinit jane</code></strong>
+MIT Project Athena (grunt.example.com)
+Kerberos Initialization for "jane"
+<code class="prompt">Password:</code> </pre><p>Try listing the tokens using <code class="command">klist</code> to see if we
+	really have them:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>klist</code></strong>
+Ticket file:    /tmp/tkt245
+Principal:      jane@EXAMPLE.COM
+
+  Issued           Expires          Principal
+Apr 30 11:23:22  Apr 30 19:23:22  krbtgt.EXAMPLE.COM@EXAMPLE.COM</pre><p>Now try changing the password using <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=passwd&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">passwd</span>(1)</span></a> to
+	check if the <span class="application">kpasswd</span> daemon can get
+	authorization to the Kerberos database:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>passwd</code></strong>
+realm EXAMPLE.COM
+<code class="prompt">Old password for jane:</code>
+<code class="prompt">New Password for jane:</code>
+Verifying password
+<code class="prompt">New Password for jane:</code>
+Password changed.</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87775568"></a>15.7.7. Adding <code class="command">su</code> Privileges</h3></div></div></div><p>Kerberos allows us to give <span class="emphasis"><em>each</em></span> user
+	who needs <code class="systemitem">root</code> privileges their own
+	<span class="emphasis"><em>separate</em></span> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> password.
+	We could now add an ID which is authorized to
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> to <code class="systemitem">root</code>.  This is
+	controlled by having an instance of <code class="systemitem">root</code>
+	associated with a principal.  Using <code class="command">kdb_edit</code>
+	we can create the entry <code class="literal">jane.root</code> in the
+	Kerberos database:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_edit</code></strong>
+Opening database...
+
+<code class="prompt">Enter Kerberos master key:</code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Previous or default values are in [brackets] ,
+enter return to leave the same, or new value.
+
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>jane</code></strong>
+<code class="prompt">Instance:</code> <strong class="userinput"><code>root</code></strong>
+
+&lt;Not found&gt;, Create [y] ? y
+
+Principal: jane, Instance: root, kdc_key_ver: 1
+<code class="prompt">New Password:</code>                    &lt;---- enter a SECURE password here
+Verifying password
+
+<code class="prompt">New Password:</code>    	 	 &lt;---- re-enter the password here
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ?</code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ?</code> <strong class="userinput"><code>12</code></strong> &lt;--- Keep this short!
+<code class="prompt">Attributes [ 0 ] ?</code>
+Edit O.K.
+<code class="prompt">Principal name:</code>		         &lt;---- null entry here will cause an exit</pre><p>Now try getting tokens for it to make sure it works:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kinit jane.root</code></strong>
+MIT Project Athena (grunt.example.com)
+Kerberos Initialization for "jane.root"
+<code class="prompt">Password:</code></pre><p>Now we need to add the user to <code class="systemitem">root</code>'s
+	  <code class="filename">.klogin</code> file:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat /root/.klogin</code></strong>
+jane.root@EXAMPLE.COM</pre><p>Now try doing the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a>:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su</code></strong>
+<code class="prompt">Password:</code></pre><p>and take a look at what tokens we have:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>klist</code></strong>
+Ticket file:	/tmp/tkt_root_245
+Principal:      jane.root@EXAMPLE.COM
+
+  Issued           Expires          Principal
+May  2 20:43:12  May  3 04:43:12  krbtgt.EXAMPLE.COM@EXAMPLE.COM</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87803728"></a>15.7.8. Using Other Commands</h3></div></div></div><p>In an earlier example, we created a principal called
+	<code class="literal">jane</code> with an instance <code class="literal">root</code>.
+	This was based on a user with the same name as the principal, and this
+	is a Kerberos default; that a
+	<code class="literal">&lt;principal&gt;.&lt;instance&gt;</code> of the form
+	<code class="literal">&lt;username&gt;.</code><code class="systemitem">root</code> will allow
+	that <code class="literal">&lt;username&gt;</code> to <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> to
+	<code class="systemitem">root</code> if the necessary entries are in the
+	<code class="filename">.klogin</code> file in <code class="systemitem">root</code>'s
+	home directory:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat /root/.klogin</code></strong>
+jane.root@EXAMPLE.COM</pre><p>Likewise, if a user has in their own home directory lines of the
+	form:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cat ~/.klogin</code></strong>
+jane@EXAMPLE.COM
+jack@EXAMPLE.COM</pre><p>This allows anyone in the <code class="literal">EXAMPLE.COM</code> realm
+	who has authenticated themselves as <code class="systemitem">jane</code> or
+	<code class="systemitem">jack</code> (via <code class="command">kinit</code>, see above)
+	to access to <code class="systemitem">jane</code>'s
+	account or files on this system (<code class="systemitem">grunt</code>) via
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rlogin&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rlogin</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rsh</span>(1)</span></a> or
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcp&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">rcp</span>(1)</span></a>.</p><p>For example, <code class="systemitem">jane</code> now logs into another system using
+	Kerberos:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kinit</code></strong>
+MIT Project Athena (grunt.example.com)
+<code class="prompt">Password:</code>
+<code class="prompt">%</code> <strong class="userinput"><code>rlogin grunt</code></strong>
+Last login: Mon May  1 21:14:47 from grumble
+Copyright (c) 1980, 1983, 1986, 1988, 1990, 1991, 1993, 1994
+        The Regents of the University of California.   All rights reserved.
+
+FreeBSD BUILT-19950429 (GR386) #0: Sat Apr 29 17:50:09 SAT 1995</pre><p>Or <code class="systemitem">jack</code> logs into <code class="systemitem">jane</code>'s account on the same machine
+	(<code class="systemitem">jane</code> having
+	set up the <code class="filename">.klogin</code> file as above, and the person
+	in charge of Kerberos having set up principal
+	<span class="emphasis"><em>jack</em></span> with a null instance):</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kinit</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>rlogin grunt -l jane</code></strong>
+MIT Project Athena (grunt.example.com)
+<code class="prompt">Password:</code>
+Last login: Mon May  1 21:16:55 from grumble
+Copyright (c) 1980, 1983, 1986, 1988, 1990, 1991, 1993, 1994
+        The Regents of the University of California.   All rights reserved.
+FreeBSD BUILT-19950429 (GR386) #0: Sat Apr 29 17:50:09 SAT 1995</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="tcpwrappers.html">Προηγ</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Πάνω</a></td><td width="40%" align="right"> <a accesskey="n" href="kerberos5.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top">15.6. TCP Wrappers </td><td width="20%" align="center"><a accesskey="h" href="index.html">Αρχή</a></td><td width="40%" align="right" valign="top"> 15.8. <span class="application">Kerberos5</span></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

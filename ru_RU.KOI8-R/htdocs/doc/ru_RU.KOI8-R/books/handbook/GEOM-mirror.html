@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>18.4. RAID1 - Зеркалирование (Mirroring)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="GEOM.html" title="Глава 18. GEOM: Модульная инфраструктура преобразования дисковых запросов" /><link rel="prev" href="GEOM-striping.html" title="18.3. RAID0 - Создание дисковой последовательности (Striping)" /><link rel="next" href="geom-ggate.html" title="18.5. Сетевые устройства GEOM Gate" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">18.4. RAID1 - Зеркалирование (Mirroring)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-striping.html">Пред.</a> </td><th width="60%" align="center">Глава 18. GEOM: Модульная инфраструктура преобразования дисковых запросов</th><td width="20%" align="right"> <a accesskey="n" href="geom-ggate.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-mirror"></a>18.4. RAID1 - Зеркалирование (Mirroring)</h2></div></div></div><a id="idp92631376" class="indexterm"></a><a id="idp92636368" class="indexterm"></a><p>Зеркалирование (Mirroring) - технология,
+      применяемая как в корпоративной среде, так и на домашних компьютерах.
+      Она позволяет создавать резервные копии <span class="quote"><<<span class="quote">на лету</span>>></span>.
+      Зеркалирование, по сути, означает, что диск A является копией диска B.
+      Или, возможно, диск C+D является копией диска A+B.  Вне зависимости от
+      конфигурации, основной аспект - дублирование информации.  Позже,
+      эта информация может быть с легкостью восстановлена или сохранена как
+      резервная копия без остановки системы, или даже физически помещена в
+      хранилище данных.</p><p>Перед началом, убедитесь, что у вас есть два физических диска
+      равной емкости.  Далее в этом примере подразумевается, что это диски
+      прямого доступа (direct access, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=da&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">da</span>(4)</span></a>) с интерфейсом
+      <acronym class="acronym">SCSI</acronym>.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92639440"></a>18.4.1. Зеркалирование первичных дисков</h3></div></div></div><p>В статье предполагается, что FreeBSD установлена на первый жесткий
+	диск, определяемый системой как <code class="filename">da0</code>.
+	Это устройство будет целевым для утилиты <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a>.</p><p>Перед построением зеркала включите дополнительную отладочную
+	информацию и откройте доступ к устройству.  Это достигается
+	установкой следующего значения переменной <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a>
+	<code class="varname">kern.geom.debugflags</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl kern.geom.debugflags=17</code></strong></pre><p>Теперь создайте зеркало.  Начните процесс с сохранения метаданных
+	на первом диске.  В результате выполнения следующей команды
+	будет создано устройство вида <code class="filename">/dev/mirror/gm</code>:</p><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Создание зеркала на диске, с которого произведена загрузка,
+	  может повлечь за собой потерю данных в том случае, если данными
+	  занят последний сектор диска.  Риск повреждения данных меньше, если
+	  создание зеркала немедленно следует за свежей установкой FreeBSD.</p></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror label -vb round-robin gm0 /dev/da0</code></strong></pre><p>Система должна выдать следующее сообщение:</p><pre class="screen">Metadata value stored on /dev/da0.
+Done.</pre><p>Инициализируйте GEOM, это повлечет за собой загрузку модуля ядра
+	<code class="filename">/boot/kernel/geom_mirror.ko</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror load</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">После успешного завершения команды будет создано устройство
+	  <code class="filename">gm0</code> в каталоге
+	  <code class="filename">/dev/mirror</code>.</p></div><p>Включите автоматическую загрузку модуля
+	<code class="filename">geom_mirror.ko</code> во время старта операционной
+	системы:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_mirror_load="YES"' &gt;&gt; /boot/loader.conf</code></strong></pre><p>Отредактируйте файл <code class="filename">/etc/fstab</code>, заменив
+	в нём упоминания старого имени устройства <code class="filename">da0</code>
+	новым именем устройства зеркала <code class="filename">gm0</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Если <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> - ваш любимый текстовый редактор, то эта
+	  задача решается просто:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vi /etc/fstab</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Сделайте резервную копию файла <code class="filename">fstab</code>,
+	  набрав в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> <strong class="userinput"><code>:w /etc/fstab.bak</code></strong>.
+	  Затем замените все части строк, содержащие имя устройства
+	  <code class="filename">da0</code>, на имя <code class="filename">gm0</code>,
+	  набрав <strong class="userinput"><code>:%s/da/mirror\/gm/g</code></strong>.</p></div><p>Независимо от аппаратного интерфейса дисков
+	(<acronym class="acronym">SCSI</acronym> или <acronym class="acronym">ATA</acronym>), устройство
+	<acronym class="acronym">RAID</acronym> будет именоваться всегда одинаково -
+	<code class="filename">gm</code>.  Содержимое файла
+	<code class="filename">fstab</code> должно выглядеть подобно следующему:</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/mirror/gm0s1b      none            swap    sw              0       0
+/dev/mirror/gm0s1a      /               ufs     rw              1       1
+/dev/mirror/gm0s1d      /usr            ufs     rw              0       0
+/dev/mirror/gm0s1f      /home           ufs     rw              2       2
+#/dev/mirror/gm0s2d     /store          ufs     rw              2       2
+/dev/mirror/gm0s1e      /var            ufs     rw              2       2
+/dev/acd0               /cdrom          cd9660  ro,noauto       0       0</pre><p>Перезагрузите систему:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown -r now</code></strong></pre><p>С этого момента во время каждой загрузки система должна
+	использовать устройство <code class="filename">gm0</code> вместо устройства
+	<code class="filename">da0</code>.  Удостовериться в этом можно так:
+	дождитесь загрузки системы, наберите команду <code class="command">mount</code>
+	и просмотрите её вывод:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/mirror/gm0s1a   1012974  224604   707334    24%    /
+devfs                      1       1        0   100%    /dev
+/dev/mirror/gm0s1f  45970182   28596 42263972     0%    /home
+/dev/mirror/gm0s1d   6090094 1348356  4254532    24%    /usr
+/dev/mirror/gm0s1e   3045006 2241420   559986    80%    /var
+devfs                      1       1        0   100%    /var/named/dev</pre><p>Как и ожидалось, вывод выглядит корректно.  И в заключение, чтобы
+	начать синхронизацию данных, включите в зеркало диск
+	<code class="filename">da1</code> при помощи следующей команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da1</code></strong></pre><p>Во время построения зеркала статус процесса построения может быть
+	 проверен следующей командой:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror status</code></strong></pre><p>Вывод вышеприведённой команды для построенного
+	и синхронизированного зеркала выглядит подобно следующему:</p><pre class="screen">      Name    Status  Components
+mirror/gm0  COMPLETE  da0
+                      da1</pre><p>Если есть какие-либо неполадки или зеркало находится в процессе
+	построения, в выводе команды будет обозначен статус
+	<code class="literal">DEGRADED</code> вместо статуса
+	<code class="literal">COMPLETE</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92700240"></a>18.4.2. Решение проблем</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92700880"></a>18.4.2.1. Система не загружается</h4></div></div></div><p>Если система прекращает загрузку и выдает строку:</p><pre class="programlisting">ffs_mountroot: can't find rootvp
+Root mount failed: 6
+mountroot&gt;</pre><p>Перезагрузите компьютер кнопкой питания или кнопкой
+	  <span class="quote"><<<span class="quote">Reset</span>>></span>.  В загрузочном меню выберите опцию (6).
+	  Это приведет к тому, что система выдаст приглашение <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>.
+	  Загрузите модуль ядра вручную:</p><pre class="screen">OK? <strong class="userinput"><code>load geom_mirror</code></strong>
+OK? <strong class="userinput"><code>boot</code></strong></pre><p>Если это сработало, модуль ядра по какой-либо причине
+	  не загрузился правильно.  Проверьте корректность соответствующей
+	  записи в <code class="filename">/boot/loader.conf</code>.  Если проблема
+	  осталась, добавьте строку:</p><pre class="programlisting">options	GEOM_MIRROR</pre><p>в файл конфигурации ядра, пересоберите и переустановите ядро.
+	  Это должно устранить проблему.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp92710992"></a>18.4.3. Восстановление после дисковых сбоев</h3></div></div></div><p>Примечательной особенностью зеркалирования является то, что если
+	диск вышел из строя, то он, пожалуй, может быть заменён вообще без
+	ущерба для данных.</p><p>Принимая во внимание предыдущую конфигурацию
+	<acronym class="acronym">RAID</acronym>1, предположим, что устройство
+	<code class="filename">da1</code> вышло из строя, и ему требуется замена.
+	Перед заменой определите, какой именно диск вышел из строя, а потом
+	выключите систему.  Теперь дефектный диск может быть заменён новым,
+	после чего необходимо снова загрузить систему.  После загрузки системы
+	для замещения диска в зеркале могут быть использованы следующие
+	команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror forget gm0</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da1</code></strong></pre><p>Для наблюдения за статусом построения используйте команду
+	<code class="command">gmirror</code> <code class="option">status</code>.  Вывод этой команды
+	достаточно прост и понятен.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-striping.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="geom-ggate.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">18.3. RAID0 - Создание дисковой последовательности (Striping) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 18.5. Сетевые устройства GEOM Gate</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

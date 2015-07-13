@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>13.2. Het bootprobleem</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="boot.html" title="Hoofdstuk 13. Het FreeBSD opstartproces" /><link rel="prev" href="boot.html" title="Hoofdstuk 13. Het FreeBSD opstartproces" /><link rel="next" href="boot-blocks.html" title="13.3. De bootmanager en opstartstadia" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">13.2. Het bootprobleem</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="boot.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 13. Het FreeBSD opstartproces</th><td width="20%" align="right"> <a accesskey="n" href="boot-blocks.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="boot-introduction"></a>13.2. Het bootprobleem</h2></div></div></div><p>Het aanzetten van een computer en het starten van het
+      besturingssysteem zorgt voor een interessant dilemma.  Vast staat
+      dat een computer niet weet wat hij moet doen totdat het
+      besturingssysteem gestart is.  Daar valt ook het starten van
+      programma's op schijf onder.  Dus als een computer geen programma
+      van schijf kan starten zonder besturingssysteem en het
+      besturingssysteem staat op schijf, hoe wordt het
+      besturingssysteem dan gestart?</p><p>Dit is een gelijksoortig probleem als dat in het boek
+      <em class="citetitle">De avonturen van Baron von
+	Münchausen</em>.  Iemand is in een put gevallen en
+      heeft zichzelf eruit gehaald door zijn laarsriempjes (bootstraps)
+      vast te pakken en zich op te trekken.  In het begin van het
+      computertijdperk is de term <em class="firstterm">bootstrap</em>
+      gegeven aan het mechanisme dat het besturingssysteem laadt.
+      Later werd dit afgekort tot <span class="quote">&#8220;<span class="quote">booten</span>&#8221;</span>.</p><a id="idp76106704" class="indexterm"></a><a id="idp76107216" class="indexterm"></a><p>Op x86 machines is het Basis Input/Output Systeem (BIOS)
+      verantwoordelijk voor het laden van het besturingssysteem.  Om
+      dit te doen zoekt het BIOS op de harde schijf naar het Master
+      Boot Record (MBR), dat op een vaste plek op de schijf staat.  Het
+      BIOS heeft voldoende kennis om het MBR te starten en gaat er
+      vanuit dat de MBR de rest van de taken uitvoert die nodig zijn om
+      het besturingssysteem te kunnen laden, mogelijk met hulp van het
+      BIOS.</p><a id="idp76108880" class="indexterm"></a><a id="idp76109392" class="indexterm"></a><a id="idp76109904" class="indexterm"></a><p>Aan de code binnen de MBR wordt meestal gerefereerd als een
+      <span class="emphasis"><em>bootmanager</em></span>, in het bijzonder als die
+      interactie heeft met een gebruiker.  In dit geval heeft de
+      bootmanager meestal meer code in de eerste
+      <span class="emphasis"><em>track</em></span> van een schijf binnen het
+      bestandssysteem van een besturingssysteem.  Een bootmanager wordt
+      soms ook <span class="emphasis"><em>boot loader</em></span> genoemd, maar FreeBSD
+      gebruikt die term voor een later stadium van het starten.
+      Populaire bootmanagers zijn onder andere
+      <span class="application">boot0</span> (ook bekend als
+      <span class="application">Boot Easy</span>, de standaard FreeBSD
+      bootmanager), <span class="application">Grub</span>,
+      <span class="application">GAG</span> en
+      <span class="application">LILO</span> (alleen
+      <span class="application">boot0</span> past binnen de MBR.)</p><p>Als er maar één besturingssysteem en een schijf
+      geïnstalleerd is, voldoet een standaard PC MBR.  Dit MBR
+      zoekt naar de eerste opstartbare (alias actieve) slice op schijf
+      en start de code op deze slice om de rest van het
+      besturingssysteem te laden.  De MBR die standaard door
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fdisk&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fdisk</span>(8)</span></a> wordt geïnstalleerd is zo'n MBR.  Die is
+      gebaseerd op <code class="filename">/boot/mbr</code>.</p><p>Indien er meerdere besturingssystemen op schijven staan, kan
+      er een andere bootmanager geïnstalleerd worden, een die een
+      lijst toont met verschillende besturingssystemen en de
+      mogelijkheid geeft om er één te kiezen dat
+      opgestart moet worden.  In de volgende paragrafen worden er twee
+      beschreven.</p><p>Het resterende deel van het FreeBSD bootstrap-systeem is
+      verdeeld in drie fases.  De eerste fase wordt gestart door het
+      MBR, dat net voldoende informatie heeft om de computer in een
+      bepaalde toestand te zetten en de tweede fase te starten.  De
+      tweede fase kan net iets meer doen voordat hij de derde fase
+      start.  De derde fase voltooit het laden van het
+      besturingssysteem.  Dit proces is verdeeld in drie fases omdat de
+      PC-standaarden grenzen stellen aan de grootte van programma's die
+      gedraaid kunnen worden in de eerste twee fases van dit proces.
+      Door deze taken aan elkaar te koppelen krijgt FreeBSD een flexibeler
+      laadgedeelte.</p><a id="idp76149712" class="indexterm"></a><a id="idp76150224" class="indexterm"></a><p>Daarna wordt de kernel gestart en begint met het zoeken naar
+      en initialiseren van apparaten.  Zodra het kernel-opstartproces
+      klaar is, geeft de kernel de controle over aan het
+      gebruikerproces <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a>, dat controleert of de schijven een
+      bruikbare status hebben.  Dan start <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> de instellingen
+      op gebruikersniveau die de bestandssystemen mount, de
+      netwerkkaarten instelt voor communicatie met het netwerk en in
+      het algemeen worden de processen gestart die moeten draaien op
+      een FreeBSD systeem bij het opstarten.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="boot.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="boot.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="boot-blocks.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">Hoofdstuk 13. Het FreeBSD opstartproces </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 13.3. De bootmanager en opstartstadia</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

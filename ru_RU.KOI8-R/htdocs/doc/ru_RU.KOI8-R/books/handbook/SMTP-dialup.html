@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>24.8. Использование почты с коммутируемым соединением</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="mail.html" title="Глава 24. Электронная почта" /><link rel="prev" href="outgoing-only.html" title="24.7. Настройка почты только для отправки" /><link rel="next" href="SMTP-Auth.html" title="24.9. SMTP аутентификация" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">24.8. Использование почты с коммутируемым соединением</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="outgoing-only.html">Пред.</a> </td><th width="60%" align="center">Глава 24. Электронная почта</th><td width="20%" align="right"> <a accesskey="n" href="SMTP-Auth.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-dialup"></a>24.8. Использование почты с коммутируемым соединением</h2></div></div></div><p>Если у вас есть статический IP, настройки по умолчанию менять
+      не потребуется.  Установите имя хоста в соответствии с присвоенным
+      именем интернет и <span class="application">sendmail</span> будет делать
+      свою работу.</p><p>Если у вас динамический IP адрес и используется коммутируемое
+      PPP соединение с интернет, у вас возможно уже есть почтовый ящик
+      на сервере провайдера.  Предположим, что домен провайдера называется
+      <code class="systemitem">example.net</code>, и что ваше
+      имя пользователя <code class="systemitem">user</code>, ваш компьютер называется
+      <code class="systemitem">bsd.home</code>, и провайдер сообщил вам, что
+      возможно использование <code class="systemitem">relay.example.net</code> в качестве сервера для пересылки
+      почты.</p><p>Для получения почты из почтового ящика необходима установка
+      соответствующей программы.  Хорошим выбором является
+      утилита <span class="application">fetchmail</span>, она поддерживает
+      множество различных протоколов.  Эта программа доступна в виде
+      пакета или из Коллекции Портов (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/fetchmail/pkg-descr">mail/fetchmail</a>).  Обычно провайдер
+      предоставляет доступ по протоколу <acronym class="acronym">POP</acronym>.  Если
+      вы работаете с пользовательским <acronym class="acronym">PPP</acronym>, то можете
+      автоматически забирать почту после установления соединения с
+      интернет с помощью следующей записи в
+      <code class="filename">/etc/ppp/ppp.linkup</code>:</p><pre class="programlisting">MYADDR:
+!bg su user -c fetchmail</pre><p>Если вы используете <span class="application">sendmail</span> (как
+      показано ниже) для доставки почты к не-локальным учетным записям,
+      вам возможно потребуется обработка почтовой очереди
+      <span class="application">sendmail</span> сразу после установки
+      соединения с интернет.  Для выполнения этой работы поместите
+      в <code class="filename">/etc/ppp/ppp.linkup</code> следующую команду
+      сразу после <code class="command">fetchmail</code>:</p><pre class="programlisting">  !bg su user -c "sendmail -q"</pre><p>Предполагается, что учетная запись для
+      <code class="systemitem">user</code> существует на <code class="systemitem">bsd.home</code>.  В домашнем каталоге
+      <code class="systemitem">user</code> на <code class="systemitem">bsd.home</code>, создайте файл
+      <code class="filename">.fetchmailrc</code>:</p><pre class="programlisting">poll example.net protocol pop3 fetchall pass MySecret</pre><p>Этот файл не должен быть доступен на чтение никому, кроме
+      <code class="systemitem">user</code>, поскольку в нем находится пароль
+      <code class="literal">MySecret</code>.</p><p>Для отправки почты с правильным заголовком
+      <code class="literal">from:</code>, вам потребуется сообщить
+      <span class="application">sendmail</span> использовать
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:user@example.net">user@example.net</a>&gt;</code> вместо
+      <code class="email">&lt;user@bsd.home&gt;</code>.  Вы можете также указать
+      <span class="application">sendmail</span> отправлять почту через <code class="systemitem">relay.example.net</code>, для более быстрой пересылки
+      почты.</p><p>Должен подойти следующий файл <code class="filename">.mc</code>:</p><pre class="programlisting">VERSIONID(`bsd.home.mc version 1.0')
+OSTYPE(bsd4.4)dnl
+FEATURE(nouucp)dnl
+MAILER(local)dnl
+MAILER(smtp)dnl
+Cwlocalhost
+Cwbsd.home
+MASQUERADE_AS(`example.net')dnl
+FEATURE(allmasquerade)dnl
+FEATURE(masquerade_envelope)dnl
+FEATURE(nocanonify)dnl
+FEATURE(nodns)dnl
+define(`SMART_HOST', `relay.example.net')
+Dmbsd.home
+define(`confDOMAIN_NAME',`bsd.home')dnl
+define(`confDELIVERY_MODE',`deferred')dnl</pre><p>Обратитесь к предыдущему разделу за информацией о том, как
+      преобразовать этот файл <code class="filename">.mc</code> в файл
+      <code class="filename">sendmail.cf</code>.  Не забудьте также перезапустить
+      <span class="application">sendmail</span> после обновления
+      <code class="filename">sendmail.cf</code>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="outgoing-only.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="SMTP-Auth.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">24.7. Настройка почты только для отправки </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 24.9. SMTP аутентификация</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

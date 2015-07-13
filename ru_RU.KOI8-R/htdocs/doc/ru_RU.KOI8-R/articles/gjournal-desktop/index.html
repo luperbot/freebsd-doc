@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Настройка журналирования UFS для настольного компьютера.</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Журналируемая файловая система использует лог для записи всех транзакций, происходящих в файловой системе, который также сохраняет ее целостность в случае краха системы или пропадания питания. Несмотря на то, что всё еще возможна потеря несохранённых изменений файлов, журналирование почти полностью исключает возможность повреждения структуры файловой системы, вызванное непредвиденным остановом работы. Журналирование также сокращает до минимума время, необходимое для проверки файловой системы после отказа. Несмотря на то, что в используемой FreeBSD файловой системе UFS нет поддержки журналирования, новый класс системы GEOM в FreeBSD 7.X может быть использован для для ведения независимого от файловой системы журналирования. Эта статья объясняет, как реализовать журналирование UFS для типичного настольного компьютера." /><link rel="home" href="index.html" title="Настройка журналирования UFS для настольного компьютера." /><link rel="next" href="understanding-journaling.html" title="2. Реализация журналирования в FreeBSD" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Настройка журналирования UFS для настольного компьютера.</th></tr><tr><td width="20%" align="left"> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="understanding-journaling.html">След.</a></td></tr></table><hr /></div><div xml:lang="ru" class="article" lang="ru"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71959248"></a>Настройка журналирования UFS для настольного компьютера.</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="author"><h3 class="author"><span class="firstname">Manolis</span> <span class="surname">Kiagias</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:manolis@FreeBSD.org">manolis@FreeBSD.org</a>&gt;</code></p></div></div></div></div><div>Издание: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Авторские права © 2008 Manolis Kiagias</p></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="trademarks.html">Юридическое уведомление</a></div><div>    .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Аннотация</div><p>Журналируемая файловая система использует лог для записи всех
+	транзакций, происходящих в файловой системе, который также
+	сохраняет ее целостность в случае краха системы или пропадания
+	питания. Несмотря на то, что всё еще возможна потеря несохранённых
+	изменений файлов, журналирование почти полностью исключает
+	возможность повреждения структуры файловой системы, вызванное
+	непредвиденным остановом работы. Журналирование также сокращает
+	до минимума время, необходимое для проверки файловой системы после
+	отказа. Несмотря на то, что в используемой FreeBSD файловой системе
+	UFS нет поддержки журналирования, новый класс системы GEOM
+	в FreeBSD 7.<em class="replaceable"><code>X</code></em> может быть использован
+	для для ведения независимого от файловой системы журналирования.
+	Эта статья объясняет, как реализовать журналирование UFS для
+	типичного настольного компьютера.</p></div></div></div><div class="docformatnavi">
+      [
+      
+	  По разделам
+	
+      /
+      <a href="article.html">Одним файлом</a>
+      ]
+    </div><hr /></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="sect1"><a href="index.html#introduction">1. Вступление</a></span></dt><dt><span class="sect1"><a href="understanding-journaling.html">2. Реализация журналирования в FreeBSD</a></span></dt><dt><span class="sect1"><a href="reserve-space.html">3. Действия, необходимые во время установки FreeBSD</a></span></dt><dt><span class="sect1"><a href="configure-journal.html">4. Настройка журналирования</a></span></dt><dt><span class="sect1"><a href="troubleshooting-gjournal.html">5. Устранение неполадок с журналированием</a></span></dt><dt><span class="sect1"><a href="further-reading.html">6. Для дальнейшего ознакомления</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="introduction"></a>1. Вступление</h2></div></div></div><p>Серверное оборудование обычно хорошо защищено от потери питания.
+      Настольный компьютер часто подвержен неожиданным пропаданиям питания,
+      случайным нажатиям кнопки Reset и другим происшествиям (часто
+      связанным с неосторожностью пользователей), которые могут привести
+      к непредвиденным выключениям. Механизм Soft Updates, как правило,
+      достаточно эффективно защищает файловую систему в таких случаях, однако
+      в последствии требуется длительная фоновая проверка. В очень редких
+      случаях повреждения файловой системы достигают того уровня, при
+      котором становится необходимым вмешательство пользователя и данные
+      могут быть утерянными.</p><p>Новая возможность журналирования, предоставленная системой GEOM,
+      может существенно выручить в подобных случаях, исключая время,
+      необходимое для проверки файловых систем и удостовериваясь,
+      что файловая система быстро восстановлена в целостное состояние.</p><p>Эта статья описывает порядок действий, необходимых для
+      конфигурирования журналирования UFS на типичном настольном компьютере,
+      в котором один жесткий диск используется для размещения как
+      операционной системы, так и данных. В статье подразумевается
+      установка FreeBSD "с нуля". Шаги достаточно просты и не требуют
+      чрезмерно сложных манипуляций с командной строкой</p><p>После прочтения данной статьи вы будете знать:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Как зарезервировать место для журнала во время новой
+	  установки FreeBSD.</p></li><li class="listitem"><p>Как загрузить модуль <code class="literal">geom_journal</code> (или
+	  включить поддержку журналирования в специализированном ядре
+	  системы).</p></li><li class="listitem"><p>Как преобразовать существующую файловую систему, в систему,
+	  использующую журналирование, и какие опции монтирования
+	  использовать в <code class="filename">/etc/fstab</code>.</p></li><li class="listitem"><p>Как реализовать журналирование на новых (пустых) разделах.</p></li><li class="listitem"><p>Как диагностировать неполадки, связанные с журналированием.</p></li></ul></div><p>Перед прочтением этой статьи вам необходимо:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Понимать базовые концепции таких операционных систем,
+	  как <span class="trademark">UNIX</span>(R) и FreeBSD.</p></li><li class="listitem"><p>Быть знакомым с процедурой установки FreeBSD, а также с программой
+	  <span class="application">sysinstall</span>.</p></li></ul></div><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Процедура, описанная здесь, подразумевает подготовку к новой
+	установке, в которой на дисках еще нет пользовательских данных.
+	Так как эту процедуру можно модифицировать и расширить на системы,
+	которые уже используются, вам настоятельно рекомендуется сделать
+	<span class="emphasis"><em>резервную копию</em></span> всех ценных данных.
+	Путаница в низкоуровневых операциях с дисками и разделами может
+	привести к фатальным ошибкам и потере данных.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="understanding-journaling.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"> </td><td width="40%" align="right" valign="top"> 2. Реализация журналирования в FreeBSD</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

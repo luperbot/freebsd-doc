@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>13.3. USB设备信息</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="usb.html" title="第 13 章 USB设备" /><link rel="prev" href="usb-hc.html" title="13.2. 主控器" /><link rel="next" href="usb-devprobe.html" title="13.4. 设备的探测和连接" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">13.3. USB设备信息</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="usb-hc.html">上一页</a> </td><th width="60%" align="center">第 13 章 USB设备</th><td width="20%" align="right"> <a accesskey="n" href="usb-devprobe.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="usb-dev"></a>13.3. USB设备信息</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72552272"></a>13.3.1. 设备配置信息</h3></div></div></div><p>每个设备提供了不同级别的配置信息。每个设备具有一个或多个
+        配置，探测/连接期间从其中选定一个。配置提供功率和带宽要求。
+	每个配置中可以有多个接口。设备接口是端点的汇集(collection)。
+	例如，USB扬声器可以有一个音频接口（音频类），和对旋钮(knob)、
+        拨号盘(dial)和按钮的接口（HID类）。
+        一个配置中的所有接口可以同时有效，并可被不同的
+	驱动程序连接。每个接口可以有备用接口，以提供不同质量的服务参数。
+	例如，在照相机中，这用来提供不同的帧大小以及每秒帧数。</p><p>每个接口中可以指定0或多个端点。端点是与设备进行通信的单向
+        访问点。它们提供缓冲区来临时存储从设备而来的，或外出到设备的数据。
+	每个端点在配置中有唯一地址，即端点号加上其方向。默认端点，即
+	端点0，不是任何接口的一部分，并且在所有配置中可用。它由服务层
+	管理，并且设备驱动程序不能直接使用。</p><p>Level 0 Level 1 Level 2 Slot 0</p><p>Slot 3 Slot 2 Slot 1</p><p>(只显示了32个槽中的4个)</p><p>这种层次化配置信息在设备中通过标准的一组描述符来描述（参看
+        USB规范[2]第9.6节）。它们可以通过Get Descriptor Request来请求。
+	服务层缓存这些描述符以避免在USB总线上进行不必要的传输。对这些
+	描述符的访问是通过函数调用来提供的。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>设备描述符：关于设备的通用信息，如供应商，产品
+	  和修订ID，支持的设备类、子类和适用的协议，默认端点的最大包大小
+	  等。</p></li><li class="listitem"><p>配置描述符：此配置中的接口数，支持的挂起和
+	  恢复能力，以及功率要求。</p></li><li class="listitem"><p>接口描述符：接口类、子类和适用的协议，接口备用
+	  配置的数目和端点数目。</p></li><li class="listitem"><p>端点描述符：端点地址、方向和类型，支持的最大包
+	  大小，如果是中断类型的端点则还包括轮询频率。默认端点（端点0）
+	  没有描述符，而且从不被计入接口描述符中。</p></li><li class="listitem"><p>字符串描述符：在其他描述符中会为某些字段提供
+	  字符串索引。它们可被用来检取描述性字符串，可能以多种语言
+	  的形式提供。</p></li></ul></div><p>类说明(specification)可以添加它们自己的描述符类型，这些描述符
+        也可以通过GetDescriptor Request来获得。</p><p>管道与设备上端点的通信，流经所谓的管道。驱动程序将到端点的
+        传输提交到管道，并提供传输（异步传输）失败或完成时调用的回调，
+	或等待完成（同步传输）。到端点的传输在管道中被串行化。传输或者完成，
+	或者失败，或者超时（如果设置了超时）。对于传输有两种类型的超时。
+	超时的发生可能由于USB总线上的超时（毫秒）。这些超时被视为失败，
+	可能是由于设备断开连接引起的。另一种超时在软件中实现，当传输没有
+	在指定的时间（秒）内完成时触发。这是由于设备对传输的包否定应答引起的。
+	其原因是由于设备还没有准备好接收数据，缓冲区欠载或超载，或协议错误。
+	</p><p>如果管道上的传输大于关联的端点描述符中指定的最大包大小，主
+        控器（OHCI）或HC驱动程序（UHCI）将按最大包大小分割传输，并且最后
+        一个包可能小于最大包的大小。</p><p>有时候对设备来说返回少于所请求的数据并不是个问题。例如，
+        到调制解调器的大块in传输可能请求200字节的数据，但调制解调器
+	那时只有5个字节可用。驱动程序可以设置短包(SPD)标志。它允许主
+	控器即使在传输的数据量少于所请求的数据量的情况下也接受包。
+	这个标志只在in传输中有效，因为将要被发送到设备的数据量总是事先
+	知道的。如果传输过程中设备出现不可恢复的错误，管道会被停顿。
+	接受或发送更多数据以前，驱动程序需要确定停顿的原因，并通过在
+	默认管道上发送清除端点挂起设备请求(clear endpoint halt device
+	request)来清除端点停顿条件。</p><p>有四种不同类型的端点和对应的管道： - </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>
+          控制管道/默认管道：
+          每个设备有一个控制管道，连接到默认端点（端点0）。此管道运载设备
+	  请求和关联的数据。默认管道和其他管道上的传输的区别在于传输所
+	  使用的协议，协议在USB规范[2]中描述。这些请求用于复位和配置设备。
+	  每个设备必须支持USB规范[2]的第9章中提供的一组基本命令。管道上
+	  支持的命令可以通过设备类规范扩展，以支持额外的功能。
+          </p></li><li class="listitem"><p>大块(bulk)管道：这是USB与原始传输媒体对应的等价物。
+          </p></li><li class="listitem"><p>中断管道：host向设备发送数据请求，如果设备没有
+	  东西发送，则将NAK（否定应答）数据包。中断传输按创建管道时指定的
+	  频率被调度。</p></li><li class="listitem"><p>同步管道：这些管道用于具有固定时延的同步数据，
+	例如视频或音频流，但不保证一定传输。当前实现中已经有对这种类型
+	管道的某些支持。当传输期间出现错误，或者由于，例如缺乏缓冲区空间
+	来存储进入的数据而引起的设备否定应答包（NAK）时，控制、大块和中断
+	管道中的包会被重试。而同步包在传递失败或对包NAK时不会重试，因为
+	那样可能违反同步约束。</p></li></ul></div><p>所需带宽的可用性在管道的创建期间被计算。传输在1毫秒的帧内
+        进行调度。帧中的带宽分配由USB规范的第5.6节规定。同步和中断传输被
+	允许消耗帧中多达90%的带宽。控制和大块传输的包在所有同步和中断包
+        之后进行调度，并将消耗所有剩余带宽。</p><p>关于传输调度和带宽回收的更多信息可以在USB规范[2]的第5章，
+        UHCI规范[3]的的第1.3节，OHCI规范[4]的3.4.2节中找到。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="usb-hc.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="usb.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="usb-devprobe.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">13.2. 主控器 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 13.4. 设备的探测和连接</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

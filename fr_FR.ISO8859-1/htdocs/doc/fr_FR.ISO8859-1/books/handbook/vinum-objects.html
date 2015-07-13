@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>21.5. Objets Vinum</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="vinum-vinum.html" title="Chapitre 21. Le gestionnaire de volume Vinum" /><link rel="prev" href="ch21s04.html" title="21.4. Intégrité des données" /><link rel="next" href="vinum-examples.html" title="21.6. Quelques exemples" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.5. Objets Vinum</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch21s04.html">Précédent</a> </td><th width="60%" align="center">Chapitre 21. Le gestionnaire de volume Vinum</th><td width="20%" align="right"> <a accesskey="n" href="vinum-examples.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-objects"></a>21.5. Objets Vinum</h2></div></div></div><p>Afin de résoudre ces problèmes,
+	Vinum implémente une hiérarchie d'objets à quatre
+	niveaux:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>L'objet le plus visible est le disque virtuel,
+	    appelé <span class="emphasis"><em>volume</em></span>.  Les volumes ont
+	    essentiellement les mêmes propriétés qu'un
+	    disque UNIX&#8482;, bien qu'il y ait quelques différences
+	    mineures.  Ils n'ont aucune limitation de taille.</p></li><li class="listitem"><p>Les volumes sont composés de
+	    <span class="emphasis"><em>plexes</em></span>, chacune d'entre elles
+	    représente l'ensemble de l'espace d'adressable d'un
+	    volume.  Ce niveau dans la hiérarchie permet ainsi la
+	    redondance.  Pensez aux plexes comme différents disques
+	    dans un ensemble miroir, chacun contenant les mêmes
+	    données.</p></li><li class="listitem"><p>Comme Vinum existe dans le système de stockage disque
+	    d'UNIX&#8482;, il serait possible d'utiliser les
+	    partitions UNIX&#8482; pour construire des blocs pour des
+	    plexes à disques multiples, mais en fait cela ne serait
+	    pas suffisamment flexible: les disques UNIX&#8482; ne
+	    peuvent avoir qu'un nombre limités de partitions.
+	    Au lieu de cela Vinum subdivise une simple partition
+	    UNIX&#8482; (le <span class="emphasis"><em>disque</em></span>) en zones
+	    contiguës appelées <span class="emphasis"><em>sous-disques</em></span>,
+	    qui sont utilisés comme bloc pour construire les
+	    plexes.</p></li><li class="listitem"><p>Les sous-disques résident sur le
+	    <span class="emphasis"><em>disque</em></span> Vinum, en fait les partitions
+	    UNIX&#8482;.  Les disques Vinum peuvent contenir un nombre
+	    quelconque de sous-disque.  A l'exception d'une petite
+	    zone au début du disque, qui est utilisée pour stocker
+	    les informations de configuration et d'état,
+	    l'intégralité
+	    du disque est disponible pour le stockage des
+	    données.</p></li></ul></div><p>Les sections suivantes décrivent la façon dont
+	ces objets fournissent les fonctionnalités requises pour
+	Vinum.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81556816"></a>21.5.1. Considérations sur la taille des volumes</h3></div></div></div><p>Les plexes peuvent comprendre de multiple sous-disques
+	répartis sur tous les disques dans la configuration Vinum.
+	Par conséquent, la taille d'un disque ne limite pas la taille
+	d'une plex, et donc d'un volume.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81557968"></a>21.5.2. Stockage de données redondant</h3></div></div></div><p>Vinum implémente le mode miroir en attachant de multiples
+	plexes à un volume.  Un volume peut contenir entre une et huit
+	plexes.</p><p>Bien qu'une plex représente les données
+	complètes d'un volume, il est possible que des parties de la
+	représentation soient physiquement manquantes, soit en raison
+	de la mise en place (en définissant un sous-disque comme ne
+	faisant pas partie de la plex) ou par accident (en raison de
+	la panne d'un disque).  Tant qu'au moins une plex peut fournir les
+	données de l'intégralité de la plage d'adresse
+	d'un volume, le volume est totalement fonctionnel.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81559504"></a>21.5.3. Problèmes de performance</h3></div></div></div><p>Vinum implémente la concaténation et la
+	segmentation au niveau de la plex:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Une <span class="emphasis"><em>plex concaténée</em></span>
+	    utilise alternativement l'espace d'adresse de chaque
+	    sous-disque.</p></li><li class="listitem"><p>Une <span class="emphasis"><em>plex segmentée</em></span> segmente les
+	    données sur chaque sous-disque.  Les sous-disques doivent
+	    avoir la même taille, et il doit y avoir au moins deux
+	    sous-disques pour distinguer la plex d'une plex
+	    concaténée.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81563344"></a>21.5.4. Quelle organisation de plex?</h3></div></div></div><p>La version de Vinum fournie avec FreeBSD 10.1
+	implémente deux type de plexes:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Les plexes concaténées sont les plus
+	    flexibles: elles peuvent contenir un nombre quelconque de
+	    de sous-disques, et les sous-disques peuvent être de
+	    taille différentes.  La plex peut être étendue
+	    en ajoutant des sous-disques supplémentaires.  Elles
+	    demandent moins de temps <acronym class="acronym">CPU</acronym> que les
+	    plexes segmentées, bien que la différence en charge
+	    <acronym class="acronym">CPU</acronym> ne soit pas mesurable.  D'autre
+	    part, elles sont plus susceptibles d'échauffement,
+	    là où un disque est très actif et les autres
+	    sont au repos.</p></li><li class="listitem"><p>Le plus grand avantage des plexes segmentées
+	    (<acronym class="acronym">RAID-0</acronym>) est qu'elles réduisent
+	    les problèmes d'échauffement: en choisissant tailles
+	    de segments optimales (environ 256 KO), vous pouvez
+	    également réduire la charge des disques.  Les
+	    inconvénients de cette approche sont un code (infimement)
+	    plus complexe et des restrictions sur les sous-disques:
+	    ils doivent être de la même taille, et agrandir une plex
+	    en ajoutant de nouveaux sous-disques est si complexe que
+	    Vinum ne l'implémente pas actuellement.  Vinum
+	    impose une restriction triviale supplémentaire: une plex
+	    segmentée doit avoir au moins deux sous-disques, puisque
+	    sinon elle ne serait distinguable d'une plex
+	    concaténée.</p></li></ul></div><p><a class="xref" href="vinum-objects.html#vinum-comparison" title="Tableau 21.1. Organisations de plex Vinum">Tableau 21.1, « Organisations de plex Vinum »</a> résume les avantages et
+	inconvénients de chaque type d'organisation de plex.</p><div class="table"><a id="vinum-comparison"></a><div class="table-title">Tableau 21.1. Organisations de plex Vinum</div><div class="table-contents"><table summary="Organisations de plex Vinum" border="1"><colgroup><col /><col /><col /><col /><col /></colgroup><thead><tr><th>Type de plex</th><th>Nombre minimal de sous-disques</th><th>Possibilité d'ajout de sous-disques</th><th>Doivent être de même taille</th><th>Application</th></tr></thead><tbody><tr><td>concaténée</td><td>1</td><td>oui</td><td>non</td><td>Stockage de grandes quantités de données
+		avec le maximum de flexibilité en terme de placement
+		et des performances modérées</td></tr><tr><td>segmentée</td><td>2</td><td>non</td><td>oui</td><td>Haute performance combinée avec un accès
+		hautement concourant</td></tr></tbody></table></div></div><br class="table-break" /></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch21s04.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-examples.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">21.4. Intégrité des données </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 21.6. Quelques exemples</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

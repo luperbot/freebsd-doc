@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>7. 链接脚本到 rc.d 框架</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="up" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="prev" href="rcng-daemon-adv.html" title="6. 启动并停止高级守护进程" /><link rel="next" href="rcng-args.html" title="8. 给予 rc.d 脚本更多的灵活性" /><link rel="copyright" href="trademarks.html" title="法律通告" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">7. 链接脚本到 rc.d 框架</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="rcng-daemon-adv.html">上一页</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="rcng-args.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rcng-hookup"></a>7. 链接脚本到 rc.d 框架</h2></div></div></div><p>当编写好了一个脚本，它需要被整合到 <code class="filename">rc.d</code> 中去。
+      一个重要的步骤就是安装脚本到 <code class="filename">/etc/rc.d</code>
+      （对基本系统而言）或 <code class="filename">/usr/local/etc/rc.d</code>
+      （对ports而言）中去。在 &lt;<code class="filename">bsd.prog.mk</code>&gt; 和
+      &lt;<code class="filename">bsd.port.mk</code>&gt; 中都为此提供了方便的接口，
+      通常你不必担心适当的所有权限和模式。系统脚本应当是通过可以在
+      <code class="filename">src/etc/rc.d</code> 找到的 <code class="filename">Makefile</code>
+      安装的。Port 脚本可以像
+      <a class="link" href="../../../../doc/en_US.ISO8859-1/books/porters-handbook/rc-scripts.html" target="_top">Porter's Handbook</a>
+      中描述那样通过使用 <code class="varname">USE_RC_SUBR</code> 来被安装。</p><p>不过，我们应该预先考虑到我们脚本在系统启动顺序中的位置。
+      我们的脚本所处理的服务可能依赖于其它的服务。举个例子，
+      没有网络接口和路由选择的启用运行的话，一个网络守护进程是不起作用的。
+      即使一个服务看似什么都不需要，在基本文件系统检查挂载完毕之前也很难启动。</p><p>之前我们曾提到过 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>。现在是时候来密切地关注下它了。
+      笼统地说，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 处理一组文件，检验它们的内容，
+      并从文件集合打印一个文件列表的依赖顺序到 <code class="varname">stdout</code>
+      标准输出。这点是用于保持文件内部的依赖信息，
+      而每个文件只能说明自己的依赖。一个文件可以指定如下信息：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>它 <span class="emphasis"><em>提供</em></span> 的 <span class="quote">“<span class="quote">条件</span>”</span>
+          的名字（意味着我们服务的名字）；</p></li><li class="listitem"><p>它 <span class="emphasis"><em>需求</em></span> 的
+          <span class="quote">“<span class="quote">条件</span>”</span> 的名字；</p></li><li class="listitem"><p>应该 <span class="emphasis"><em>先</em></span> 运行的文件的
+          <span class="quote">“<span class="quote">条件</span>”</span>的名字；</p></li><li class="listitem"><p>能用于从全部文件集合中选择一个子集的额外
+          <span class="emphasis"><em>关键字</em></span>（ <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>
+          可通过选项而被指定来包括或省去由特殊关键字所列出的文件。）</p></li></ul></div><p>并不奇怪的是，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 只能处理接近 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>
+      语法的文本文件。<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 所解读的特殊行看起来类似
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 的注释。这种特殊文本行的语法相当严格地简化了其处理。
+      请查阅 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 以获取更详细的信息。</p><p>除使用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 的特殊行以外，
+      脚本可以坚持将其依赖的其它服务强制性启动。当其它服务是可选的，
+      并因系统管理员错误地在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>
+      中禁用掉该服务而使其不能自行启动时，会需要这一点。</p><p>将这些谨记在心，我们来考虑下简单结合了依赖信息增强的守护进程脚本：</p><div class="informalexample"><pre class="programlisting">#!/bin/sh
+
+# PROVIDE: mumbled oldmumble <a id="rcng-hookup-provide"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+# REQUIRE: DAEMON cleanvar frotz<a id="rcng-hookup-require"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+# BEFORE:  LOGIN<a id="rcng-hookup-before"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+# KEYWORD: nojail shutdown<a id="rcng-hookup-keyword"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+
+. /etc/rc.subr
+
+name=mumbled
+rcvar=mumbled_enable
+
+command="/usr/sbin/${name}"
+start_precmd="${name}_prestart"
+
+mumbled_prestart()
+{
+	if ! checkyesno frotz_enable &amp;&amp; \
+	    ! /etc/rc.d/frotz forcestatus 1&gt;/dev/null 2&gt;&amp;1; then
+		force_depend frotz || return 1<a id="rcng-hookup-force"></a><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span>
+	fi
+	return 0
+}
+
+load_rc_config $name
+run_rc_command "$1"</pre></div><p>跟前面一样，做如下详细分析：</p><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-hookup-provide"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>该行声明了我们脚本所提供的 <span class="quote">“<span class="quote">条件</span>”</span> 的名字。
+          现在其它脚本可以用那些名字来标明我们脚本的依赖。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">通常脚本指定一个单独的已提供的条件。然而，
+            并没有什么妨碍我们从列出的那些条件中指定，例如，
+            为了兼容性的目的。</p><p xmlns="http://www.w3.org/1999/xhtml">在其它情况，主要的名称，或者说唯一的，
+            <code class="literal">PROVIDE:</code> 条件应该与
+            <code class="envar">${name}</code> 相同。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-hookup-require"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> <a href="#rcng-hookup-before"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>因此我们的脚本指示了其依赖于别的脚本所提供的
+          <span class="quote">“<span class="quote">条件</span>”</span>。根据这些行的信息，脚本请示
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 以将其放在一个或多个提供
+          <code class="filename">DAEMON</code> 和 <code class="filename">cleanvar</code>
+          的脚本后面，但在提供 <code class="filename">LOGIN</code> 的脚本前面。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="literal">BEFORE:</code>
+            这一行不可以在其它脚本不完整的依赖关系列表中滥用。
+            适合使用 <code class="literal">BEFORE:</code>
+            的情况是当其它脚本不关心我们的脚本，
+            但是我们的脚本如果在另一个之前运行的话能够更好地执行任务。
+            一个典型的实例是网络接口和防火墙：
+            虽然接口不依赖防火墙来完成自己的工作，
+            但是系统安全将因一切网络流量之前启动的防火墙而受益。</p><p xmlns="http://www.w3.org/1999/xhtml">除了条件相对应的每个单独服务，脚本使用元条件和它们的
+            <span class="quote">“<span class="quote">占位符</span>”</span> 来保证某个操作组在其它之前被执行。
+            这些是由 <code class="filename">UPPERCASE</code>
+            大写名字所表示的。它们的列表和用法可以在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc</span>(8)</span></a> 中找到。</p><p xmlns="http://www.w3.org/1999/xhtml">切记将一个服务名称放进 <code class="literal">REQUIRE:</code>
+            行不能保证实际的服务会在我们的脚本启动的时候运行。
+            所需求的服务可能会启动失败或在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 中被禁掉了。
+            显然，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 是无法追踪这些细节的，并且
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc</span>(8)</span></a> 也不会去追踪。所以，
+            脚本启动的应用程序应当能够应付任何所需求的服务的不可用情况。
+            某些情况下，我们可以用 <a class="link" href="rcng-hookup.html#forcedep">下面</a>
+            所讨论的方式来协助脚本。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-hookup-keyword"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p><a id="keywords"></a>如我们从上述文字所记起的，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>
+            关键字可以用来选择或省略某些脚本。即任何 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>
+            用户可以通过指定 <code class="option">-k</code> 和 <code class="option">-s</code>
+            选项来分别指定 <span class="quote">“<span class="quote">保留清单（keep list）</span>”</span> 和
+            <span class="quote">“<span class="quote">跳过清单（skip list）</span>”</span>。
+            从全部文件到按依赖关系排列的清单，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>
+            将只是挑出保留清单（除非是空的）
+            中那些带关键字的以及从跳过清单中挑出不带关键字的文件。</p><p>在 FreeBSD 中，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 被
+          <code class="filename">/etc/rc</code> 和
+          <code class="filename">/etc/rc.shutdown</code> 所使用。
+          这两个脚本定义了 FreeBSD 中 <code class="filename">rc.d</code>
+          关键字以及它们的意义的标准列表如下：</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="literal">nojail</code></span></dt><dd><p>该服务不适用于 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a> 环境。
+                如果是在 jail 的内部的话，自动启动和关闭程序将忽略该脚本。</p></dd><dt><span class="term"><code class="literal">nostart</code></span></dt><dd><p>该服务只能手动启动否则将不会启动。
+                自动启动程序将忽略此脚本。结合 <code class="literal">shutdown</code>
+                关键字的话，这可以用来编写只在系统关闭时执行一些任务的脚本。</p></dd><dt><span class="term"><code class="literal">shutdown</code></span></dt><dd><p>这个关键字 <span class="emphasis"><em>明确</em></span>
+                地列出了需要在系统关闭前停止的服务。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">当系统即将关闭的时候，
+                  <code class="filename">/etc/rc.shutdown</code> 在运行。
+                  它假定认为大部分的 <code class="filename">rc.d</code>
+                  脚本在那刻什么都不做。因此，
+                  <code class="filename">/etc/rc.shutdown</code>
+                  选择性地调用带有 <code class="literal">shutdown</code>
+                  关键字的 <code class="filename">rc.d</code> 脚本，
+                  有效地忽略其余的脚本。为了更快的关闭，
+                  <code class="filename">/etc/rc.shutdown</code> 传递
+                  <code class="option">faststop</code> 命令给其运行的脚本，
+                  以跳过预置的检查，例如，进程文件 pidfile 的检查。
+                  正如依赖性服务应该在其所依赖的服务之前停止，
+                  <code class="filename">/etc/rc.shutdown</code>
+                  以相反的依赖次序来运行这些脚本。</p><p xmlns="http://www.w3.org/1999/xhtml">如果写一个真正的 <code class="filename">rc.d</code> 脚本的话，
+                  你应当考虑到其是否与系统关闭时有关系。例如，
+                  如果你的脚本只通过响应 <code class="option">start</code>
+                  命令来运行任务，那么你不需要包含这个关键字。然而，
+                  如果你的脚本管理着一个服务，那么，在系统进入 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=halt&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">halt</span>(8)</span></a>
+                  中所描述的其本身关闭顺序的最终阶段之前停止该脚本，
+                  可能是个不错的主意。特别是，
+                  你显然是应该关闭一个需要相当长时间，
+                  或需要特定的动作才能干净地关闭的服务。
+                  数据库引擎就是这样一个典型的例子。</p></div></dd></dl></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-hookup-force"><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></a> </p></td><td valign="top" align="left"><p><a id="forcedep"></a>以
+            <code class="function">force_depend</code>
+            起始的行应被用于更谨慎的情况。通常，用于修正相互关联的
+            <code class="filename">rc.d</code>
+            脚本分层结构的配置文件时会更加稳妥。</p><p>如果你仍不能完成不含 <code class="function">force_depend</code> 的脚本，
+          范例提供了一个如何有条件地调用它的习惯用法。在范例中，我们的
+          <code class="command">mumbled</code> 守护进程需求另一个以高级方式启动的进程，
+          <code class="command">frotz</code>。但 <code class="command">frotz</code> 也是可选的；
+          而且 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 对这些信息是一无所知的。幸运的是，
+          我们的脚本已访问到全部的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量。如果
+          <code class="envar">frotz_enable</code> 为真，我们希望的最好结果是依靠
+          <code class="filename">rc.d</code> 已经启动了 <code class="command">frotz</code>。
+          否则我们强制检查 <code class="command">frotz</code> 的状态。最终，
+          如果 <code class="command">frotz</code> 依赖的服务没有找到或运行的话，
+          我们将强制其运行。这时 <code class="function">force_depend</code>
+          将发出一条警告信息，因为它只应该在检查到配置信息丢失的情况下被调用。</p></td></tr></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="rcng-daemon-adv.html">上一页</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="rcng-args.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">6. 启动并停止高级守护进程 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 8. 给予 rc.d 脚本更多的灵活性</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

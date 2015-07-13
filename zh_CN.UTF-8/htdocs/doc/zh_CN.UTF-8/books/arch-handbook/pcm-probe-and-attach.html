@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>15.3. 探测，连接等</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="oss.html" title="第 15 章 声音子系统" /><link rel="prev" href="oss-files.html" title="15.2. 文件" /><link rel="next" href="oss-interfaces.html" title="15.4. 接口" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.3. 探测，连接等</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="oss-files.html">上一页</a> </td><th width="60%" align="center">第 15 章 声音子系统</th><td width="20%" align="right"> <a accesskey="n" href="oss-interfaces.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="pcm-probe-and-attach"></a>15.3. 探测，连接等</h2></div></div></div><p>声音驱动程序使用与任何硬件驱动程序模块相同的方法探测和连接（设备）。
+      你可能希望浏览一下手册中<a class="link" href="isa-driver.html" title="第 10 章 ISA设备驱动程序">ISA</a>或<a class="link" href="pci.html" title="第 11 章 PCI设备">PCI</a>章节的内容来获取更多信息。</p><p>然而，声音驱动程序在某些方面又有些不同：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>他们将自己声明为<code class="filename">pcm</code>类设备，带有一个
+          设备私有结构<code class="varname">struct snddev_info</code>：</p><pre class="programlisting">          static driver_t xxx_driver = {
+              "pcm",
+              xxx_methods,
+              sizeof(struct snddev_info)
+          };
+
+          DRIVER_MODULE(snd_xxxpci, pci, xxx_driver, pcm_devclass, 0, 0);
+          MODULE_DEPEND(snd_xxxpci, snd_pcm, PCM_MINVER, PCM_PREFVER,PCM_MAXVER);</pre><a id="idp66921168" class="indexterm"></a><p>大多数声音驱动程序需要存储关于其设备的附加私有信息。私有数据
+          结构通常在连接例程中分配。其地址通过调用
+          <code class="function">pcm_register()</code>和
+          <code class="function">mixer_init()</code>传递给
+          <code class="filename">pcm</code>。后面<code class="filename">pcm</code>
+          将此地址作为调用声音驱动程序接口时的参数传递回来。</p></li><li class="listitem"><p>声音驱动程序的连接例程应当通过调用<code class="function">mixer_init()
+          </code>向<code class="filename">pcm</code>声明它的MIXER或AC97
+          接口。对于MIXER接口，这会接着引起调用
+          <a class="link" href="oss-interfaces.html#xxxmixer-init" title="15.4.2.1. mixer_init">
+          <code class="function">xxxmixer_init()</code></a>。</p></li><li class="listitem"><p>声音驱动程序的连接例程通过调用
+          <code class="function">pcm_register(dev, sc, nplay, nrec)</code>
+          向<code class="filename">pcm</code>声明其通用CHANNEL配置，其中
+          <code class="varname">sc</code>是设备数据结构的地址，
+          在<code class="filename">pcm</code>以后的调用中将会用到它，
+          <code class="varname">nplay</code>和<code class="varname">nrec</code>是播放和录音
+          通道的数目。</p></li><li class="listitem"><p>声音驱动程序的连接例程通过调用
+          <code class="function">pcm_addchan()</code>声明它的每个通道对象。这会在
+          <code class="filename">pcm</code>中建立起通道合成，并接着会引起调用
+            <a class="link" href="oss-interfaces.html#xxxchannel-init" title="15.4.1.3. channel_init">
+            <code class="function">xxxchannel_init()</code></a>
+            （译注：请参考原文）。</p></li><li class="listitem"><p>声音驱动程序的分离例程在释放其资源之前应当调用
+        <code class="function">pcm_unregister()</code>。</p></li></ul></div><p>有两种可能的方法来处理非PnP设备：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>使用<code class="function">device_identify()</code>方法
+          （范例：<code class="filename">sound/isa/es1888.c</code>）。
+          <code class="function">device_identify()</code>方法在已知地址探测硬件，
+          如果发现支持的设备就会创建一个新的pcm设备，这个pcm设备接着
+          会被传递到probe/attach。</p></li><li class="listitem"><p>使用定制内核配置的方法，为pcm设备设置适当的hints（范例：
+          <code class="filename">sound/isa/mss.c</code>）。</p></li></ul></div><p><code class="filename">pcm</code>驱动程序应当实现
+    <code class="function">device_suspend</code>，
+    <code class="function">device_resume</code>和
+    <code class="function">device_shutdown</code>例程，这样电源管理和模块卸载就能
+    正确地发挥作用。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="oss-files.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="oss.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="oss-interfaces.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">15.2. 文件 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 15.4. 接口</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

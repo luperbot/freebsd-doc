@@ -1,0 +1,969 @@
+======================================
+FreeBSD/i386 5.4-RELEASE Release Notes
+======================================
+
+.. raw:: html
+
+   <div class="ARTICLE">
+
+.. raw:: html
+
+   <div class="TITLEPAGE">
+
+FreeBSD/i386 5.4-RELEASE Release Notes
+======================================
+
+The FreeBSD Project
+~~~~~~~~~~~~~~~~~~~
+
+Copyright © 2000, 2001, 2002, 2003, 2004, 2005 The FreeBSD Documentation
+Project
+
+| $FreeBSD: src/release/doc/en\_US.ISO8859-1/relnotes/common/new.sgml,v
+  1.761.2.41.2.9 2005/05/05 17:49:08 hrs Exp $
+
+.. raw:: html
+
+   <div class="LEGALNOTICE">
+
+FreeBSD is a registered trademark of the FreeBSD Foundation.
+
+IBM, AIX, EtherJet, Netfinity, OS/2, PowerPC, PS/2, S/390, and ThinkPad
+are trademarks of International Business Machines Corporation in the
+United States, other countries, or both.
+
+IEEE, POSIX, and 802 are registered trademarks of Institute of
+Electrical and Electronics Engineers, Inc. in the United States.
+
+Intel, Celeron, EtherExpress, i386, i486, Itanium, Pentium, and Xeon are
+trademarks or registered trademarks of Intel Corporation or its
+subsidiaries in the United States and other countries.
+
+Sparc, Sparc64, SPARCEngine, and UltraSPARC are trademarks of SPARC
+International, Inc in the United States and other countries. Products
+bearing SPARC trademarks are based upon architecture developed by Sun
+Microsystems, Inc.
+
+Many of the designations used by manufacturers and sellers to
+distinguish their products are claimed as trademarks. Where those
+designations appear in this document, and the FreeBSD Project was aware
+of the trademark claim, the designations have been followed by the
+\`\`™'' or the \`\`®'' symbol.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div class="ABSTRACT">
+
+The release notes for FreeBSD 5.4-RELEASE contain a summary of the
+changes made to the FreeBSD base system since 5.3-RELEASE. This document
+lists applicable security advisories that were issued since the last
+release, as well as significant changes to the FreeBSD kernel and
+userland. Some brief remarks on upgrading are also presented.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+--------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="TOC">
+
+**Table of Contents**
+1 `Introduction <#INTRO>`__
+2 `What's New <#NEW>`__
+2.1 `Security Advisories <#SECURITY>`__
+2.2 `Kernel Changes <#KERNEL>`__
+2.2.1 `Boot Loader Changes <#BOOT>`__
+2.2.2 `Hardware Support <#PROC>`__
+2.2.3 `Network Protocols <#NET-PROTO>`__
+2.2.4 `Disks and Storage <#DISKS>`__
+2.2.5 `File Systems <#FS>`__
+2.2.6 `Contributed Software <#AEN292>`__
+2.3 `Userland Changes <#USERLAND>`__
+2.3.1 ```/etc/rc.d`` Scripts <#RC-SCRIPTS>`__
+2.4 `Contributed Software <#CONTRIB>`__
+2.5 `Ports/Packages Collection Infrastructure <#PORTS>`__
+2.6 `Release Engineering and Integration <#RELENG>`__
+2.7 `Documentation <#DOC>`__
+3 `Upgrading from previous releases of FreeBSD <#UPGRADE>`__
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT1">
+
+1 Introduction
+--------------
+
+This document contains the release notes for FreeBSD 5.4-RELEASE on the
+i386 hardware platform. It describes recently added, changed, or deleted
+features of FreeBSD. It also provides some notes on upgrading from
+previous versions of FreeBSD.
+
+This distribution of FreeBSD 5.4-RELEASE is a release distribution. It
+can be found at ftp://ftp.FreeBSD.org/ or any of its mirrors. More
+information on obtaining this (or other) release distributions of
+FreeBSD can be found in the `\`\`Obtaining FreeBSD''
+appendix <../../../../doc/en_US.ISO8859-1/books/handbook/mirrors.html>`__
+to the `FreeBSD
+Handbook <../../../../doc/en_US.ISO8859-1/books/handbook/>`__.
+
+All users are encouraged to consult the release errata before installing
+FreeBSD. The errata document is updated with \`\`late-breaking''
+information discovered late in the release cycle or after the release.
+Typically, it contains information on known bugs, security advisories,
+and corrections to documentation. An up-to-date copy of the errata for
+FreeBSD 5.4-RELEASE can be found on the FreeBSD Web site.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT1">
+
+--------------
+
+2 What's New
+------------
+
+This section describes the most user-visible new or changed features in
+FreeBSD since 5.3-RELEASE. In general, changes described here are unique
+to the 5-STABLE branch unless specifically marked as [MERGED] features.
+
+Typical release note items document recent security advisories issued
+after 5.3-RELEASE, new drivers or hardware support, new commands or
+options, major bug fixes, or contributed software upgrades. They may
+also list changes to major ports/packages or release engineering
+practices. Clearly the release notes cannot list every single change
+made to FreeBSD between releases; this document focuses primarily on
+security advisories, user-visible changes, and major architectural
+improvements.
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.1 Security Advisories
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A bug in the
+`fetch(1) <http://www.FreeBSD.org/cgi/man.cgi?query=fetch&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+utility, which allows a malicious HTTP server to cause arbitrary
+portions of the client's memory to be overwritten, has been fixed. For
+more information, see security advisory
+`FreeBSD-SA-04:16.fetch <ftp://ftp.FreeBSD.org/pub/FreeBSD/CERT/advisories/FreeBSD-SA-04:16.fetch.asc>`__.
+
+A bug in
+`procfs(5) <http://www.FreeBSD.org/cgi/man.cgi?query=procfs&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__
+and
+`linprocfs(5) <http://www.FreeBSD.org/cgi/man.cgi?query=linprocfs&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__
+which could allow a malicious local user to read parts of kernel memory
+or perform a local denial of service attack by causing a system panic,
+has been fixed. For more information, see security advisory
+`FreeBSD-SA-04:17.procfs <ftp://ftp.FreeBSD.org/pub/FreeBSD/CERT/advisories/FreeBSD-SA-04:17.procfs.asc>`__.
+
+Two buffer overflows in the TELNET client program have been corrected.
+They could have allowed a malicious TELNET server or an active network
+attacker to cause
+`telnet(1) <http://www.FreeBSD.org/cgi/man.cgi?query=telnet&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+to execute arbitrary code with the privileges of the user running it.
+More information can be found in security advisory
+`FreeBSD-SA-05:01.telnet <ftp://ftp.FreeBSD.org/pub/FreeBSD/CERT/advisories/FreeBSD-SA-05:01.telnet.asc>`__.
+
+A information disclosure vulnerability in the
+`sendfile(2) <http://www.FreeBSD.org/cgi/man.cgi?query=sendfile&sektion=2&manpath=FreeBSD+5.4-RELEASE>`__
+system call, which could permit it to transmit random parts of kernel
+memory, has been fixed. More details are in security advisory
+`FreeBSD-SA-05:02.sendfile <ftp://ftp.FreeBSD.org/pub/FreeBSD/CERT/advisories/FreeBSD-SA-05:02.sendfile.asc>`__.
+
+An information leak vulnerability in the ``SIOCGIFCONF``
+`ioctl(2) <http://www.FreeBSD.org/cgi/man.cgi?query=ioctl&sektion=2&manpath=FreeBSD+5.4-RELEASE>`__,
+which leaked 12 bytes of kernel memory, has been fixed. More details are
+in security advisory
+`FreeBSD-SA-05:04.ifconf <ftp://ftp.FreeBSD.org/pub/FreeBSD/CERT/advisories/FreeBSD-SA-05:04.ifconf.asc>`__.
+
+Several programming errors in
+`cvs(1) <http://www.FreeBSD.org/cgi/man.cgi?query=cvs&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__,
+which could potentially cause arbitrary code to be executed on CVS
+servers, have been corrected. Further information can be found in
+security advisory
+`FreeBSD-SA-05:05.cvs <ftp://ftp.FreeBSD.org/pub/FreeBSD/CERT/advisories/FreeBSD-SA-05:05.cvs.asc>`__.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.2 Kernel Changes
+~~~~~~~~~~~~~~~~~~
+
+The
+`jail(8) <http://www.FreeBSD.org/cgi/man.cgi?query=jail&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+feature now supports a new sysctl ``security.jail.chflags_allowed``,
+which controls the behavior of
+`chflags(1) <http://www.FreeBSD.org/cgi/man.cgi?query=chflags&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+within a jail. If set to ``0`` (the default), then a jailed ``root``
+user is treated as an unprivileged user; if set to ``1``, then a jailed
+root user is treated the same as an unjailed ``root`` user.
+
+The loader tunable ``debug.mpsafevm`` has been enabled by default.
+
+A number of bugs have been fixed in the ULE scheduler.
+
+A bug in Inter-Processor Interrupt (IPI) handling, which could cause SMP
+systems to crash under heavy load, has been fixed. More details are
+contained in errata note
+`FreeBSD-EN-05:03.ipi <ftp://ftp.FreeBSD.org/pub/FreeBSD/ERRATA/notices/FreeBSD-EN-05:03.ipi.asc>`__.
+
+Memory allocation for legacy PCI bridges has been limited to the top
+32MB of RAM. Many older, legacy bridges only allow allocation from this
+range. This change only applies to devices which don't have their memory
+assigned by the BIOS. This change fixes the \`\`bad Vcc'' error of
+CardBus bridges
+(`pccbb(4) <http://www.FreeBSD.org/cgi/man.cgi?query=pccbb&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__).
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.2.1 Boot Loader Changes
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.2.2 Hardware Support
+^^^^^^^^^^^^^^^^^^^^^^
+
+A framework for flexible processor speed control has been added. It
+provides methods for various drivers to control CPU power utilization by
+adjusting the processor speed. More details can be found in the
+`cpufreq(4) <http://www.FreeBSD.org/cgi/man.cgi?query=cpufreq&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+manual page.
+
+The pcii driver has been added to support GPIB-PCIIA IEEE-488 cards.
+
+.. raw:: html
+
+   <div class="SECT4">
+
+--------------
+
+2.2.2.1 Multimedia Support
+''''''''''''''''''''''''''
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT4">
+
+--------------
+
+2.2.2.2 Network Interface Support
+'''''''''''''''''''''''''''''''''
+
+The
+`cdce(4) <http://www.FreeBSD.org/cgi/man.cgi?query=cdce&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+USB Communication Device Class Ethernet driver has been added.
+
+The
+`cp(4) <http://www.FreeBSD.org/cgi/man.cgi?query=cp&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver is now MPSAFE.
+
+The
+`ctau(4) <http://www.FreeBSD.org/cgi/man.cgi?query=ctau&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver is now MPSAFE.
+
+The
+`cx(4) <http://www.FreeBSD.org/cgi/man.cgi?query=cx&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver is now MPSAFE.
+
+The
+`ed(4) <http://www.FreeBSD.org/cgi/man.cgi?query=ed&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver now supports the
+`altq(4) <http://www.FreeBSD.org/cgi/man.cgi?query=altq&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+framework.
+
+In the
+`em(4) <http://www.FreeBSD.org/cgi/man.cgi?query=em&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver, hardware support for VLAN tagging is now disabled by default due
+to some interactions between this feature and promiscuous mode.
+
+Ethernet flow control is now disabled by default in the
+`fxp(4) <http://www.FreeBSD.org/cgi/man.cgi?query=fxp&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver, to prevent problems with a system panics or is left in the
+kernel debugger.
+
+The
+`hme(4) <http://www.FreeBSD.org/cgi/man.cgi?query=hme&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver is now MPSAFE.
+
+The
+`re(4) <http://www.FreeBSD.org/cgi/man.cgi?query=re&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver now supports the
+`altq(4) <http://www.FreeBSD.org/cgi/man.cgi?query=altq&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+framework.
+
+The
+`sf(4) <http://www.FreeBSD.org/cgi/man.cgi?query=sf&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver now has support for device polling and
+`altq(4) <http://www.FreeBSD.org/cgi/man.cgi?query=altq&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__.
+
+Several programming errors in the
+`sk(4) <http://www.FreeBSD.org/cgi/man.cgi?query=sk&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver have been corrected. These bugs were particular to SMP systems,
+and could cause panics, page faults, aborted SSH connections, or
+corrupted file transfers. More details can be found in errata note
+`FreeBSD-EN-05:02.sk <ftp://ftp.FreeBSD.org/pub/FreeBSD/ERRATA/notices/FreeBSD-EN-05:02.sk.asc>`__.
+
+The
+`sk(4) <http://www.FreeBSD.org/cgi/man.cgi?query=sk&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver now has support for
+`altq(4) <http://www.FreeBSD.org/cgi/man.cgi?query=altq&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__.
+This driver also now supports jumbo frames on Yukon-based interfaces.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.2.3 Network Protocols
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The MTU feedback in IPv6 has been disabled when the sender writes data
+that must be fragmented.
+
+The Common Address Redundancy Protocol (CARP) has been implemented. CARP
+comes from OpenBSD and allows multiple hosts to share an IP address,
+providing high availability and load balancing. For more information,
+see the
+`carp(4) <http://www.FreeBSD.org/cgi/man.cgi?query=carp&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+manual page.
+
+The
+`ipfw(4) <http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+system can work with ``debug.mpsafenet``\ =\ ``1`` (this tunable is
+``1`` by default) when the ``gid``, ``jail``, and/or ``uid`` rule
+options are used.
+
+The
+`ipfw(8) <http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+``ipfw fwd`` rule now supports the full packet destination manipulation
+when the kernel option ``options IPFIREWALL_FORWARD_EXTENDED`` is
+specified in addition to ``options IPFIREWALL_FORWARD``. This kernel
+option disables all restrictions to ensure proper behavior for locally
+generated packets and allows redirection of packets destined to locally
+configured IP addresses. Note that
+`ipfw(8) <http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+rules have to be carefully crafted to make sure that things like PMTU
+discovery do not break.
+
+`ipnat(8) <http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+now allows redirect rules to work for non-TCP/UDP packets.
+
+Ongoing work is reducing the use of the Giant lock by the network
+protocol stack and improving the locking strategies.
+
+A new
+`ng\_netflow(4) <http://www.FreeBSD.org/cgi/man.cgi?query=ng_netflow&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+NetGraph node allows a router running FreeBSD to do NetFlow version 5
+exports.
+
+The
+`sppp(4) <http://www.FreeBSD.org/cgi/man.cgi?query=sppp&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver now includes Frame Relay support.
+
+A bug in TCP that sometimes caused RST packets to be ignored if the
+receive window was zero bytes has been fixed.
+
+Several bugs in the TCP SACK implementation have been fixed.
+
+The KAME IPv4 IPsec implementation integrated in FreeBSD now supports
+TCP-MD5.
+
+Random ephemeral port number allocation has led to some problems with
+port reuse at high connection rates. This feature is now disabled during
+periods of high connection rates; whenever new connections are created
+faster than ``net.inet.ip.portrange.randomcps`` per second, port number
+randomization is disabled for the next
+``net.inet.ip.portrange.randomtime`` seconds. The default values for
+these two sysctl variables are ``10`` and ``45``, respectively.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.2.4 Disks and Storage
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The
+`amr(4) <http://www.FreeBSD.org/cgi/man.cgi?query=amr&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver is now safe for use on systems using
+`pae(4) <http://www.FreeBSD.org/cgi/man.cgi?query=pae&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__.
+
+The
+`arcmsr(4) <http://www.FreeBSD.org/cgi/man.cgi?query=arcmsr&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver has been added. It supports the Areca ARC-11\ ``xx`` and
+ARC-12\ ``xx`` series of SATA RAID controllers.
+
+The
+`hptmv(4) <http://www.FreeBSD.org/cgi/man.cgi?query=hptmv&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver, which supports the HighPoint RocketRAID 182x series, has been
+added.
+
+The
+`ips(4) <http://www.FreeBSD.org/cgi/man.cgi?query=ips&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver now support kernel crash dumps on some modern ServeRAID models.
+
+The
+`matcd(4) <http://www.FreeBSD.org/cgi/man.cgi?query=matcd&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+driver has been removed.
+
+The SHSEC GEOM class has been added. It provides for the sharing of a
+secret between multiple GEOM providers. All of these providers must be
+present in order to reveal the secret. This feature is controlled by the
+`gshsec(8) <http://www.FreeBSD.org/cgi/man.cgi?query=gshsec&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility.
+
+Information about newly-mounted cd9660 file systems (such as the
+presence of RockRidge extensions) is now only printed if the kernel was
+booted in verbose mode. This change was made to reduce the amount of
+(generally unnecessary) kernel log messages.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.2.5 File Systems
+^^^^^^^^^^^^^^^^^^
+
+Recomputing the summary information for \`\`dirty'' UFS and UFS2 file
+systems is no longer done at mount time, but is now done by background
+`fsck(8) <http://www.FreeBSD.org/cgi/man.cgi?query=fsck&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__.
+This change improves the startup speed when mounting large file systems
+after a crash. The prior behavior can be restored by setting the
+``vfs.ffs.compute_summary_at_mount`` sysctl variable to a non-zero
+value.
+
+A kernel panic in the NFS server has been fixed. More details can be
+found in errata note
+`FreeBSD-EN-05:01.nfs <ftp://ftp.FreeBSD.org/pub/FreeBSD/ERRATA/notices/FreeBSD-EN-05:01.nfs.asc>`__.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.2.6 Contributed Software
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**ACPI-CA** has been updated from 20040527 to 20041119.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.3 Userland Changes
+~~~~~~~~~~~~~~~~~~~~
+
+The
+`ftpd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=ftpd&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+program now uses the ``212`` and ``213`` status codes for directory and
+file status correctly (``211`` was used in the previous versions). This
+behavior is described in RFC 959.
+
+The
+`getaddrinfo(3) <http://www.FreeBSD.org/cgi/man.cgi?query=getaddrinfo&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+function now queries ``A`` DNS resource records before ``AAAA`` records
+when ``AF_UNSPEC`` is specified. Some broken DNS servers return
+``NXDOMAIN`` against non-existent ``AAAA`` queries, even when it should
+return ``NOERROR`` with empty return records. This is a problem for an
+IPv4/IPv6 dual stack node because the ``NXDOMAIN`` returned by the first
+query of an ``AAAA`` record makes the querying server stop attempting to
+resolve the ``A`` record if any. Also, this behavior has been recognized
+as a potential denial-of-service attack (see
+http://www.kb.cert.org/vuls/id/714121 for more details). Note that
+although the query order has been changed, the returned result still
+includes ``AF_INET6`` records before ``AF_INET`` records.
+
+The ``create`` command of the
+`gpt(8) <http://www.FreeBSD.org/cgi/man.cgi?query=gpt&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility now supports a ``-f`` command-line flag to force creation of a
+GPT even when there is an MBR record on a disk.
+
+The gvinum(8) utility now supports ``checkparity``, ``rebuildparity``,
+and ``setstate`` subcommands.
+
+The ``libarchive`` library (as well as the
+`tar(1) <http://www.FreeBSD.org/cgi/man.cgi?query=tar&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+command that uses it) now has support for reading ISO images (with
+optional RockRidge extensions) and ZIP archives (with ``deflate`` and
+``none`` compression).
+
+The ``libgpib`` library has been added to give userland access to GPIB
+devices (using the the pcii driver) via the ``ibfoo`` API.
+
+A number of bugfixes for ``libpthread`` have been merged from HEAD.
+
+A number of new functions have been implemented in the
+`math(3) <http://www.FreeBSD.org/cgi/man.cgi?query=math&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+library. These include
+`ceill(3) <http://www.FreeBSD.org/cgi/man.cgi?query=ceill&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`floorl(3) <http://www.FreeBSD.org/cgi/man.cgi?query=floorl&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`ilogbl(3) <http://www.FreeBSD.org/cgi/man.cgi?query=ilogbl&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`fma(3) <http://www.FreeBSD.org/cgi/man.cgi?query=fma&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+and variants,
+`lrint(3) <http://www.FreeBSD.org/cgi/man.cgi?query=lrint&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+and variants, and
+`lround(3) <http://www.FreeBSD.org/cgi/man.cgi?query=lround&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+and variants.
+
+The
+`mkuzip(8) <http://www.FreeBSD.org/cgi/man.cgi?query=mkuzip&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility, which compresses file system images for use with ``GEOM_UZIP``
+`geom(4) <http://www.FreeBSD.org/cgi/man.cgi?query=geom&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+module, has been added. [MERGED]
+
+The
+`moused(8) <http://www.FreeBSD.org/cgi/man.cgi?query=moused&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+daemon now supports \`\`virtual scrolling'', in which mouse motions made
+while holding down the middle mouse button are interpreted as scrolling.
+This feature is enabled with the ``-V`` flag.
+
+A separate directory has been added for
+`named(8) <http://www.FreeBSD.org/cgi/man.cgi?query=named&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+dynamic zones which is owned by the ``bind`` user (for creation of the
+zone journal file). For more detail, see an example dynamic zone in the
+sample
+`named.conf(5) <http://www.FreeBSD.org/cgi/man.cgi?query=named.conf&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__.
+
+The
+`newfs(8) <http://www.FreeBSD.org/cgi/man.cgi?query=newfs&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility now supports a ``-n`` flag to suppress the creation of a
+``.snap`` directory on new file systems. This feature is intended for
+use on memory or vnode file systems that will not require snapshot
+support.
+
+The
+`newfs(8) <http://www.FreeBSD.org/cgi/man.cgi?query=newfs&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility now emits a warning when creating a UFS or UFS2 file system that
+cannot support snapshots. This situation can occur in the case of very
+large file systems with small block sizes.
+
+The ``NO_NIS`` compile-time knob for userland has been added. As its
+name implies, enabling this ``Makefile`` variable will cause NIS support
+to be excluded from various programs and will cause the NIS utilities to
+not be built.
+
+The
+`ncal(1) <http://www.FreeBSD.org/cgi/man.cgi?query=ncal&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+utility now supports a ``-m`` flag to generate a calendar for a
+specified month in the current year.
+
+The
+`periodic(8) <http://www.FreeBSD.org/cgi/man.cgi?query=periodic&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+security output now supports the display of information about blocked
+packet counts from
+`pf(4) <http://www.FreeBSD.org/cgi/man.cgi?query=pf&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__.
+
+The
+`ppp(8) <http://www.FreeBSD.org/cgi/man.cgi?query=ppp&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+program now implements an ``echo`` parameter, which allows LCP ECHOs to
+be enabled independently of LQR reports. Older versions of
+`ppp(8) <http://www.FreeBSD.org/cgi/man.cgi?query=ppp&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+would revert to LCP ECHO mode on negotiation failure. It is now
+necessary to specify ``enable echo`` to get this behavior.
+
+Two bugs in the
+`pppd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=pppd&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+program have been fixed. They may result in an incorrect CBCP response,
+which violates the Microsoft PPP Callback Control Protocol section 3.2.
+
+The
+`restore(8) <http://www.FreeBSD.org/cgi/man.cgi?query=restore&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility has regained the ability to read FreeBSD version 1 dump tapes.
+
+The
+`rm(1) <http://www.FreeBSD.org/cgi/man.cgi?query=rm&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+utility now supports an ``-I`` option that asks for confirmation (once)
+if recursively removing directories or if more than 3 files are listed
+in the command line.
+
+The
+`rtld(1) <http://www.FreeBSD.org/cgi/man.cgi?query=rtld&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+dynamic linker now supports specifying library replacements via the
+``LD_LIBMAP`` environment variable. This variable will override the
+entries in
+`libmap.conf(5) <http://www.FreeBSD.org/cgi/man.cgi?query=libmap.conf&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__.
+
+The
+`strftime(3) <http://www.FreeBSD.org/cgi/man.cgi?query=strftime&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+function now supports some GNU extensions such as ``-`` (no padding),
+``_`` (use space as padding), and ``0`` (zero padding).
+
+The
+`syslog(3) <http://www.FreeBSD.org/cgi/man.cgi?query=syslog&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__
+function is now thread-safe.
+
+The
+`syslogd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility now opens an additional domain socket (``/var/run/logpriv`` by
+default), with ``0600`` permissions to be used by privileged programs.
+This prevents privileged programs from locking when the domain sockets
+run out of buffer space due to a local denial-of-service attack.
+
+The
+`syslogd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+now supports ``-S`` option which allows to change the pathname of the
+privileged socket. This is useful when you do not want the daemon to
+receive any messages from the local sockets (``/var/run/log`` and
+``/var/run/logpriv`` are used by default).
+
+The
+`syslogd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility now allows ``:`` and ``%`` characters in the hostname
+specifications. These characters are used in IPv6 addresses and scope
+IDs.
+
+The
+`systat(1) <http://www.FreeBSD.org/cgi/man.cgi?query=systat&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+``-netstat`` display is now IPv6-aware.
+
+The ``-f`` option of
+`tail(1) <http://www.FreeBSD.org/cgi/man.cgi?query=tail&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+utility now supports more than one file at a time.
+
+The
+`tcpdrop(8) <http://www.FreeBSD.org/cgi/man.cgi?query=tcpdrop&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+command, which closes a selected TCP connection, has been added. It was
+obtained from OpenBSD.
+
+`whois(1) <http://www.FreeBSD.org/cgi/man.cgi?query=whois&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+now supports a ``-k`` flag for querying ``whois.krnic.net`` (the
+National Internet Development Agency of Korea), which holds details of
+IP address allocations within Korea.
+
+A bug, which caused the last line of configuration files such as
+`hosts(5) <http://www.FreeBSD.org/cgi/man.cgi?query=hosts&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__,
+`services(5) <http://www.FreeBSD.org/cgi/man.cgi?query=services&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__,
+and so on to be ignored if it did not end in a newline character, has
+been fixed.
+
+.. raw:: html
+
+   <div class="SECT3">
+
+--------------
+
+2.3.1 ``/etc/rc.d`` Scripts
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+`rc.conf(5) <http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__
+now supports changes of network interface names at boot time. For
+example:
+
+.. code:: PROGRAMLISTING
+
+    ifconfig_fxp0_name="net0"
+    ifconfig_net0="inet 10.0.0.1/16"
+
+`rc.conf(5) <http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&sektion=5&manpath=FreeBSD+5.4-RELEASE>`__
+now supports the ``tmpmfs_flags`` and ``varmfs_flags`` variables. These
+can be used to pass extra options to the
+`mdmfs(8) <http://www.FreeBSD.org/cgi/man.cgi?query=mdmfs&sektion=8&manpath=FreeBSD+5.4-RELEASE>`__
+utility, to customize the finer details of the
+`md(4) <http://www.FreeBSD.org/cgi/man.cgi?query=md&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__
+file system creation, such as to turn on/off softupdates, to specify a
+default owner for the file system, and so on.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.4 Contributed Software
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**BIND** has been updated from version 9.3.0 to version 9.3.1.
+
+**Heimdal** has been updated from 0.6.1 to 0.6.3.
+
+A snapshot of **netcat** from OpenBSD as of 4 February 2005 has been
+added. More information can be found in the
+`nc(1) <http://www.FreeBSD.org/cgi/man.cgi?query=nc&sektion=1&manpath=FreeBSD+5.4-RELEASE>`__
+manual page.
+
+**OpenSSL** has been updated from 0.9.7d to 0.9.7e.
+
+**sendmail** has been updated from version 8.13.1 to version 8.13.3.
+
+The timezone database has been updated from **tzdata2004e** to
+**tzdata2004g**.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.5 Ports/Packages Collection Infrastructure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``ports/INDEX*`` files, which kept an index of all of the entries in
+the ports collection, have been removed from the CVS repository. These
+files were generated only infrequently, and therefore were usually
+out-of-date and inaccurate. Users requiring an index file (such as for
+use by programs such as
+`portupgrade(1) <http://www.FreeBSD.org/cgi/man.cgi?query=portupgrade&sektion=1&manpath=FreeBSD+Ports>`__)
+have two alternatives for obtaining a copy:
+
+-  Build an index file based on the current ports tree by running
+   ``make index`` from the top of the ``ports/`` tree.
+
+-  Fetch an index file over the network by running ``make fetchindex``
+   from the top of the ``ports/`` tree. This index file will (typically)
+   be accurate to within a day.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.6 Release Engineering and Integration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In prior FreeBSD releases, the ``disc1`` CD-ROM (or ISO image) was a
+bootable installation disk containing the base system, ports tree, and
+common packages. The ``disc2`` CD-ROM (or ISO image) was a bootable
+\`\`fix it'' disk with a live filesystem, to be used for making
+emergency repairs. This layout has now changed. For all architectures
+except ia64, the ``disc1`` image now contains the base system
+distribution files, ports tree, and the live filesystem, making it
+suitable for both an initial installation and repair purposes. (On the
+ia64, the live filesystem is on a separate disk due to its size.)
+Packages appear on separate disks; in particular, the ``disc2`` image
+contains commonly packages such as desktop environments. Documents from
+the FreeBSD Documentation Project also appear on ``disc2``.
+
+The supported version of the **GNOME** desktop environment has been
+updated from 2.6.2 to 2.10. More information about running **GNOME** on
+FreeBSD can be found on the `FreeBSD GNOME
+Project <../../../../gnome/>`__ Web page.
+
+.. raw:: html
+
+   <div class="NOTE">
+
+    **Note:** Users of older versions of the **GNOME** desktop
+    (```x11/gnome2`` <http://www.FreeBSD.org/cgi/url.cgi?ports/x11/gnome2/pkg-descr>`__)
+    must take particular care in upgrading. Simply upgrading it from the
+    FreeBSD Ports Collection with
+    `portupgrade(1) <http://www.FreeBSD.org/cgi/man.cgi?query=portupgrade&sektion=1&manpath=FreeBSD+Ports>`__
+    (```sysutils/portupgrade`` <http://www.FreeBSD.org/cgi/url.cgi?ports/sysutils/portupgrade/pkg-descr>`__)
+    will cause serious problems. **GNOME** desktop users should read the
+    instructions carefully at
+    `../../../../gnome/docs/faq210.html <../../../../gnome/docs/faq210.html>`__
+    and use the
+    ```gnome_upgrade.sh`` <../../../../gnome/gnome_upgrade.sh>`__ script
+    to properly upgrade to **GNOME** 2.10.
+
+.. raw:: html
+
+   </div>
+
+The supported version of the **KDE** desktop environment has been
+updated from 3.3.0 to 3.4.0. More information regarding running **KDE**
+on FreeBSD can be found on the `KDE on
+FreeBSD <http://freebsd.kde.org/>`__ Web page.
+
+.. raw:: html
+
+   <div class="NOTE">
+
+    **Note:** Users of older versions of **KDE** should follow the
+    upgrading procedure documented on the `KDE on
+    FreeBSD <http://freebsd.kde.org/>`__ Web page or in
+    ``ports/UPDATING``.
+
+.. raw:: html
+
+   </div>
+
+The supported version of **Xorg** has been updated from 6.7.0 to 6.8.2.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT2">
+
+--------------
+
+2.7 Documentation
+~~~~~~~~~~~~~~~~~
+
+The following manual pages, which were derived from RFCs and possibly
+violate the IETF's copyrights, have been replaced:
+`gai\_strerror(3) <http://www.FreeBSD.org/cgi/man.cgi?query=gai_strerror&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`getaddrinfo(3) <http://www.FreeBSD.org/cgi/man.cgi?query=getaddrinfo&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`getnameinfo(3) <http://www.FreeBSD.org/cgi/man.cgi?query=getnameinfo&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`inet6\_opt\_init(3) <http://www.FreeBSD.org/cgi/man.cgi?query=inet6_opt_init&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`inet6\_option\_space(3) <http://www.FreeBSD.org/cgi/man.cgi?query=inet6_option_space&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`inet6\_rth\_space(3) <http://www.FreeBSD.org/cgi/man.cgi?query=inet6_rth_space&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`inet6\_rthdr\_space(3) <http://www.FreeBSD.org/cgi/man.cgi?query=inet6_rthdr_space&sektion=3&manpath=FreeBSD+5.4-RELEASE>`__,
+`icmp6(4) <http://www.FreeBSD.org/cgi/man.cgi?query=icmp6&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__,
+and
+`ip6(4) <http://www.FreeBSD.org/cgi/man.cgi?query=ip6&sektion=4&manpath=FreeBSD+5.4-RELEASE>`__.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="SECT1">
+
+--------------
+
+3 Upgrading from previous releases of FreeBSD
+---------------------------------------------
+
+Users with existing FreeBSD systems are *highly* encouraged to read the
+\`\`FreeBSD 5.4-RELEASE Migration Guide''. This document generally has
+the filename ``MIGRATE5.TXT`` on the distribution media, or any other
+place that the release notes can be found. It offers some notes on
+migrating from FreeBSD 4.X, but more importantly, also discusses some of
+the relative merits of upgrading to FreeBSD 5.\ ``X`` versus running
+FreeBSD 4.\ ``X``.
+
+.. raw:: html
+
+   <div class="IMPORTANT">
+
+    **Important:** Upgrading FreeBSD should, of course, only be
+    attempted after backing up *all* data and configuration files.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+--------------
+
+This file, and other release-related documents, can be downloaded from
+ftp://ftp.FreeBSD.org/.
+
+For questions about FreeBSD, read the
+`documentation <http://www.FreeBSD.org/docs.html>`__ before contacting
+<questions@FreeBSD.org\ >.
+
+For questions about this documentation, e-mail <doc@FreeBSD.org\ >.

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>10.8. Temas avanzados</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="linuxemu.html" title="Capítulo 10. Compatibilidad binaria con Linux" /><link rel="prev" href="sapr3.html" title="10.7. Instalación de SAP® R/3®" /><link rel="next" href="system-administration.html" title="Parte III. Administración del sistema." /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.8. Temas avanzados</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="sapr3.html">Anterior</a> </td><th width="60%" align="center">Capítulo 10. Compatibilidad binaria con Linux</th><td width="20%" align="right"> <a accesskey="n" href="system-administration.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="linuxemu-advanced"></a>10.8. Temas avanzados</h2></div></div></div><p>Si siente curiosidad por saber cómo funciona
+      la compatibilidad con Linux esta es la sección que
+      debe leer.  La mayor parte de lo que sigue está
+      basado casi en su totalidad en un mensaje enviado por Terry
+      Lambert <code class="email">&lt;<a xmlns="" class="email" href="mailto:tlambert@primenet.com">tlambert@primenet.com</a>&gt;</code> a la lista <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-chat" target="_top">lista de charla de FreeBSD</a>
+      (Message ID: <code class="literal">&lt;199906020108.SAA07001@usr09.primenet.com&gt;</code>).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp74340176"></a>10.8.1. ?Cómo funciona?</h3></div></div></div><a id="idp74340816" class="indexterm"></a><p>FreeBSD dispone de una abstracció denominada
+      <span class="quote">&#8220;<span class="quote">cargador de clase en ejecución</span>&#8221;</span>.  Esto no
+      es más que un bloque de código incrustado
+      en la llamada <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=execve&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">execve</span>(2)</span></a> del sistema.</p><p>Históricamente las plataformas <span class="trademark">UNIX</span>®
+      disponían de un único cargador
+      de binarios, que en última instancia
+      (<span class="emphasis"><em>fallback</em></span>) recurría
+      al cargador <code class="literal">#!</code> para ejecutar
+      cualesquiera intérpretes o scripts de la shell. Ese
+      cargador único examinaba el número
+      mágico (generalmente los 4 u 8 primeros bytes
+      del fichero) para ver si era un binario reconocible
+      por el sistema y, en tal caso, invocaba al cargador
+      binario.</p><p>Si no era de tipo binario, la llamada <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=execve&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">execve</span>(2)</span></a>
+      devolvía un error y la shell intentaba empezar
+      a ejecutarlo como órdenes shell, tomando por
+      defecto como punto de partida
+      <span class="quote">&#8220;<span class="quote">la shell actual, sea cual sea</span>&#8221;</span>.</p><p>Posteriormente se pensó en hacer una
+      modificación de manera que <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> examinara
+      los dos primeros caracteres, de modo que si eran
+      <code class="literal">:\n</code> se llamaba a la shell
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> en su lugar (parece ser que en SCO
+      fueron los primeros en utilizar ese truco).</p><p>Lo que ocurre ahora es que FreeBSD dispone de una
+        lista de cargadores, en lugar de uno solo.  FreeBSD
+        recorre esa lista de cargadores, con un cargador genérico
+        <code class="literal">#!</code> que sabe reconocer los
+	intérpretes en base a los caracteres que
+        siguen al siguiente espacio en blanco, con
+	<code class="filename">/bin/sh</code> como último
+        recurso.</p><a id="idp74357840" class="indexterm"></a><p>Para dar soporte a la ABI
+      (<span class="quote">&#8220;<span class="quote">Application Binary Interface</span>&#8221;</span>) de Linux,
+      FreeBSD interpreta el número mágico como un
+      binario ELF (<span class="quote">&#8220;<span class="quote">Executable and Linking
+      Format</span>&#8221;</span>): En este punto no hace distinción
+      entre FreeBSD, <span class="trademark">Solaris</span>&#8482;, <span class="trademark">Linux</span>® o cualquier otro SO que tenga un
+      tipo de imagen ELF.</p><a id="idp74360528" class="indexterm"></a><p>El cargador ELF busca entonces una marca
+      (<span class="emphasis"><em>brand</em></span>) especial, una
+      sección de comentarios en la imagen ELF
+      que no está presente en los binarios ELF de
+      SVR4/<span class="trademark">Solaris</span>&#8482;.</p><p>Para que los binarios de Linux funcionen deben
+      estar marcados con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=brandelf&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">brandelf</span>(1)</span></a> como tipo
+      <code class="literal">Linux</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>brandelf -t Linux file</code></strong></pre><p>Hecho esto el cargador ELF verá la
+      marca <code class="literal">Linux</code> en el fichero.</p><a id="idp74365520" class="indexterm"></a><p>Cuando el cargador ELF ve la marca
+      <code class="literal">Linux</code> sustituye un puntero en la
+      estructura <code class="literal">proc</code>.  Todas las
+      llamadas del sistema se indexan a través de
+      este puntero (en un sistema <span class="trademark">UNIX</span>® tradicional
+      sería el «array» de estructura
+      <code class="literal">sysent[]</code> que contiene las llamadas
+      del sistema).  Además, el proceso se marca
+      con unos indicadores (<span class="quote">&#8220;<span class="quote">flags</span>&#8221;</span>) para que
+      el vector trampa del código de envío
+      señales lo maneje de una forma determinada,
+      así como otros arreglos (menores) que
+      serán utilizados por el módulo Linux
+      del kernel.</p><p>El vector de llamada del sistema Linux contiene,
+      entre otras cosas, una lista de entradas
+      <code class="literal">sysent[]</code> cuyas direcciones residen
+      en el módulo del kernel.</p><p>Cuando el binario Linux realiza una llamada al
+      sistema, el código trampa extrae el puntero
+      a la función de la llamada del sistema de la estructura
+      <code class="literal">proc</code>, y así obtiene los puntos de
+      entrada a las llamadas del sistema Linux, no las
+      de FreeBSD.</p><p>Además, el modo Linux cambia la raíz
+      de las búsquedas de una forma dinámica. En
+      efecto, esto es lo que hace la opción
+      <code class="option">union</code> cuando se monta un sistema de ficheros
+      (¡y que <span class="emphasis"><em>no</em></span> es lo mismo que el
+      sistema de ficheros <code class="literal">unionfs</code>!).  Primero
+      se hace un intento de buscar el fichero en el directorio
+      <code class="filename">/compat/linux/ruta-original</code>
+      y <span class="emphasis"><em>solo después</em></span>, si lo anterior
+      falla, se repite la búsqueda en el
+      directorio
+      <code class="filename">/ruta-original</code>.  Esto
+      permite que se puedan ejecutar binarios que necesitan de
+      otros binarios (por ejemplo las herramientas de
+      programación (<span class="quote">&#8220;<span class="quote">toolchain</span>&#8221;</span>) de Linux
+      pueden ejecutarse en su totalidad bajo la ABI de
+      Linux). Esto significa también que los binarios
+      Linux pueden cargar y ejecutar binarios FreeBSD si los binarios
+      Linux equivalentes no se hallan presentes y que se puede poner
+      una orden <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=uname&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">uname</span>(1)</span></a> en el árbol de directorios
+      <code class="filename">/compat/linux</code> para poder estar seguros de
+      que los binarios Linux no puedan decir que no estaban
+      ejecutándose en Linux.</p><p>En efecto, hay un kernel Linux en el kernel
+       FreeBSD; las distintas funciones subyacentes que
+       implementan todos los servicios proporcionados
+       por el kernel son idénticas en ambas, las
+       tablas de entradas de llamadas del sistema en FreeBSD y en
+       Linux: operaciones del sistema de ficheros, operaciones
+       de memoria virtual, envío de señales
+       IPC System V, etc.  La única diferencia es que
+       los binarios FreeBSD reciben sus funciones de
+       conexión (<span class="quote">&#8220;<span class="quote"><span class="emphasis"><em>glue</em></span></span>&#8221;</span>)
+       y los binarios Linux las suyas (la mayoría de los
+       sistemas operativos más antiguos solo tienen sus
+       propias funciones de conexión:
+       direcciones de funciones en un <span class="quote">&#8220;<span class="quote">array</span>&#8221;</span> de
+       estructura <code class="literal">sysent[]</code> estática y
+       global, en lugar de direcciones de funciones que se extraen
+       a partir de un puntero inicializado dinámicamente
+       en la estructura <code class="literal">proc</code> del proceso que hace
+       la llamada).</p><p>?Cuál es entonces la ABI nativa de FreeBSD?  No
+      importa. Básicamente, la única diferencia
+      es (ahora mismo; esto podría cambiar y probablemente lo
+      hará en una release futura) que las funciones de
+      conexión de FreeBSD están enlazadas
+      estáticamente en el kernel mientras que las de
+      Linux pueden estarlo también estáticamente o
+      se puede acceder a ellas por medio de un módulo
+      del kernel.</p><p>Bien, pero ?de verdad es esto una
+      emulación?  No.  Es una implementación ABI, no
+      una emulación. No hay un emulador involucrado (ni
+      un simulador, para adelantarnos a la siguiente
+      pregunta).</p><p>Entonces ?por qué a veces se le llama
+      <span class="quote">&#8220;<span class="quote">emulación Linux</span>&#8221;</span>?  ¡Para hacer
+      más difícil el vender FreeBSD!  En serio, se
+      debe a que la primera implementación se hizo
+      en un momento en que realmente no había ninguna
+      palabra distinta a esa para describir lo que se estaba
+      haciendo; decir que FreeBSD ejecutaba binarios Linux no era
+      cierto si no se compilaba el código o se cargaba
+      un módulo; hacía falta una forma de
+      describir todo esto y acabamos usando
+      <span class="quote">&#8220;<span class="quote">emulador Linux</span>&#8221;</span>.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="sapr3.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="linuxemu.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="system-administration.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">10.7. Instalación de <span class="trademark">SAP</span>® <span class="trademark">R/3</span>® </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> Parte III. Administración del sistema.</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

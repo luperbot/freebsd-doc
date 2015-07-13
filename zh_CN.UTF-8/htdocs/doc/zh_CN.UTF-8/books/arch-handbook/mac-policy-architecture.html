@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>6.6. MAC策略模块体系结构</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="mac.html" title="第 6 章 TrustedBSD MAC 框架" /><link rel="prev" href="mac-framework-kernel-arch.html" title="6.5. MAC 框架的内核体系结构" /><link rel="next" href="mac-entry-point-reference.html" title="6.7. MAC策略入口函数参考" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6.6. MAC策略模块体系结构</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-framework-kernel-arch.html">上一页</a> </td><th width="60%" align="center">第 6 章 TrustedBSD MAC 框架</th><td width="20%" align="right"> <a accesskey="n" href="mac-entry-point-reference.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-policy-architecture"></a>6.6. MAC策略模块体系结构</h2></div></div></div><p>安全策略可以直接编入内核，也可以编译成独立的内核模块，在系统引导时或者运行时使用模块加载命令加载。
+      策略模块通过一组预先定义好的入口函数与系统交互。通过它们，策略模块能够掌握某些系统事件的发生，并且在必要的时候影响系统的访问控制决策。
+      每个策略模块包含下列组成部分：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>可选：策略配置参数</p></li><li class="listitem"><p>策略逻辑和参数的集中实现</p></li><li class="listitem"><p>可选：策略生命周期事件的实现，比如，策略的初始化和销毁</p></li><li class="listitem"><p>可选：对所选内核对象的安全标记进行初始化、维护和销毁的支持</p></li><li class="listitem"><p>可选：对所选对象的使用进程进行监控以及修改对象安全标记的支持</p></li><li class="listitem"><p>策略相关的访问控制入口函数的实现</p></li><li class="listitem"><p>对策略标志、模块入口函数和策略特性的声明</p></li></ul></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-policy-declaration"></a>6.6.1. 策略注销</h3></div></div></div><p>策略模块可以使用	<code class="function">MAC_POLICY_SET()</code> 宏来声明。
+	该宏完成以下工作：为该策略命名（向系统声明该策略提供的名字）；提交策略定义的 MAC 入口函数向量的地址；
+	按照策略的要求设置该策略的加载标志位，保证 MAC 框架将以策略所期望的方式对其进行操作；
+       另外，还可能请求框架为策略分配标记状态 slot 值。</p><pre class="programlisting">static struct mac_policy_ops mac_<em class="replaceable"><code>policy</code></em>_ops =
+{
+        .mpo_destroy = mac_<em class="replaceable"><code>policy</code></em>_destroy,
+        .mpo_init = mac_<em class="replaceable"><code>policy</code></em>_init,
+        .mpo_init_bpfdesc_label = mac_<em class="replaceable"><code>policy</code></em>_init_bpfdesc_label,
+        .mpo_init_cred_label = mac_<em class="replaceable"><code>policy</code></em>_init_label,
+/* ... */
+        .mpo_check_vnode_setutimes = mac_<em class="replaceable"><code>policy</code></em>_check_vnode_setutimes,
+        .mpo_check_vnode_stat = mac_<em class="replaceable"><code>policy</code></em>_check_vnode_stat,
+        .mpo_check_vnode_write = mac_<em class="replaceable"><code>policy</code></em>_check_vnode_write,
+};</pre><p>如上所示，MAC 策略入口函数向量，<code class="varname">mac_<em class="replaceable"><code>policy</code></em>_ops</code>，
+	将策略模块中定义的功能函数挂接到特定的入口函数地址上。
+	在稍后的“入口函数参考”小节中，将提供可用入口函数功能描述和原型的完整列表。
+	与模块注册相关的入口函数有两个：<span class="symbol">.mpo_destroy</span>和<span class="symbol">.mpo_init</span>。
+	当某个策略向模块框架注册操作成功时，<span class="symbol">.mpo_init</span>将被调用，此后其他的入口函数才能被使用。
+	这种特殊的设计使得策略有机会根据自己的需要，进行特定的分配和初始化操作，比如对特殊数据或锁的初始化。
+	卸载一个策略模块时，将调用 <span class="symbol">.mpo_destroy</span> 用来释放策略分配的内存空间或注销其申请的锁。
+	目前，为了防止其他入口函数被同时调用，调用上述两个入口函数的进程必须持有 MAC 策略链表的互斥锁：这种限制将被放开，
+	但与此同时，将要求策略必须谨慎使用内核原语,以避免由于上锁次序或睡眠造成死锁。</p><p>之所以向策略声明提供模块名字域，是为了能够唯一标识该模块，以便解析模块依赖关系。选择使用恰当的字符串作为名字。
+	在策略加载和卸载时，策略的完整字符串名字将经由内核日志显示给用户。另外，当向用户进程报告状态信息时也会包含该字符串。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-policy-flags"></a>6.6.2. 策略标志</h3></div></div></div><p>在声明时提供标志参数域的机制，允许策略模块在作为模块被加载时，就自身特性向 MAC 框架提供说明。
+       目前，已经定义的标志有三个：</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">MPC_LOADTIME_FLAG_UNLOADOK</span></dt><dd><p>表示该策略模块可以被卸载。
+	    如果未提供该标志，则表示该策略模块拒绝被卸载。
+	    那些使用安全标记的状态，而又不能在运行时释放该状态的模块可能会设置该标志。
+	    </p></dd><dt><span class="term">MPC_LOADTIME_FLAG_NOTLATE</span></dt><dd><p>表示该策略模块必须在系统引导过程时进行加载和初始化。
+	    如果该标志被设置，那么在系统引导之后注册该模块的请求将被 MAC 框架所拒绝。
+           那些需要为大范围的系统对象进行安全标记初始化工作，而又不能处理含有未被正确初始化安全标记的对象的策略模块可能会设置该标志。</p></dd><dt><span class="term">MPC_LOADTIME_FLAG_LABELMBUFS</span></dt><dd><p>表示该策略模块要求为 Mbuf 指定安全标记，并且为存储其标记所需的内存空间总是提前分配好的。
+           缺省情况下，MAC 框架并不会为 Mbuf 分配标记存储，除非系统中注册的策略模块中至少有一个设置了该标志。
+           这种做法在没有策略需要对 Mbuf 做标记时，显著地提升了系统网络性能。另外，在某些特殊环境下，可以通过设置内核选项，
+           <code class="literal">MAC_ALWAYS_LABEL_MBUF</code>，强制 MAC 框架为 Mbuf 的安全标记分配存储，而不论上述标志如何设置。</p></dd></dl></div><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">那些使用了
+	<code class="literal">MPC_LOADTIME_FLAG_LABELMBUFS</code> 标志但没有设置
+	<code class="literal">MPC_LOADTIME_FLAG_NOTLATE</code> 标志的
+	策略模块必须能够正确地处理通过入口函数传入的值为 <code class="literal">NULL</code>
+	的 Mbuf 安全标记指针。
+	这是因为那些没有分配标记存储的处理中的 Mbuf 在一个需要 Mbuf 安全标记的策略模块加载之后，
+       其安全标记的指针将仍然为空。
+	如果策略在网络子系统活跃之前被加载（即，该策略不是被推迟加载的），那么所有的 Mbuf 的标记存储的分配就可以得到保证。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="mac-policy-entry-points"></a>6.6.3. 策略入口函数</h3></div></div></div><p>MAC 框架为注册的策略提供四种类型的入口函数：
+      策略注册和管理入口函数；
+      用于处理内核对象声明周期事件，如初始化、
+      创建和销毁，的入口函数；
+      处理该策略模块感兴趣的访问控制决策事件的入口函数；
+      以及用于管理对象安全标记的调用入口函数。
+      此外，
+      还有一个 <code class="function">mac_syscall()</code> 入口函数，
+      被策略模块用于在不注册新的系统调用的前提下，
+      扩展内核接口。</p><p>策略模块的编写人员除了必须清楚在进入特定入口函数之后，
+      哪些对象锁是可用的之外，
+      还应该熟知内核所采用的加锁策略。
+      编程人员在入口函数之内应该避免使用非叶节点锁，
+      并且遵循访问和修改对象时的加锁规程，
+      以降低导致死锁的可能性。
+      特别地，
+      程序员应该清楚，
+      虽然在通常情况下，
+      进入入口函数之后，
+      已经上了一些锁，
+      可以安全地访问对象及其安全标记，
+      但是这并不能保证对它们进行修改（
+      包括对象本身和其安全标记）
+      也是安全的。
+      相关的上锁信息，可以参考 MAC 框架入口函数的相关文档。</p><p>策略入口函数把两个分别指向对象本身和其安全标记的指针传递给策略模块。
+      这样一来，即使策略并不熟悉对象内部结构，也能基于标记作出正确决策。
+      只有进程信任状这个对象例外：MAC 框架总是假设所有的策略模块是理解其内部结构的。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-framework-kernel-arch.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-entry-point-reference.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">6.5. MAC 框架的内核体系结构 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 6.7. MAC策略入口函数参考</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

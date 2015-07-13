@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>2.7. ファイルシステム</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="4.4BSD オペレーティングシステムの設計と実装" /><link rel="up" href="overview.html" title="第2章 4.4BSD の設計の概要" /><link rel="prev" href="overview-io-system.html" title="2.6. I/O システム" /><link rel="next" href="overview-filestore.html" title="2.8. ファイル記録機構" /><link rel="copyright" href="legalnotice.html" title="法律上の通知" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.7. ファイルシステム</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="overview-io-system.html">戻る</a>〓</td><th width="60%" align="center">第2章 4.4BSD の設計の概要</th><td width="20%" align="right">〓<a accesskey="n" href="overview-filestore.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="overview-filesystem"></a>2.7. ファイルシステム</h2></div></div></div><p>通常ファイルとは一次元のバイト列であり、
+        任意の場所から読み込み・書き込みが可能です。
+        カーネルは、ファイルのレコード境界を認識しませんが、
+        多くのプログラムは 改行 (LF) 文字を行の終りと認識します。
+        またこれとは異なるファイル構造を利用するアプリケーションもあります。
+        ファイル自身には、ファイルに関するシステム情報はまったく含まれません。
+        各ファイルのファイル所有者、許可属性、
+        使用状況などのいくつかの情報はファイルではなくファイルシステムが保持しています。</p><p><span class="emphasis"><em>ファイル名</em></span>は最大 255 文字までの文字列です。
+        ファイル名は<span class="emphasis"><em>ディレクトリ</em></span>
+        と呼ばれる型のファイルに保管されます。
+        ディレクトリに含まれるファイルの情報は<span class="emphasis"><em>ディレクトリエントリ</em></span>と呼ばれ、
+        ファイル名以外にファイルそのものへのポインタも含みます。
+        ディレクトリエントリには通常のファイル以外に、
+        他のディレクトリを参照するエントリが含まれます。
+        このようにしてディレクトリとファイルによる階層が形作られ、
+        その階層構造を<span class="emphasis"><em>ファイルシステム</em></span>と呼びます。</p><div class="figure"><a id="fig-small-fs"></a><div class="figure-title">図2.2 小規模なファイルシステム</div><div class="figure-contents"><div class="mediaobject"><img src="fig2.png" alt="小規模なファイルシステムツリー" /></div></div></div><br class="figure-break" /><p><a class="xref" href="overview-filesystem.html#fig-small-fs" title="図2.2 小規模なファイルシステム">図2.2「小規模なファイルシステム」</a>は小規模なファイルシステムの一例です。
+        ディレクトリはサブディレクトリを含むことができ、
+        入れ子の深さには特に制限はありません。
+        ファイルシステムの一貫性を保つため、
+        カーネルはプロセスが直接ディレクトリへ書き込むことを禁止しています。
+        ファイルシステムには、通常ファイル、ディレクトリ以外に、
+        デバイスファイルやソケットなどの他のオブジェクトへの参照も含まれます。</p><p>ファイルシステムは、
+        <span class="emphasis"><em>ルートディレクトリ</em></span>
+        を始点とする木構造を持っています。
+        ルートディレクトリは、
+        <span class="emphasis"><em>スラッシュ</em></span>
+        と呼ばれる場合もあり、斜線文字(/)で表されます。
+        ルートディレクトリにはファイルが含まれます。
+        図 2.2 の例では、
+        <code class="filename">usr</code>
+        ディレクトリが含まれ、その
+        <code class="filename">usr</code>
+        ディレクトリには、
+        <code class="filename">bin</code>
+        ディレクトリが含まれます。
+        <code class="filename">bin</code>
+        ディレクトリには、通常
+        <code class="filename">ls</code>
+        や
+        <code class="filename">vi</code>
+        をはじめとする、プログラムの実行可能コードが含まれます。</p><p>プロセスは、ファイルの指定を<span class="emphasis"><em>パス名</em></span>によって行います。
+        パス名は、0 個以上のファイル名を斜線文字(/)で区切った文字列です。
+        カーネルはパス名を解釈するため、それぞれのプロセスに 2 つのパス名を関連付けます。
+        プロセスの<span class="emphasis"><em>ルートディレクトリ</em></span>は、
+        プロセスがアクセスできるファイルシステム上で最も上位の点です。
+        通常、このルートディレクトリは、
+        ファイルシステム全体のルートディレクトリに設定されます。
+        斜線文字 (/) ではじまるパス名は<span class="emphasis"><em>絶対パス名</em></span>と呼ばれ、
+        カーネルは、そのパス名がプロセスのルートディレクトリから
+        開始するものと解釈します。</p><p>斜線文字 (/) ではじまらないパス名は<span class="emphasis"><em>相対パス名</em></span>と呼ばれ、
+        プロセスの<span class="emphasis"><em>カレント作業ディレクトリ</em></span>を基準とした相対的なパスとして解釈されます
+        (このディレクトリは、短縮して
+        <span class="emphasis"><em>カレントディレクトリ</em></span>
+        または、
+        <span class="emphasis"><em>作業ディレクトリ</em></span>
+        とも呼ばれます)。
+        カレントディレクトリそのものは、
+        <span class="emphasis"><em>ドット</em></span>
+        とも呼ばれ、1 つのピリオド (<code class="filename">.</code>) で表されます。
+        ファイル名
+        <span class="emphasis"><em>ドットドット</em></span> (<code class="filename">..</code>) は、
+        ディレクトリの親ディレクトリを表します。
+        ルートディレクトリの親ディレクトリはルートディレクトリ自身です。</p><p><span class="emphasis"><em>chroot</em></span>
+        システムコールにより、プロセスのルートディレクトリを、
+        <span class="emphasis"><em>chdir</em></span>
+        システムコールにより、カレントディレクトリを変更できます。
+        <span class="emphasis"><em>chdir</em></span>
+        はいつでも行えますが、
+        <span class="emphasis"><em>chroot</em></span>
+        の実行は、管理者特権を持つプロセスに限られます。
+        <span class="emphasis"><em>chroot</em></span>
+        は通常、システムに対するアクセス制限を課すために用いられます。</p><p>図 2.2 のファイルシステムにおいて、プロセスのルートディレクトリ
+        がファイルシステムのルートディレクトリで、カレントディレクトリが
+        <code class="filename">/usr</code>
+        であったとします。このとき、
+        <code class="filename">vi</code>
+        を参照するには、絶対パスを用いて、
+        <code class="filename">/usr/bin/vi</code>
+        とも書けますし、カレントディレクトリからの相対パスを用いて、
+        <code class="filename">bin/vi</code>
+        とも書けます。</p><p>システムのユーティリティやデータベースは、
+        よく知られたある決まったディレクトリに保存されます。
+        ファイルシステムの階層構造としてよく知られたものに、
+        各々のユーザの<span class="emphasis"><em>ホームディレクトリ</em></span>があります。
+        たとえば、図 2.2 の
+        <code class="filename">/usr/staff/mckusick</code>
+        や
+        <code class="filename">/usr/staff/karels</code>
+        などです。 ユーザがログインすると、
+        シェルのカレントディレクトリはホームディレクトリに設定されます。
+        ユーザはホームディレクトリ内で通常ファイルの作成と同様にディレクトリも作成できるため、
+        複雑な階層構造を構築することも可能です。</p><p>ユーザからはファイルシステムが 1 つに見えますが、
+        システムは 1 つの仮想ファイルシステムが、
+        実際には異なるデバイス上の複数の物理ファイルシステムから構成されていることを認識しています。
+        物理ファイルシステムは、異なったデバイスにまたがることはできません。
+        ほとんどの場合、物理ディスクデバイスは複数の論理デバイスに分割されるため、
+        1 つの物理デバイス上に複数のファイルシステムを構成することもできます。
+        すべての絶対パス名を解決できるファイルシステムを
+        <span class="emphasis"><em>ルートファイルシステム</em></span>と呼び、
+        常に利用可能な状態になっています。
+        他のファイルシステムは、マウントすることができます。
+        マウントとは、ルートファイルシステムのディレクトリ構造の一部として統合する操作です。
+        ファイルシステムにマウントされたディレクトリの参照は、
+        そのマウントされたファイルシステムのルートディレクトリの参照へと
+        カーネルによって透過的に変換されます。</p><p><span class="emphasis"><em>link</em></span>
+        システムコールは、既存のファイル名に、別名を与えます。
+        <span class="emphasis"><em>リンク</em></span>が成功すると、
+        ファイルはどちらのファイル名からでもアクセスできるようになります。
+        ファイル名は <span class="emphasis"><em>unlink</em></span>
+        システムコールにより削除できます。
+        ファイルを参照していた最後の名前が削除されると
+        (さらにファイルを開いていた最後のプロセスがファイルを閉じると)
+        ファイルそのものも削除されます。</p><p>ファイルは<span class="emphasis"><em>ディレクトリ</em></span>内で階層構造を持って保持されます。
+        ディレクトリそのものも一種のファイルですが、
+        ディレクトリは一般のファイルと異なり、
+        システムによって決められた構造を持っています。
+        ディレクトリは一般のファイルと同じくプロセスから読み込むことが可能ですが、
+        ディレクトリに変更を加えられるのはカーネルだけです。
+        ディレクトリは
+        <span class="emphasis"><em>mkdir</em></span> システムコールで作成し、
+        <span class="emphasis"><em>rmdir</em></span> システムコールで削除します。
+        4.2BSD 以前のシステムにおける
+        <span class="emphasis"><em>mkdir</em></span> と <span class="emphasis"><em>rmdir</em></span>
+        システムコールは、一連の
+        <span class="emphasis"><em>link</em></span>、<span class="emphasis"><em>unlink</em></span>
+        システムコールの実行として実装されていました。
+        明示的にディレクトリの作成、
+        削除を行うシステムコールを新たに追加した理由は、3 つあります。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>アトミックな動作を可能にするため。
+            link システムコールによる実装の場合と異なり、
+            システムがクラッシュした場合に
+            ディレクトリの構造が中途半端なままになることがありません。</p></li><li class="listitem"><p>ネットワークファイルシステムを使用している場合には
+            シリアライズ (操作順序の保証) を行うため、ファイルおよびディレクトリの作成、
+            削除はアトミックに行われる必要があります。</p></li><li class="listitem"><p>UNIX 以外のファイルシステム
+            (他のパーティション上の MS-DOS
+            ファイルシステムなど) をサポートする場合、
+            そのファイルシステムが
+            link システムコールをサポートしない可能性があります。
+            たとえそれがディレクトリをサポートするファイルシステムであっても、
+            UNIX ファイルシステムとは異なり、ディレクトリをリンクとして作成、
+            削除しないものもあります。
+            そのためそのようなファイルシステムでは、
+            ディレクトリの作成、削除は、
+            明示的に要求されない限り行われません。</p></li></ol></div><p>
+        <span class="emphasis"><em>chown</em></span>
+        システムコールはファイルの所有者とグループを設定します。
+        <span class="emphasis"><em>chmod</em></span>
+        システムコールは、ファイルの保護モードを変更します。
+        これらのファイルの属性は、
+        <span class="emphasis"><em>stat</em></span>
+        システムコールをファイル名に対し実行することで読み出すことができます。
+        <span class="emphasis"><em>fchown</em></span>、
+        <span class="emphasis"><em>fchmod</em></span>、
+        <span class="emphasis"><em>fstat</em></span>
+        システムコールは、同様な動作をファイル名ではなくファイル記述子に対して行います。
+        <span class="emphasis"><em>rename</em></span>
+        システムコールは、ファイルに新しい名前をつけて古い名前を削除します。
+        ディレクトリ作成・削除操作と同じように、
+        <span class="emphasis"><em>rename</em></span>
+        システムコールはローカルファイルシステムの名前変更動作をアトミックにするため
+        4.2BSD で追加されました。
+        後に、この動作はネットワーク上の非 UNIX
+        ファイルシステムに対して名前変更操作を行う場合に有効であることがわかりました。</p><p>
+        <span class="emphasis"><em>truncate</em></span>は、
+        4.2BSD で追加されたファイルを任意の長さに切り詰めるシステムコールです。
+        このシステムコール追加の主な目的は
+        ランダムアクセスファイルの最後をプログラムが最後にアクセスした場所に設定する、
+        という動作を持つ Fortran ランタイムライブラリのサポートでした。
+        <span class="emphasis"><em>truncate</em></span>
+        システムコールを使用しない場合、
+        ファイルの長さを縮める唯一の方法は必要な部分をコピーしたファイルを作成し、
+        元のファイルを削除した後にコピーしたファイルをリネームする方法です。
+        このアルゴリズムは遅いだけでなく、
+        空き容量の少ないファイルシステムでは失敗する可能性があります。</p><p>ファイルシステムにファイルを縮める機能が追加されると、
+        それはカーネルが大きな空のディレクトリを小さくする用途に使用するようになりました。
+        空のディレクトリを縮小すると、
+        ファイルの作成、
+        削除時にカーネルがファイルを検索する時間を短縮できるという利点があります。</p><p>新規に作成されたファイルには、
+        作成したプロセスのユーザ識別子と作成が行われたディレクトリのグループ識別子を与えられます。
+        ファイルの保護用に 3 レベルのアクセス制御機構が用意されています。
+        この 3 レベルのファイルアクセス許可は</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>ファイルを所有しているユーザ</p></li><li class="listitem"><p>ファイルを所有しているグループ</p></li><li class="listitem"><p>他のすべて</p></li></ol></div><p>に対して設定することができます。
+        それぞれのアクセスレベルは、さらに
+        読み取り許可、書き込み許可、実行許可に分けられています。</p><p>ファイルは作成時に長さが 0 であり、
+        書き込みされるにつれて長くなっていきます。
+        システムはファイルが開かれると、
+        対応する記述子の現在位置を指定するポインタを保持します。
+        このポインタはファイル内をランダムアクセスするように動かすことが可能です。
+        <span class="emphasis"><em>fork</em></span> や <span class="emphasis"><em>dup</em></span>
+        システムコールによりファイル記述子を共有するプロセス間では、
+        この現在位置ポインタは共有されます。
+        別々の <span class="emphasis"><em>open</em></span> システムコールによって
+        作成されたファイル記述子は、独立した現在位置ポインタを持ちます。
+        ファイルは<span class="emphasis"><em>穴</em></span>を持つことがあります。
+        穴とはファイルの一次元構造の中で、
+        データが一度も書き込まれたことのない空の部分です。
+        ファイルの最後尾より後にポインタを動かし書き込みを行うことで、
+        ファイルに穴をつくることができます。
+        読み込まれた場合、穴は 0 の値をもつバイトとして扱われます。</p><p>初期の UNIX システムではファイル名に 14 文字以内という制限があり、
+        よく問題となっていました。
+        たとえば、ユーザは当然ながら長く説明的なファイル名を付けたいと望みますし、
+        <code class="filename">basename.extension</code>
+        という慣用的なファイル命名規則を考えると、
+        extension (C のソースファイルの <code class="literal">.c</code>、
+        中間バイナリオブジェクトファイルの <code class="literal">.o</code>
+        というように、ファイルの種類を示す部分) に 1 から 3 文字必要ですから、
+        basename に付けられる文字数は 10 から 12 しか残っていません。
+        ソースコード制御システムやエディタは通常、
+        独自の目的のためにさらに 2 文字をファイル名の前後に付加しますので、
+        実際に使えるのは、8 から 10 文字になります。
+        basename として英語を一単語 (たとえば multiplexer) 使うだけで、
+        簡単に 10 から 12 文字になってしまうでしょう。</p><p>このような制限を守るのは不可能ではありませんが、
+        危険な場合もあります。
+        他の UNIX システムでは、
+        より長いファイル名を受け付けるものの実際にファイルを作成する時点でファイル名を
+        <span class="emphasis"><em>切り詰める</em></span>ものがあるからです。
+        C のソースコードファイル <code class="filename">multiplexer.c</code>
+        (すでに 13 文字です) のソースコード制御ファイルは、
+        頭に <code class="literal">s.</code> が付加されて <code class="filename">s.multiplexer</code>
+        となります。
+        このファイルは、C ソースの文書の
+        <code class="literal">troff</code> ソースファイル <code class="filename">multiplexer.ms</code>
+        のソースコード制御ファイルと区別がつきません。
+        ソースコード制御システムはこの問題に対して警告を出さないため、
+        これらの 2 つのファイル内容の取り違えは容易に発生します。
+        注意深くコーディングすればこのような問題は避けられますが、
+        4.2BSD でロングファイルネームが導入されたことで
+        この問題は実質的になくなりました。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="overview-io-system.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="overview.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="overview-filestore.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">2.6. I/O システム〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓2.8. ファイル記録機構</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>2. Реализация журналирования в FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Настройка журналирования UFS для настольного компьютера." /><link rel="up" href="index.html" title="Настройка журналирования UFS для настольного компьютера." /><link rel="prev" href="index.html" title="Настройка журналирования UFS для настольного компьютера." /><link rel="next" href="reserve-space.html" title="3. Действия, необходимые во время установки FreeBSD" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2. Реализация журналирования в FreeBSD</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="index.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="reserve-space.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="understanding-journaling"></a>2. Реализация журналирования в FreeBSD</h2></div></div></div><p>Журналирование, предоставляемое системой GEOM
+      в FreeBSD 7.<em class="replaceable"><code>X</code></em>, не является особенностью
+      файловой системы (в отличие от, например, файловой системы ext3
+      в <span class="trademark">Linux</span>(R)), оно функционирует на блочном уровне. А это значит,
+      что оно может быть применено к разным типам файловых систем,
+      однако для FreeBSD 7.0-RELEASE журналирование может быть применено
+      только для UFS2.</p><p>Возможность журналирования обеспечивается загрузкой модуля
+      <code class="filename">geom_journal.ko</code> в ядро (или сборкой собственного
+      ядра с активированием соответствующих опций) и использованием команды
+      <code class="command">gjournal</code> для конфигурирования файловой системы.
+      В общем, вы предпочтете журналировать файловые системы большого размера,
+      к примеру - <code class="filename">/usr</code>. Однако, вам придется
+      зарезервировать некоторое количество свободного места (см.
+      следующий раздел).</p><p>Когда файловая система журналируется, некоторая часть
+      дискового пространства требуется для хранения самого журнала.
+      Дисковое пространство, содержащее данные, называется
+      <span class="emphasis"><em>поставщиком данных (data provider)</em></span>,
+      а часть пространства, содержащая журнал, называется
+      <span class="emphasis"><em>поставщиком журнала (journal provider)</em></span>.
+      Поставщики данных и журнала должны быть на разных разделах,
+      если журналирование достраивается к содержащему данные разделу.
+      А если журналирование включается для нового раздела, у вас есть
+      возможность использовать один поставщик для данных и журнала.
+      В любом из двух вышеупомянутых случаев команда
+      <code class="command">gjournal</code> задействует поставщики и создаст
+      конечную журналируемую файловую систему. Например:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Вы намереваетесь журналировать файловую систему
+	  <code class="filename">/usr</code>, размещенную на
+	  <code class="filename">/dev/ad0s1f</code>,
+	  файловая система уже содержит данные.</p></li><li class="listitem"><p>Вы зарезервировали часть дискового пространства на разделе
+	  <code class="filename">/dev/ad0s1g</code>.</p></li><li class="listitem"><p>Используя команду <code class="command">gjournal</code>,
+	  создаем новый файл устройства
+	  <code class="filename">/dev/ad0s1f.journal</code>,
+	  для которого <code class="filename">/dev/ad0s1f</code>
+	  является поставщиком данных, а
+	  <code class="filename">/dev/ad0s1g</code> -
+	  поставщик журнала. Это новое устройство необходимо использовать
+	  во всех последующих операциях.</p></li></ul></div><p>Размер дискового пространства, отводимого под поставщик журнала,
+      зависит от нагруженности файловой системы, а не от размера самого
+      поставщика данных. Например, для типичного настольного компьютера
+      достаточно отвести 1 Гб под поставщик журнала для файловой
+      системы <code class="filename">/usr</code>, в то время как компьютеру,
+      имеющему интенсивный дисковый ввод/вывод (например, редактирование
+      видео) может потребоваться больше. Если свободное место на поставщике
+      журнала заканчивается раньше, чем происходит сброс журнала на
+      диск, - вы получите панику ядра.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Очень маловероятно то, что размеры журнала, предложенные здесь,
+	станут причиной проблем с обычным настольным компьютером (на котором
+	вы просматриваете веб-страницы, обрабатываете текст или проигрываете
+	мультимедийные файлы). Если работа вашего компьютера подразумевает
+	интенсивную дисковую активность, то для обеспечения стабильности
+	следует придерживаться следующего правила: размер ОЗУ должен
+	уместиться в 30% размера, отведенного под журнал. Например, если в
+	вашем компьютере установлен 1 Гб ОЗУ, создайте под поставщик
+	журнала раздел размером около 3.3 Гб. (Умножьте размер ОЗУ
+	в 3.3 раза, чтоб получить размер журнала).</p></div><p>Для получения дополнительной информации о журналировании, пожалуйста,
+      прочитайте страницу справочника, посвященную <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="index.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="reserve-space.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Настройка журналирования UFS для настольного компьютера. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 3. Действия, необходимые во время установки FreeBSD</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>4.4. Создание патчей</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD по созданию портов" /><link rel="up" href="slow-porting.html" title="Глава 4. Медленное портирование" /><link rel="prev" href="slow-modifying.html" title="4.3. Модификация порта" /><link rel="next" href="slow-configure.html" title="4.5. Конфигурирование" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4.4. Создание патчей</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="slow-modifying.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Медленное портирование</th><td width="20%" align="right"> <a accesskey="n" href="slow-configure.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slow-patch"></a>4.4. Создание патчей</h2></div></div></div><p>Файлы, которые добавлялись или изменялись в процессе
+      создания порта, могут быть выявлены программой <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a>, а
+      результат работы этой программы может быть в дальнейшем передан
+      программе <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=patch&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">patch</span>(1)</span></a>.  Такое действие с обычным файлом
+      подразумевает сохранение копии файла с первоначальным
+      содержимым перед внесением каких-либо изменений.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cp <em class="replaceable"><code>file</code></em> <em class="replaceable"><code>file</code></em>.orig</code></strong></pre><p>Патчи сохраняются в виде файлов с именем
+      <code class="filename">patch-*</code>, где <em class="replaceable"><code>*</code></em>
+      обозначает путь к файлу, к которому применяется патч, такой как
+      <code class="filename">patch-Imakefile</code> или
+      <code class="filename">patch-src-config.h</code>.</p><p>После того как файл был изменён, используется <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a>
+      для получения разницы между первоначальной и изменённой
+      версиями.  Параметр <code class="option">-u</code> указывает <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a>
+      выводить разницу в <span class="quote"><<<span class="quote">унифицированном</span>>></span> формате,
+      который также является предпочтительным.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>diff -u <em class="replaceable"><code>file</code></em>.orig <em class="replaceable"><code>file</code></em> &gt; patch-<em class="replaceable"><code>pathname-file</code></em></code></strong></pre><p>Для порождении патчей для новых добавляемых файлов
+      используется параметр <code class="option">-N</code>, который заставляет
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> трактовать несуществующие прежде файлы как если бы
+      они существовали, но имели пустое содержимое:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>diff -u -N <em class="replaceable"><code>newfile</code></em>.orig <em class="replaceable"><code>newfile</code></em> &gt; patch-<em class="replaceable"><code>pathname-newfile</code></em></code></strong></pre><p>Файлы с патчами помещаются в каталоге
+      <code class="varname">PATCHDIR</code> (как правило, это <code class="filename">files/</code>), откуда они будут взяты
+      автоматически.  Все патчи обязаны быть сделаны относительно
+      каталога <code class="varname">WRKSRC</code> (как правило, это каталог, в
+      который распаковывается исходный архив и где будет выполняться
+      построение).  Для упрощения внесения изменений и обновлений
+      избегайте наличия более чем одного патча для одного и того же
+      файла (например, патчей <code class="filename">patch-file</code> и
+      <code class="filename">patch-file2</code>, оба меняющих файл
+      <code class="filename">WRKSRC/foobar.c</code>).  Обратите внимание, что
+      если путь к изменяемому файлу содержит символ подчеркивания
+      (<code class="literal">_</code>), то патч должен содержать в своем имени
+      два подчеркивания вместо одного.  Например, для применения
+      патча на файл с именем
+      <code class="filename">src/freeglut_joystick.c</code> соответствующий
+      патч следует назвать
+      <code class="filename">patch-src-freeglut__joystick.c</code>.</p><p>Пожалуйста, используйте для именования патчей только
+      символы <code class="literal">[-+._a-zA-Z0-9]</code>.  Не используйте
+      любые другие символы, кроме этих.  Не называйте патчи как
+      <code class="filename">patch-aa</code> или
+      <code class="filename">patch-ab</code>, всегда ссылайтесь на путь и
+      название файла в названиях самих патчей.</p><p>Существует альтернативный упрощённый способ создания патчей
+      для существующих файлов.  Первые шаги те же самые: создание
+      копии неизменённого файла с расширением
+      <code class="filename">.orig</code> и внесение изменений.  После этого
+      используйте <code class="command">make makepatch</code>, чтобы обновить
+      файлы с патчами в каталоге <code class="filename">files</code> данного
+      порта.</p><p>Не помещайте строки RCS в патчи.
+      <span class="application">Subversion</span> будет изменять их при
+      помещении файлов в дерево портов, и когда мы будем их оттуда
+      извлекать, они будут уже другие, поэтому применение патчей
+      окончится неудачей.  Строчки RCS предваряются знаком доллара
+      (<code class="literal">$</code>), и обычно начинаются с
+      <code class="literal">$Id</code> или
+      <code class="literal">$RCS</code>.</p><p>Использование параметра рекурсии (<code class="option">-r</code>) с
+      командой <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> для генерации патчей - это хорошо, но всё
+      же, пожалуйста, смотрите на получающиеся патчи, чтобы убедиться
+      в отсутствии ненужного мусора.  В частности, diff-разниц между
+      двумя резервными копиями файлов, файлы
+      <code class="filename">Makefile</code>, когда как порт использует
+      <code class="command">Imake</code> или GNU-версию программы
+      <code class="command">configure</code>, и так далее, не нужны, и должны
+      быть удалены.  Если было необходимо отредактировать файл
+      <code class="filename">configure.in</code> и запустить
+      <code class="command">autoconf</code> для перегенерации
+      <code class="command">configure</code>, не нужно включать файлы diff для
+      <code class="command">configure</code> (они частенько вырастают до
+      нескольких тысяч строк!).  Вместо этого задайте
+      <code class="literal">USE_AUTOTOOLS=autoconf:261</code> и включите
+      diff-файл для <code class="filename">configure.in</code>.</p><p>Старайтесь минимизировать в патчах объём нефункциональных
+      изменений с пустыми символами.  В мире Открытого Исходного Кода
+      является распространенным совместное использование проектами
+      больших объемов кодовой базы, но с различными стилями и
+      правилами отступов.  При копировании работающей функциональной
+      части из одного проекта для исправления похожей области в
+      другом, будьте аккуратны, пожалуйста: получаемый однострочный
+      патч может указаться полон нефункциональных изменений.  Это не
+      только увеличивает размер репозитория
+      <span class="application">Subversion</span>, но также усложняет поиск
+      того, что конкретно вызвало проблему и что вообще
+      поменялось.</p><p>Если нужно удалить файл, сделайте это при выполнении цели
+      <code class="buildtarget">post-extract</code>, вместо того чтобы
+      оформлять это как часть патча.</p><p>Простые перемещения могут быть выполнены непосредственно из
+      <code class="filename">Makefile</code> порта с использованием
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sed&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sed</span>(1)</span></a> в режиме in-place.  Это удобно, когда при изменении
+      используется значение переменной:</p><pre class="programlisting">post-patch:
+	@${REINPLACE_CMD} -e 's|for Linux|for FreeBSD|g' ${WRKSRC}/README</pre><p>Довольно часто в исходных файлах портируемого программного
+      обеспечения используется конвенция CR/LF.  Это может стать
+      причиной проблем с дальнейшей упаковкой, предупреждениями
+      компилятора или выполнением скриптов (таких как
+      <code class="literal">/bin/sh^M not found</code>).  Для быстрого
+      преобразования всех файлов из CR/LF просто в LF добавьте в
+      <code class="filename">Makefile</code> порта эту запись:</p><pre class="programlisting">USES=	dos2unix</pre><p>Может быть задан точный список преобразуемых файлов:</p><pre class="programlisting">USES=	dos2unix
+DOS2UNIX_FILES=	util.c util.h</pre><p>Используйте <code class="varname">DOS2UNIX_REGEX</code>, чтобы
+      преобразовать группу файлов в разных подкаталогах.  Его
+      параметром является регулярное выражение, совместимое с
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=find&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">find</span>(1)</span></a>.  Подробнее о формате в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=re_format&amp;sektion=7"><span class="citerefentry"><span class="refentrytitle">re_format</span>(7)</span></a>.  Такой
+      вариант удобен для преобразования всех файлов заданного
+      расширения.  Для примера, преобразуем все исходные файлы, не
+      затрагивая двоичные файлы:</p><pre class="programlisting">USES=	dos2unix
+DOS2UNIX_REGEX=	.*\.([ch]|cpp)</pre><p>Другим вариантом является использование
+      <code class="varname">DOS2UNIX_GLOB</code>, который вызывает
+      <code class="command">find</code> для каждого из перечисленных в нём
+      элементов.</p><pre class="programlisting">USES=	dos2unix
+DOS2UNIX_GLOB=	*.c *.cpp *.h</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="slow-modifying.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="slow-porting.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="slow-configure.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">4.3. Модификация порта </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 4.5. Конфигурирование</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>22.11. DNS</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="advanced-networking.html" title="第22章 高度なネットワーク" /><link rel="prev" href="network-dhcp.html" title="22.10. DHCP" /><link rel="next" href="network-ntp.html" title="22.12. NTP" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">22.11. DNS</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-dhcp.html">戻る</a>〓</td><th width="60%" align="center">第22章 高度なネットワーク</th><td width="20%" align="right">〓<a accesskey="n" href="network-ntp.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-dns"></a>22.11. DNS</h2></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Lee</span> <span class="firstname">Chern</span> [FAMILY Given]</span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96865872"></a>22.11.1. 概観</h3></div></div></div><a id="idp96866512" class="indexterm"></a><p>FreeBSD はデフォルトでは
+	DNS プロトコルの最も一般的な実装である BIND
+	(Berkeley Internet Name Domain) を使用します。DNS はホスト名を
+	IP アドレスに、そして IP アドレスをホスト名に関連づけるプロトコルです。
+	たとえば <code class="systemitem">www.FreeBSD.org</code> に対する問い合わせは
+	The FreeBSD Project の ウェブサーバの IP アドレスを受け取るでしょう。
+	その一方で <code class="systemitem">ftp.FreeBSD.org</code> に対する問い合わせは、
+	対応する FTP マシンの IP アドレスを返すでしょう。
+	同様に、その逆のことも可能です。
+	IP アドレスに対する問い合わせを行うことで、
+	そのホスト名を解決することができます。
+	DNS 検索を実行するために、
+	システム上でネームサーバを動作させる必要はありません。</p><a id="idp96896976" class="indexterm"></a><p>DNS は、
+	個々のドメイン情報を格納およびキャッシュした、
+	権威のあるルートサーバおよび他の小規模なネームサーバによる多少複雑なシステムによって、
+	インターネット全体にわたって協調して動作します。</p><p>この文書は FreeBSD で安定版として利用されている
+	BIND 8.x について説明します。
+	FreeBSD では BIND 9.x を <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/bind9/pkg-descr">net/bind9</a>
+	port からインストールできます。</p><p>RFC1034 および RFC1035 は DNS プロトコルを定義しています。</p><p>現在のところ BIND は
+	<a class="link" href="http://www.isc.org/" target="_top">Internet Software Consortium
+	  (www.isc.org)</a> によって保守されています。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96900048"></a>22.11.2. 用語</h3></div></div></div><p>この文書を理解するには
+	DNS 関連の用語をいくつか理解しなければいけません。</p><a id="idp96901072" class="indexterm"></a><a id="idp96901584" class="indexterm"></a><a id="idp96902096" class="indexterm"></a><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><thead><tr><th>用語</th><th>定義</th></tr></thead><tbody><tr><td>正引き DNS</td><td>ホスト名から IP アドレスへの対応です。</td></tr><tr><td>オリジン (origine)</td><td>特定のゾーンファイルによってカバーされるドメインへの参照です。</td></tr><tr><td><span class="application">named</span>, BIND, ネームサーバ</td><td>FreeBSD 内の BIND ネームサーバパッケージの一般名称です。</td></tr><tr><td>リゾルバ (resolver)</td><td>マシンがゾーン情報についてネームサーバに問い合わせるシステムプロセスです。</td></tr><tr><td>逆引き DNS</td><td>正引き DNS の逆です。つまり
+		IP アドレスからホスト名への対応です。</td></tr><tr><td>ルートゾーン</td><td>インターネットゾーン階層の起点です。
+		すべてのゾーンはルートゾーンの下に属します。
+		これはファイルシステムのすべてのファイルがルートディレクトリの下に属することと似ています。</td></tr><tr><td>ゾーン</td><td>同じ権威によって管理される個々の DNS ドメイン、
+		DNS サブドメイン、あるいは DNS の一部分です。</td></tr></tbody></table></div><a id="idp96926416" class="indexterm"></a><p>ゾーンの例:
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="systemitem">.</code> はルートゾーンです。</p></li><li class="listitem"><p><code class="systemitem">org.</code> はルートゾーンの下のゾーンです。</p></li><li class="listitem"><p><code class="systemitem">example.org</code> は
+	    <code class="systemitem">org.</code> ゾーンの下のゾーンです。</p></li><li class="listitem"><p><code class="systemitem">foo.example.org.</code> はサブドメインで、
+	    <code class="systemitem">example.org.</code> の下のゾーンです。</p></li><li class="listitem"><p>
+	    <code class="systemitem">1.2.3.in-addr.arpa</code> は 3.2.1.* の
+	    IP 空間に含まれるすべての IP アドレスを参照するゾーンです。
+	  </p></li></ul></div><p>見て分かるように、ホスト名のより詳細な部分はその左側に現れます。
+	たとえば <code class="systemitem">example.org.</code> は
+	<code class="systemitem">org.</code> より限定的です。同様に <code class="systemitem">org.</code>
+	はルートゾーンより限定的です。
+	ホスト名の各部分のレイアウトはファイルシステムに非常に似ています。
+	たとえば <code class="filename">/dev</code>
+	はルートの下であることなどです。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96936528"></a>22.11.3. ネームサーバを実行する理由</h3></div></div></div><p>ネームサーバは通常二つの形式があります:
+	権威のあるネームサーバとキャッシュネームサーバです。</p><p>権威のあるネームサーバは以下の場合に必要です。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>問い合わせに対して信頼できる返答をすることで、
+	    ある人が DNS 情報を世界に向けて発信したいとき。</p></li><li class="listitem"><p><code class="systemitem">example.org</code>
+	    といったドメインが登録されており、
+	    その下にあるホスト名に
+	    IP アドレスを割り当てる必要があるとき。</p></li><li class="listitem"><p>IP アドレスブロックが (IP からホスト名への)
+	    逆引き DNS エントリを必要とするとき。</p></li><li class="listitem"><p>プライマリサーバがダウンしているかまたはアクセスできない場合に、
+	    代わりに問い合わせに対してスレーブと呼ばれるバックアップネームサーバが返答しなければならないとき。</p></li></ul></div><p>キャッシュネームサーバは以下の場合に必要です。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>ローカルのネームサーバが、
+	    外部のネームサーバに問い合わせするよりも、
+	    キャッシュしてより速く返答できるとき。</p></li><li class="listitem"><p>ネットワークトラフィックの総量を減らしたいとき
+	    (DNS のトラフィックはインターネットトラフィック全体の
+	    5% 以上を占めることが測定されています)</p></li></ul></div><p><code class="systemitem">www.FreeBSD.org</code> に対する問い合わせを発したとき、
+	リゾルバは大体の場合上流の ISP
+	のネームサーバに問い合わせをして返答を得ます。
+	ローカルのキャッシュ DNS サーバがあれば、
+	問い合わせはキャッシュ
+	DNS サーバによって外部に対して一度だけ発せられます。
+	情報がローカルに蓄えられるので、
+	追加の問い合わせはいずれもローカルネットワークの外側にまで確認しなくてもよくなります。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96948944"></a>22.11.4. 動作のしくみ</h3></div></div></div><p>FreeBSD では BIND デーモンは自明な理由から
+	<span class="application">named</span> と呼ばれます。</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><thead><tr><th>ファイル</th><th>説明</th></tr></thead><tbody><tr><td><span class="application">named</span></td><td>BIND デーモン</td></tr><tr><td><code class="command">ndc</code></td><td>ネームデーモンコントロールプログラム</td></tr><tr><td><code class="filename">/etc/namedb</code></td><td>BIND のゾーン情報が置かれるディレクトリ</td></tr><tr><td><code class="filename">/etc/namedb/named.conf</code></td><td>デーモンの設定ファイル</td></tr></tbody></table></div><p>
+	ゾーンファイルは通常 <code class="filename">/etc/namedb</code>
+	ディレクトリ内に含まれており、ネームサーバによって処理される
+	DNS ゾーン情報を含んでいます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96963792"></a>22.11.5. BIND の起動</h3></div></div></div><a id="idp96964432" class="indexterm"></a><p>BIND はデフォルトでインストールされているので、
+	すべてを設定することは比較的単純です。</p><p>named デーモンが起動時に開始されることを保証するには、
+	<code class="filename">/etc/rc.conf</code> に以下の変更をいれてください。
+      </p><pre class="programlisting">named_enable="YES"</pre><p>デーモンを手動で起動するためには (設定をした後で)</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ndc start</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96972752"></a>22.11.6. 設定ファイル</h3></div></div></div><a id="idp96973392" class="indexterm"></a><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96974544"></a>22.11.6.1. <code class="command">make-localhost</code> の利用</h4></div></div></div><p>次のコマンドが</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/namedb</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>sh make-localhost</code></strong></pre><p>ローカル逆引き DNS ゾーンファイルを
+	  <code class="filename">/etc/namedb/localhost.rev</code>
+	  に適切に作成することを確認してください。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp96978512"></a>22.11.6.2. <code class="filename">/etc/namedb/named.conf</code></h4></div></div></div><pre class="programlisting">// $FreeBSD$
+//
+// 詳細については named(8) マニュアルページを参照してください。プライマリサーバ
+// を設定するつもりなら、DNS がどのように動作するかの詳細を確実に理解してくださ
+// い。単純な間違いであっても、影響をうける相手に対する接続を壊したり、無駄な
+// インターネットトラフィックを大量に引き起こし得ます。
+
+options {
+        directory "/etc/namedb";
+
+// "forwarders" 節に加えて次の行を有効にすることで、ネームサーバに決して自発的
+// に問い合わせを発せず、常にそのフォワーダにたいして尋ねるように強制すること
+// ができます:
+//
+//      forward only;
+
+// あなたが上流のプロバイダ周辺の DNS サーバを利用できる場合、その IP アドレス
+// をここに入力し、下記の行を有効にしてください。こうすれば、そのキャッシュの
+// 恩恵にあやかることができ、インターネット全体の DNS トラフィックが減るでしょう。
+/*
+        forwarders {
+                127.0.0.1;
+        };
+*/</pre><p>コメントが言っている通り、上流のキャッシュの恩恵を受けるために
+	  <code class="literal">forwarders</code> をここで有効にすることができます。
+	  通常の状況では、ネームサーバはインターネットの特定のネームサーバを調べて、
+	  探している返答を見つけるまで再帰的に問い合わせを行います。
+	  これが有効になっていれば、まず上流のネームサーバ
+	  (または 与えられたネームサーバ) に問い合わせて、
+	  そのキャッシュを利用するでしょう。
+	  問い合わせをする上流のネームサーバが極度に通信量が多く、
+	  高速であった場合、これを有効にする価値があるかもしれません。</p><div xmlns="" class="warning"><h3 class="admontitle">警告: </h3><p xmlns="http://www.w3.org/1999/xhtml">ここに <code class="systemitem">127.0.0.1</code>
+	    を指定しても動作 <span class="emphasis"><em>しません</em></span>。
+	    上流のネームサーバの IP アドレスに変更してください。</p></div><pre class="programlisting">        /*
+         * あなたと利用したいネームサーバとの間にファイアウォールがある場合、
+         * 下記の quiery-source 指令を有効にする必要があるでしょう。
+         * 過去の BIND のバージョンは常に 53 番ポートに問い合わせをしますが、
+         * BIND 8.1 はデフォルトで非特権ポートを使用します。
+         */
+        // query-source address * port 53;
+
+        /*
+         * 砂場内で動作させている場合、ダンプファイルのために異なる場所を指定
+         * しなければならないかもしれません。
+         */
+        // dump-file "s/named_dump.db";
+};
+
+// 注意: 下記は将来のリリースで対応されるでしょう。
+/*
+host { any; } {
+        topology {
+                127.0.0.0/8;
+        };
+};
+*/
+
+// セカンダリを設定することはより簡単な方法で、そのおおまかな姿が下記で説明さ
+// れています。
+//
+// ローカルネームサーバを有効にする場合、このサーバが最初に尋ねられるように
+// /etc/resolv.conf に 127.0.0.1 を入力することを忘れないでください。さらに、
+// /etc/rc.conf 内で有効にすることも確認してください。
+
+zone "." {
+        type hint;
+        file "named.root";
+};
+
+zone "0.0.127.IN-ADDR.ARPA" {
+        type master;
+        file "localhost.rev";
+};
+
+zone
+"0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.IP6.INT" {
+        type master;
+        file "localhost.rev";
+};
+
+// 注意: 下記の IP アドレスを使用しないでください。これはダミーでありデモや文書
+// だけを目的としたものです。
+//
+// セカンダリ設定の例です。少なくともあなたのドメインが属するゾーンに対するセカ
+// ンダリになることは便利かもしれません。プライマリの責を負っている IP アドレス
+// をネットワーク管理者に尋ねてください。
+//
+// 逆引き参照ゾーン (IN-ADDR.ARPA) を含めることを決して忘れないでください!
+// (これは ".IN-ADDR.ARPA" を付け加えられたそれぞれの IP アドレスの最初のバイト
+// の逆順です。)
+//
+// プライマリゾーンの設定をはじめる前に DNS および BIND がどのように動作するか
+// 完全に理解してください。時々自明でない落し穴があります。それに比べるとセカン
+// ダリを設定するのは単純です。
+//
+// 注意: 下記の例を鵜呑みにして有効にしないでください。:-) 実際の名前とアドレス
+// を代わりに使用してください。
+//
+// 注意!!! FreeBSD は bind を砂場のなかで動かします (rc.conf 内の named_flags
+// を参照してください)。セカンダリゾーンを含んだディレクトリは、bind によって
+// 書き込み可能でなければなりません。次の手順が推奨されます:
+//
+//      mkdir /etc/namedb/s
+//      chown bind:bind /etc/namedb/s
+//      chmod 750 /etc/namedb/s</pre><p>BIND を砂場 (sandbox) で
+	  (訳注: chroot をもちいて) 動作させるための詳細は
+	  <a class="link" href="network-dns.html#network-named-sandbox" title="22.11.8. 砂場で named を実行する">砂場で named を実行する</a> を参照してください。</p><pre class="programlisting">/*
+zone "example.com" {
+        type slave;
+        file "s/example.com.bak";
+        masters {
+                192.168.1.1;
+        };
+};
+
+zone "0.168.192.in-addr.arpa" {
+        type slave;
+        file "s/0.168.192.in-addr.arpa.bak";
+        masters {
+                192.168.1.1;
+        };
+};
+*/</pre><p><code class="filename">named.conf</code> の中で、
+	  上記は転送と逆引きゾーンのためのスレーブエントリの例です。</p><p>新しくサービスするそれぞれのゾーンについて、新規のエントリを
+	  <code class="filename">named.conf</code> に加えなければいけません。</p><p>たとえば <code class="systemitem">example.org</code>
+	  に対する最もシンプルなゾーンエントリは以下のようになります。</p><pre class="programlisting">zone "example.org" {
+	type master;
+	file "example.org";
+};</pre><p>このゾーンは <code class="option">type</code>
+	  命令で示されているようにマスタで、ゾーン情報を
+	  <code class="option">file</code> 命令で指示された
+	  <code class="filename">/etc/namedb/example.org</code>
+	  ファイルに保持しています。</p><pre class="programlisting">zone "example.org" {
+	type slave;
+	file "example.org";
+};</pre><p>スレーブの場合、
+	  ゾーン情報は特定のゾーンのマスタネームサーバから転送され、
+	  指定されたファイルに保存されます。
+	  マスタサーバが停止するか到達できない場合には、
+	  スレーブサーバが転送されたゾーン情報を保持していて、
+	  サービスできるでしょう。</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97001168"></a>22.11.6.3. ゾーンファイル</h4></div></div></div><p><code class="systemitem">example.org</code> に対するマスタゾーンファイル
+	  (<code class="filename">/etc/namedb/example.org</code> に保持されます)
+	  の例は以下のようになります。</p><pre class="programlisting">$TTL 3600
+
+example.org. IN SOA ns1.example.org. admin.example.org. (
+                        5               ; Serial
+                        10800           ; Refresh
+                        3600            ; Retry
+                        604800          ; Expire
+                        86400 )         ; Minimum TTL
+
+; DNS Servers
+@       IN NS           ns1.example.org.
+@       IN NS           ns2.example.org.
+
+; Machine Names
+localhost       IN A    127.0.0.1
+ns1             IN A    3.2.1.2
+ns2             IN A    3.2.1.3
+mail            IN A    3.2.1.10
+@               IN A    3.2.1.30
+
+; Aliases
+www             IN CNAME        @
+
+; MX Record
+@               IN MX   10      mail.example.org.</pre><p><span class="quote">「<span class="quote">.</span>」</span>
+	  が最後についているすべてのホスト名は正確なホスト名であり、
+	  一方で <span class="quote">「<span class="quote">.</span>」</span>
+	  で終了しないすべての行はオリジンが参照されることに注意してください。
+	  たとえば <code class="literal">www</code> は <code class="literal">www + オリジン</code>
+	  に展開されます。この架空のゾーンファイルでは、
+	  オリジンは <code class="systemitem">example.org.</code> なので
+	  <code class="literal">www</code> は <code class="systemitem">www.example.org.</code>
+	  に展開されます。</p><p>
+	  ゾーンファイルの書式は次のとおりです。
+	</p><pre class="programlisting">recordname      IN recordtype   value</pre><a id="idp97011280" class="indexterm"></a><p>DNS レコードに使われる最も一般的なものは以下のとおりです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">SOA</span></dt><dd><p>ゾーン権威の起点</p></dd><dt><span class="term">NS</span></dt><dd><p>権威のあるネームサーバ</p></dd><dt><span class="term">A</span></dt><dd><p>ホストのアドレス</p></dd><dt><span class="term">CNAME</span></dt><dd><p>別名としての正規の名称</p></dd><dt><span class="term">MX</span></dt><dd><p>メールエクスチェンジャ</p></dd><dt><span class="term">PTR</span></dt><dd><p>ドメインネームポインタ
+		(逆引き DNS で使用されます)</p></dd></dl></div><pre class="programlisting">
+example.org. IN SOA ns1.example.org. admin.example.org. (
+                        5               ; Serial
+                        10800           ; Refresh after 3 hours
+                        3600            ; Retry after 1 hour
+                        604800          ; Expire after 1 week
+                        86400 )         ; Minimum TTL of 1 day</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="systemitem">example.org.</code></span></dt><dd><p>このゾーンのオリジンでもあるドメイン名</p></dd><dt><span class="term"><code class="systemitem">ns1.example.org.</code></span></dt><dd><p>このゾーンに対して権威のあるプライマリネームサーバ</p></dd><dt><span class="term"><code class="literal">admin.example.org.</code></span></dt><dd><p>このゾーンの責任者。@
+	      を置き換えた電子メールアドレスを指定します。
+	      (<code class="email">&lt;<a xmlns="" class="email" href="mailto:admin@example.org">admin@example.org</a>&gt;</code> は
+	      <code class="literal">admin.example.org</code> になります)</p></dd><dt><span class="term"><code class="literal">5</code></span></dt><dd><p>ファイルのシリアル番号です。
+		これはファイルが変更されるたびに増加させる必要があります。
+		現在では多くの管理者は <code class="literal">yyyymmddrr</code>
+		という形式をシリアル番号として使用することを好みます。
+		2001041002 は最後に修正されたのが 2001/04/10 で、後ろの 02
+		はその日で二回目に修正されたものであるということを意味するでしょう。
+		シリアル番号は、
+		それが更新されたときにスレーブネームサーバに対してゾーンを通知するので重要です。</p></dd></dl></div><pre class="programlisting">
+@       IN NS           ns1.example.org.</pre><p>これは <code class="varname">NS</code> エントリです。
+	  このゾーンに対して権威のある返答を返すネームサーバはすべて、
+	  このエントリを一つ有していなければなりません。
+	  ここにある <code class="literal">@</code> は
+	  <code class="systemitem">example.org.</code> を意味します。
+	  <code class="literal">@</code> はオリジンに展開されます。</p><pre class="programlisting">
+localhost       IN A    127.0.0.1
+ns1             IN A    3.2.1.2
+ns2             IN A    3.2.1.3
+mail            IN A    3.2.1.10
+@               IN A    3.2.1.30</pre><p><code class="varname">A</code> レコードはマシン名を示します。
+	  上記のように <code class="systemitem">ns1.example.org</code> は
+	  <code class="systemitem">3.2.1.2</code> に結びつけられるでしょう。
+	  ふたたびオリジンを示す <code class="literal">@</code>
+	  がここに使用されていますが、これは
+	  <code class="systemitem">example.org</code> が
+	  <code class="systemitem">3.2.1.30</code>
+	  に結び付けられることを意味しています。</p><pre class="programlisting">
+www             IN CNAME        @</pre><p><code class="varname">CNAME</code>
+	  レコードは通常マシンに別名を与えるときに使用されます。
+	  例では <code class="systemitem">www</code> はオリジン、すなわち
+	  <code class="systemitem">example.org</code>
+	  (<code class="systemitem">3.2.1.30</code>)
+	  のアドレスをふられたマシンへの別名を与えます。
+	  <code class="varname">CNAME</code> はホスト名の別名、
+	  または複数のマシン間で一つのホスト名をラウンドロビン
+	  (訳注: 問い合わせがあるたびに別の IP アドレスを返すことで、
+	  一台にアクセスが集中することを防ぐ手法)
+	  するときに用いられます。</p><pre class="programlisting">
+@               IN MX   10      mail.example.org.</pre><p><code class="varname">MX</code> レコードは、
+	  ゾーンに対してどのメールサーバがやってきたメールを扱うことに責任を持っているかを示します。
+	  <code class="systemitem">mail.example.org</code>
+	  はメールサーバのホスト名で、10 はメールサーバの優先度を示します。</p><p>優先度が 3,2 または
+	  1 などのメールサーバをいくつも置くことができます。
+	  <code class="systemitem">example.org</code>
+	  へ送ろうとしているメールサーバははじめに一番優先度の高いメールサーバに接続しようとします。
+	  そして接続できない場合、二番目に優先度の高いサーバに接続しようとし、
+	  以下、メールが適切に配送されるまで同様に繰り返します。</p><p>in-addr.arpa ゾーンファイル (逆引き DNS) に対しても
+	  <code class="varname">A</code> または <code class="varname">CNAME</code> の代わりに
+	  <code class="varname">PTR</code> エントリが用いられることを除けば、
+	  同じ書式が使われます。</p><pre class="programlisting">$TTL 3600
+
+1.2.3.in-addr.arpa. IN SOA ns1.example.org. admin.example.org. (
+                        5               ; Serial
+                        10800           ; Refresh
+                        3600            ; Retry
+                        604800          ; Expire
+                        3600 )          ; Minimum
+
+@       IN NS   ns1.example.org.
+@       IN NS   ns2.example.org.
+
+2       IN PTR  ns1.example.org.
+3       IN PTR  ns2.example.org.
+10      IN PTR  mail.example.org.
+30      IN PTR  example.org.</pre><p>このファイルは上記の架空のドメインの
+	  IP アドレスからホスト名への対応を与えます。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97051216"></a>22.11.7. キャッシュネームサーバ</h3></div></div></div><a id="idp97051856" class="indexterm"></a><p>キャッシュネームサーバはどのゾーンに対しても権威をもたないネームサーバです。
+	キャッシュネームサーバは単に自分で問い合わせをし、
+	後で使えるように問い合わせの結果を覚えておきます。
+	これを設定するには、ゾーンを何も含まずに、
+	通常通りネームサーバを設定してください。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-named-sandbox"></a>22.11.8. 砂場で <span class="application">named</span> を実行する</h3></div></div></div><a id="idp97054672" class="indexterm"></a><a id="idp97055824" class="indexterm"></a><p>セキュリティを強めるために <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> を非特権ユーザで実行し、
+	砂場のディレクトリ内に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>
+	して実行したいと思うかもしれません。
+	こうすると <span class="application">named</span>
+	デーモンは砂場の外にはまったく手を出すことができません。
+	<span class="application">named</span> が乗っ取られたとしても、
+	これによって起こりうる損害が小さくなるでしょう。
+	FreeBSD にはデフォルトで、そのための <code class="systemitem">bind</code>
+	というユーザとグループがあります。</p><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">多くの人々は <span class="application">named</span>
+	  を <code class="command">chroot</code> するように設定する代わりに、
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a> 環境内で <span class="application">named</span>
+	  を実行することを奨めるでしょう。
+	  この節ではそれは扱いません。</p></div><p><span class="application">named</span> は砂場の外
+	(共有ライブラリ、ログソケットなど) にアクセスできないので、
+	<span class="application">named</span>
+	を正しく動作させるためにいくつもの段階を経る必要があります。
+	下記のチェックリストにおいては、砂場のパスは
+	<code class="filename">/etc/namedb</code> で、
+	このディレクトリの内容には何も手を加えていないと仮定します。
+	<code class="systemitem">root</code> 権限で次のステップを実行してください。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="application">named</span>
+	    が存在することを期待しているディレクトリをすべて作成します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/namedb</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir -p bin dev etc var/tmp var/run master slave</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chown bind:bind slave var/*</code></strong><a id="chown-slave"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#chown-slave"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>これらのディレクトリに対して
+		<span class="application">named</span>
+		が必要なのは書き込み権限だけなので、それだけを与えます。</p></td></tr></table></div></li><li class="listitem"><p>基本ゾーンファイルと設定ファイルの編集と作成を行います。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /etc/localtime etc</code></strong><a id="localtime"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>mv named.conf etc &amp;&amp; ln -sf etc/named.conf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv named.root master</code></strong>
+
+<code class="prompt">#</code> <strong class="userinput"><code>sh make-localhost &amp;&amp; mv localhost.rev localhost-v6.rev master</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat &gt; master/named.localhost
+$ORIGIN localhost.
+$TTL 6h
+@	IN	SOA	localhost. postmaster.localhost. (
+			1	; serial
+			3600	; refresh
+			1800	; retry
+			604800	; expiration
+			3600 )	; minimum
+	IN	NS	localhost.
+	IN	A		127.0.0.1
+^D</code></strong></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#localtime"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>これは <span class="application">named</span> が <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	      に正しい時刻でログを書き込むことを可能にします。</p></td></tr></table></div></li><li class="listitem"><p>4.9-RELEASE より前のバージョンの FreeBSD を使用している場合、
+	    静的リンクされた <span class="application">named-xfer</span>
+	    を構築し、砂場にコピーしてください。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libisc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make cleandir &amp;&amp; make depend &amp;&amp; make all</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libbind</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make cleandir &amp;&amp; make depend &amp;&amp; make all</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/libexec/named-xfer</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir &amp;&amp; make cleandir &amp;&amp; make depend &amp;&amp; make NOSHARED=yes all</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp named-xfer /etc/namedb/bin &amp;&amp; chmod 555 /etc/namedb/bin/named-xfer</code></strong><a id="clean-cruft"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></pre><p>静的リンクされた <code class="command">named-xfer</code>
+	    をインストールしたら、
+	    ソースツリーの中にライブラリまたはプログラムの古くなったコピーを残さないように、
+	    掃除する必要があります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libisc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/lib/libbind</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/libexec/named-xfer</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make cleandir</code></strong></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#clean-cruft"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>このステップは時々失敗することが報告されています。
+		もし失敗した場合、次のコマンドを実行してください。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src &amp;&amp; make cleandir &amp;&amp; make cleandir</code></strong></pre><p>そして <code class="filename">/usr/obj</code>
+		ツリーを削除します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm -fr /usr/obj &amp;&amp; mkdir /usr/obj</code></strong></pre><p>これはソースツリーからすべての
+		<span class="quote">「<span class="quote">がらくた</span>」</span> を一掃します。
+		もう一度上記の手順を行うと、今度はうまく動作するでしょう。</p></td></tr></table></div><p>バージョン 4.9-RELEASE 以降の
+	    FreeBSD を使用している場合 <code class="filename">/usr/libexec</code>
+	    にある <code class="command">named-xfer</code>
+	    のコピーはデフォルトで静的リンクされています。
+	    砂場にコピーするために単純に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cp&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">cp</span>(1)</span></a> が使えます。</p></li><li class="listitem"><p><span class="application">named</span> が見ることができ、
+	    書き込むことのできる <code class="filename">dev/null</code>
+	    を作成します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/namedb/dev &amp;&amp; mknod null c 2 2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 666 null</code></strong></pre></li><li class="listitem"><p><code class="filename">/etc/namedb/var/run/ndc</code> から
+	    <code class="filename">/var/run/ndc</code>
+	    へのシンボリックリンクを作成します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -sf /etc/namedb/var/run/ndc /var/run/ndc</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">これは単に <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ndc</span>(8)</span></a> を実行するたびに <code class="option">-c</code>
+	      オプションを指定しなくてもよいようにするだけです。
+	      /var/run の中身は起動時に削除されるため、
+	      これが有用だと思うなら、このコマンドをルートの crontab に
+	      <code class="option">@reboot</code>
+	      オプションを指定して追加してください。
+	      詳細については <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crontab&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">crontab</span>(5)</span></a> を参照してください。</p></div></li><li class="listitem"><p><span class="application">named</span> が書き込める追加の
+	    <code class="filename">log</code> ソケットを作成するように
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> を設定します。
+	    これを行うためには、<code class="filename">/etc/rc.conf</code>
+	    内の <code class="varname">syslogd_flags</code> 変数に
+	    <code class="literal">-l /etc/namedb/dev/log</code> を加えてください。</p></li><li class="listitem"><p>次の行を <code class="filename">/etc/rc.conf</code> に加えて
+	    <span class="application">named</span> が起動し、
+	    自身を砂場内に <code class="command">chroot</code> するように調整します</p><pre class="programlisting">named_enable="YES"
+named_flags="-u bind -g bind -t /etc/namedb /etc/named.conf"</pre><div xmlns="" class="note"><h3 class="admontitle">注記: </h3><p xmlns="http://www.w3.org/1999/xhtml">設定ファイル <em class="replaceable"><code>/etc/named.conf</code></em>
+	      は <span class="emphasis"><em>砂場のディレクトリに対して相対的な</em></span>
+	      フルパスで表されることに注意してください。
+	      つまり、上記の行で示されたファイルは実際には
+	      <code class="filename">/etc/namedb/etc/named.conf</code> です。</p></div></li></ul></div><p>次のステップは <span class="application">named</span>
+	がどのゾーンを読み込むか、
+	そしてディスク上のどこにゾーンファイルがあるのかを知るために
+	<code class="filename">/etc/namedb/etc/named.conf</code> を編集することです。
+	下記に例をコメントを加えて示します
+	(ここで特にコメントされていない内容については、
+	砂場の中で動作させない DNS サーバの設定と同じです)。</p><pre class="programlisting">options {
+        directory "/";<a id="directory"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+        named-xfer "/bin/named-xfer";<a id="named-xfer"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+        version "";		// Don't reveal BIND version
+        query-source address * port 53;
+};
+// ndc control socket
+controls {
+        unix "/var/run/ndc" perm 0600 owner 0 group 0;
+};
+// Zones follow:
+zone "localhost" IN {
+        type master;
+        file "master/named.localhost";<a id="master"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+        allow-transfer { localhost; };
+        notify no;
+};
+zone "0.0.127.in-addr.arpa" IN {
+        type master;
+        file "master/localhost.rev";
+        allow-transfer { localhost; };
+        notify no;
+};
+zone "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.int" {
+	type master;
+	file "master/localhost-v6.rev";
+	allow-transfer { localhost; };
+	notify no;
+};
+zone "." IN {
+        type hint;
+        file "master/named.root";
+};
+zone "private.example.net" in {
+        type master;
+        file "master/private.example.net.db";
+	allow-transfer { 192.168.10.0/24; };
+};
+zone "10.168.192.in-addr.arpa" in {
+        type slave;
+        masters { 192.168.10.2; };
+        file "slave/192.168.10.db";<a id="slave"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+};</pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#directory"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p><code class="literal">directory</code> は
+	    <code class="filename">/</code> を指定します。
+	    <span class="application">named</span>
+	    が必要とするファイルはすべてこのディレクトリにあります。
+	    (この指定は <span class="quote">「<span class="quote">通常の</span>」</span> (訳注: 砂場内で動作させない)
+	    ユーザにとっての <code class="filename">/etc/namedb</code>
+	    と等価です)。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#named-xfer"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p><code class="command">named-xfer</code>
+	    バイナリへの (<span class="application">named</span> にとっての)
+	    フルパスを指定します。
+	    <span class="application">named</span> はデフォルトで
+	    <code class="command">named-xfer</code> を <code class="filename">/usr/libexec</code>
+	    から探すようにコンパイルされているので、これが必要です</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#master"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>このゾーンに対するゾーンファイルを
+	    <span class="application">named</span> が見つけられるようにファイル名を
+	    (上記と同様に <code class="literal">directory</code> からの相対パスで)
+	    指定します。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#slave"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>このゾーンに対するゾーン情報がマスタサーバからが転送されたあとに、
+	    <span class="application">named</span>
+	    がゾーンファイルのコピーを書き込むファイル名を
+	    (上記と同様に <code class="literal">directory</code> からの相対パスで)
+	    指定します。これが、上記のように設定段階で
+	    <code class="filename">slave</code> ディレクトリの所有者を
+	    <code class="systemitem">bind</code> に変更する理由です。</p></td></tr></table></div><p>上記のステップを完了したら、サーバを再起動するか <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	を再起動し、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> を起動してください。その際、
+	<code class="varname">syslogd_flags</code> および
+	<code class="varname">named_flags</code>
+	に新たに指定したオプションが有効になっていることを確かめてください。
+	これで <span class="application">named</span>
+	を砂場のなかで動作させることができているはずです!</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97155408"></a>22.11.9. セキュリティ</h3></div></div></div><p>BIND は DNS の最も一般的な実装ではありますが、
+	常にセキュリティ問題を抱えています。
+	問題になり得る、また悪用可能なセキュリティホールが時々みつかります。
+      </p><p>現在のインターネットおよび FreeBSD
+	のセキュリティ問題について常に最新の情報を得るために
+	<a class="link" href="http://www.cert.org/" target="_top">CERT</a> および
+	<a class="link" href="../handbook/eresources.html#ERESOURCES-MAIL" target="_top">freebsd-security-notifications</a>
+	を購読するとよいでしょう。</p><div xmlns="" class="tip"><h3 class="admontitle">ヒント: </h3><p xmlns="http://www.w3.org/1999/xhtml">問題が生じたとしても、
+	  最新のソースからビルドした named を用意しておけば、
+	  問題にならないかもしれません。</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97158608"></a>22.11.10. さらなる情報源</h3></div></div></div><p>
+	BIND/named のマニュアルページ: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ndc</span>(8)</span></a> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">named.conf</span>(5)</span></a>
+      </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="link" href="http://www.isc.org/products/BIND/" target="_top">ISC Bind
+	      公式ページ</a></p></li><li class="listitem"><p><a class="link" href="http://www.nominum.com/getOpenSourceResource.php?id=6" target="_top">
+	      BIND FAQ</a></p></li><li class="listitem"><p><a class="link" href="http://www.oreilly.com/catalog/dns4/" target="_top">O'Reilly
+	      DNS and BIND 4th Edition</a></p></li><li class="listitem"><p><a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1034.txt" target="_top">RFC1034
+	      - Domain Names - Concepts and Facilities</a>
+	    (ドメイン名、その概念と基盤)</p></li><li class="listitem"><p><a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1035.txt" target="_top">RFC1035
+	      - Domain Names - Implementation and Specification</a>
+	    (ドメイン名、その実装と仕様)</p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-dhcp.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="network-ntp.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">22.10. DHCP〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓22.12. NTP</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

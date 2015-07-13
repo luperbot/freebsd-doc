@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>5. Pre-Faulting e Ottimizzazioni di Azzeramento</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="up" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="prev" href="freeing-pages.html" title="4. Quando liberare una pagina" /><link rel="next" href="page-table-optimizations.html" title="6. Ottimizzazioni della Tabella delle Pagine" /><link rel="copyright" href="trademarks.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5. Pre-Faulting e Ottimizzazioni di Azzeramento</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="freeing-pages.html">Indietro</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="page-table-optimizations.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="prefault-optimizations"></a>5. Pre-Faulting e Ottimizzazioni di Azzeramento</h2></div></div></div><p>Subire un VM fault non è costoso se la pagina sottostante
+      è già nella memoria fisica e deve solo essere mappata di
+      nuovo nel processo, ma può divenire costoso nel caso se ne
+      subiscano un bel po' su base regolare.  Un buon esempio di ciò si
+      ha eseguendo un programma come <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> o <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ps&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ps</span>(1)</span></a> ripetutamente.
+      Se il binario del programma è mappato in memoria ma non nella
+      tabella delle pagine, allora tutte le pagine che verranno accedute dal
+      programmma dovranno generare un page fault ogni volta che il programma
+      viene eseguito.
+      Ciò non è necessario quando le pagine in questione sono
+      già nella cache della VM, quindi FreeBSD tenterà di
+      pre-popolare le tabelle delle pagine di un processo con quelle pagine che
+      sono già nella VM Cache.  Una cosa che FreeBSD non fa ancora
+      è effettuare il pre-copy-on-write di alcune pagine nel caso di una
+      chiamata a exec.
+      Ad esempio, se esegui il programma <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> mentre stai eseguendo
+      <code class="command">vmstat 1</code> noterai che subisce sempre un certo numero
+      di page fault, anche eseguendolo ancora e ancora.  Questi sono
+      zero-fill fault, legati alla necessità di azzerare memoria,
+      non program code fault, legati alla copia dell'eseguibile in memoria
+      (che erano già stati gestiti come pre-fault).
+      Pre-copiare le pagine all'exec o alla fork è un'area che potrebbe
+      essere soggetta a maggior studio.</p><p>Una larga percentuale dei page fault che accadono è composta di
+      zero-fill fault.  In genere è possibile notare questo fatto
+      osservando l'output di <code class="command">vmstat -s</code>.
+      Questi accadono quando un processo accede a pagine nell'area del BSS.
+      Ci si aspetta che l'area del BSS sia composta inizialmente da zeri
+      ma il sistema della VM non si preoccupa di allocare nessuna memoria
+      finché il processo non ne ha effettivamente bisogno.
+      Quindi nel momento in cui accade un fault il sistema della VM non
+      deve solo allocare una nuova pagina, ma deve anche azzerarla.
+      Per ottimizzare l'operazione di azzeramento, il sistema della VM
+      ha la capacità di pre-azzerare le pagine e segnalarle come tali,
+      e di richiedere pagine pre-azzerate quando avvengono zero-fill fault.
+      Il pre-azzeramento avviene quando la CPU è inutilizzata ma il
+      numero di pagine che vengono pre-azzerate dal sistema è limitato
+      per evitare di spazzare via la cache della memoria.  Questo è un
+      eccellente esempio di complessità aggiunta al sistema della VM per
+      ottimizare il percorso critico.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="freeing-pages.html">Indietro</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="page-table-optimizations.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">4. Quando liberare una pagina </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 6. Ottimizzazioni della Tabella delle Pagine </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

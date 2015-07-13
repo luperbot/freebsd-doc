@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>Υλοποίηση του UFS Journaling σε ένα Desktop Υπολογιστή</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Ένα σύστημα αρχείων που διαθέτει δυνατότητα journaling, χρησιμοποιεί ένα αρχείο καταγραφής (journal ή ημερολόγιο) στο οποίο γίνονται αρχικά οι εγγραφές πριν καταχωρηθούν στο κανονικό σύστημα αρχείων. Με τον τρόπο αυτό μπορεί να εξασφαλιστεί η ακεραιότητα του συστήματος αρχείων στην περίπτωση κατάρρευσης ή απότομης διακοπής της τροφοδοσίας του. Η χρήση του journaling διασφαλίζει την συνολική ακεραιότητα του συστήματος αρχείων, αλλά δεν μπορεί να διασφαλίσει ότι δεν θα έχουμε απώλεια δεδομένων σε μεμονωμένα αρχεία τα οποία ήταν ενδεχομένως σε χρήση την ώρα της κατάρρευσης. Ένα πλεονέκτημα του journaling είναι η ελαχιστοποίηση του χρόνου που απαιτείται για τον έλεγχο του συστήματος αρχείων σε περίπτωση κακού τερματισμού. Το σύστημα αρχείων UFS που χρησιμοποιείται από το FreeBSD δεν διαθέτει δικό του ενσωματωμένο journaling. Ωστόσο, το πλαίσιο λειτουργιών GEOM στο FreeBSD 7.X παρέχει ένα νέο journal class το οποίο δίνει αυτή τη δυνατότητα, και μάλιστα ανεξάρτητα από το σύστημα αρχείων που χρησιμοποιείται. Στο άρθρο αυτό εξετάζουμε πως μπορούμε να χρησιμοποιήσουμε το journaling σε ένα τυπικό desktop μηχάνημα για εργασία γραφείου." /><link rel="home" href="index.html" title="Υλοποίηση του UFS Journaling σε ένα Desktop Υπολογιστή" /><link rel="next" href="understanding-journaling.html" title="2. Κατανόηση του Journaling στο FreeBSD" /><link rel="copyright" href="trademarks.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Υλοποίηση του UFS Journaling σε ένα Desktop Υπολογιστή</th></tr><tr><td width="20%" align="left"> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="understanding-journaling.html">Επόμενο</a></td></tr></table><hr /></div><div xml:lang="el" class="article" lang="el"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71495632"></a>Υλοποίηση του UFS Journaling σε ένα Desktop Υπολογιστή</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="author"><h3 class="author"><span class="firstname">Μανώλης</span> <span class="surname">Κιαγιάς</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:manolis@FreeBSD.org">manolis@FreeBSD.org</a>&gt;</code></p></div></div></div></div><div>Αναθεώρηση: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Πνευματικά Δικαιώματα © 2008 Μανώλης Κιαγιάς</p></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="trademarks.html">Νομική Σημείωση</a></div><div>Τελευταία τροποποίηση στις  από .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Περίληψη</div><p>Ένα σύστημα αρχείων που διαθέτει δυνατότητα journaling,
+	χρησιμοποιεί ένα αρχείο καταγραφής (journal ή ημερολόγιο) στο οποίο
+	γίνονται αρχικά οι εγγραφές πριν καταχωρηθούν στο κανονικό σύστημα
+	αρχείων.  Με τον τρόπο αυτό μπορεί να εξασφαλιστεί η ακεραιότητα του
+	συστήματος αρχείων στην περίπτωση κατάρρευσης ή απότομης διακοπής της
+	τροφοδοσίας του.  Η χρήση του journaling διασφαλίζει την συνολική
+	ακεραιότητα του συστήματος αρχείων, αλλά δεν μπορεί να διασφαλίσει
+	ότι δεν θα έχουμε απώλεια δεδομένων σε μεμονωμένα αρχεία τα οποία
+	ήταν ενδεχομένως σε χρήση την ώρα της κατάρρευσης.  Ένα πλεονέκτημα
+	του journaling είναι η ελαχιστοποίηση του χρόνου που απαιτείται για
+	τον έλεγχο του συστήματος αρχείων σε περίπτωση κακού τερματισμού.  Το
+	σύστημα αρχείων UFS που χρησιμοποιείται από το FreeBSD δεν διαθέτει δικό
+	του ενσωματωμένο journaling.  Ωστόσο, το πλαίσιο λειτουργιών GEOM στο
+	FreeBSD 7.<em class="replaceable"><code>X</code></em> παρέχει ένα νέο journal
+	class το οποίο δίνει αυτή τη δυνατότητα, και μάλιστα ανεξάρτητα από
+	το σύστημα αρχείων που χρησιμοποιείται.  Στο άρθρο αυτό εξετάζουμε
+	πως μπορούμε να χρησιμοποιήσουμε το journaling σε ένα τυπικό desktop
+	μηχάνημα για εργασία γραφείου.</p></div></div></div><div class="docformatnavi">
+      [
+      
+	  HTML σε τμήματα
+	
+      /
+      <a href="article.html">HTML σε ένα τμήμα</a>
+      ]
+    </div><hr /></div><div class="toc"><div class="toc-title">Πίνακας Περιεχομένων</div><dl class="toc"><dt><span class="sect1"><a href="index.html#introduction">1. Εισαγωγή</a></span></dt><dt><span class="sect1"><a href="understanding-journaling.html">2. Κατανόηση του Journaling στο FreeBSD</a></span></dt><dt><span class="sect1"><a href="reserve-space.html">3. Βήματα Κατά την Εγκατάσταση του FreeBSD</a></span></dt><dt><span class="sect1"><a href="configure-journal.html">4. Ρύθμιση του Journaling</a></span></dt><dt><span class="sect1"><a href="troubleshooting-gjournal.html">5. Αντιμετώπιση Προβλημάτων</a></span></dt><dt><span class="sect1"><a href="further-reading.html">6. Επιπλέον Πληροφορίες</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="introduction"></a>1. Εισαγωγή</h2></div></div></div><p>Αν και οι περισσότεροι εξυπηρετητές που χρησιμοποιούνται σε
+      περιβάλλοντα παραγωγής είναι καλά προστατευμένοι από μη-αναμενόμενους
+      τερματισμούς, δεν συμβαίνει το ίδιο και με το συνηθισμένο desktop
+      μηχάνημα το οποίο βρίσκεται στα χέρια του τελικού χρήστη.  Αυτό συνήθως
+      δεν προστατεύεται από διακοπές ρεύματος, ενώ δεν είναι και οι λίγες οι
+      περιπτώσεις που ο κακός τερματισμός οφείλεται σε λανθασμένο χειρισμό
+      του χρήστη (κατά λάθος πίεση του reset κ.α.).  Στις περισσότερες από
+      αυτές τις περιπτώσεις, τα Soft Updates που χρησιμοποιεί το σύστημα
+      αρχείων UFS μπορούν να το προστατεύσουν αρκετά καλά, αν και μετά τον
+      προβληματικό τερματισμό απαιτείται συνήθως έλεγχος του συστήματος
+      αρχείων, ο οποίος ακόμα και όταν γίνεται στο παρασκήνιο, διαρκεί
+      αρκετό χρόνο.  Σε σπάνιες περιπτώσεις, το σύστημα αρχείων μπορεί να
+      υποστεί ζημιά η οποία να χρειάζεται χειροκίνητη επέμβαση για να
+      διορθωθεί, ενώ είναι πιθανή και η απώλεια δεδομένων.</p><p>Η νέα δυνατότητα για journaling που παρέχεται από το GEOM μπορεί
+      να βοηθήσει ιδιαίτερα στις παραπάνω περιπτώσεις, ελαχιστοποιώντας το
+      χρόνο που απαιτείται για τον έλεγχο του συστήματος αρχείων και
+      εξασφαλίζοντας ότι το σύστημα θα επανέλθει πολύ σύντομα σε σταθερή
+      κατάσταση.</p><p>Το άρθρο αυτό περιγράφει μια διαδικασία για την υλοποίηση του UFS
+      journaling σε ένα τυπικό desktop PC (στο οποίο χρησιμοποιείται ένας
+      σκληρός δίσκος τόσο για το σύστημα όσο και για τα δεδομένα).  Θα πρέπει
+      να ακολουθήσετε αυτές τις οδηγίες κατά τη διάρκεια μιας νέας
+      εγκατάστασης του FreeBSD.  Τα βήματα είναι αρκετά απλά και δεν απαιτούν
+      ιδιαίτερα πολύπλοκες εντολές.</p><p>Αφού διαβάσετε αυτό το άρθρο, θα ξέρετε:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Πως να δεσμεύσετε κάποιο χώρο στο δίσκο για το journaling κατά
+	  τη διάρκεια μιας νέας εγκατάστασης του FreeBSD.</p></li><li class="listitem"><p>Πως να φορτώσετε και να ενεργοποιήσετε το άρθρωμα (module)
+	  <code class="literal">geom_journal</code> (ή πως να ενσωματώσετε τη
+	  λειτουργία του στον προσαρμοσμένο πυρήνα σας).</p></li><li class="listitem"><p>Πως να μετατρέψετε τα υπάρχοντα συστήματα αρχείων σας ώστε
+	  να χρησιμοποιούν journaling, και τι παραμέτρους θα πρέπει να δώσετε
+	  στο <code class="filename">/etc/fstab</code> ώστε να τα προσαρτήσετε.</p></li><li class="listitem"><p>Πως να ενεργοποιήσετε το journaling σε νέες (άδειες)
+	  κατατμήσεις.</p></li><li class="listitem"><p>Πως να αντιμετωπίσετε προβλήματα που σχετίζονται με το
+	  journaling.</p></li></ul></div><p>Πριν διαβάσετε αυτό το άρθρο, θα πρέπει:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Να κατανοείτε βασικές έννοιες του <span class="trademark">UNIX</span>(R) και του FreeBSD.</p></li><li class="listitem"><p>Να είστε εξοικειωμένος με τη διαδικασία εγκατάστασης του FreeBSD
+	  και το βοηθητικό πρόγραμμα
+	  <span class="application">sysinstall</span>.</p></li></ul></div><div xmlns="" class="warning"><h3 class="admontitle">Προειδοποίηση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Η διαδικασία που περιγράφεται εδώ, προορίζεται για χρήση σε νέες
+	εγκαταστάσεις, όπου δεν υπάρχουν ακόμα αποθηκευμένα δεδομένα χρήστη.
+	Αν και είναι δυνατόν να τροποποιήσετε και να επεκτείνετε τη
+	διαδικασία αυτή σε μηχανήματα που βρίσκονται ήδη σε κανονική χρήση,
+	θα πρέπει οπωσδήποτε να
+	<span class="emphasis"><em>πάρετε αντίγραφα ασφαλείας</em></span> όλων των σημαντικών
+	δεδομένων πριν επιχειρήσετε οποιαδήποτε αλλαγή.  Όταν κάνετε αλλαγές
+	στα συστήματα αρχείων και στις κατατμήσεις των δίσκων σε τέτοιο
+	επίπεδο, είναι πιθανόν να κάνετε λάθη τα οποία θα αποβούν μοιραία για
+	τα δεδομένα σας.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="understanding-journaling.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"> </td><td width="40%" align="right" valign="top"> 2. Κατανόηση του Journaling στο FreeBSD</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

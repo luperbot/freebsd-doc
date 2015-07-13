@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>18.7. Журналирование UFS средствами GEOM</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="GEOM.html" title="Глава 18. GEOM: Модульная инфраструктура преобразования дисковых запросов" /><link rel="prev" href="geom-glabel.html" title="18.6. Метки дисковых устройств" /><link rel="next" href="filesystems.html" title="Глава 19. Поддержка файловых систем" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">18.7. Журналирование UFS средствами GEOM</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="geom-glabel.html">Пред.</a> </td><th width="60%" align="center">Глава 18. GEOM: Модульная инфраструктура преобразования дисковых запросов</th><td width="20%" align="right"> <a accesskey="n" href="filesystems.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="geom-gjournal"></a>18.7. Журналирование UFS средствами GEOM</h2></div></div></div><a id="idp92804048" class="indexterm"></a><a id="idp92804816" class="indexterm"></a><p>С выходом FreeBSD 7.0 был реализован долгожданный механизм
+      ведения журналов для файловых систем.
+      Сама реализация этого механизма осуществляется средствами системы
+      <acronym class="acronym">GEOM</acronym>, а конфигурирование выполняется утилитой
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a>.</p><p>Что такое журналирование?  Журналирование сохраняет протокол
+      транзакций файловой системы, то есть: изменения, составляющие
+      логически завершенную операцию записи, сперва вносятся в журнал, а
+      модификация метаданных и данных самого файла выполняется позже.
+      В дальнейшем журнал может быть задействован для повторного выполнения
+      транзакций на файловой системе с целью предотвращения нарушения
+      целостности файловой системы.</p><p>Журналирование - это еще одним механизм предотвращения
+      утери данных и нарушения целостности файловой системы.  В отличие от
+      механизма Soft Updates, который отслеживает и периодически сохраняет
+      обновления метаданных, и механизма снэпшотов, который создает образ
+      файловой системы, сам журнал хранится в специально отведенном
+      для этой задачи пространстве диска, и, в некоторых случаях, может
+      содержаться целиком на отдельном диске.</p><p>В отличие от других реализаций журналирования файловых систем,
+      метод <code class="command">gjournal</code> работает на блочном уровне, он
+      не встроен в файловую систему; это лишь надстройка над системой
+      <acronym class="acronym">GEOM</acronym>.</p><p>Чтобы включить поддержку <code class="command">gjournal</code>,
+      в файле конфигурации ядра FreeBSD должна присутствовать следующая опция
+      (включено по умолчанию для FreeBSD 7.0 и более поздних версий
+      систем):</p><pre class="programlisting">options	UFS_GJOURNAL</pre><p>Журналируемым устройствам, монтируемым во время загрузки системы,
+      также потребуется модуль ядра <code class="filename">geom_journal.ko</code>.
+      Внесите следующую запись в файл
+      <code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">geom_journal_load="YES"</pre><p>В качестве альтернативы, функции вышеупомянутого модуля можно
+      встроить в специализированное ядро.  Для этого добавьте следующую опцию
+      в файл конфигурации ядра:</p><pre class="programlisting">options	GEOM_JOURNAL</pre><p>Для создания журнала на новой файловой системе выполните
+      следующие шаги (здесь и далее подразумевается, что
+      <code class="filename">da4</code> есть новый <acronym class="acronym">SCSI</acronym>
+      диск):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal label /dev/da4</code></strong></pre><p>На этом этапе в каталоге <code class="filename">/dev</code> должны присутствовать файлы
+      устройств <code class="filename">/dev/da4</code> и
+      <code class="filename">/dev/da4.journal</code>.  Теперь необходимо
+      создать файловую систему:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -O 2 -J /dev/da4.journal</code></strong></pre><p>Предыдущая команда создаст файловую систему <acronym class="acronym">UFS</acronym>2
+      на журналируемом устройстве.</p><p>Смонтируйте устройство в требуемый каталог файловой системы:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da4.journal <em class="replaceable"><code>/mnt</code></em></code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">В случае наличия нескольких слайсов, журнал создается для каждого
+	из них.  Например, если есть два слайса, и они называются
+	<code class="filename">ad4s1</code> и <code class="filename">ad4s2</code>, то
+	утилитой <code class="command">gjournal</code> создаются файлы устройств
+	<code class="filename">ad4s1.journal</code> и
+	<code class="filename">ad4s2.journal</code>. </p></div><p>Для увеличения производительности может потребоваться хранение
+      журнала на отдельном диске.  В таких случаях необходимо указать имя
+      поставщика журнала или устройства хранения после имени устройства,
+      на котором планируется включение журналирования.  Журналирование также
+      может быть активировано утилитой <code class="command">tunefs</code> на действующих
+      файловых системах; однако, всегда создавайте резервную копию перед
+      попытками изменить настройки файловой системы.  В большинстве случаев,
+      выполнение команды <code class="command">gjournal</code> завершится ошибкой, если
+      создание журнала невозможно, в то время как некорректное использование
+      команды <code class="command">tunefs</code> не защитит против потери данных.</p><p>Также возможно журналирование загрузочного диска системы FreeBSD.
+      За детальными инструкциями по этой возможности обратитесь к статье
+      <a class="link" href="../../../../doc/ru_RU.KOI8-R/articles/gjournal-desktop" target="_top">Настройка журналирования
+	UFS для настольного компьютера</a>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="geom-glabel.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="filesystems.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">18.6. Метки дисковых устройств </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 19. Поддержка файловых систем</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

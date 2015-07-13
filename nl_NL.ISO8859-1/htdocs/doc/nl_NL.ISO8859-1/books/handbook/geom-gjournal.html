@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.8. UFS logboeken door middel van GEOM</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="GEOM.html" title="Hoofdstuk 20. GEOM: Modulair schijftransformatie raamwerk" /><link rel="prev" href="geom-glabels.html" title="20.7. Het labelen van schijven" /><link rel="next" href="filesystems.html" title="Hoofdstuk 21. Ondersteuning van bestandssystemen" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.8. UFS logboeken door middel van GEOM</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="geom-glabels.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 20. GEOM: Modulair schijftransformatie raamwerk</th><td width="20%" align="right"> <a accesskey="n" href="filesystems.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="geom-gjournal"></a>20.8. UFS logboeken door middel van GEOM</h2></div></div></div><a id="idp81400784" class="indexterm"></a><a id="idp81401296" class="indexterm"></a><p>Met de komst van FreeBSD 7.0 komt ook de langverwachte
+      optie van <acronym class="acronym">UFS</acronym> logboeken.  De implementatie
+      zelf is gedaan door middel van het GEOM subsysteem, welke
+      makkelijk geconfigureerd kan worden met behulp van de
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> applicatie.</p><p>Wat is logboeken? Logboek mogelijkheden betekend het opslaan
+      van bestandssysteem transacties, zoals wijzigingen die een
+      complete schrijfactie zijn, voor er meta-data wordt toegevoegd
+      en voor de wijzigingen op schijf worden gezet.  Deze transactie
+      log kan later opnieuw afgespeeld worden om te voorkomen dat er
+      bestandssysteem inconsistenties voorkomen.</p><p>Deze methode is een extra manier om te beschermen tegen
+      gegevensverlies en inconsistenties van het bestandssysteem.  In
+      tegenstelling tot Soft Updates, welke bijhoud welke meta-data
+      wijzigingen er worden uitgevoerd en Snapshots, wat een beeld
+      bestand is van het bestandssysteem, wordt er een complete log
+      bewaard in de schijfruimte die speciaal voor deze taak is
+      gereserveerd, en in sommige gevallen op een compleet andere
+      schijf.</p><p>In tegenstelling tot andere logboek implementaties is de
+      <code class="command">gjournal</code> methode blok gebaseerd en niet
+      geïmplementeerd als onderdeel van het bestandssysteem maar
+      als uitbreiding op <acronym class="acronym">GEOM</acronym>.</p><p>Om ondersteuning in te schakelen voor
+      <code class="command">gjournal</code>, moet de kernel over de volgende optie
+      beschikken, welke standaard is op FreeBSD 7.X-systemen:</p><pre class="programlisting">options        UFS_GJOURNAL</pre><p>Indien gejournalde volumes tijdens het opstarten aangekoppeld
+      moeten worden, moet de kernelmodule
+      <code class="filename">geom_journal.ko</code> ook geladen zijn, door de
+      volgende regel aan <code class="filename">/boot/loader.conf</code> toe te
+      voegen:</p><pre class="programlisting">geom_journal_load="YES"</pre><p>Ook kan deze functie in een eigen kernel worden ingebouwd,
+      door de volgende regel aan het kernelinstellingenbestand toe te
+      voegen:</p><pre class="programlisting">options    GEOM_JOURNAL</pre><p>Het creëren van een logboek op een vrij en beschikbaar
+      bestandssysteem kan nu gedaan worden met behulp van de volgende
+      stappen, ervan uitgaande dat <code class="filename">da4</code> de
+      nieuwe beschikbare <acronym class="acronym">SCSI</acronym> schijf is:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal label /dev/da4</code></strong></pre><p>Op dit moment zou er een <code class="filename">ad4</code>
+      apparaatknooppunt en een <code class="filename">ad4.journal</code>
+      apparaatknooppunt moeten zijn.  Nu kan er een bestandssysteem op
+      gezet worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -O 2 -J /dev/da4.journal</code></strong></pre><p>Het hiervoor ingevoerde commando zal een
+      <acronym class="acronym">UFS</acronym>2 bestandssysteem met logboek
+      ondersteuning aanmaken.</p><p>Koppel het apparaat op een gewenst koppelpunt met:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da4.journal /mnt</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">In het geval dat er meerdere slices zijn, zal er een logboek
+	voor elke slice gecreëerd worden.  Bijvoorbeeld, als
+	<code class="filename">ad4s1</code> en <code class="filename">ad4s2</code>
+	allebei slices zijn, dan zal <code class="command">gjournal</code> een
+	<code class="filename">ad4s1.journal</code> en een
+	<code class="filename">ad4s2.journal</code> creëeren.</p></div><p>Voor performance doeleinden is het gewenst om het logboek op een
+      andere schijf te bewaren.  Voor deze gevallen moet de
+      logboekleverancier of het opslagapparaat gespecificeerd worden
+      achter het apparaat waarop de logboek functionaliteit aangebracht
+      moet worden.  De logboekfunctionaliteit kan ook worden
+      ingeschakeld op een reeds bestaand systeem met behulp van
+      <code class="command">tunefs</code>.  Maak echter altijd een back-up voor dat
+      dit soort dingen uitgeprobeerd worden.  In de meeste gevallen zal
+      <code class="command">gjournal</code> falen als het geen actueel logboek
+      kan maken, maar het voorkomt geen dataverlies als gevolg van
+      verkeerd gebruik van <code class="command">tunefs</code>.</p><p>Het is ook mogelijk om een journal van de opstartschijf van
+      een FreeBSD-systeem bij te houden.  Voor gedetailleerde instructies
+      over deze taak wordt naar het artikel <a class="link" href="../../../../doc/nl_NL.ISO8859-1/articles/gjournal-desktop" target="_top">Implementing UFS
+	Journaling on a Desktop PC</a> verwezen.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="geom-glabels.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="filesystems.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">20.7. Het labelen van schijven </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> Hoofdstuk 21. Ondersteuning van bestandssystemen</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

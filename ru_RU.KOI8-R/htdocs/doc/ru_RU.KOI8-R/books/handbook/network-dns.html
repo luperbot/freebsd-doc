@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>25.6. Domain Name System (DNS)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="network-servers.html" title="Глава 25. Сетевые серверы" /><link rel="prev" href="network-dhcp.html" title="25.5. Автоматическая настройка сети (DHCP)" /><link rel="next" href="network-apache.html" title="25.7. Apache HTTP сервер" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">25.6. Domain Name System (<acronym class="acronym">DNS</acronym>)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-dhcp.html">Пред.</a> </td><th width="60%" align="center">Глава 25. Сетевые серверы</th><td width="20%" align="right"> <a accesskey="n" href="network-apache.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-dns"></a>25.6. Domain Name System (<acronym class="acronym">DNS</acronym>)</h2></div><div><span class="authorgroup">Текст предоставил <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Chern</span> <span class="surname">Lee</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>  <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98260048"></a>25.6.1. Обзор</h3></div></div></div><a id="idp98260688" class="indexterm"></a><p>По умолчанию во FreeBSD используется одна из версий программы BIND
+	(Berkeley Internet Name Domain), являющейся самой распространенной
+	реализацией протокола <acronym class="acronym">DNS</acronym>.  <acronym class="acronym">DNS</acronym> -
+	это протокол, при помощи которого имена преобразуются в
+	<acronym class="acronym">IP</acronym>-адреса и наоборот.  Например, в ответ на запрос о
+	<code class="systemitem">www.FreeBSD.org</code> будет получен IP-адрес
+	веб-сервера Проекта FreeBSD, а запрос о <code class="systemitem">ftp.FreeBSD.org</code> возвратит
+	<acronym class="acronym">IP</acronym>-адрес соответствующей машины с
+	<acronym class="acronym">FTP</acronym>-сервером.  Точно также происходит и обратный
+	процесс.  Запрос, содержащий IP-адрес машины, возвратит имя хоста.  Для
+	выполнения запросов к <acronym class="acronym">DNS</acronym> вовсе не обязательно иметь
+	в системе работающий сервер имён.</p><p>FreeBSD в настоящее время поставляется с сервером
+	<acronym class="acronym">DNS</acronym> <acronym class="acronym">BIND</acronym>9, предоставляющим
+	расширенные настройки безопасности, новую схему расположения файлов
+	конфигурации и автоматические настройки для <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>.</p><a id="idp98275280" class="indexterm"></a><p>В сети Интернет <acronym class="acronym">DNS</acronym> управляется через
+	достаточно сложную систему авторизированных корневых серверов имён,
+	серверов доменов первого уровня (Top Level Domain,
+	<acronym class="acronym">TLD</acronym>) и других менее крупных серверов имён, которые
+	содержат и кэшируют информацию о конкретных доменах.</p><p>На данный момент пакет BIND поддерживается Internet Systems
+	Consortium <code class="uri"><a class="uri" href="https://www.isc.org/" target="_top">https://www.isc.org/</a></code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98277968"></a>25.6.2. Используемая терминология</h3></div></div></div><p>Для понимания этого документа нужно понимать значения некоторых
+	терминов, связанных с работой <acronym class="acronym">DNS</acronym>.</p><a id="idp98279376" class="indexterm"></a><a id="idp98280016" class="indexterm"></a><a id="idp98280528" class="indexterm"></a><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Термин</th><th>Определение</th></tr></thead><tbody><tr><td>Прямой запрос к <acronym class="acronym">DNS</acronym> (forward DNS)</td><td>Преобразование имён хостов в адреса IP</td></tr><tr><td>Ориджин (origin)</td><td>Обозначает домен, покрываемый конкретным файлом
+		зоны</td></tr><tr><td><span class="application">named</span>, bind</td><td>Общеупотребительные названия для обозначения пакета BIND,
+		обеспечивающего работу сервера имён во FreeBSD.</td></tr><tr><td>Резолвер</td><td>Системный процесс, посредством которого машина обращается
+		к серверу имён для получения информации о зоне</td></tr><tr><td>Обратный <acronym class="acronym">DNS</acronym> (reverse
+		<acronym class="acronym">DNS</acronym>)</td><td>Преобразование адресов <acronym class="acronym">IP</acronym> в имена
+		хостов</td></tr><tr><td>Корневая зона</td><td>Начало иерархии зон Интернет.  Все зоны находятся под
+		корневой зоной, подобно тому, как все файлы располагаются ниже
+		корневого каталога.</td></tr><tr><td>Зона</td><td>Отдельный домен, поддомен или часть
+		<acronym class="acronym">DNS</acronym>, управляемая
+		одним сервером.</td></tr></tbody></table></div><a id="idp98295248" class="indexterm"></a><p>Примеры зон:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="systemitem">.</code> - так обычно обозначается
+	    в документации корневая зона.</p></li><li class="listitem"><p><code class="systemitem">org.</code> - домен верхнего уровня
+	    (<acronym class="acronym">TLD</acronym>) в корневой зоне.</p></li><li class="listitem"><p><code class="systemitem">example.org.</code> является
+	    зоной в домене верхнего уровня (<acronym class="acronym">TLD</acronym>)
+	    <code class="systemitem">org.</code>.</p></li><li class="listitem"><p><code class="systemitem">1.168.192.in-addr.arpa</code> является зоной, в которую
+	    включены все <acronym class="acronym">IP</acronym>-адреса, формирующие пространство адресов
+	    <code class="systemitem">192.168.1.*</code>.</p></li></ul></div><p>Как можно видеть, уточняющая часть имени хоста появляется слева.
+	Например, <code class="systemitem">example.org.</code> более точен, чем
+	<code class="systemitem">org.</code>, также, как <code class="systemitem">org.</code> более
+	точен, чем корневая зона.  Расположение каждой части имени хоста сильно
+	похоже на файловую систему: каталог <code class="filename">/dev</code>
+	расположен в корневой файловой системе, и так далее.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98318160"></a>25.6.3. Причины, по которым вам может понадобиться сервер имён</h3></div></div></div><p>Сервера имён обычно используются в двух видах: авторитетный сервер
+	имён и кэширующий сервер имён, также называемый распознавателем
+	(resolver).</p><p>Авторитетный сервер имён нужен, когда:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>нужно предоставлять информацию о <acronym class="acronym">DNS</acronym>
+	    остальному миру, отвечая на запросы авторизированно.</p></li><li class="listitem"><p>зарегистрирован домен, такой, как
+	    <code class="systemitem">example.org</code> и в этом домене требуется
+	    поставить имена машин в соответствие с их адресами
+	    <acronym class="acronym">IP</acronym>.</p></li><li class="listitem"><p>блоку адресов <acronym class="acronym">IP</acronym> требуется обратные записи
+	    <acronym class="acronym">DNS</acronym> (<acronym class="acronym">IP</acronym> в имена
+	    хостов).</p></li><li class="listitem"><p>резервный (slave) сервер имён должен отвечать на запросы.</p></li></ul></div><p>Кэширующий сервер имён нужен, когда:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>локальный сервер <acronym class="acronym">DNS</acronym> может кэшировать информацию и отвечать на
+	    запросы быстрее, чем это происходит при прямом опросе внешнего
+	    сервера имён.</p></li></ul></div><p>Например, когда кто-нибудь запрашивает информацию о
+	<code class="systemitem">www.FreeBSD.org</code>, то обычно резолвер обращается к
+	серверу имён вашего провайдера, посылает запрос и ожидает ответа.  С
+	локальным кэширующим сервером <acronym class="acronym">DNS</acronym> запрос во внешний мир будет делаться
+	всего один раз.  Последующие запросы не будут посылаться за
+	пределы локальной сети, потому что информация уже имеется в
+	кэше.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98333008"></a>25.6.4. Как это работает</h3></div></div></div><p>Во FreeBSD даемон BIND называется
+	<span class="application">named</span>.</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Файл</th><th>Описание</th></tr></thead><tbody><tr><td><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a></td><td>Даемон BIND</td></tr><tr><td><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rndc</span>(8)</span></a></td><td>Программа управления даемоном сервера имён</td></tr><tr><td><code class="filename">/etc/namedb</code></td><td>Каталог, в котором располагается вся информация о зонах
+		BIND</td></tr><tr><td><code class="filename">/etc/namedb/named.conf</code></td><td>Конфигурационный файл для даемона</td></tr></tbody></table></div><p>Файлы зон обычно располагаются в каталоге
+	<code class="filename">/etc/namedb</code> и содержат информацию о зоне DNS,
+	за которую отвечает сервер имён.</p><p>В зависимости от способа конфигурации зоны на сервере файлы
+	зон могут располагаться в подкаталогах <code class="filename">master</code>, <code class="filename">slave</code> или <code class="filename">dynamic</code> иерархии
+	<code class="filename">/etc/namedb</code>.
+	Эти файлы содержат <acronym class="acronym">DNS</acronym> информацию, которую и будет
+	сообщать в ответ на запросы сервер имен.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98350928"></a>25.6.5. Запуск BIND</h3></div></div></div><a id="idp98351568" class="indexterm"></a><p>Так как сервер имён BIND устанавливается по умолчанию, его
+	настройка сравнительно проста.</p><p>Стандартная конфигурация <span class="application">named</span>
+	запускает простой кэширующий сервер в ограниченной среде
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>, который прослушивает запросы на интерфейсе обратной
+	связи (loopback) с адресом (127.0.0.1).
+	Для одноразового запуска даемона в этой
+	конфигурации используйте команду</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/named onestart</code></strong></pre><p>Чтобы даемон <span class="application">named</span> запускался во
+	время загрузки, поместите в <code class="filename">/etc/rc.conf</code>
+	следующую строку:</p><pre class="programlisting">named_enable="YES"</pre><p>Разумеется, существует множество различных конфигураций
+	<code class="filename">/etc/namedb/named.conf</code>, лежащих за рамками
+	данного документа.  Разнообразные опции запуска
+	<span class="application">named</span> во FreeBSD описаны в переменных
+	<code class="literal">named_<em class="replaceable"><code>*</code></em></code> файла
+	<code class="filename">/etc/defaults/rc.conf</code> и странице справочника
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>.  Кроме того, полезной может оказаться
+	<a class="xref" href="configtuning-rcd.html" title="12.7. Использование rc во FreeBSD 5.X и последующих версиях">Раздел 12.7, <<Использование rc во FreeBSD 5.X и последующих версиях>></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98360656"></a>25.6.6. Конфигурационные файлы</h3></div></div></div><a id="idp98361296" class="indexterm"></a><p>Файлы конфигурации даемона <span class="application">named</span>
+	расположены в каталоге
+	<code class="filename">/etc/namedb</code> и, за исключением
+	случая, когда вам требуется просто резолвер, требуют модификации.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98363600"></a>25.6.6.1. <code class="filename">/etc/namedb/named.conf</code></h4></div></div></div><pre class="programlisting">// $FreeBSD$
+//
+// If you are going to set up an authoritative server, make sure you
+// understand the hairy details of how DNS works.  Even with
+// simple mistakes, you can break connectivity for affected parties,
+// or cause huge amounts of useless Internet traffic.
+
+options {
+	// All file and path names are relative to the chroot directory,
+	// if any, and should be fully qualified.
+	directory	"/etc/namedb/working";
+	pid-file	"/var/run/named/pid";
+	dump-file	"/var/dump/named_dump.db";
+	statistics-file	"/var/stats/named.stats";
+
+// If named is being used only as a local resolver, this is a safe default.
+// For named to be accessible to the network, comment this option, specify
+// the proper IP address, or delete this option.
+	listen-on	{ 127.0.0.1; };
+
+// If you have IPv6 enabled on this system, uncomment this option for
+// use as a local resolver.  To give access to the network, specify
+// an IPv6 address, or the keyword "any".
+//	listen-on-v6	{ ::1; };
+
+// These zones are already covered by the empty zones listed below.
+// If you remove the related empty zones below, comment these lines out.
+	disable-empty-zone "255.255.255.255.IN-ADDR.ARPA";
+	disable-empty-zone "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.IP6.ARPA";
+	disable-empty-zone "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.IP6.ARPA";
+
+// If you've got a DNS server around at your upstream provider, enter
+// its IP address here, and enable the line below.  This will make you
+// benefit from its cache, thus reduce overall DNS traffic in the Internet.
+/*
+	forwarders {
+		127.0.0.1;
+	};
+*/
+
+// If the 'forwarders' clause is not empty the default is to 'forward first'
+// which will fall back to sending a query from your local server if the name
+// servers in 'forwarders' do not have the answer.  Alternatively you can
+// force your name server to never initiate queries of its own by enabling the
+// following line:
+//	forward only;
+
+// If you wish to have forwarding configured automatically based on
+// the entries in /etc/resolv.conf, uncomment the following line and
+// set named_auto_forward=yes in /etc/rc.conf.  You can also enable
+// named_auto_forward_only (the effect of which is described above).
+//	include "/etc/namedb/auto_forward.conf";</pre><p>Как и говорится в комментариях, если вы хотите получить эффект от
+	использования кэша провайдера, то можно включить раздел
+	<code class="literal">forwarders</code>.  В обычном случае сервер имён будет
+	рекурсивно опрашивать определённые серверы имён Интернет до тех пор,
+	пока не получит ответ на свой запрос.  При включении этого раздела
+	он будет автоматически опрашивать сервер имён вашего провайдера (или
+	тот, который здесь указан), используя преимущества его кэша.
+	наличия нужной информации.  Если соответствующий сервер имён провайдера
+	работает быстро и имеет хороший канал связи, то в результате такой
+	настройки вы можете получить хороший результат.</p><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml"><code class="systemitem">127.0.0.1</code> здесь
+	  работать <span class="emphasis"><em>не будет</em></span>.  Измените
+	  его на IP-адрес сервера имён провайдера.</p></div><pre class="programlisting">/*
+	   Modern versions of BIND use a random UDP port for each outgoing
+	   query by default in order to dramatically reduce the possibility
+	   of cache poisoning.  All users are strongly encouraged to utilize
+	   this feature, and to configure their firewalls to accommodate it.
+
+	   AS A LAST RESORT in order to get around a restrictive firewall
+	   policy you can try enabling the option below.  Use of this option
+	   will significantly reduce your ability to withstand cache poisoning
+	   attacks, and should be avoided if at all possible.
+
+	   Replace NNNNN in the example with a number between 49160 and 65530.
+	*/
+	// query-source address * port NNNNN;
+};
+
+// If you enable a local name server, don't forget to enter 127.0.0.1
+// first in your /etc/resolv.conf so this server will be queried.
+// Also, make sure to enable it in /etc/rc.conf.
+
+// The traditional root hints mechanism. Use this, OR the slave zones below.
+zone "." { type hint; file "/etc/namedb/named.root"; };
+
+/*	Slaving the following zones from the root name servers has some
+	significant advantages:
+	1. Faster local resolution for your users
+	2. No spurious traffic will be sent from your network to the roots
+	3. Greater resilience to any potential root server failure/DDoS
+
+	On the other hand, this method requires more monitoring than the
+	hints file to be sure that an unexpected failure mode has not
+	incapacitated your server.  Name servers that are serving a lot
+	of clients will benefit more from this approach than individual
+	hosts.  Use with caution.
+
+	To use this mechanism, uncomment the entries below, and comment
+	the hint zone above.
+
+	As documented at http://dns.icann.org/services/axfr/ these zones:
+	"." (the root), ARPA, IN-ADDR.ARPA, IP6.ARPA, and ROOT-SERVERS.NET
+	are available for AXFR from these servers on IPv4 and IPv6:
+	xfr.lax.dns.icann.org, xfr.cjr.dns.icann.org
+*/
+/*
+zone "." {
+	type slave;
+	file "/etc/namedb/slave/root.slave";
+	masters {
+		192.5.5.241;	// F.ROOT-SERVERS.NET.
+	};
+	notify no;
+};
+
+zone "arpa" {
+	type slave;
+	file "/etc/namedb/slave/arpa.slave";
+	masters {
+		192.5.5.241;	// F.ROOT-SERVERS.NET.
+	};
+	notify no;
+};
+*/
+
+/*	Serving the following zones locally will prevent any queries
+	for these zones leaving your network and going to the root
+	name servers.  This has two significant advantages:
+	1. Faster local resolution for your users
+	2. No spurious traffic will be sent from your network to the roots
+*/
+// RFCs 1912 and 5735 (and BCP 32 for localhost)
+zone "localhost"	{ type master; file "/etc/namedb/master/localhost-forward.db"; };
+zone "127.in-addr.arpa"	{ type master; file "/etc/namedb/master/localhost-reverse.db"; };
+zone "255.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// RFC 1912-style zone for IPv6 localhost address
+zone "0.ip6.arpa"	{ type master; file "/etc/namedb/master/localhost-reverse.db"; };
+
+// "This" Network (RFCs 1912 and 5735)
+zone "0.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// Private Use Networks (RFCs 1918 and 5735)
+zone "10.in-addr.arpa"	   { type master; file "/etc/namedb/master/empty.db"; };
+zone "16.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "17.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "18.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "19.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "20.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "21.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "22.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "23.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "24.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "25.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "26.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "27.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "28.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "29.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "30.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "31.172.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "168.192.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+
+// Link-local/APIPA (RFCs 3927 and 5735)
+zone "254.169.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+
+// IETF protocol assignments (RFCs 5735 and 5736)
+zone "0.0.192.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+
+// TEST-NET-[1-3] for Documentation (RFCs 5735 and 5737)
+zone "2.0.192.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "100.51.198.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "113.0.203.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+
+// IPv6 Range for Documentation (RFC 3849)
+zone "8.b.d.0.1.0.0.2.ip6.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+
+// Domain Names for Documentation and Testing (BCP 32)
+zone "test" { type master; file "/etc/namedb/master/empty.db"; };
+zone "example" { type master; file "/etc/namedb/master/empty.db"; };
+zone "invalid" { type master; file "/etc/namedb/master/empty.db"; };
+zone "example.com" { type master; file "/etc/namedb/master/empty.db"; };
+zone "example.net" { type master; file "/etc/namedb/master/empty.db"; };
+zone "example.org" { type master; file "/etc/namedb/master/empty.db"; };
+
+// Router Benchmark Testing (RFCs 2544 and 5735)
+zone "18.198.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+zone "19.198.in-addr.arpa" { type master; file "/etc/namedb/master/empty.db"; };
+
+// IANA Reserved - Old Class E Space (RFC 5735)
+zone "240.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "241.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "242.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "243.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "244.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "245.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "246.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "247.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "248.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "249.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "250.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "251.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "252.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "253.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "254.in-addr.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// IPv6 Unassigned Addresses (RFC 4291)
+zone "1.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "3.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "4.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "5.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "6.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "7.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "8.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "9.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "a.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "b.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "c.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "d.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "e.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "0.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "1.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "2.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "3.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "4.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "5.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "6.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "7.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "8.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "9.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "a.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "b.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "0.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "1.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "2.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "3.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "4.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "5.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "6.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "7.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// IPv6 ULA (RFC 4193)
+zone "c.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "d.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// IPv6 Link Local (RFC 4291)
+zone "8.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "9.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "a.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "b.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// IPv6 Deprecated Site-Local Addresses (RFC 3879)
+zone "c.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "d.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "e.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+zone "f.e.f.ip6.arpa"	{ type master; file "/etc/namedb/master/empty.db"; };
+
+// IP6.INT is Deprecated (RFC 4159)
+zone "ip6.int"		{ type master; file "/etc/namedb/master/empty.db"; };
+
+// NB: Do not use the IP addresses below, they are faked, and only
+// serve demonstration/documentation purposes!
+//
+// Example slave zone config entries.  It can be convenient to become
+// a slave at least for the zone your own domain is in.  Ask
+// your network administrator for the IP address of the responsible
+// master name server.
+//
+// Do not forget to include the reverse lookup zone!
+// This is named after the first bytes of the IP address, in reverse
+// order, with ".IN-ADDR.ARPA" appended, or ".IP6.ARPA" for IPv6.
+//
+// Before starting to set up a master zone, make sure you fully
+// understand how DNS and BIND work.  There are sometimes
+// non-obvious pitfalls.  Setting up a slave zone is usually simpler.
+//
+// NB: Don't blindly enable the examples below. :-)  Use actual names
+// and addresses instead.
+
+/* An example dynamic zone
+key "exampleorgkey" {
+	algorithm hmac-md5;
+	secret "sf87HJqjkqh8ac87a02lla==";
+};
+zone "example.org" {
+	type master;
+	allow-update {
+		key "exampleorgkey";
+	};
+	file "dynamic/example.org";
+};
+*/
+
+/* Example of a slave reverse zone
+zone "1.168.192.in-addr.arpa" {
+	type slave;
+	file "/etc/namedb/slave/1.168.192.in-addr.arpa";
+	masters {
+		192.168.1.1;
+	};
+};
+*/</pre><p>Это примеры описаний прямой и обратной зон из файла
+	<code class="filename">named.conf</code> для вторичных серверов.</p><p>Для каждого новой зоны, которую будет обслуживать сервер имён,
+	в файл <code class="filename">named.conf</code> должна быть добавлена
+	запись.</p><p>К примеру, самая простая запись для домена <code class="systemitem">example.org</code> может выглядеть вот так:</p><pre class="programlisting">zone "example.org" {
+	type master;
+	file "master/example.org";
+};</pre><p>Зона является первичной, что отражается в поле
+	<code class="option">type</code>, и информация о зоне хранится в файле
+	<code class="filename">/etc/namedb/master/example.org</code>, что указывается в
+	поле <code class="option">file</code>.</p><pre class="programlisting">zone "example.org" {
+	type slave;
+	file "slave/example.org";
+};</pre><p>В случае вторичной зоны информация о ней передается с основного
+	сервера имён для заданной зоны и сохраняется в указанном файле.  Если
+	и когда основной сервер имён выходит и строя или недосягаем, то
+	скачанная информация о зоне будет находиться на вторичных серверах, и
+	они смогут обслуживать эту зону.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98381136"></a>25.6.6.2. Файлы зон</h4></div></div></div><a id="idp98381776" class="indexterm"></a><p>Пример файла зоны <code class="systemitem">example.org</code>
+	для основного
+	сервера  (располагающийся в файле
+	<code class="filename">/etc/namedb/master/example.org</code>) имеет такой
+	вид:</p><pre class="programlisting">$TTL 3600        ; 1 hour default TTL
+example.org.    IN      SOA      ns1.example.org. admin.example.org. (
+                                2006051501      ; Serial
+                                10800           ; Refresh
+                                3600            ; Retry
+                                604800          ; Expire
+                                300             ; Negative Response TTL
+                        )
+
+; DNS Servers
+                IN      NS      ns1.example.org.
+                IN      NS      ns2.example.org.
+
+; MX Records
+                IN      MX 10   mx.example.org.
+                IN      MX 20   mail.example.org.
+
+                IN      A       192.168.1.1
+
+; Machine Names
+localhost       IN      A       127.0.0.1
+ns1             IN      A       192.168.1.2
+ns2             IN      A       192.168.1.3
+mx              IN      A       192.168.1.4
+mail            IN      A       192.168.1.5
+
+; Aliases
+www             IN      CNAME   example.org.</pre><p>Заметьте, что все имена хостов, оканчивающиеся на <span class="quote"><<<span class="quote">.</span>>></span>,
+	задают полное имя, тогда как все имена без символа <span class="quote"><<<span class="quote">.</span>>></span> на
+	конце считаются заданными относительно origin.  Например,
+        <code class="literal">ns1</code> преобразуется в
+        <code class="literal">ns1.<em class="replaceable"><code>example.org.</code></em></code></p><p>Файл зоны имеет следующий формат:</p><pre class="programlisting">recordname      IN recordtype  value</pre><a id="idp98412112" class="indexterm"></a><p>Наиболее часто используемые записи DNS:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">SOA</span></dt><dd><p>начало зоны ответственности</p></dd><dt><span class="term">NS</span></dt><dd><p>авторитативный сервер имен</p></dd><dt><span class="term">A</span></dt><dd><p>адрес хоста</p></dd><dt><span class="term">CNAME</span></dt><dd><p>каноническое имя для алиаса</p></dd><dt><span class="term">MX</span></dt><dd><p>обмен почтой</p></dd><dt><span class="term">PTR</span></dt><dd><p>указатель на доменное имя (используется в обратных
+	      зонах DNS)</p></dd></dl></div><pre class="programlisting">example.org. IN SOA ns1.example.org. admin.example.org. (
+                        2006051501      ; Serial
+                        10800           ; Refresh after 3 hours
+                        3600            ; Retry after 1 hour
+                        604800          ; Expire after 1 week
+                        300 )           ; Negative Response TTL</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="systemitem">example.org.</code></span></dt><dd><p>имя домена, а также ориджин для этого файла зоны.</p></dd><dt><span class="term"><code class="systemitem">ns1.example.org.</code></span></dt><dd><p>основной/авторитативный сервер имён для этой зоны.</p></dd><dt><span class="term"><code class="literal">admin.example.org.</code></span></dt><dd><p>человек, отвечающий за эту зону, адрес электронной почты с
+	      символом <span class="quote"><<<span class="quote">@</span>>></span> замененным на точку.
+	      (<code class="email">&lt;<a xmlns="" class="email" href="mailto:admin@example.org">admin@example.org</a>&gt;</code>
+	      становится <code class="literal">admin.example.org</code>)</p></dd><dt><span class="term"><code class="literal">2006051501</code></span></dt><dd><p>последовательный номер файла.  При каждом изменении файла
+	      зоны это число должно увеличиваться.  В настоящее время для
+	      нумерации многие администраторы предпочитают формат
+	      <code class="literal">ггггммддвв</code>.  <code class="literal">2006051501</code>
+	      будет означать, что
+	      файл последний раз изменялся 15.05.2006, а последнее число
+	      <code class="literal">01</code>
+	      означает, что это была первая модификация файла за день.
+	      Последовательный номер важен, так как он служит для того, чтобы
+	      вторичные серверы узнавали об обновлении зоны.</p></dd></dl></div><pre class="programlisting">       IN      NS      ns1.example.org.</pre><p>Это NS-запись.  Такие записи должны иметься для
+	всех серверов имён, которые будут отвечать за зону.</p><pre class="programlisting">localhost       IN      A       127.0.0.1
+ns1             IN      A       192.168.1.2
+ns2             IN      A       192.168.1.3
+mx              IN      A       192.168.1.4
+mail            IN      A       192.168.1.5</pre><p>Записи типа A служат для обозначения имён машин.  Как это видно
+	выше, имя <code class="systemitem">ns1.example.org</code> будет
+	преобразовано в <code class="systemitem">192.168.1.2</code>.</p><pre class="programlisting">       IN      A       192.168.1.1</pre><p>Эта строка присваивает IP адрес
+	  <code class="systemitem">192.168.1.1</code> текущему ориджину,
+	  в данном случае домену
+	  <code class="systemitem">example.org</code>.</p><pre class="programlisting">www	     IN CNAME	@</pre><p>Записи с каноническими именами обычно используются для присвоения
+	машинам псевдонимов.  В этом примере <code class="systemitem">www</code> является
+	псевдонимом для <span class="quote"><<<span class="quote">главной</span>>></span> машины, имя которой по воле
+	случая совпало с именем домена
+	<code class="systemitem">example.org</code> (<code class="systemitem">192.168.1.1</code>).
+	Записи типа CNAME нельзя использовать совместно с другими
+	типами записей для одного и того же имени хоста (recordname).</p><a id="idp98453072" class="indexterm"></a><pre class="programlisting">	       IN MX   10      mail.example.org.</pre><p>MX-запись указывает, какие почтовые серверы
+	отвечают за обработку входящей электронной почты для зоны.  <code class="systemitem">mail.example.org</code> является именем почтового
+	сервера, а 10 обозначает приоритет этого почтового сервера.</p><p>Можно иметь несколько почтовых серверов с приоритетами,
+	например, 10, 20 и так далее.
+	Почтовый сервер, пытающийся доставить почту для <code class="systemitem">example.org</code>,
+	сначала попробует связаться с машиной, имеющий MX-запись с самым
+	большим приоритетом (наименьшим числовым значением в поле MX),
+	затем с приоритетом поменьше и так далее, до тех
+	пор, пока почта не будет отправлена.</p><p>Для файлов зон in-addr.arpa (обратные записи DNS) используется тот
+	же самый формат, отличающийся только использованием записей
+	PTR вместо A или CNAME.</p><pre class="programlisting">$TTL 3600
+
+1.168.192.in-addr.arpa. IN SOA ns1.example.org. admin.example.org. (
+                        2006051501      ; Serial
+                        10800           ; Refresh
+                        3600            ; Retry
+                        604800          ; Expire
+                        300 )           ; Negative Response TTL
+
+        IN      NS      ns1.example.org.
+        IN      NS      ns2.example.org.
+
+1       IN      PTR     example.org.
+2       IN      PTR     ns1.example.org.
+3       IN      PTR     ns2.example.org.
+4       IN      PTR     mx.example.org.
+5       IN      PTR     mail.example.org.</pre><p>В этом файле дается полное соответствие имён хостов IP-адресам в
+	нашем описанном ранее вымышленном домене.</p><p>Следует отметить, что все имена в правой части PTR-записи должны
+	быть полными доменными именами (то есть, заканчиваться точкой
+	<span class="quote"><<<span class="quote">.</span>>></span>).</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98458192"></a>25.6.7. Кэширующий сервер имён</h3></div></div></div><a id="idp98458832" class="indexterm"></a><p>Кэширующий сервер имён - это сервер имен, чья главная
+	задача - разрешение рекурсивных запросов.  Он просто выполняет
+	запросы от своего имени и сохраняет результаты для последующего
+	использования.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98464720"></a>25.6.8. <acronym class="acronym">* DNSSEC</acronym></h3></div></div></div><a id="idp98465616" class="indexterm"></a><p>Этот раздел не переведен.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98467280"></a>25.6.9. Безопасность</h3></div></div></div><p>Хотя BIND является самой распространенной реализацией DNS, всегда
+	стоит вопрос об обеспечении безопасности.  Время от времени
+	обнаруживаются возможные и реальные бреши в безопасности.</p><p>FreeBSD автоматически запускает <span class="application">named</span>
+	в ограниченном окружении (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>); помимо этого, есть
+	еще несколько механизмов, помогающих защититься от возможных
+	атак на сервис <acronym class="acronym">DNS</acronym>.</p><p>Весьма полезно прочесть сообщения безопасности <a class="link" href="http://www.cert.org/" target="_top">CERT</a> и подписаться на
+	<a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-security-notifications" target="_top">Список рассылки FreeBSD, посвящённый срочным сообщениям, связанным с безопасностью</a> для того, чтобы быть в курсе
+	текущих проблем с обеспечением безопасности Internet и FreeBSD.</p><div xmlns="" class="tip"><h3 class="admontitle">Подсказка: </h3><p xmlns="http://www.w3.org/1999/xhtml">Если возникает проблема, то наличие последних исходных текстов
+	  и свежесобранного <span class="application">named</span> может
+	  способствовать её решению.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="dns-read"></a>25.6.10. Дополнительная литература</h3></div></div></div><p>Справочная информация по BIND/<span class="application">named</span>:
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rndc</span>(8)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">named.conf</span>(5)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=nsupdate&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">nsupdate</span>(8)</span></a>,
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dnssec-signzone&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dnssec-signzone</span>(8)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dnssec-keygen&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dnssec-keygen</span>(8)</span></a></p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="link" href="https://www.isc.org/software/bind" target="_top">
+	    Официальная страница ISC BIND</a></p></li><li class="listitem"><p><a class="link" href="https://www.isc.org/software/guild" target="_top">
+	    Официальный форум ISC BIND</a></p></li><li class="listitem"><p><a class="link" href="http://www.oreilly.com/catalog/dns5/" target="_top">
+	    Книга издательства O'Reilly DNS and BIND 5th Edition</a></p></li><li class="listitem"><p><a class="link" href="http://www.root-dnssec.org/documentation/" target="_top">Root
+	    <acronym class="acronym">DNSSEC</acronym></a></p></li><li class="listitem"><p><a class="link" href="http://data.iana.org/root-anchors/draft-icann-dnssec-trust-anchor.html" target="_top"><acronym class="acronym">DNSSEC</acronym> Trust Anchor Publication for the Root
+	    Zone</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc1034" target="_top">RFC1034
+	    - Domain Names - Concepts and Facilities</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc1035" target="_top">RFC1035
+	    - Domain Names - Implementation and Specification</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc4033" target="_top">RFC4033
+	    - DNS Security Introduction and Requirements</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc4034" target="_top">RFC4034
+	    - Resource Records for the DNS Security Extensions</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc4035" target="_top">RFC4035
+	    - Protocol Modifications for the DNS Security
+	    Extensions</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc4641" target="_top">RFC4641
+	    - DNSSEC Operational Practices</a></p></li><li class="listitem"><p><a class="link" href="http://tools.ietf.org/html/rfc5011" target="_top">RFC5011
+	    - Automated Updates of DNS Security (<acronym class="acronym">DNSSEC</acronym>
+	    Trust Anchors</a></p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-dhcp.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="network-servers.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="network-apache.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">25.5. Автоматическая настройка сети (DHCP) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 25.7. Apache HTTP сервер</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

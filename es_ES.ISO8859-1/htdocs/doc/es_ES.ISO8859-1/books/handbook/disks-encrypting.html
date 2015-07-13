@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>18.15. Cifrado de particiones de disco</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="disks.html" title="Capítulo 18. Almacenamiento" /><link rel="prev" href="quotas.html" title="18.14. Cuotas en sistemas de ficheros" /><link rel="next" href="GEOM.html" title="Capítulo 19. GEOM: Marco de trabajo modular de transformación de discos" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">18.15. Cifrado de particiones de disco</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="quotas.html">Anterior</a> </td><th width="60%" align="center">Capítulo 18. Almacenamiento</th><td width="20%" align="right"> <a accesskey="n" href="GEOM.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-encrypting"></a>18.15. Cifrado de particiones de disco</h2></div><div><span class="authorgroup">Escrito por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Lucky</span> <span class="surname">Green</span></span>. </span></div></div></div><a id="idp78462800" class="indexterm"></a><p>FreeBSD ofrece un alto grado de protección
+      contra el acceso no autorizado a los datos.  Los Permisos de fichero
+      y MAC (Mandatory Access Control, controles de acceso obligatorio,
+      consulte el <a class="xref" href="mac.html" title="Capítulo 16. Mandatory Access Control">Capítulo 16, <em>Mandatory Access Control</em></a>) ayudan a evitar que otros
+      tengan acceso no autorizado a los datos mientras el sistema
+      operativo está funcionando y la computadora está
+      encendida.  Sin embargo los permisos impuestos por el
+      sistema operativo son irrelevantes si un atacante tiene acceso
+      físico al sistema y puede simplemente mover el disco
+      duro de la computadora a otro sistema para copiar
+      y analizar datos sensibles.</p><p>Independientemente de cómo un atacante pueda
+      conseguir acceso a un disco duro a a un sistema apagado,
+      <span class="application">el cifrado de disco basado en GEOM
+      (GEOM Based Disk Encryption, gbde)</span> puede proteger
+      los datos de los sistemas de ficheros del sistema incluso
+      contra atacantes muy decididos y con recursos adecuados a
+      su disposición.   A diferencia de otros métodos de
+      cifrado más difíciles de usar, que cifran
+      únicamente ficheos individuales,
+      <span class="application">gbde</span> cifra sistemas de ficheros
+      completos de forma transparente.  Ni un solo texto en limpio
+      llega a tocar el disco duro.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78465744"></a>18.15.1. Habilitar gbde en el kernel</h3></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Conviértase en <code class="systemitem">root</code></strong></p><p>La configuración de <span class="application">gbde</span>
+            requiere privilegios de superusuario.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su -</code></strong>
+Password:</pre></li><li class="step"><p class="title"><strong>Verifique la versión del sistema operativo</strong></p><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a> requiere FreeBSD 5.0 o posterior.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>uname -r</code></strong>
+5.0-RELEASE</pre></li><li class="step"><p class="title"><strong>Añada soporte de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a> al fichero de
+            configuración de su kernel</strong></p><p>Añada la siguiente línea al fichero de
+            configuración de su kernel con el editor que
+            prefiera:</p><p><code class="literal">options GEOM_BDE</code></p><p>Configure, recompile e instale el kernel de FreeBSD.
+            Este proceso se detalla en el
+            <a class="xref" href="kernelconfig.html" title="Capítulo 8. Configuración del kernel de FreeBSD">Capítulo 8, <em>Configuración del kernel de FreeBSD</em></a>.</p><p>Reinicie con el nuevo kernel.</p></li></ol></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78480592"></a>18.15.2. Preparación del disco duro cifrado</h3></div></div></div><p>El siguiente ejemplo asume que añade a su sistema
+        un disco duro nuevo que contendrá una sola
+        partición cifrada.  Esta partición se
+        montará como <code class="filename">/private</code>.
+        <span class="application">gbde</span> puede usarse también
+        para cifrar <code class="filename">/home</code> y
+        <code class="filename">/var/mail</code>,
+        pero esto requeriría instrucciones más complejas que
+        las que se pretenden dar en esta introducción.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Añada el nuevo disco</strong></p><p>Instale el nuevo disco en el sistema como se explicó
+            en la <a class="xref" href="disks-adding.html" title="18.3. Añadir discos">Sección 18.3, &#8220;Añadir discos&#8221;</a>.  En nuestro ejemplo hemos
+            añadido una nueva partición de disco como
+            <code class="filename">/dev/ad4s1c</code>.  Los dispositivos
+            <code class="filename">/dev/ad0s1*</code>
+            representan particiones FreeBSD estándar que i
+            existían previamente en el sistema.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4</pre></li><li class="step"><p class="title"><strong>Crée un directorio para los ficheros
+            <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span> de gbde</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/gbde</code></strong></pre><p>Los ficheros <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span> de
+            <span class="application">gbde</span>
+            contienen información que <span class="application">gbde</span>
+            requiere para acceder a las particiones cifradas.   Sin el
+            acceso a los ficheros <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span>
+            <span class="application">gbde</span> no podrá descifrar los
+            datos alojados en la partición cifrada sin una cantidad
+            significativa de trabajo, tarea para la que además
+            no le resultará de ayuda este software.  Cada
+            partición cifrada utiliza un fichero
+            <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span> separado.</p></li><li class="step"><p class="title"><strong>Inicialice la partición gbde</strong></p><p>Una partición <span class="application">gbde</span>
+            debe inicializarse antes de que pueda utilizarse.
+            Esta inicialización sólo debe hacerse
+            una vez:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde init /dev/ad4s1c -i -L /etc/gbde/ad4s1c</code></strong></pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> abrirá su editor para que pueda
+            configurar las opciones de configuración que se
+            le presentarán en una plantilla.
+            Para utilizar UFS1 o UFS2, ponga el sector_size a 2048:</p><pre class="programlisting">$FreeBSD: src/sbin/gbde/template.txt,v 1.1 2002/10/20 11:16:13 phk Exp $
+#
+# El tamaño de sector (sector size) es la unidad de datos más
+# pequeña que podrá leer o escribir.  Si la elige demasiado
+# pequeña reducirá el rendimiento y la cantidad de espacio
+# útil.  Si la elige demasiado grande puede hacer que los sistemas
+# de ficheros no funcionen.  512 es el tamaño mínimo y
+# siempre funciona.  Si va a usar UFS utilice
+#
+sector_size     =       2048
+[...]
+</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> le pedirá dos veces que escriba la
+            contraseña que debe usarse para asegurar los datos.
+            La contraseña debe ser la misma las dos veces.  La
+            capacidad de <span class="application">gbde</span> de proteger sus
+            datos depende íntegramente de la calidad de la
+            contraseña que elija.
+	  <a href="#ftn.idp78501072" class="footnote" id="idp78501072"><sup class="footnote">[11]</sup></a></p><p>El fichero <code class="command">gbde init</code> crea un fichero
+            <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span> para su partición
+            <span class="application">gbde</span>, que en nuestro ejemplo
+            está en
+	    <code class="filename">/etc/gbde/ad4s1c</code>.</p><div xmlns="" class="caution"><h3 class="admontitle">Atención: </h3><p xmlns="http://www.w3.org/1999/xhtml">Es imprescindible que los ficheros <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span>
+              de <span class="application">gbde</span>
+              <span class="emphasis"><em>deben</em></span> respaldarse junto con
+              el contenido de cualquier partición cifrada.
+              Aunque la sola acció de borrar
+              un fichero <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span> no puede evitar que un atacante
+              motivado descifre una partición
+              <span class="application">gbde</span> sin el fichero
+              <span class="quote">&#8220;<span class="quote">lock</span>&#8221;</span>, el propietario legítimo
+              no podrá acceder a los datos en la partición
+              cifrada sin una cantidad notable de trabajo, que es
+              necesario señalar que no entra dentro de las funciones
+              de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> ni de su diseñador.</p></div></li><li class="step"><p class="title"><strong>Conecte al kernel la partición cifrada</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c</code></strong></pre><p>Se le pedirá la contraseña que elijió
+            al inicializar la partición cifrada.  El
+            nuevo dispositivo cifrado aparecerá en
+            <code class="filename">/dev</code> como
+	    <code class="filename">/dev/nombre_de_dispositivo.bde</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4        /dev/ad4s1c.bde</pre></li><li class="step"><p class="title"><strong>Crée un sistema de ficheros en el dispositivo
+            cifrado</strong></p><p>Una vez el dispositivo cifrado está conectado
+            al kernel puede crear un sistema de ficheros en el
+            dispositivo con <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a>.  Dado que es más
+            rápido inicializar un sistema de ficheros del
+            nuevo UFS2 que un sistema de ficheros del tradicional
+            UFS1, le recomendamos encarecidamente usar
+            <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> con la opción
+            <code class="option">-O2</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">La opción <code class="option">-O2</code> es el
+            valor por defecto en FreeBSD 5.1-RELEASE
+            y siguientes.</p></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U -O2 /dev/ad4s1c.bde</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml"><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> debe ejecutarse en una
+              partición <span class="application">gbde</span>
+              conectada, que podrá identificar por la extensión
+	      <code class="filename">*.bde</code>
+              del nombre del dispositivo.</p></div></li><li class="step"><p class="title"><strong>Montar la partición cifrada</strong></p><p>Crée un punto de montaje para el sistema cifrado
+            de ficheros.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /private</code></strong></pre><p>Montar el sistema cifrado de ficheros.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre></li><li class="step"><p class="title"><strong>Verificar que el sistema cifrado de ficheros esté
+            disponible</strong></p><p>el sistema cifrado de ficheros debería ser visible
+            para <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> y estar listo para su uso.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem        Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a      1037M    72M   883M     8%    /
+/devfs            1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f       8.1G    55K   7.5G     0%    /home
+/dev/ad0s1e      1037M   1.1M   953M     0%    /tmp
+/dev/ad0s1d       6.1G   1.9G   3.7G    35%    /usr
+/dev/ad4s1c.bde   150G   4.1K   138G     0%    /private</pre></li></ol></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78607824"></a>18.15.3. Montaje de sistemas cifrados de ficheros</h3></div></div></div><p>Todos los sistemas cifrados de ficheros deben reconectarse al
+        kernel después de cada arranque.  Además, antes de
+        poder utilizarlo debe revisarlo por si contuviera errores y montarlo.
+        Todo el proceso debe ser ejecutado por el usuario
+        <code class="systemitem">root</code>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Conectar la partición gbde al kernel</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c</code></strong></pre><p>Se le pedirá la contraseña que
+            elijió en la inicialización
+            de la partición cifrada gbde.</p></li><li class="step"><p class="title"><strong>Revisión de errores en el sistema de ficheros</strong></p><p>Como que los sistemas cifrados de ficheros no pueden
+            aparecer en <code class="filename">/etc/fstab</code> (lo que haría
+            que fueran montados automáticamente), los sistemas
+            de ficheros deben revisarse manualmente mediante <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a>
+            antes de montarlos.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -p -t ffs /dev/ad4s1c.bde</code></strong></pre></li><li class="step"><p class="title"><strong>Montar los sistemas cifrados de ficheros</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre><p>El sistema cifrado de ficheros está listo para su
+            uso.</p></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78617168"></a>18.15.3.1. Montar automáticamente particiones cifradas</h4></div></div></div><p>Es posible usar un <span class="quote">&#8220;<span class="quote">script</span>&#8221;</span> para automatizar
+          la conexión, revisión y el montaje de una
+          partición cifrada, pero por razones de seguridad el
+          <span class="quote">&#8220;<span class="quote">script</span>&#8221;</span> no debe contener la
+          contraseña de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a>.  Se recomienda
+          ejecutar esos <span class="quote">&#8220;<span class="quote">scripts</span>&#8221;</span> se ejecuten de forma manual
+          proporcionando la contraseña vía consola o
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78621136"></a>18.15.4. Protección criptográfica que usa gbde</h3></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> cifra el XXX sector payload usando AES de 128 bits
+          en modo CBC.  Cada sector en el disco se cifra con una clave
+          AES diferente.  Para más información sobre el
+          diseño criptográfico de
+          <span class="application">gbde</span>, incluyendo cómo se
+          derivan las claves de sector a partir de la contraseña
+          consulte <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78628304"></a>18.15.5. Problemas de compatibilidad</h3></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> es incompatible con dispositivos
+          <span class="application">gbde</span> cifrados.  Todos los
+          dispositivos <code class="filename">*.bde</code>
+          deben desconectarse del kernel antes de iniciar
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> o se <span class="quote">&#8220;<span class="quote">congelará</span>&#8221;</span> durante
+          la prueba inicial de dispositivos.  Para desconectar el
+          el dispositivo cifrado de nuestro ejemplo haga lo siguiente:
+          </p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde detach /dev/ad4s1c</code></strong></pre><p>Tenga en cuenta también que, como <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">vinum</span>(4)</span></a> no
+        utiliza el subsistema <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">geom</span>(4)</span></a>, no es posible usar
+        <span class="application">gbde</span> en volúmenes
+	<span class="application">vinum</span>.</p></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp78501072" class="footnote"><p><a href="#idp78501072" class="para"><sup class="para">[11] </sup></a>Si quiere ayuda para seleccionar una contraseña
+            segura que además sea fácil de recordar visite
+            el sitio web
+            <a class="link" href="http://world.std.com/~reinhold/diceware.html" target="_top">Diceware
+            Passphrase</a>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="quotas.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">18.14. Cuotas en sistemas de ficheros </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> Capítulo 19. GEOM: Marco de trabajo modular de transformación de discos</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.3. RAID0 - Distribución por bandas</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="GEOM.html" title="Capítulo 19. GEOM: Marco de trabajo modular de transformación de discos" /><link rel="prev" href="GEOM-intro.html" title="19.2. Introducción a GEOM" /><link rel="next" href="GEOM-mirror.html" title="19.4. RAID1 - Replicación" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.3. RAID0 - Distribución por bandas</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-intro.html">Anterior</a> </td><th width="60%" align="center">Capítulo 19. GEOM: Marco de trabajo modular de transformación de discos</th><td width="20%" align="right"> <a accesskey="n" href="GEOM-mirror.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-striping"></a>19.3. RAID0 - Distribución por bandas</h2></div><div><span class="authorgroup">Escrito por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span> y <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Murray</span> <span class="surname">Stokely</span></span>. </span></div></div></div><a id="idp78667216" class="indexterm"></a><a id="idp78667984" class="indexterm"></a><p>La distribución por bandas (striping) es un método que
+      se usa para combinar varias unidades de disco en un único volumen.
+      En muchos casos, esto se hace usando controladoras por hardware.  El
+      subsistema de discos GEOM proporciona soporte por software para
+      <acronym class="acronym">RAID</acronym>0, también conocido como discos
+      configurados en bandas.</p><p>En un sistema <acronym class="acronym">RAID</acronym>0, los datos se dividen en
+      bloques que son escritos por todas las unidades de la agrupación.
+      En lugar de tener que esperar a que el sistema escriba 256 kB en un
+      disco, un sistema <acronym class="acronym">RAID</acronym>0 puede escribir simultáneamente
+      64 kB en cada uno de los cuatro discos, ofreciendo un superior
+      rendimiento de E/S.  Este rendimiento se puede mejorar aún
+      más usando varias controladoras de disco.</p><p>Cada uno de los discos de una banda <acronym class="acronym">RAID</acronym>0 debe ser
+      del mismo tamaño, pues las peticiones de E/S están
+      intercaladas para leer o escribir en varios discos en paralelo.</p><div class="mediaobject" align="center"><img src="geom/striping.png" align="middle" alt="Ilustració de la distribución por bandas de los discos" /></div><div class="procedure"><a id="idp78673872"></a><div class="procedure-title">Procedimiento 19.1. Creación de una banda de discos ATA sin formatear</div><ol class="procedure" type="1"><li class="step"><p>Cargue el módulo <code class="filename">geom_stripe</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_stripe.ko</code></strong></pre></li><li class="step"><p>Asegúrese de que existe un punto de montaje adecuado.
+	Si este volumen se convertirá en una partición raíz,
+	utilice temporalmente otro punto de montaje, como <code class="filename">/mnt</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /mnt</code></strong></pre></li><li class="step"><p>Determine los nombres de dispositivo de los discos que
+	serán configurados en bandas, y cree el nuevo dispositivo de
+	banda.  Por ejemplo, podría utilizar la siguiente orden para configurar
+	en bandas dos discos <acronym class="acronym">ATA</acronym> sin usar ni particionar:
+        <code class="filename">/dev/ad2</code> y
+        <code class="filename">/dev/ad3</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gstripe label -v st0 /dev/ad2 /dev/ad3</code></strong></pre></li><li class="step"><p>Si se va a usar este volumen como dispositivo raíz
+	para arrancar el sistema, debe ejecutar la siguiente orden antes de
+	crear el sistema de ficheros:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fdisk -vBI /dev/stripe/st0</code></strong></pre></li><li class="step"><p>Se debe crear una tabla de particiones en el nuevo volumen con la
+	siguiente orden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/stripe/st0</code></strong></pre></li><li class="step"><p>Aademás del dispositivo <code class="filename">st0</code>,
+	este proceso debería haber creado otros dos
+	dispositivos en el directorio
+	<code class="filename">/dev/stripe</code>, incluyendo
+	<code class="filename">st0a</code> y <code class="filename">st0c</code>.
+        Ahora se debe crear un sistema de ficheros en el dispositivo
+	<code class="filename">st0a</code> usando la siguiente orden
+        <code class="command">newfs</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/stripe/st0a</code></strong></pre><p>Por la pantalla se deslizarán muchos números, y al
+	cabo de unos pocos segundos, el proceso habrá finalizado.  El
+	volumen ha sido creado y está preparado para ser montado:</p></li></ol></div><p>Se puede usar la siguiente orden para montar manualmente una banda de
+	  discos recién creada:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/stripe/st0a /mnt</code></strong></pre><p>Para montar automáticamente este sistema de ficheros distribuido
+    por bandas durante el proceso de arranque, ponga la información
+    del volumen en el fichero <code class="filename">/etc/fstab</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "/dev/stripe/st0a /mnt ufs rw 2 2" \</code></strong>
+    <strong class="userinput"><code>&gt;&gt; /etc/fstab</code></strong></pre><p>También se debe cargar automáticamente durante la
+    inicialización del sistema el módulo geom, añadiendo
+    una línea a <code class="filename">/boot/loader.conf</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_stripe_load="YES"' &gt;&gt; /boot/loader.conf</code></strong></pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-intro.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM-mirror.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">19.2. Introducción a GEOM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> 19.4. RAID1 - Replicación</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

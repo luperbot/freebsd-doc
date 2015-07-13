@@ -1,0 +1,894 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>27.4. Network Information System (NIS/YP)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="network-servers.html" title="Capitolo 27. Server di rete" /><link rel="prev" href="network-nfs.html" title="27.3. Network File System (NFS)" /><link rel="next" href="network-dhcp.html" title="27.5. Configurazione Automatica della Rete (DHCP)" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.4. Network Information System (NIS/YP)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-nfs.html">Indietro</a> </td><th width="60%" align="center">Capitolo 27. Server di rete</th><td width="20%" align="right"> <a accesskey="n" href="network-dhcp.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-nis"></a>27.4. Network Information System (NIS/YP)</h2></div><div><span class="authorgroup">Scritto da <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Bill</span> <span class="surname">Swingle</span></span>. </span></div><div><span class="authorgroup">Migliorato da <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Eric</span> <span class="surname">Ogren</span></span> e <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Udo</span> <span class="surname">Erdelhoff</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp87924432"></a>27.4.1. Cos'è?</h3></div></div></div><a id="idp87925072" class="indexterm"></a><a id="idp87999440" class="indexterm"></a><a id="idp87999952" class="indexterm"></a><a id="idp88000464" class="indexterm"></a><a id="idp88000976" class="indexterm"></a><a id="idp88001488" class="indexterm"></a><a id="idp88002000" class="indexterm"></a><p><acronym class="acronym">NIS</acronym>,
+        che sta per Network Information Services, fu sviluppato
+        da Sun Microsystems per centralizzare l'amministrazione
+        di sistemi <span class="trademark">UNIX</span>® (in origine <span class="trademark">SunOS</span>&#8482;).  Ora in sostanza
+        è diventato uno standard di settore; tutti i sistemi
+        <span class="trademark">UNIX</span>® like (<span class="trademark">Solaris</span>&#8482;, HP-UX, <span class="trademark">AIX</span>®, Linux, NetBSD,
+        OpenBSD, FreeBSD, etc) supportano
+        <acronym class="acronym">NIS</acronym>.</p><a id="idp88006096" class="indexterm"></a><p><acronym class="acronym">NIS</acronym>
+        in precedenza era noto come Yellow Pages, ma per una questione
+        di marchi, Sun ha cambiato il nome.  Il vecchio termine (e yp)
+        è ancora si incontra ancora spesso.</p><a id="idp88015952" class="indexterm"></a><p>E' un sistema client/server basato su RPC che
+        permette ad un gruppo di macchine in un dominio
+        NIS di condividere un insieme comune di file di
+        configurazione.  Questo permette ad un amministratore
+        di sistema di installare sistemi client
+        NIS con il minimo di dati di configurazione e di aggiungere,
+        rimuovere o modificare dati di configurazione da una singola
+        macchina.</p><a id="idp88017488" class="indexterm"></a><p>E' simile al sistema di domini di <span class="trademark">Windows NT</span>®; anche
+        se le implementazioni interne dei due sistemi sono del tutto
+        diverse, le funzionalità  base possono essere
+        paragonate.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88019024"></a>27.4.2. Termini/Processi che Dovresti Conoscere</h3></div></div></div><p>Ci sono parecchi termini e molti importanti processi
+        utente che incontrerai quando cercherai di implementare
+        NIS su FreeBSD, sia che cerchi di creare un server NIS
+        sia che cerchi di installare un client NIS:</p><a id="idp88020048" class="indexterm"></a><a id="idp88020944" class="indexterm"></a><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Termine</th><th>Descrizione</th></tr></thead><tbody><tr><td>Nome dominio NIS</td><td>Un server NIS master e tutti i suoi client
+                (inclusi i suoi server slave) hanno un nome
+                dominio NIS.  Analogamente al nome dominio di
+                <span class="trademark">Windows NT</span>®, il nome dominio NIS non ha nulla
+                a che fare
+                con il <acronym class="acronym">DNS</acronym>.</td></tr><tr><td><span class="application">rpcbind</span></td><td>Deve essere in esecuzione al fine
+                di abilitare <acronym class="acronym">RPC</acronym> (Remote
+                Procedure Call, un protocollo di rete usato da NIS).
+                Se <span class="application">rpcbind</span> non è attivo,
+                sarà  impossibile portare in esecuzione un server NIS
+                o fungere da client NIS
+              </td></tr><tr><td><span class="application">ypbind</span></td><td>Esegue il <span class="quote">«<span class="quote">bind</span>»</span> di un client NIS
+                al suo server.  Prenderà  il nome dominio NIS dal
+                sistema, e, usando <acronym class="acronym">RPC</acronym>, si
+                connetterà  al server.
+                <span class="application">ypbind</span>
+                è il fulcro di una comunicazione client-server in
+                ambiente NIS; se <span class="application">ypbind</span>
+                muore su un client, questo non sarà  in grado di
+                accedere il server NIS.</td></tr><tr><td><span class="application">ypserv</span></td><td>Dovrebbe essere in esecuzione solo sui
+                server NIS;è il processo NIS vero e
+                proprio.  Se <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a>
+                muore, il server non sarà  più in grado di
+                rispondere a richieste NIS (si spera ci sia
+                un server slave per sostituirlo).  Ci sono
+                alcune implementazioni di NIS
+                (ma non quello di FreeBSD) che non cerca di
+                ricollegarsi ad un altro server se il server
+                che stava usando muore.  Spesso, l'unica cosa
+                che aiuta in questo caso è riavviare il
+                processo server (o anche
+                l'intero server o il processo
+                <span class="application">ypbind</span> sul client).</td></tr><tr><td><span class="application">rpc.yppasswdd</span></td><td>Un altro processo che dovrebbe essere in
+                esecuzione solo sui server master NIS; è un demone
+                che permette a client NIS di cambiare le proprie
+                password NIS.  Se questo demone non è attivo,
+                gli utenti dovranno loggarsi al server master NIS
+                e cambiare le proprie password da lì.</td></tr></tbody></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88040912"></a>27.4.3. Come funziona?</h3></div></div></div><p>Ci sono tre tipi di host in ambiente NIS:
+        master server, slave server e client.  I server
+        fungono da magazzino centralizzato per le
+        informazioni sulla configurazione degli host.  I
+        server master mantengono la copia "ufficiale"
+        di queste informazioni, mentre i server slave effettuano
+        il mirror di queste informazioni per ridondanza.  I client
+        si affidano al server per ottenere queste informazioni.</p><p>Le informazioni in molti file possono essere
+        condivise in questo modo.  I file
+        <code class="filename">master.passwd</code>
+        ,<code class="filename">group</code> e <code class="filename">hosts</code> sono
+        in genere condivisi in questo modo via NIS.  Qualora un
+        processo su un client necessiti di informazioni che
+        normalmente sarebbero trovate in questi file in locale,
+        fa una query al server NIS a cui è legato.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88043472"></a>27.4.3.1. Tipi di macchine</h4></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Un <span class="emphasis"><em>server master NIS</em></span><a id="idp88045264" class="indexterm"></a>. Questo
+              server, analogamente a primary domain controller
+              <span class="trademark">Windows NT</span>® , mantiene i file usati da tutti i client
+              NIS.  Il file <code class="filename">passwd</code>,
+              il file <code class="filename">group</code>, e vari altri
+              file usati da client NIS vivono sul
+              server master.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">E' possibile per una macchina agire
+              da master server NIS per più di un dominio
+              NIS.  Comunque, questo caso non sarà 
+              coperto in questa introduzione,
+              che presuppone un ambiente NIS relativamente piccolo.</p></div></li><li class="listitem"><p><span class="emphasis"><em>NIS slave server</em></span><a id="idp88048976" class="indexterm"></a>.  Analogamente
+              a backup domain controller <span class="trademark">Windows NT</span>®, i server
+              slave NIS mantengono copie dei file di dati
+              del server master NIS.  I server slave NIS garantiscono
+              la ridondanza che viene richiesta in ambienti
+              importanti.  Inoltre aiutano a bilanciare il carico
+              del server master: i client NIS si legano sempre
+              al NIS server che risponde per primo alla loro richiesta,
+              compresi i server slave.</p></li><li class="listitem"><p><span class="emphasis"><em>NIS client</em></span><a id="idp88051152" class="indexterm"></a>.  I client NIS,
+              come la maggior parte delle workstation <span class="trademark">Windows NT</span>®
+              , si autenticano nei confronti del NIS server
+              (o del domain controller <span class="trademark">Windows NT</span>® nel caso di
+              workstation <span class="trademark">Windows NT</span>®) per effettuare il login.
+            </p></li></ul></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88062416"></a>27.4.4. Usare NIS/YP</h3></div></div></div><p>Questa sezione riguarderà  l'installazione
+        di un ambiente di esempio NIS.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88063440"></a>27.4.4.1. Il Piano</h4></div></div></div><p>Supponiamo che tu sia l'amministratore di un piccolo
+          laboratorio universitario.  Questo laboratorio, che
+          consiste di 15 macchine FreeBSD, al momento non ha
+          un sistema centralizzato di amministrazione; ogni
+          macchina ha il suo <code class="filename">/etc/passwd</code> e
+          <code class="filename">/etc/master.passwd</code>.  Questi file
+          sono tenuti sincronizzati fra di loro attraverso
+          intervento manuale; al momento, quando aggiungi un utente
+          al laboratorio, devi eseguire <code class="command">adduser</code>
+          su tutte e 15 le macchine.  Chiaramente, questa situazione
+          è provvisoria, così hai deciso di convertire il
+          laboratorio a NIS, usando due delle macchine
+          come server.</p><p>Così la configurazione del laboratorio adesso
+          sembra questa:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /><col /></colgroup><thead><tr><th>Nome della macchina</th><th>Indirizzo IP</th><th>Ruolo della macchina</th></tr></thead><tbody><tr><td><code class="systemitem">ellington</code></td><td><code class="systemitem">10.0.0.2</code></td><td>NIS master</td></tr><tr><td><code class="systemitem">coltrane</code></td><td><code class="systemitem">10.0.0.3</code></td><td>NIS slave</td></tr><tr><td><code class="systemitem">basie</code></td><td><code class="systemitem">10.0.0.4</code></td><td>Workstation della facoltà</td></tr><tr><td><code class="systemitem">bird</code></td><td><code class="systemitem">10.0.0.5</code></td><td>Macchina client</td></tr><tr><td><code class="systemitem">cli[1-11]</code></td><td><code class="systemitem">10.0.0.[6-17]</code></td><td>Altre macchine client</td></tr></tbody></table></div><p>Se stai installando uno schema NIS per la
+          prima volta, è una buona idea riflettere
+          su come affrontarlo.  Indipendemente dalla
+          dimensione della rete, ci sono alcune
+          decisioni che devono essere prese.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88083792"></a>27.4.4.1.1. Scegliere un nome dominio NIS</h5></div></div></div><a id="idp88084432" class="indexterm"></a><p>Questo può non essere il
+            <span class="quote">«<span class="quote">nome dominio</span>»</span> a
+            cui sei abituato.  Per la precisione viene chiamato
+            <span class="quote">«<span class="quote">nome dominio NIS</span>»</span>.  Quando un client
+            fa il broadcast della sua richiesta per informazioni,
+            include il nome del dominio NIS di cui fa parte.
+            In questo modo molti server su una rete possono distinguere
+            a quale server la richiesta è riferita.  Considerate
+            il nome dominio NIS come il nome per un gruppo di host
+            che sono collegati per qualche motivo.</p><p>Alcune organizzazioni scelgono di usare il loro
+            nome dominio Internet come nome dominio NIS.  Questo non
+            è raccomandabile in quanto può causare confusione
+            quando si cerchi di debuggare problemi di rete.
+            Il nome dominio NIS dovrebbe essere unico all'interno
+            della tua rete ed è utile che sia descrittivo
+            del gruppo di macchine che rappresenta.  Per
+            esempio, il dipartimento di Arte della Acme Inc. può
+            essere nel dominio <span class="quote">«<span class="quote">acme-art</span>»</span>.  Per questo
+            esempio, si presume tu abbia scelto il nome
+            <code class="literal">test-domain</code>.</p><a id="idp88087888" class="indexterm"></a><p>Comunque, alcuni sistemi operativi (principalmente
+            <span class="trademark">SunOS</span>&#8482;) usano il loro nome dominio NIS come loro nome
+            dominio Internet.  Se una o più macchine sulla tua rete
+            hanno questa restrizione, tu <span class="emphasis"><em>devi</em></span>
+            usare il nome dominio Internet come il tuo
+            nome dominio NIS.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88130768"></a>27.4.4.1.2. Requisiti fisici dei server</h5></div></div></div><p>Ci sono molte cose da tener in mente quando si
+            sceglie quale macchina usare come server NIS.  Una
+            delle caratteristiche più sfortunate di NIS
+            è il livello di dipendenza che i client hanno
+            verso il server.  Se un client non riesce a
+            contattare il server per
+            il suo dominio NIS, molto spesso la macchina risulta
+            inutilizzabile.  La mancanza di informazioni utente e
+            di gruppo fa sì che molti sistemi si blocchino.  Tenendo
+            questo in mente dovresti accertati di scegliere una
+            macchina che non sia soggetta a reboot frequenti o
+            una che non sia usata per sviluppo.  Il server
+            NIS dovrebbe essere in teoria una macchina
+            stand alone il cui unico
+            scopo di esistenza è essere un server NIS.  Se hai una
+            rete non pesantemente trafficata,
+            è accettabile installare
+            il server NIS su una macchina che esegue altri servizi,
+            basta ricordarsi che se il server NIS diventa
+            irrangiungibile, <span class="emphasis"><em>tutti</em></span> i tuoi
+            client NIS ne saranno affetti in modo negativo.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88132432"></a>27.4.4.2. Server NIS</h4></div></div></div><p> Le copie canoniche di tutte le informazioni NIS
+          sono conservate su una singola macchina chiamata
+          il server master NIS.  I database usati per conservare
+          le informazioni sono chiamate mappe NIS.  In FreeBSD,
+          queste mappe sono conservate in
+          <code class="filename">/var/yp/[nome-dominio]</code> dove
+          <code class="filename">[nome-dominio]</code> è il nome del dominio
+          NIS che si server.  Un singolo server NIS può supportare
+          molti domini al tempo stesso, di conseguenza è
+          possibile avere molte directory di questo tipo,
+          una per ogni dominio supportato.  Ogni dominio
+          avrà  il suo insieme indipendente di mappe.</p><p>I server NIS master e slave gestiscono tutte le
+          richieste NIS col demone <code class="command">ypserv</code>.
+          <code class="command">ypserv</code> è responsabile per
+          la ricezione delle richieste in entrata dai client NIS,
+          traducendo il dominio richiesto e il nome mappa ad un
+          percorso verso il file di database e trasmettendo
+          i dati indietro al client.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88135376"></a>27.4.4.2.1. Installare un server master NIS</h5></div></div></div><a id="idp88136016" class="indexterm"></a><p>Installare un server master NIS può essere
+            relativamente semplice, a seconda delle tue
+            necessità .  FreeBSD presenta un supporto nativo
+            per NIS.  Tutto quello che devi fare è aggiungere
+            le seguenti linee a <code class="filename">/etc/rc.conf</code>,
+            e FreeBSD farà  il resto.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><pre class="programlisting">nisdomainname="test-domain"</pre><p>
+                Questa linea imposterà  il nome domino NIS a
+                <code class="literal">test-domain</code>
+                al momento della configurazione di rete
+                (ad esempio dopo il reboot).</p></li><li class="step"><pre class="programlisting">nis_server_enable="YES"</pre><p>
+                Questa linea dirà  a FreeBSD di avviare i processi
+                NIS server la prossima volta che la rete
+                è riavviata.</p></li><li class="step"><pre class="programlisting">nis_yppasswdd_enable="YES"</pre><p>
+                Questo avvierà  il demone
+                <code class="command">rpc.yppasswd</code> che, come accennato
+                prima, permetterà  agli utenti di cambiare la loro
+                password NIS dalle macchine client.</p></li></ol></div><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">A seconda delle tue impostazioni NIS, potresti
+              aver bisogno di aggiungere altre linee.  Leggi
+              la <a class="link" href="network-nis.html#network-nis-server-is-client" title="27.4.10. Server NIS che Sono Anche Client">
+              sezione sui NIS server che sono anche NIS client
+              </a>, di seguito, per dettagli.</p></div><p>Ora, tutto quello che devi fare è eseguire
+             il comando <code class="command">/etc/netstart</code>
+             come super-utente.  Questo imposterà 
+             il sistema, usando i valori che hai specificato
+             in <code class="filename">/etc/rc.conf</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88149200"></a>27.4.4.2.2. Inizializzare le mappe NIS</h5></div></div></div><a id="idp88149840" class="indexterm"></a><p>Le <span class="emphasis"><em>mappe NIS</em></span> sono file di
+            database, che sono conservati nella directory
+            <code class="filename">/var/yp</code>.  Sono generati
+            da file di configurazione nella directory
+            <code class="filename">/etc</code> del NIS master, con
+            una eccezione: il file
+            <code class="filename">/etc/master.passwd</code>.
+            C'è un buon motivo per questo, infatti
+            normalmente non vuoi che siano
+            propagate le password a <code class="systemitem">root</code>
+            e ad altri account amministrativi a tutti gli
+            altri server nel dominio NIS.  Così prima
+            di inizializzare le mappe
+            NIS, dovresti:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp /etc/master.passwd /var/yp/master.passwd</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /var/yp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>vi master.passwd</code></strong></pre><p>Dovresti rimuovere tutte le linee che riguardano
+            account di sistema (<code class="systemitem">bin</code>,
+            <code class="systemitem">tty</code>, <code class="systemitem">kmem</code>,
+            <code class="systemitem">games</code>, etc.), così come altri
+            account che non vuoi siano propagate ai client NIS
+            (per esempio <code class="systemitem">root</code> ed ogni altro
+            account con UID 0 (super-utente)).</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Accertati che il file
+              <code class="filename">/var/yp/master.passwd</code> non
+              sia nè leggibile dal gruppo nè dal resto
+              del mondo (modo 600)!
+              Usa il comando <code class="command">chmod</code>, se
+              appropriato.</p></div><a id="idp88164688" class="indexterm"></a><p>Quando hai finito, è il momento di inizializzare
+            le mappe NIS!  FreeBSD include uno script chiamato
+            <code class="command">ypinit</code> che lo fa per te (leggi
+            la sua pagina di manuale per dettagli).  Nota che
+            questo script è disponibile sulla maggior parte dei
+            sistemi operativi <span class="trademark">UNIX</span>® ma non su tutti.  Su
+            Digital Unix/Compaq Tru64 UNIX è chiamato
+            <code class="command">ypsetup</code>.  Poichè stiamo generando
+            mappe per un NIS master, passeremo l'opzione
+            <code class="option">-m</code> al comando <code class="command">ypinit</code>.
+            Per generare le mappe NIS, supponendo che tu abbia già 
+            eseguito i passi di cui sopra, esegui:</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>ypinit -m test-domain</code></strong>
+Server Type: MASTER Domain: test-domain
+Creating an YP server will require that you answer a few questions.
+Questions will all be asked at the beginning of the procedure.
+Do you want this procedure to quit on non-fatal errors? [y/n: n]
+<strong class="userinput"><code>n</code></strong>
+Ok, please remember to go back and redo manually whatever fails.
+If you don't, something might not work.
+At this point, we have to construct a list of this domains YP servers.
+rod.darktech.org is already known as master server.
+Please continue to add any slave servers, one per line. When you are
+done with the list, type a &lt;control D&gt;.
+master server   :  ellington
+next host to add:  <strong class="userinput"><code>coltrane</code></strong>
+next host to add:  <strong class="userinput"><code>^D</code></strong>
+The current list of NIS servers looks like this:
+ellington
+coltrane
+Is this correct?  [y/n: y] <strong class="userinput"><code>y</code></strong>
+
+[..output from map generation..]
+
+NIS Map update completed.
+ellington has been setup as an YP master server without any errors.</pre><p><code class="command">ypinit</code> dovrebbe aver creato
+            <code class="filename">/var/yp/Makefile</code> da
+            <code class="filename">/var/yp/Makefile.dist</code>.
+            Quando creato, questo file assume che tu stia operando
+            su un ambiente NIS a server singolo con solo macchine
+            FreeBSD.  Dal momento che <code class="literal">test-domain</code>
+            ha anche un server slave, devi editare
+            <code class="filename">/var/yp/Makefile</code>:</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>vi /var/yp/Makefile</code></strong></pre><p>Dovresti commentare la linea che dice</p><pre class="programlisting">NOPUSH = "True"</pre><p>(se non è già commentata).</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88174928"></a>27.4.4.2.3. Impostare un server slave NIS</h5></div></div></div><a id="idp88175568" class="indexterm"></a><p>Impostare un server NIS slave è anche
+            più semplice che impostare il master.  Loggati
+            al server slave ed edita
+            il file <code class="filename">/etc/rc.conf</code>
+            esattamente come hai fatto col server master.
+            L'unica differenza è che
+            ora dobbiamo usare l'opzione <code class="option">-s</code> quando
+            eseguiamo <code class="command">ypinit</code>.  L'opzione
+            <code class="option">-s</code> richiede che il nome del
+            server NIS sia passato, così la nostra linea
+            di comando assomiglia
+            alla seguente:</p><pre class="screen">coltrane<code class="prompt">#</code> <strong class="userinput"><code>ypinit -s ellington
+test-domain</code></strong>
+
+Server Type: SLAVE Domain: test-domain Master: ellington
+
+Creating an YP server will require that you answer a few questions.
+Questions will all be asked at the beginning of the procedure.
+
+Do you want this procedure to quit on non-fatal errors? [y/n: n]
+<strong class="userinput"><code>n</code></strong>
+
+Ok, please remember to go back and redo manually whatever fails.
+If you don't, something might not work.
+There will be no further questions. The remainder of the procedure
+should take a few minutes, to copy the databases from ellington.
+Transferring netgroup...
+ypxfr: Exiting: Map successfully transferred
+Transferring netgroup.byuser...
+ypxfr: Exiting: Map successfully transferred
+Transferring netgroup.byhost...
+ypxfr: Exiting: Map successfully transferred
+Transferring master.passwd.byuid...
+ypxfr: Exiting: Map successfully transferred
+Transferring passwd.byuid...
+ypxfr: Exiting: Map successfully transferred
+Transferring passwd.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring group.bygid...
+ypxfr: Exiting: Map successfully transferred
+Transferring group.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring services.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring rpc.bynumber...
+ypxfr: Exiting: Map successfully transferred
+Transferring rpc.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring protocols.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring master.passwd.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring networks.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring networks.byaddr...
+ypxfr: Exiting: Map successfully transferred
+Transferring netid.byname...
+ypxfr: Exiting: Map successfully transferred
+Transferring hosts.byaddr...
+ypxfr: Exiting: Map successfully transferred
+Transferring protocols.bynumber...
+ypxfr: Exiting: Map successfully transferred
+Transferring ypservers...
+ypxfr: Exiting: Map successfully transferred
+Transferring hosts.byname...
+ypxfr: Exiting: Map successfully transferred
+
+coltrane has been setup as an YP slave server without any errors.
+Don't forget to update map ypservers on ellington.</pre><p>Ora dovresti avere una directory chiamata
+            <code class="filename">/var/yp/test-domain</code>.  Copie
+            delle mappe NIS del master server dovrebbero risiedere
+            in questa directory.  Dovresti accertarti che siano
+            aggiornate.  La seguente linea di
+            <code class="filename">/etc/crontab</code> sul tuo server slave
+            dovrebbe far ciò:</p><pre class="programlisting">20      *       *       *       *       root /usr/libexec/ypxfr passwd.byname
+21      *       *       *       *       root   /usr/libexec/ypxfr passwd.byuid</pre><p>Queste due linee forzano lo slave a sincronizzare
+            le sue mappe con le mappe del server master.
+            Anche se queste entry non sono obbligatorie,
+            dal momento che il server
+            master cerca di assicurarsi che tutte le modifiche
+            alle sue mappe NIS siano comunicate ad i suoi slave
+            e perchè le informazioni sulle password sono vitali
+            per i sistemi che dipendono dal server, è una buona idea
+            forzare gli aggiornamenti.  Questo è ancora più
+            importante su reti trafficate dove gli aggiornamenti
+            delle mappe potrebbero non essere completi.</p><p>Adesso, esegui il comando
+            <code class="command">/etc/netstart</code> anche sullo slave,
+            per avviare il server NIS.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88187344"></a>27.4.4.3. Client NIS</h4></div></div></div><p>Un client NIS stabilisce quello che è
+          chiamato un binding ad un particolare NIS
+          server usando il demone
+          <code class="command">ypbind</code>.  <code class="command">ypbind</code>
+          controlla il dominio di default del sistema
+          (impostato dal comando <code class="command">domainname</code>),
+          ed inizia a fare broadcast di richieste RPC sulla rete
+          locale.  Queste richieste specificano il nome del
+          dominio per il quale <code class="command">ypbind</code> sta
+          cercando di stabilire un binding.  Se un server è stato
+          configurato a servire il dominio richiesto, risponderà 
+          a <code class="command">ypbind</code>, che registrerà  l'indirizzo
+          del server.  Se ci sono molti server disponibili
+          (ad esempio un master e molti slave),
+          <code class="command">ypbind</code> userà  l'indirizzo del primo
+          che risponde.  Da quel momento in poi, il sistema client
+          dirigerà  tutte le sue richieste NIS a quel server.
+          <code class="command">ypbind</code> occasionalmente farà  un
+          <span class="quote">«<span class="quote">ping</span>»</span> del server per accertarsi che sia su
+          ed attivo.  Se non riceve una risposta di uno dei suoi
+          ping in un tempo accettabile, <code class="command">ypbind</code>
+          segnerà  il dominio come non connesso e inizierà 
+          di nuovo a fare broadcasting nella speranza di
+          localizzare un altro server.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88200144"></a>27.4.4.3.1. Impostare un client NIS</h5></div></div></div><a id="idp88200784" class="indexterm"></a><p>Impostare una macchina FreeBSD perchè sia un client
+            NIS è abbastanza semplice.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Edita il file <code class="filename">/etc/rc.conf</code> e
+                aggiungi le seguenti linee per impostare il nome
+                dominio NIS ed avviare <code class="command">ypbind</code>
+                all'avvio della rete:</p><pre class="programlisting">nisdomainname="test-domain"
+nis_client_enable="YES"</pre></li><li class="step"><p>Per importare tutte le possibili linee di
+                password dal server NIS, rimuovi tutti gli account
+                utente dal tuo <code class="filename">/etc/master.passwd</code>
+                ed usa <code class="command">vipw</code> per aggiungere
+                la seguente linea alla fine del file:</p><pre class="programlisting">+:::::::::</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Questa linea permetterà  a chiunque con un
+                  valido account nella mappa delle password
+                  del server NIS di loggarsi sul client.  Ci
+                  sono molti modi per
+                  configurare il tuo client NIS cambiando questa
+                  linea.  Leggi la
+                  <a class="link" href="network-nis.html#network-netgroups" title="27.4.7. Usare i Netgroups">sezione
+                    sui netgroups</a> di seguito per maggiori
+                  informazioni.  Per letture più dettagliate vedere
+                  il libro della O'Reilly
+                  <code class="literal">Managing NFS and NIS</code>.</p></div><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Dovresti tenere almeno un account locale (non
+                  importato via NIS) nel tuo file
+                  <code class="filename">/etc/master.passwd</code> e questo
+                  account dovrebbe essere anche un membro del gruppo
+                  <code class="systemitem">wheel</code>.  Se c'è qualche
+                  problema con NIS, questo account può essere usato
+                  per loggarsi da remoto, diventare
+                  <code class="systemitem">root</code> e riparare le cose.</p></div></li><li class="step"><p>Per impostare tutte le possibili linee dei gruppi
+                dal server NIS, aggiungi questa linea al tuo file
+                <code class="filename">/etc/group</code>:</p><pre class="programlisting">+:*::</pre></li></ol></div><p>Dopo aver completato questi passi, dovresti
+            essere in grado di eseguire <code class="command">ypcat passwd</code>
+            e vedere la mappa delle password del NIS server.</p></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88213328"></a>27.4.5. Sicurezza di NIS</h3></div></div></div><p>In generale, ogni utente remoto può eseguire una RPC
+        a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> ed ottenere i contenuti delle tue mappe NIS,
+        ammesso che l'utente remoto conosca il tuo nome dominio.
+        Per prevenire tali transazioni non autorizzate,
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> supporta una caratteristica chiamata
+        <span class="quote">«<span class="quote">securenets</span>»</span> che può essere usata per
+        restringere l'accesso ad un dato insieme di host.  All'avvio
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> cercherà  di caricare le informazioni
+        delle securenets da un file chiamato
+        <code class="filename">/var/yp/securenets</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Questo percorso varia a secondo del percorso
+          specificato con l'opzione <code class="option">-p</code>.  Questo
+          file contiene linee che consistono di una
+          specificazione della rete e di una maschera di
+          rete separate da spazi vuoti.  Le linee che
+          cominciano con <span class="quote">«<span class="quote">#</span>»</span> sono
+          considerati commenti.  Un esempio di file securenets può
+          assomigliare al seguente:</p></div><pre class="programlisting"># allow connections from local host -- mandatory
+127.0.0.1     255.255.255.255
+# allow connections from any host
+# on the 192.168.128.0 network
+192.168.128.0 255.255.255.0
+# allow connections from any host
+# between 10.0.0.0 to 10.0.15.255
+# this includes the machines in the testlab
+10.0.0.0      255.255.240.0</pre><p>Se <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypserv&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypserv</span>(8)</span></a> riceve una richiesta da un indirizzo
+        che coincide con una di queste regole, processerà 
+        la richiesta normalmente.  Se l'indirizzo non coincide
+        la richiesta sarà  ignorata ed un messaggio di warning
+        sarà  loggato.  Se il file
+        <code class="filename">/var/yp/securenets</code> non esiste,
+        <code class="command">ypserv</code> permetterà  connessioni
+        da ogni host.</p><p>Il programma <code class="command">ypserv</code> ha
+        anche supporto per il pacchetto di Wietse Venema
+        <span class="application">TCP Wrapper</span>.  Questo
+        permette all'amministratore di usare i file
+        di configurazione di <span class="application">TCP Wrapper</span>
+        per controlli sull'accesso al posto di
+        <code class="filename">/var/yp/securenets</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Pur essendo entrambi questi meccanismi di accesso
+          di controllo abbastanza sicuri,
+          questi, come il test di porta privilegiata,
+          sono vulnerabili agli attacchi
+          <span class="quote">«<span class="quote">IP spoofing</span>»</span>.  Tutto il traffico
+          relativo a NIS dovrebbe essere bloccato al firewall.</p><p xmlns="http://www.w3.org/1999/xhtml">I server che usano
+          <code class="filename">/var/yp/securenets</code>
+          possono non riuscire a servire client NIS legittimi che
+          abbiano implementazioni TCP/IP obsolete.  Alcune
+          di queste implementazioni impostano a zero tutti i
+          bit degli host quando fanno broadcast e/o non
+          riescono a osservare la maschera di sotto-rete
+          quando calcolano l'indirizzo
+          broadcast.  Mentre alcuni di questi problemi possono
+          essere corretti cambiando la configurazione del client,
+          altri problemi possono causare il ritiro dei client
+          in questione o l'abbandono di
+          <code class="filename">/var/yp/securenets</code>.</p><p xmlns="http://www.w3.org/1999/xhtml">Usando <code class="filename">/var/yp/securenets</code> su un
+          server con una tale obsoleta implementazione del TCP/IP
+          è sicuramente una cattiva idea e causerà  alla
+          perdita della funzionalità  NIS per gran parte della tua
+          rete.</p><a xmlns="http://www.w3.org/1999/xhtml" id="idp88230480" class="indexterm"></a><p xmlns="http://www.w3.org/1999/xhtml">L'uso del pacchetto
+          <span class="application">TCP Wrapper</span>
+          aumenta la latenza del tuo server NIS.  Il ritardo
+          addizionale può essere lungo a sufficienza tanto
+          da causare dei timeout in programmi client, specialmente
+          su reti trafficate o con server NIS lenti.  Se uno o
+          più client soffre di questi sintomi, dovresti convertire
+          il sistema dei client in questione a server NIS slave
+          e forzarli a non fare il binding a loro stessi.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88232016"></a>27.4.6. Impedire ad Alcuni Utenti di Loggarsi</h3></div></div></div><p>Nel nostro laboratorio c'è una macchina
+        <code class="systemitem">basie</code> che si suppone sia una workstation
+        solo della facoltà .  Non vogliamo togliere questa
+        macchina dal dominio NIS, tuttavia il file
+        <code class="filename">passwd</code> sul server NIS master
+        contiene account che sono sia della
+        facoltà  sia degli studenti.  Cosa possiamo fare?</p><p>C'è un modo di impedire a specifici utenti di loggarsi
+        ad una macchina, anche se sono presenti nel database NIS.
+        Per farlo, tutto quello che devi fare è
+        aggiungere
+        <code class="literal">-username</code>
+        alla fine del file <code class="filename">/etc/master.passwd</code>
+        sulla macchina client, dove
+        <em class="replaceable"><code>username</code></em> è lo username
+        dell'utente di cui vuoi impedire l'accesso.
+        E' meglio fare questo con
+        <code class="command">vipw</code> dato che <code class="command">vipw</code>
+        farà  un controllo di correttezza dei tuoi cambiamenti a
+        <code class="filename">/etc/master.passwd</code>, e ricostruirà 
+        automaticamente il database delle password quando hai finito
+        di editarlo.  Ad esempio, se vogliamo impedire l'accesso
+        all'utente <code class="systemitem">bill</code> verso l'host
+        <code class="systemitem">basie</code> faremmo:</p><pre class="screen">basie<code class="prompt">#</code> <strong class="userinput"><code>vipw</code></strong>
+<strong class="userinput"><code>[aggiungi -bill alla fine del file, poi esci]</code></strong>
+vipw: rebuilding the database...
+vipw: done
+
+basie<code class="prompt">#</code> <strong class="userinput"><code>cat /etc/master.passwd</code></strong>
+
+root:[password]:0:0::0:0:The super-user:/root:/bin/csh
+toor:[password]:0:0::0:0:The other super-user:/root:/bin/sh
+daemon:*:1:1::0:0:Owner of many system processes:/root:/sbin/nologin
+operator:*:2:5::0:0:System &amp;:/:/sbin/nologin
+bin:*:3:7::0:0:Binaries Commands and Source,,,:/:/sbin/nologin
+tty:*:4:65533::0:0:Tty Sandbox:/:/sbin/nologin
+kmem:*:5:65533::0:0:KMem Sandbox:/:/sbin/nologin
+games:*:7:13::0:0:Games pseudo-user:/usr/games:/sbin/nologin
+news:*:8:8::0:0:News Subsystem:/:/sbin/nologin
+man:*:9:9::0:0:Mister Man Pages:/usr/share/man:/sbin/nologin
+bind:*:53:53::0:0:Bind Sandbox:/:/sbin/nologin
+uucp:*:66:66::0:0:UUCP
+pseudo-user:/var/spool/uucppublic:/usr/libexec/uucp/uucico
+xten:*:67:67::0:0:X-10 daemon:/usr/local/xten:/sbin/nologin
+pop:*:68:6::0:0:Post Office Owner:/nonexistent:/sbin/nologin
+nobody:*:65534:65534::0:0:Unprivileged user:/nonexistent:/sbin/nologin
++:::::::::
+-bill
+
+basie<code class="prompt">#</code></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-netgroups"></a>27.4.7. Usare i Netgroups</h3></div><div><span class="authorgroup">Grazie al contributo di <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Udo</span> <span class="surname">Erdelhoff</span></span>. </span></div></div></div><a id="idp88242768" class="indexterm"></a><p>Il metodo mostrato nella sezione precedente funziona
+        ragionevolmente bene se hai bisogno di regole speciali
+        per un numero molto piccolo di utenti e/o macchine.  Su
+        reti più grandi, <span class="emphasis"><em>certamente</em></span> ti
+        dimenticherai di impedire l'accesso di certi utenti
+        a macchine dal ruolo critico, oppure potresti perfino
+        finire a modificare ogni macchina separatamente, in questo
+        modo perdendo il beneficio centrale di NIS:
+        l'amministrazione <span class="emphasis"><em>centralizzata</em></span>.</p><p>La soluzione degli sviluppatori NIS a questo problema
+        è chiamata <span class="emphasis"><em>netgroups</em></span>.  Il
+        loro scopo e la loro semantica possono essere
+        paragonate ai normali gruppi utenti usati dal
+        file system <span class="trademark">UNIX</span>®.  L'unica differenza
+        è la mancanza di un ID numerico e l'abilità  di
+        definire un netgroup che includa sia gruppi utenti che altri
+        netgroup.</p><p>I netgroup furono sviluppati per gestire grandi reti
+        complesse con centinaia di utenti e macchine.  Da un lato
+        questa è una Buona Cosa se sei obbligato a gestire una
+        simile situazione.  Dall'altro, questa complessità  rende
+        praticamente impossibile spiegare i netgroup con esempi
+        relativamente semplici.  L'esempio usato nel resto di questa
+        sezione dimostra questo problema.</p><p>Assumiamo che la favorevole introduzione di NIS nei tuoi
+        laboratori catturi l'interesse dei tuoi superiori.  Il tuo
+        prossimo compito è di estendere il tuo dominio NIS per
+        coprire alcune altre macchine del campo.  Le due tabelle contengono
+        i nomi dei nuovi utenti e delle nuove macchine, con una breve
+        descrizione.</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>User Name(s)</th><th>Description</th></tr></thead><tbody><tr><td><code class="systemitem">alpha</code>,
+                <code class="systemitem">beta</code></td><td>Impiegato normale del dipartimento IT</td></tr><tr><td><code class="systemitem">charlie</code>,
+                <code class="systemitem">delta</code></td><td>Il nuovo apprendista del dipartimento IT</td></tr><tr><td><code class="systemitem">echo</code>,
+                <code class="systemitem">foxtrott</code>,
+                <code class="systemitem">golf</code>, ...</td><td>Impiegato ordinario</td></tr><tr><td><code class="systemitem">able</code>, <code class="systemitem">baker</code>,
+                ...</td><td>Gli interni correnti</td></tr></tbody></table></div><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Machine Name(s)</th><th>Description</th></tr></thead><tbody><tr><td><code class="systemitem">war</code>, <code class="systemitem">death</code>,
+                <code class="systemitem">famine</code>,
+                <code class="systemitem">pollution</code></td><td>Il tuoi server più importanti.  Solo
+                gli impiegati IT hanno il permesso di loggarsi
+                in queste macchine.</td></tr><tr><td><code class="systemitem">pride</code>, <code class="systemitem">greed</code>,
+                <code class="systemitem">envy</code>, <code class="systemitem">wrath</code>,
+                <code class="systemitem">lust</code>, <code class="systemitem">sloth</code></td><td>Server meno importanti.  Tutti i membri
+                del dipartimento IT hanno il permesso di loggarsi
+                a queste macchine.</td></tr><tr><td><code class="systemitem">one</code>, <code class="systemitem">two</code>,
+                <code class="systemitem">three</code>, <code class="systemitem">four</code>,
+                ...</td><td>Workstation normali.  Solo
+                <span class="emphasis"><em>veri</em></span> impiegati hanno permesso
+                di accedere a queste macchine.</td></tr><tr><td><code class="systemitem">trashcan</code></td><td>Una macchina molto vecchia senza alcun dato
+                critico.  Anche gli interni hanno permesso di usare
+                questa macchina.</td></tr></tbody></table></div><p>Se provi ad implementare queste restrizioni bloccando
+        separatamente ogni utente, dovresti aggiungere una linea
+        <code class="literal">-user</code>
+        ad ogni <code class="filename">passwd</code> per ogni utente che
+        non ha il permesso di loggarsi in quel sistema.  Se ti
+        dimentichi anche solo di una linea, potresti essere nei
+        pasticci.  Può essere ragionevole fare ciò
+        correttamente durante l'installazione iniziale, comunque
+        <span class="emphasis"><em>certamente</em></span> ti dimenticherai alla fine
+        di aggiungere le linee per i nuovi utenti durante le
+        operazioni giornaliere.  Dopo tutto, Murphy era un
+        ottimista.</p><p>Gestire questa situazione con i netgroup offre
+        molti vantaggi.  Non c'è bisogno di gestire
+        separatamente ogni utente; basta assegnare un utente ad
+        uno o più netgroup e permettere o impedire il login
+        a tutti i membri del netgroup.  Se aggiungi una
+        nuova macchina, dovrai solo definire restrizioni di
+        login per i netgroup.  Se un nuovo utente viene
+        aggiunto, dovrai solo aggiungere l'utente
+        ad uno o più netgroup.  Questi cambiamenti sono indipendenti
+        l'uno dall'altro: non più <span class="quote">«<span class="quote">per ogni combinazione di
+        utenti e macchine fai ...</span>»</span>Se la tua installazione
+        NIS è pianificata con attenzione, dovrai solo modificare
+        esattamente un file centrale di configurazione per garantire
+        o negare l'accesso alle macchine.</p><p>Il primo passo è l'inizializzazione della mappa NIS
+        netgroup.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypinit&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypinit</span>(8)</span></a> di FreeBSD non crea questa mappa
+        di default, ma la sua implementazione NIS la supporterà 
+        una volta che è stata creata.  Per aggiungere una linea alla
+        mappa, semplicemente usa il comando</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>vi /var/yp/netgroup</code></strong></pre><p>e poi inizia ad aggiungere contenuti.  Per i nostri esempi
+        abbiamo bisogno di almeno quattro netgroup: impiegati IT,
+        apprendisti IT, impiegati normali ed interni.</p><pre class="programlisting">IT_EMP  (,alpha,test-domain)    (,beta,test-domain)
+IT_APP  (,charlie,test-domain)  (,delta,test-domain)
+USERS   (,echo,test-domain)     (,foxtrott,test-domain) \
+        (,golf,test-domain)
+INTERNS (,able,test-domain)     (,baker,test-domain)</pre><p><code class="literal">IT_EMP</code>, <code class="literal">IT_APP</code> etc.
+        sono i nomi dei netgroup.  Ogni gruppo fra parentesi tonde
+        aggiunge uno o più account utente.  I tre campi dentro il
+        gruppo sono:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Il nome degli host dove le seguenti caratteristiche
+            sono valide.  Se non specifichi un nome host, la linea
+            è valida per tutti gli host.  Se specifichi un nome host,
+            entrerai nel regno dell'oscurità , dell'orrore
+            e della confusione assoluta.</p></li><li class="listitem"><p>Il nome dell'account che appartiene a questo
+            netgroup.</p></li><li class="listitem"><p>Il dominio NIS per l'account.  Puoi
+            importare account da altri domini NIS nel tuo netgroup
+            se sei uno di quei ragazzi sfortunati con più di
+            un dominio NIS.</p></li></ol></div><p>Ognuno di questi campi può contenere
+        wildcards.  Leggi <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=netgroup&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">netgroup</span>(5)</span></a> per dettagli.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><a xmlns="http://www.w3.org/1999/xhtml" id="idp88303184" class="indexterm"></a><p xmlns="http://www.w3.org/1999/xhtml">Nomi netgroup più lunghi di 8 caratteri
+          non dovrebbero essere usati, specialmente se hai macchine
+          che eseguono altri sistemi operativi all'interno del
+          tuo dominio NIS.  I nomi sono case sensitive; usare
+          le lettere maiuscole per il tuo netgroup è
+          un modo semplice per distinguere fra utenti,
+          macchine e nomi di netgroup.</p><p xmlns="http://www.w3.org/1999/xhtml">Alcuni client NIS (non FreeBSD) non possono
+          gestire netgroup con un numero troppo grande di linee.
+          Ad esempio, alcune vecchie versioni di <span class="trademark">SunOS</span>&#8482; iniziano
+          ad avere problemi se un netgroup contiene più di 15
+          <span class="emphasis"><em>linee</em></span>.  Puoi superare questo
+          limite creando molti sotto-netgroup con 15 o meno utenti
+          ed un vero netgroup che consiste dei sotto-netgroup:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">BIGGRP1  (,joe1,domain)  (,joe2,domain)
+(,joe3,domain) [...]
+BIGGRP2  (,joe16,domain)  (,joe17,domain) [...]
+BIGGRP3  (,joe31,domain)  (,joe32,domain)
+BIGGROUP  BIGGRP1 BIGGRP2 BIGGRP3</pre><p xmlns="http://www.w3.org/1999/xhtml">Puoi ripetere questo processo se hai bisogno di più
+          di 225 utenti all'interno di un singolo netgroup.</p></div><p>Attivare e distribuire la tua nuova mappa NIS
+        è facile:</p><pre class="screen">ellington<code class="prompt">#</code> <strong class="userinput"><code>cd /var/yp</code></strong>
+ellington<code class="prompt">#</code> <strong class="userinput"><code>make</code></strong></pre><p>Questo genererà  le tre mappe NIS
+        <code class="filename">netgroup</code>,
+        <code class="filename">netgroup.byhost</code> e
+        <code class="filename">netgroup.byuser</code>.  Usa
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypcat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ypcat</span>(1)</span></a> per controllare che le tue
+        nuove mappe NIS siano disponibili:</p><pre class="screen">ellington<code class="prompt">%</code> <strong class="userinput"><code>ypcat -k
+netgroup</code></strong>
+ellington<code class="prompt">%</code> <strong class="userinput"><code>ypcat -k netgroup.byhost</code></strong>
+ellington<code class="prompt">%</code> <strong class="userinput"><code>ypcat -k
+netgroup.byuser</code></strong></pre><p>L'output del tuo primo comando dovrebbe assomigliare
+        a <code class="filename">/var/yp/netgroup</code>.  Il secondo
+        comando non produrrà  output se non hai specificato
+        netgroup specifici agli host.  Il terzo comando può
+        essere usato per ottenere una lista dei netgroup di un
+        utente.</p><p>L'installazione del client è abbastanza semplice.
+        Per configurare il server <code class="systemitem">war</code>, devi solo
+        eseguire <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vipw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">vipw</span>(8)</span></a> e sostituire la linea</p><pre class="programlisting">+:::::::::</pre><p>con</p><pre class="programlisting">+@IT_EMP:::::::::</pre><p>Ora, solo i dati per l'utente definito nel netgroup
+         <code class="literal">IT_EMP</code> sono importati nel
+         database delle password di <code class="systemitem">war</code> e solo
+         questi utenti hanno permesso di accesso.</p><p>Sfortunatamente, questa limitazione si applica anche
+        alla funzione della shell <code class="literal">~</code> ed a
+        tutte le routine che convertono fra nomi utenti e user ID
+        numerici.  In altre parole,<code class="command">cd ~user
+        </code> non funzionerà ,
+        <code class="command">ls -l</code> mostrerà  gli ID numerici
+        invece dello username e
+        <code class="command">find . -user joe -print</code>
+        darà  l'errore <span class="errorname">No such user</span>.  Per
+        riparare questo, dovrai importare tutte le linee dell'utente
+        <span class="emphasis"><em>senza permettere a loro di loggarsi sui tuoi
+        server</em></span>.</p><p>Questo può essere ottenuto aggiungendo un'altra
+        linea a <code class="filename">/etc/master.passwd</code>.  Questo
+        dovrebbe contenere:</p><p><code class="literal">+:::::::::/sbin/nologin</code>, dal significato
+        <span class="quote">«<span class="quote">Importa tutte le entry ma imposta la shell di
+        login a <code class="filename">/sbin/nologin</code> nelle linee
+        importate</span>»</span>.  Puoi sostituire ogni campo nella linea
+        <code class="literal">passwd</code> piazzando un valore di default
+        nel tuo <code class="filename">/etc/master.passwd</code>.</p><div xmlns="" class="warning"><h3 class="admontitle">Avvertimento: </h3><p xmlns="http://www.w3.org/1999/xhtml">Accertati che la linea
+          <code class="literal">+:::::::::/sbin/nologin</code> sia piazzata
+          dopo <code class="literal">+@IT_EMP:::::::::</code>.  Altrimenti
+          tutti gli account utente importati da NIS avranno
+          <code class="filename">/sbin/nologin</code> come loro shell
+          di login.</p></div><p>Dopo questo cambiamento, dovrai solo cambiare
+        una mappa NIS se un nuovo impiegato si unisce
+        al dipartimento IT.  Puoi usare un simile
+        approccio per i server meno importanti
+        sostituendo <code class="literal">+:::::::::</code> nella tua versione
+        locale di <code class="filename">/etc/master.passwd</code>
+        con qualcosa del tipo:</p><pre class="programlisting">+@IT_EMP:::::::::
++@IT_APP:::::::::
++:::::::::/sbin/nologin</pre><p>Le linee corrispondenti per le workstation normali
+        potrebbero essere:</p><pre class="programlisting">+@IT_EMP:::::::::
++@USERS:::::::::
++:::::::::/sbin/nologin</pre><p>E tutto sarebbe a posto fino a che non c'è un
+        cambiamento di policy dopo poche settimane:
+        il dipartimento IT inizia ad assumere interni.
+        Gli interni IT hanno permesso di usare le normali
+        workstation ed i server meno importanti; e gli
+        apprendisti IT hanno permesso di loggarsi ai
+        server principali.  Aggiungi un nuovo netgroup
+        <code class="literal">IT_INTERN</code>, aggiungi i nuovi interni IT
+        a questo nuovo netgroup <code class="literal">IT_INTERN</code>,
+        e inizia a cambiare la configurazione su ogni nuova macchina...
+        Come il vecchio adagio dice:<span class="quote">«<span class="quote">Errori nella pianificazione
+        centralizzata porta a caos globale</span>»</span>.</p><p>L'abilità  NIS di creare netgroup da altri netgroup
+        può essere usata per prevenire situazioni come queste.  Una
+        possibilità  è la creazione di netgroup basati sul
+        ruolo.  Per esempio, potresti creare un netgroup chiamato
+        <code class="literal">BIGSRV</code> per definire le restrizioni di login
+        per i server importanti, un altro netgroup chiamato
+        <code class="literal">SMALLSRV</code> per i server meno importanti
+        ed un terzo netgroup chiamato <code class="literal">USERBOX</code>
+        per le workstation normali.  Ognuna di questi netgroup
+        contiene i netgroup che hanno permesso di accesso a
+        queste macchine.  Le nuove linee della tua mappa NIS
+        dovrebbero assomigliare a questa:</p><pre class="programlisting">BIGSRV    IT_EMP  IT_APP
+SMALLSRV  IT_EMP  IT_APP  ITINTERN
+USERBOX   IT_EMP  ITINTERN USERS</pre><p>Questo metodo di definire restrizioni di login
+        funziona ragionevolmente bene se puoi definire gruppi
+        di macchine con restrizioni identiche.  Sfortunatamente
+        questa è l'eccezione, non la regola.  La maggior parte del
+        tempo, avrai necessità  di definire restrizioni di login
+        macchina per macchina.</p><p>Definizioni di netgroup specifiche per ogni
+        macchina sono l'altra possibilità  per gestire
+        il cambiamento di policy delineato sopra.
+        In questo scenario il
+        <code class="filename">/etc/master.passwd</code> di ogni macchina
+        deve contenere due linee che iniziano con
+        <span class="quote">«<span class="quote">+</span>»</span>.  La prima di queste aggiunge un netgroup
+        con l'account che ha il permesso di loggarsi alla macchina,
+        il secondo aggiunge tutti gli altri account con
+        <code class="filename">/sbin/nologin</code> come shell.  E' buona
+        norma usare la versione <span class="quote">«<span class="quote">MAIUSCOLA</span>»</span> del nome
+        macchina come nome del netgroup.  In altre parole, le linee
+        dovrebbero assomigliare a questa:</p><pre class="programlisting">+@<em class="replaceable"><code>BOXNAME</code></em>:::::::::
++:::::::::/sbin/nologin</pre><p>Una volta che hai completato questo task per tutte
+        le macchine, non dovrai mai più modificare la versione locale
+        di <code class="filename">/etc/master.passwd</code>.  Tutti
+        gli ulteriori cambiamenti possono essere
+        gestiti modificando la mappa NIS.  Di
+        seguito un esempio di una possibile
+        mappa netgroup per questo scenario con altri vantaggi
+        addizionali:</p><pre class="programlisting"># Define groups of users first
+IT_EMP    (,alpha,test-domain)    (,beta,test-domain)
+IT_APP    (,charlie,test-domain)  (,delta,test-domain)
+DEPT1     (,echo,test-domain)     (,foxtrott,test-domain)
+DEPT2     (,golf,test-domain)     (,hotel,test-domain)
+DEPT3     (,india,test-domain)    (,juliet,test-domain)
+ITINTERN  (,kilo,test-domain)     (,lima,test-domain)
+D_INTERNS (,able,test-domain)     (,baker,test-domain)
+#
+# Now, define some groups based on roles
+USERS     DEPT1   DEPT2     DEPT3
+BIGSRV    IT_EMP  IT_APP
+SMALLSRV  IT_EMP  IT_APP    ITINTERN
+USERBOX   IT_EMP  ITINTERN  USERS
+#
+# And a groups for a special tasks
+# Allow echo and golf to access our anti-virus-machine
+SECURITY  IT_EMP  (,echo,test-domain)  (,golf,test-domain)
+#
+# machine-based netgroups
+# Our main servers
+WAR       BIGSRV
+FAMINE    BIGSRV
+# User india needs access to this server
+POLLUTION  BIGSRV  (,india,test-domain)
+#
+# This one is really important and needs more access restrictions
+DEATH     IT_EMP
+#
+# The anti-virus-machine mentioned above
+ONE       SECURITY
+#
+# Restrict a machine to a single user
+TWO       (,hotel,test-domain)
+# [...more groups to follow]</pre><p>Se stai usando qualche tipo di database per
+        gestire i tuoi account utente, dovresti essere in
+        grado di creare la prima parte della mappa con i
+        tuoi tool di report del database.  In
+        questo modo, i nuovi utenti avranno accesso automaticamente
+        alle macchine.</p><p>Un ultima nota di avvertimento: può non essere sempre
+        consigliabile usare netgroup basati sulle macchine.  Se
+        stai per mettere in produzione qualche dozzina o perfino qualche
+        centinaia di macchine identiche per laboratori studente,
+        dovresti usare netgroup basati sul ruolo invece che netgroup
+        basati sulla macchina, per tenere la dimensione della mappa
+        NIS al di sotto di un limite ragionevole.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88349392"></a>27.4.8. Cose Importanti da Ricordare</h3></div></div></div><p>Ci sono ancora un paio di cose che dovrai cambiare
+        ora che operi in ambiente NIS.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Ogni volta che devi aggiungere un utente al
+            laboratorio devi aggiungerlo
+            <span class="emphasis"><em>solo</em></span> al server
+            master NIS e <span class="emphasis"><em>devi ricordarti di ricostruire
+            le mappe NIS</em></span>.  Se ti dimentichi di farlo
+            il nuovo utente non sarà  in grado di loggarsi in alcuna
+            macchina eccetto che sul server NIS master.  Per esempio,
+            se abbiamo bisogno di aggiungere un nuovo utente
+            <code class="systemitem">jsmith</code> al laboratorio,
+            faremmo:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw useradd jsmith</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /var/yp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make test-domain</code></strong></pre><p>Puoi anche eseguire <code class="command">adduser jsmith</code>
+            invece di <code class="command">pw useradd jsmith</code>.</p></li><li class="listitem"><p><span class="emphasis"><em>Tieni gli account amministrativi fuori
+            dalle mappe NIS</em></span>.  Normalmente non vuoi che
+            gli account amministrativ e le password si propaghino
+            a macchine che avranno utenti che non dovrebbero avere
+            accesso a quegli account.</p></li><li class="listitem"><p><span class="emphasis"><em>Tieni al sicuro il NIS master e slave,
+            e minimizza il tempo in cui sono giù</em></span>.  Se
+            qualcuno hackera o semplicemente spegne queste macchine
+            riesce a privare molte persone della possibilità  di
+            loggarsi al laboratorio.</p><p>Questa è la principale debolezza di ogni
+            sistema centralizzato di amministrazione.  Se non proteggi
+            il tuo server NIS, avrai un mucchio di utenti
+            arrabbiati!</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88428752"></a>27.4.9. Compatibilità con NIS v1</h3></div></div></div><p><span class="application">ypserv</span> di FreeBSD supporta
+        fino ad un certo punto client NIS v1.  L'implementazione
+        di NIS di FreeBSD usa solo il protocollo NIS v2, comunque
+        altre implementazioni includono supporto per il protocollo
+        v1 per compatibilità  all'indietro coi vecchi sistemi.  Il
+        demone <span class="application">ypbind</span> fornito con questi
+        sistemi proverà  a stabilire un binding con un server
+        NIS v1 anche se potrebbero non averne mai bisogno
+        (e possono continuare a fare broadcast in ricerca di
+        uno anche dopo che hanno ricevuto risposta da un
+        server v2).  Nota che mentre il supporto per i
+        client normali viene garantito, questa versione
+        di <span class="application">ypserv</span> non
+        gestisce richieste di trasferimento di mappe v1; di
+        conseguenza, non può essere usato come master o slave in
+        congiunzione con server NIS più vecchi che
+        supportano solo il protocollo v1.  Fortunatamente,
+        probabilmente non ci sono
+        server del genere in uso oggi.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-nis-server-is-client"></a>27.4.10. Server NIS che Sono Anche Client</h3></div></div></div><p> Bisogna prestare molta attenzione quando
+        si esegue <span class="application">ypserv</span> in
+        un dominio multi-server dove le macchine server
+        sono anche client NIS.
+        E' generalmente una buona idea forzare i server
+        ad effettuare il binding a sè stessi piuttosto
+        che permettere loro di effettuare il broadcast
+        delle richieste binding e
+        potenzialmente possono fare il bind una all'altra.
+        Possono risultare strani errori quando un
+        server va giù e gli altri sono dipendenti da
+        lui.  Alla fine, tutti i client andranno in timeout
+        e cercheranno di effettuare il bind ad altri server,
+        ma il ritardo di questa operazione può essere
+        considerevole e l'uscita
+        di errore è ancora presente dato che i server possono
+        fare il binding fra di loro di nuovo.</p><p>Puoi forzare un host a fare il binding ad un server
+        in particolare usando <code class="command">ypbind</code> con
+        l'opzione <code class="option">-S</code>.  Se non vuoi fare
+        questa azione a mano ogni volta che fai il reboot
+        del tuo server NIS, puoi aggiungere queste linee al tuo
+        <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">nis_client_enable="YES"  # run client stuff as well
+nis_client_flags="-S <em class="replaceable"><code>NIS
+domain</code></em>,<em class="replaceable"><code>server</code></em>"</pre><p>Consulta <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ypbind&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ypbind</span>(8)</span></a> per ulteriori informazioni.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88465232"></a>27.4.11. Formato delle Password</h3></div></div></div><a id="idp88470096" class="indexterm"></a><p>Uno dei problemi più comuni in cui la gente incappa
+        quando tenta di implementare NIS è la compatibilità
+        del formato delle password.  Se il tuo server NIS usa password
+        criptate con DES, supporterà solo client che usano anche loro
+        DES.  Ad esempio, se hai client NIS <span class="trademark">Solaris</span>&#8482; nella rete,
+        dovrai quasi certamente usare password criptate
+        con DES.</p><p>Per controllare quale formato il tuo server
+        e client usano, dai un'occhiata a
+        <code class="filename">/etc/login.conf</code>.  Se l'host
+        è configurato per usare password criptate
+        DES, la classe <code class="literal">default</code> conterrà 
+        una linea simile a questa:</p><pre class="programlisting">default:\
+:passwd_format=des:\
+:copyright=/etc/COPYRIGHT:\
+[Further entries elided]</pre><p>Altri valori possibili per l'opzione
+        <code class="literal">passwd_format</code> includono
+        <code class="literal">blf</code> e <code class="literal">md5</code>
+        (per password criptate con Blowfish e con MD5,
+        rispettivamente).</p><p>Se hai fatto modifiche a
+        <code class="filename">/etc/login.conf</code>,
+        dovrai anche ricostruire il database
+        delle possibilità  di login, il che si
+        ottiene eseguendo il seguente comando
+        come <code class="systemitem">root</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Il formato delle password che sono
+          già  in <code class="filename">/etc/master.passwd</code> non
+          sarà  aggiornato finchè un utente cambia la
+          sua password per la prima volta
+          <span class="emphasis"><em>dopo</em></span> che il
+          database delle possibilità  di login
+          è ricostruito.</p></div><p>Dopodichè per assicurarti che le password siano
+        criptate con il formato che hai scelto, dovresti
+        anche controllare che <code class="literal">crypt_default</code>
+        in <code class="filename">/etc/auth.conf</code> dia precedenza
+        al formato delle password scelto.  Per farlo,
+        inserisci il formato che hai scelto per primo
+        nella lista.  Ad esempio, quando usi password
+        criptate DES, la linea dovrebbe essere:</p><pre class="programlisting">crypt_default  =  des blf md5</pre><p>Seguendo i passi sopra citati su ognuno dei FreeBSD
+        basati su NIS server e client, puoi star sicuro che tutti
+        siano d'accordo su quale formato delle password sia usato
+        all'interno della rete.  Se hai problemi nell'identificazione
+        su un client NIS, questo è un buon punto di partenza per
+        cercare possibili problemi.  Ricordati: se vuoi mettere
+        in produzione un server NIS per una rete eterogenea,
+        dovrai probabilmente usare DES su tutti i sistemi
+        poichè questo è il minimo standard comune.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-nfs.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="network-servers.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="network-dhcp.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">27.3. Network File System (NFS) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 27.5. Configurazione Automatica della Rete (DHCP)</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

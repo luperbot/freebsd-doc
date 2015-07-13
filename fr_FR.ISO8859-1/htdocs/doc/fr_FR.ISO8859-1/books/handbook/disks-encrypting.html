@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.16. Chiffrer les partitions d'un disque</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="disks.html" title="Chapitre 19. Stockage des données" /><link rel="prev" href="quotas.html" title="19.15. Quotas d'utilisation des disques" /><link rel="next" href="swap-encrypting.html" title="19.17. Chiffrage de l'espace de pagination" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.16. Chiffrer les partitions d'un disque</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="quotas.html">Précédent</a> </td><th width="60%" align="center">Chapitre 19. Stockage des données</th><td width="20%" align="right"> <a accesskey="n" href="swap-encrypting.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-encrypting"></a>19.16. Chiffrer les partitions d'un disque</h2></div><div><span class="authorgroup">Contribution de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Lucky</span> <span class="surname">Green</span></span>. </span></div></div></div><a id="idp80999120" class="indexterm"></a><p>FreeBSD offre d'excellentes protections contre un accès
+      non autorisé aux données par l'intermédiaire du
+      réseau.  Les permissions sur les fichiers et le contrôle
+      d'accès obligatoire &#8212; &#8220;Mandatory Access
+      Control&#8221; (MAC) (voir <a class="xref" href="mac.html" title="Chapitre 17. Mandatory Access Control ** Traduction en Cours **">Chapitre 17, <em>Mandatory Access Control ** Traduction en Cours **</em></a>) empêchent
+      l'accès aux données pour des tiers non autorisés
+      quand le système d'exploitation est actif et l'ordinateur en
+      fonctionnement.  Cependant, des permissions renforcés
+      sont inutiles si l'attaquant a un accès physique à
+      un ordinateur et peut simplement déplacer le disque dur
+      sur un autre système pour copier et analyser les
+      données sensibles.</p><p>Indépendamment de la manière dont une personne
+      malveillante s'est
+      trouvé en possession d'un disque dur ou a arrêté
+      un ordinateur, le <span class="application">chiffrage de disque basé
+      sur GEOM (gbde)</span> (&#8220;GEOM Based Disk
+      Encryption&#8221;) et le système de chiffrage
+      <code class="command">geli</code> de FreeBSD sont en mesure de
+      protéger les données des systèmes de
+      fichiers contre des attaquants très motivés et aux
+      ressources importantes.  A la différence des
+      méthodes de chiffrage lourdes qui chiffrent uniquement
+      les fichiers individuels, <span class="application">gbde</span> et
+      <code class="command">geli</code> chiffrent de manière transparente
+      l'intégralité du système de fichiers.
+      Aucun texte en clair ne touche les plateaux du disque.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81002832"></a>19.16.1. Chiffrage des disques avec
+	<span class="application">gbde</span></h3></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Devenir <code class="systemitem">root</code></strong></p><p>La configuration de <span class="application">gbde</span>
+	    requiert les privilèges du super-utilisateur.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su -</code></strong>
+Password:</pre></li><li class="step"><p class="title"><strong>Ajouter le support <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a> au fichier de
+	    configuration du noyau</strong></p><p>Ajoutez la ligne suivante à votre fichier de
+	    configuration du noyau:</p><p><code class="literal">options GEOM_BDE</code></p><p>Recompilez le noyau comme décrit dans <a class="xref" href="kernelconfig.html" title="Chapitre 9. Configurer le noyau de FreeBSD">Chapitre 9, <em>Configurer le noyau de FreeBSD</em></a>.</p><p>Redémarrez avec le nouveau noyau.</p></li><li class="step"><p>Au lieu de recompiler le noyau, on peut utiliser
+	    <code class="command">kldload</code> pour charger le support
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_bde</code></strong></pre></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81021904"></a>19.16.1.1. Préparation du disque dur chiffré</h4></div></div></div><p>L'exemple suivant suppose que vous ajoutez un nouveau
+	disque dur à votre système et qui contiendra une
+	seule partition chiffrée.  Cette partition sera
+	montée sous <code class="filename">/private</code>.
+	<span class="application">gbde</span> peut également être
+	utilisé pour chiffrer les répertoires
+	<code class="filename">/home</code> et <code class="filename">/var/mail</code>,
+	mais cela demande une configuration plus complexe qui
+	dépasse le cadre de cette introduction.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Ajouter le nouveau disque</strong></p><p>Installez le nouveau disque comme expliqué dans
+	    <a class="xref" href="disks-adding.html" title="19.3. Ajouter des disques">Section 19.3, « Ajouter des disques »</a>.  Pour les besoins de cet
+	    exemple, une nouvelle partition disque a été
+	    ajoutée en tant que <code class="filename">/dev/ad4s1c</code>.
+	    Les périphériques du type
+	    <code class="filename">/dev/ad0s1*</code>
+	    représentent les partitions FreeBSD standards sur le
+	    système exemple.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4</pre></li><li class="step"><p class="title"><strong>Créer un répertoire pour héberger
+	    les fichiers de verrouillage de GBDE</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/gbde</code></strong></pre><p>Le fichier de verrouillage de
+	    <span class="application">gbde</span> contient l'information
+	    nécessaire à <span class="application">gbde</span> pour
+	    accéder aux partitions chiffrées.  Sans accès
+	    au fichier de verrouillage,
+	    <span class="application">gbde</span> sera incapable de
+	    déchiffrer les données contenues sur la partition
+	    chiffrée sans une aide manuelle significative ce
+	    qui n'est pas supporté par le logiciel.  Chaque
+	    partition chiffrée utilise un fichier de verrouillage
+	    propre.</p></li><li class="step"><p class="title"><strong>Initialiser la partition gbde</strong></p><p>Une partition <span class="application">gbde</span>
+	    doit être initialisée avant d'être utilisable.
+	    Cette initialisation doit être effectuée une seule
+	    fois:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde init /dev/ad4s1c -i -L /etc/gbde/ad4s1c</code></strong></pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> lancera votre éditeur, vous permettant
+	    de fixer diverses options de configuration dans un
+	    gabarit.  Pour une utilisation de UFS1 ou UFS2, fixez
+	    l'option <code class="literal">sector_size</code> à
+	    2048:</p><pre class="programlisting">$FreeBSD: src/sbin/gbde/template.txt,v 1.1 2002/10/20 11:16:13 phk Exp $
+#
+# La taille d'un secteur est la plus petite unité de donnée
+# qui peut être lue ou écrite.
+# Une valeur trop petite diminue les performances et l'espace
+# disponible.
+# Une valeur trop grande peut empêcher des systèmes de
+# fichiers de fonctionner correctement.  512 est la valeur minimale
+# et sans risque.  Pour l'UFS, utiliser la taille d'un fragment
+#
+sector_size     =       2048
+[...]
+</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> vous demandera de taper deux fois
+	    la phrase d'authentification qui devra être
+	    utilisée pour sécuriser les données.  La
+	    phrase d'authentification doit être la même
+	    dans les deux cas.  La capacité de
+	    <span class="application">gbde</span> à protéger
+	    vos données dépend de la qualité de la
+	    phrase d'authentification que vous avez choisie.
+	  <a href="#ftn.idp81049424" class="footnote" id="idp81049424"><sup class="footnote">[10]</sup></a></p><p>La commande <code class="command">gbde init</code> crée
+	    un fichier de verrouillage pour votre partition
+	    <span class="application">gbde</span> qui dans cet exemple est
+	    stocké sous <code class="filename">/etc/gbde/ad4s1c</code>.</p><div xmlns="" class="caution"><h3 class="admontitle">Attention: </h3><p xmlns="http://www.w3.org/1999/xhtml">Les fichiers de verrouillage de
+	      <span class="application">gbde</span>
+	      <span class="emphasis"><em>doivent</em></span> être conservés de
+	      pair avec le contenu des partitions chiffrées.
+	      Alors que la suppression seule d'un fichier de
+	      verrouillage ne peut empêcher une personne
+	      déterminée de déchiffrer une partition
+	      <span class="application">gbde</span>, sans le fichier
+	      de verrouillage, le propriétaire légitime sera
+	      incapable d'accéder aux données de la partition
+	      chiffrée sans beaucoup de travail ce qui est
+	      totalement non supporté par
+	      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> et son concepteur.</p></div></li><li class="step"><p class="title"><strong>Attacher la partition chiffrée au noyau</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c</code></strong></pre><p>On vous demandera de fournir la phrase
+	    d'authentification que vous avez choisie lors de
+	    l'initialisation de la partition chiffrée.  Le
+	    nouveau périphérique chiffré apparaîtra
+	    dans <code class="filename">/dev</code> en tant que
+	    <code class="filename">/dev/nom_périphérique.bde</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4        /dev/ad4s1c.bde</pre></li><li class="step"><p class="title"><strong>Créer un système de fichiers
+	    sur le périphérique chiffré</strong></p><p>Une fois que le périphérique chiffré
+	    a été attaché au noyau, vous pouvez créer
+	    un système de fichiers sur le périphérique.
+	    Pour créer un système de fichiers sur le
+	    périphérique, utilisez <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a>.
+	    Puisqu'il est plus rapide d'initialiser un nouveau
+	    système de fichiers UFS2 qu'un nouveau système
+	    UFS1, l'utilisation de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> avec l'option
+	    <code class="option">-O2</code> est recommandé.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U -O2 /dev/ad4s1c.bde</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">La commande <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> peut être effectuée
+	      sur une partition <span class="application">gbde</span>
+	      attachée qui est identifiée par une extension
+	      <code class="filename">*.bde</code>
+	      au niveau du nom de périphérique.</p></div></li><li class="step"><p class="title"><strong>Monter la partition chiffrée</strong></p><p>Créez un point de montage pour le système
+	    de fichiers chiffré.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /private</code></strong></pre><p>Montez le système de fichiers chiffré.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre></li><li class="step"><p class="title"><strong>Vérifiez que le système de fichiers
+	    chiffré est disponible</strong></p><p>Le système de fichiers chiffré devrait
+	    être visible par <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> et prêt à
+	    être utilisé:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem        Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a      1037M    72M   883M     8%    /
+/devfs            1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f       8.1G    55K   7.5G     0%    /home
+/dev/ad0s1e      1037M   1.1M   953M     0%    /tmp
+/dev/ad0s1d       6.1G   1.9G   3.7G    35%    /usr
+/dev/ad4s1c.bde   150G   4.1K   138G     0%    /private</pre></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81084240"></a>19.16.1.2. Montage des systèmes de fichiers chiffrés</h4></div></div></div><p>Après chaque démarrage, tout système
+	de fichiers chiffré doit être rattaché
+	au noyau, contrôlé pour les erreurs, et monté,
+	avant que les systèmes de fichiers ne puissent être
+	utilisés.  Les commandes nécessaires doivent être
+	exécutées en tant que
+	<code class="systemitem">root</code>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Attacher la partition gdbe au noyau</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c</code></strong></pre><p>On vous demandera de fournir la phrase
+	    d'authentification que vous avez choisie lors de
+	    l'initialisation de la partition <span class="application">gbde</span> chiffrée.</p></li><li class="step"><p class="title"><strong>Contrôler les erreurs du système de fichiers</strong></p><p>Puisque les systèmes de fichiers chiffrés
+	    ne peuvent être encore listés dans le fichier
+	    <code class="filename">/etc/fstab</code> pour un montage
+	    automatique, on doit donc contrôler les systèmes de
+	    fichiers pour d'éventuelles erreurs en exécutant
+	    manuellement <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> avant le montage.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -p -t ffs /dev/ad4s1c.bde</code></strong></pre></li><li class="step"><p class="title"><strong>Monter le système de fichiers chiffré</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre><p>Le système de fichiers est maintenant
+	    disponible à l'utilisation.</p></li></ol></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81098192"></a>19.16.1.2.1. Montage automatique de partitions chiffrées</h5></div></div></div><p>Il est possible de créer une procédure pour
+	  automatiquement attacher, contrôler, et monter une
+	  partition chiffrée, mais pour des raisons de
+	  sécurité la procédure ne devrait pas contenir le
+	  mot de passe <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a>.  A la place, il est recommandé
+	  que de telles procédures soient exécutées
+	  manuellement tout en fournissant le mot de passe via la
+	  console ou <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a>.</p><p>Comme autre possibilité, une procédure
+	  <code class="filename">rc.d</code> est fournie.  Des arguments
+	  peuvent être passés à cette
+	  procédure par l'intermédiaire de
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>,, par exemple:</p><pre class="programlisting">gbde_autoattach_all="YES"
+gbde_devices="ad4s1c"</pre><p>Cela impose la saisie de la phrase d'authentification
+	  <span class="application">gbde</span> au démarrage.
+	  Après avoir entré la phrase d'authentification
+	  correctement, la partition chiffrée
+	  <span class="application">gbde</span> sera montée
+	  automatiquement.  Cela peut être très utile
+	  quand <span class="application">gbde</span> est utilisé sur
+	  des ordinateurs portables.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81104464"></a>19.16.1.3. Les protections cryptographiques utilisées
+	  par gbde</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> chiffre la partie utile des secteurs en
+	  utilisant le chiffrage AES 128 bits en mode CBC.  Chaque
+	  secteur sur le disque est chiffré avec une clé AES
+	  différente.  Pour plus d'informations sur l'architecture
+	  cryptographique de <span class="application">gbde</span>, y
+	  compris comment les clés pour chaque secteur sont
+	  des dérivés de la phrase d'authentification
+	  donnée par l'utilisateur, voir la page de manuel
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81107536"></a>19.16.1.4. Problèmes de compatibilité</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> est incompatible avec
+	  les périphériques
+	  <span class="application">gbde</span>-chiffrés.  Tous les
+	  périphériques
+	  <code class="filename">*.bde</code>
+	  doivent être détachés du noyau
+	  avant de lancer <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> ou ce dernier plantera
+	  durant son processus initial de recherche des
+	  périphériques.  Pour détacher le
+	  périphérique chiffré utilisé dans notre
+	  exemple, utilisez la commande suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde detach /dev/ad4s1c</code></strong></pre><p>Notez également qu'étant donné
+	  que <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vinum&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">vinum</span>(4)</span></a> n'utilise pas le sous-système
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geom&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">geom</span>(4)</span></a>, vous ne pouvez utiliser
+	  <span class="application">gbde</span> avec des volumes
+	  <span class="application">vinum</span>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81123024"></a>19.16.2. Chiffrage des disques avec
+	<code class="command">geli</code></h3></div><div><span class="authorgroup">Contribution de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p>Depuis FreeBSD 6.0, une nouvelle classe GEOM pour le
+	chiffrage des données est disponible:
+	<code class="command">geli</code>.  Cette classe est
+	développée par Pawel Jakub Dawidek.  L'outil
+	<code class="command">geli</code> est différent de
+	<code class="command">gbde</code>; il offre des fonctionnalités
+	différentes et utilise une méthode
+	différente pour chiffrer les données.</p><p>Les caractéristiques les plus importantes de
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> sont:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Utilisation du système <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crypto&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">crypto</span>(9)</span></a> &#8212;
+	    quand du matériel destiné au chiffrement est
+	    disponible dans la machine, <code class="command">geli</code>
+	    l'utilisera automatiquement.</p></li><li class="listitem"><p>Support de plusieurs algorithmes de chiffrement
+	    (actuellement AES, Blowfish, et 3DES).</p></li><li class="listitem"><p>Permettre le chiffrage de la partition racine.  La
+	    phrase d'authentification utilisée pour
+	    accéder à la partition racine
+	    chiffrée sera demandée au démarrage
+	    du système.</p></li><li class="listitem"><p>Permettre l'emploi de deux clés
+	    indépendantes (par exemple une <span class="quote">« <span class="quote">clé
+	    utilisateur</span> »</span> et une <span class="quote">« <span class="quote">clé
+	    entreprise</span> »</span>).</p></li><li class="listitem"><p><code class="command">geli</code> est rapide&#8212;il effectue
+	    un simple chiffrement de secteur à secteur.</p></li><li class="listitem"><p>Permettre la sauvegarde et la restauration des
+	    clés principales.  Quand un utilisateur doit
+	    détruire ses clés, il sera possible
+	    d'accéder à nouveau aux données en
+	    restaurant les clés à partir de la
+	    sauvegarde.</p></li><li class="listitem"><p>Permettre d'attacher un disque avec une clé
+	    aléatoire à usage unique &#8212; utile pour
+	    les partitions de pagination et les systèmes de
+	    fichiers temporaires.</p></li></ul></div><p>Plus de caractéristiques concernant
+	<code class="command">geli</code> peuvent être trouvées
+	dans la page de manuel de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.</p><p>Les points suivants décriront comment activer le
+	support pour <code class="command">geli</code> dans le noyau FreeBSD et
+	expliqueront comment créer et utiliser un
+	<span class="emphasis"><em>provider</em></span> (ou partition) chiffré
+	<code class="command">geli</code>.</p><p>Afin de pouvoir employer <code class="command">geli</code>, vous
+	devez utiliser FreeBSD 6.0-RELEASE ou une version
+	ultérieure.  Les privilèges du super-utilisateur
+	seront également nécessaire puisque il faudra
+	effectuer des modifications au niveau du noyau.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Ajouter le support <code class="command">geli</code> au
+	    noyau</strong></p><p>Ajoutez les lignes suivantes au fichier de
+	    configuration du noyau:</p><pre class="programlisting">options GEOM_ELI
+device crypto</pre><p>Recompilez le noyau comme décrit dans la <a class="xref" href="kernelconfig.html" title="Chapitre 9. Configurer le noyau de FreeBSD">Chapitre 9, <em>Configurer le noyau de FreeBSD</em></a>.</p><p>Sinon, le module <code class="command">geli</code> peut
+	    être chargé au démarrage.  Ajoutez la
+	    ligne suivante au fichier
+	    <code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">geom_eli_load="YES"</pre><p>Le système <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> devrait
+	    désormais être supporté par le
+	    noyau.</p></li><li class="step"><p class="title"><strong>Générer la clé
+	    principale</strong></p><p>L'exemple suivant décrira la méthode
+	    pour générer un fichier clé qui sera
+	    utilisé comme partie de la clé principale
+	    pour le <span class="emphasis"><em>provider</em></span> chiffré
+	    monté sous le répertoire <code class="filename">/private</code>.  Le fichier
+	    clé fournira des données aléatoires
+	    qui seront employées pour chiffrer la clé
+	    principale.  La clé principale sera
+	    également protégée par une phrase
+	    d'authentification.  La taille des secteurs du
+	    <span class="emphasis"><em>provider</em></span> sera de 4Ko.  De plus, sera
+	    décrit comment attacher au système le
+	    <span class="emphasis"><em>provider</em></span> geli, créer un
+	    système de fichiers dessus, utiliser ce
+	    système de fichiers et enfin comment le
+	    détacher.</p><p>Il est recommandé d'utiliser une taille de
+	    secteur plus grande (comme 4Ko) pour de meilleures
+	    performances.</p><p>La clé principale sera protégée
+	    avec une phrase d'authentification et la source de
+	    données pour le fichier clé sera
+	    <code class="filename">/dev/random</code>.  La taille des secteurs
+	    de <code class="filename">/dev/da2.eli</code>, partition que nous
+	    appelons <span class="emphasis"><em>provider</em></span>, sera de
+	    4Ko.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/root/da2.key bs=64 count=1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli init -s 4096 -K /root/da2.key /dev/da2</code></strong>
+Enter new passphrase:
+Reenter new passphrase:</pre><p>Il n'est pas obligatoire d'utiliser la phrase
+	    d'authentification et le fichier clé; chacune de
+	    ces méthodes de sécurisation de la
+	    clé principale peut être utilisée
+	    séparément.</p><p>Si à la place du fichier clé un
+	    <span class="quote">« <span class="quote">-</span> »</span> est passé, l'entrée
+	    standard sera utilisée.  Cet exemple montre comment
+	    on peut utiliser plus d'un fichier clé:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat keyfile1 keyfile2 keyfile3 | geli init -K - /dev/da2</code></strong></pre></li><li class="step"><p class="title"><strong>Attacher le <span class="emphasis"><em>provider</em></span> avec la
+	    clé générée</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>geli attach -k /root/da2.key /dev/da2</code></strong>
+Enter passphrase:</pre><p>Le nouveau périphérique sera appelé
+	    <code class="filename">/dev/da2.eli</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/da2*</code></strong>
+/dev/da2  /dev/da2.eli</pre></li><li class="step"><p class="title"><strong>Créer le nouveau système de
+	    fichiers</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/dev/da2.eli bs=1m</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/da2.eli</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da2.eli /private</code></strong></pre><p>Le système de fichiers chiffré devrait
+	    être maintenant visible par <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> et disponible
+	    à l'utilisation:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem     Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a    248M    89M   139M    38%    /
+/devfs         1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f    7.7G   2.3G   4.9G    32%    /usr
+/dev/ad0s1d    989M   1.5M   909M     0%    /tmp
+/dev/ad0s1e    3.9G   1.3G   2.3G    35%    /var
+/dev/da2.eli   150G   4.1K   138G     0%    /private</pre></li><li class="step"><p class="title"><strong>Démonter et détacher le
+	    <span class="emphasis"><em>provider</em></span></strong></p><p>Une fois l'utilisation de la partition chiffrée
+	    achevée et que la partition <code class="filename">/private</code> n'est plus
+	    nécessaire, il est prudent de penser à
+	    démonter et détacher la partition
+	    <code class="command">geli</code> chiffrée:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /private</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli detach da2.eli</code></strong></pre></li></ol></div><p>Plus d'information sur l'utilisation de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>
+	    peut être trouvée dans sa page de
+	    manuel.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp81177680"></a>19.16.2.1. Utiliser la procédure <code class="filename">rc.d</code>
+	  de <code class="filename">geli</code></h4></div></div></div><p>La commande <code class="filename">geli</code> est fournie avec
+	  une procédure <code class="filename">rc.d</code> qui peut
+	  être employée pour simplifier l'utilisation de
+	  <code class="command">geli</code>.  Un exemple de configuration de
+	  <code class="command">geli</code> à l'aide de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>
+	  sera:</p><pre class="programlisting">geli_devices="da2"
+geli_da2_flags="-p -k /root/da2.key"</pre><p>Ces lignes configureront <code class="filename">/dev/da2</code>
+	  comme <span class="emphasis"><em>provider</em></span> <code class="command">geli</code>
+	  avec une clé principale
+	  <code class="filename">/root/da2.key</code>, de plus
+	  <code class="command">geli</code> n'utilisera pas de phrase
+	  d'authentification pour attacher le
+	  <span class="emphasis"><em>provider</em></span> (notez que ceci n'est
+	  utilisable que si l'option <code class="option">-P</code> a
+	  été passée durant la phase
+	  <code class="literal">geli init</code>).  Le système
+	  détachera du noyau le <span class="emphasis"><em>provider</em></span>
+	  <code class="command">geli</code> avant l'arrêt du
+	  système.</p><p>Plus d'information sur la configuration du
+	  système <code class="filename">rc.d</code> est fournie dans la
+	  section <a class="link" href="configtuning-rcd.html" title="12.7. Utilisation du système rc sous FreeBSD">rc.d</a> de ce
+	  Manuel.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp81049424" class="footnote"><p><a href="#idp81049424" class="para"><sup class="para">[10] </sup></a>Pour des conseils sur comment choisir une
+	    phrase d'authentification sécurisée et facile
+	    à retenir, consultez le site Web <a class="link" href="http://world.std.com/~reinhold/diceware.html" target="_top">Diceware
+	    Passphrase</a>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="quotas.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="swap-encrypting.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">19.15. Quotas d'utilisation des disques </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 19.17. Chiffrage de l'espace de pagination</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

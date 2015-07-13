@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>A. Пример PAM-приложения</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Подключаемые Модули Аутентификации (PAM)" /><link rel="up" href="index.html" title="Подключаемые Модули Аутентификации (PAM)" /><link rel="prev" href="pam-module-prog.html" title="7. Программирование модуля PAM" /><link rel="next" href="pam-sample-module.html" title="B. Пример PAM-модуля" /><link rel="copyright" href="pam-legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">A. Пример PAM-приложения</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pam-module-prog.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pam-sample-module.html">След.</a></td></tr></table><hr /></div><div class="appendix"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-sample-appl"></a>A. Пример PAM-приложения</h2></div></div></div><p>Далее следует минимальная реализация программы <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=su&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">su</span>(1)</span></a> с
+      использованием PAM.  Заметьте, что в ней используется специфичная для
+      OpenPAM функция взаимодействия <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=openpam_ttyconv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">openpam_ttyconv</span>(3)</span></a>, объявление
+      которой расположено в файле <code class="filename">security/openpam.h</code>.
+      Если вы собираетесь строить это приложение в системе с другой
+      библиотекой PAM, вам необходимо будет создать собственную функцию
+      взаимодействия.  Надёжную функцию взаимодействия неожиданно трудно
+      написать; та, что находится в <a class="xref" href="pam-sample-conv.html" title="C. Пример функции взаимодействия PAM">Приложение C, <em>Пример функции взаимодействия
+      PAM</em></a>,
+      хороша в качестве отправной
+      точки, но в реальных приложениях использоваться не может.</p><pre class="programlisting">
+/*-
+ * Copyright (c) 2002,2003 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $P4: //depot/projects/openpam/bin/su/su.c#10 $
+ * $FreeBSD$
+ */
+
+#include &lt;sys/param.h&gt;
+#include &lt;sys/wait.h&gt;
+
+#include &lt;err.h&gt;
+#include &lt;pwd.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;syslog.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_appl.h&gt;
+#include &lt;security/openpam.h&gt;	/* for openpam_ttyconv() */
+
+extern char **environ;
+
+static pam_handle_t *pamh;
+static struct pam_conv pamc;
+
+static void
+usage(void)
+{
+
+	fprintf(stderr, "Usage: su [login [args]]\n");
+	exit(1);
+}
+
+int
+main(int argc, char *argv[])
+{
+	char hostname[MAXHOSTNAMELEN];
+	const char *user, *tty;
+	char **args, **pam_envlist, **pam_env;
+	struct passwd *pwd;
+	int o, pam_err, status;
+	pid_t pid;
+
+	while ((o = getopt(argc, argv, "h")) != -1)
+		switch (o) {
+		case 'h':
+		default:
+			usage();
+		}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc &gt; 0) {
+		user = *argv;
+		--argc;
+		++argv;
+	} else {
+		user = "root";
+	}
+
+	/* initialize PAM */
+	pamc.conv = &amp;openpam_ttyconv;
+	pam_start("su", user, &amp;pamc, &amp;pamh);
+
+	/* set some items */
+	gethostname(hostname, sizeof(hostname));
+	if ((pam_err = pam_set_item(pamh, PAM_RHOST, hostname)) != PAM_SUCCESS)
+		goto pamerr;
+	user = getlogin();
+	if ((pam_err = pam_set_item(pamh, PAM_RUSER, user)) != PAM_SUCCESS)
+		goto pamerr;
+	tty = ttyname(STDERR_FILENO);
+	if ((pam_err = pam_set_item(pamh, PAM_TTY, tty)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* authenticate the applicant */
+	if ((pam_err = pam_authenticate(pamh, 0)) != PAM_SUCCESS)
+		goto pamerr;
+	if ((pam_err = pam_acct_mgmt(pamh, 0)) == PAM_NEW_AUTHTOK_REQD)
+		pam_err = pam_chauthtok(pamh, PAM_CHANGE_EXPIRED_AUTHTOK);
+	if (pam_err != PAM_SUCCESS)
+		goto pamerr;
+
+	/* establish the requested credentials */
+	if ((pam_err = pam_setcred(pamh, PAM_ESTABLISH_CRED)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* authentication succeeded; open a session */
+	if ((pam_err = pam_open_session(pamh, 0)) != PAM_SUCCESS)
+		goto pamerr;
+
+	/* get mapped user name; PAM may have changed it */
+	pam_err = pam_get_item(pamh, PAM_USER, (const void **)&amp;user);
+	if (pam_err != PAM_SUCCESS || (pwd = getpwnam(user)) == NULL)
+		goto pamerr;
+
+	/* export PAM environment */
+	if ((pam_envlist = pam_getenvlist(pamh)) != NULL) {
+		for (pam_env = pam_envlist; *pam_env != NULL; ++pam_env) {
+			putenv(*pam_env);
+			free(*pam_env);
+		}
+		free(pam_envlist);
+	}
+
+	/* build argument list */
+	if ((args = calloc(argc + 2, sizeof *args)) == NULL) {
+		warn("calloc()");
+		goto err;
+	}
+	*args = pwd-&gt;pw_shell;
+	memcpy(args + 1, argv, argc * sizeof *args);
+
+	/* fork and exec */
+	switch ((pid = fork())) {
+	case -1:
+		warn("fork()");
+		goto err;
+	case 0:
+		/* child: give up privs and start a shell */
+
+		/* set uid and groups */
+		if (initgroups(pwd-&gt;pw_name, pwd-&gt;pw_gid) == -1) {
+			warn("initgroups()");
+			_exit(1);
+		}
+		if (setgid(pwd-&gt;pw_gid) == -1) {
+			warn("setgid()");
+			_exit(1);
+		}
+		if (setuid(pwd-&gt;pw_uid) == -1) {
+			warn("setuid()");
+			_exit(1);
+		}
+		execve(*args, args, environ);
+		warn("execve()");
+		_exit(1);
+	default:
+		/* parent: wait for child to exit */
+		waitpid(pid, &amp;status, 0);
+
+		/* close the session and release PAM resources */
+		pam_err = pam_close_session(pamh, 0);
+		pam_end(pamh, pam_err);
+
+		exit(WEXITSTATUS(status));
+	}
+
+pamerr:
+	fprintf(stderr, "Sorry\n");
+err:
+	pam_end(pamh, pam_err);
+	exit(1);
+}
+
+    </pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pam-module-prog.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="pam-sample-module.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">7. Программирование модуля PAM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> B. Пример PAM-модуля</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

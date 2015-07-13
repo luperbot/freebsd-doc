@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>2.5. メモリ管理</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="4.4BSD オペレーティングシステムの設計と実装" /><link rel="up" href="overview.html" title="第2章 4.4BSD の設計の概要" /><link rel="prev" href="overview-process-management.html" title="2.4. プロセス管理" /><link rel="next" href="overview-io-system.html" title="2.6. I/O システム" /><link rel="copyright" href="legalnotice.html" title="法律上の通知" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.5. メモリ管理</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="overview-process-management.html">戻る</a>〓</td><th width="60%" align="center">第2章 4.4BSD の設計の概要</th><td width="20%" align="right">〓<a accesskey="n" href="overview-io-system.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="overview-memory-management"></a>2.5. メモリ管理</h2></div></div></div><p>それぞれのプロセスはプロセスごとのプライベートアドレス空間を持っています。
+	アドレス空間は、最初に論理的な3つのセグメントに分割されます:
+	<span class="emphasis"><em>テキスト</em></span>、
+	<span class="emphasis"><em>データ</em></span>、および
+	<span class="emphasis"><em>スタック</em></span>です。
+	テキストセグメントは読み出し専用で、プログラムの命令を含んでいます。
+	データ及びスタックセグメントは読み取り書き込みともに可能です。
+	データセグメントには
+	初期化されているデータと初期化されていないデータがあるのに対し、
+	スタックセグメントはランタイムスタックを保持します。
+	ほとんどのマシンでは、プロセスが実行するとともに、
+	カーネルによってスタックセグメントは自動的に拡張されます。
+	プロセスはシステムコールによりデータセグメントを拡張する事が可能ですが、
+	セグメントの内容がファイルシステムからのデータである場合、あるいは
+	デバッグ時に限りプロセスはそのテキストセグメントのサイズを変更することができます。
+	子プロセスのセグメントの初期の内容は親プロセスのセグメントのコピーです。</p><p>プロセスアドレス空間の全内容はプロセスが実行するのには必要がありません。
+	プロセスがメインメモリにおいて保持されていないアドレス空間の一部を参照する場合、
+	システムはメインメモリーからメモリの中の必要な情報を
+	<span class="emphasis"><em>ページ</em></span>
+	につけます。
+	システムリソースが不足する場合、システムは利用可能な資源を維持するために2レベルのアプローチをします。
+	適度の量のメモリが利用可能な場合でこれらの資源が最近使用されていない場合、
+	システムはプロセスからメモリリソースを解放します。
+	メモリー不足が深刻だった場合、システムはプロセスの全情況を２次キャッシュの
+	<span class="emphasis"><em>スワップ</em></span>
+	に頼ります。
+	<span class="emphasis"><em>ページング</em></span>
+	と
+	<span class="emphasis"><em>スワップ</em></span>
+	の交換はシステムによって行われた、プロセスに有効です。
+	プロセスは実行援助として予期された将来のメモリ利用についてシステムに助言するかもしれません。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76612688"></a>2.5.1. BSDメモリ管理設計の決定</h3></div></div></div><p>疎の広いアドレス空間のサポート、
+          メモリマップファイル、共有メモリは、
+          4.2BSD に要求されたものの一つでした。
+          独立したプロセス群がプロセスのアドレス空間をファイルにマッピングし、
+          それの共有を可能にする
+	  <span class="emphasis"><em>mmap</em></span> と呼ばれるインタフェースが規定されました。
+          複数のプロセスが同じファイルにプロセスのアドレス空間をマッピングした場合、
+          一つのプロセスがファイルにマッピングされたアドレス空間の一部分に対して
+          加えた変更は、通常のファイルがそうであるのと同様、
+          同じ部分をマッピングしている他のプロセスにも反映されます。
+	  しかし結局、4.2BSDは <span class="emphasis"><em>mmap</em></span>
+          インタフェースを含まない形でリリースされました。
+          これはネットワークのような他の機能を実現する方が重要で、
+          時間的な余裕がなかったからです。</p><p><span class="emphasis"><em>mmap</em></span>
+          インタフェースの開発は、4.3BSD の作業の間も続けられました。
+	  40 社を超える会社と研究グループが、
+          Berkeley Software Architecture Manual <a class="xref" href="overview.html#biblio-mckusick-1">[<abbr class="abbrev">McKusick et al, 1994</abbr>]</a>
+          に記載されたアーキテクチャの改訂版を策定する議論に参加し、
+          いくつかの企業はその改訂版のインタフェースを実装しました
+          <a class="xref" href="overview.html#biblio-gingell">[<abbr class="abbrev">Gingell et al, 1987</abbr>]</a>。</p><p>しかし、またもや時間的な問題により
+          4.3BSD への mmap インタフェースの実装は見送られました。
+          もちろん既存の 4.3BSD 仮想記憶システムにそのインタフェースを組み込むことは
+          可能だったのですが、4.3BSD の仮想記憶システムの実装は 10
+          年近く前のものであったため、開発者たちはそれを組み込まないことに決定したのです。
+          4.3BSD の仮想記憶システムはローカルに接続されたディスク装置は高速・大容量・安価で、
+          コンピュータのメモリは小容量・高価であるという仮定に基づいて設計されており、
+          そのため、その設計はメモリ利用量を節約できる代わりに
+          余分なディスクアクセスを生成してしまうものでした。
+          また、この実装は VAX のメモリ管理ハードウェアに強く依存するもので、
+          他のコンピュータアーキテクチャへの移植が困難でした。
+          最後にもう一つ付け加えるなら、この仮想記憶システムは
+          現在普及がすすみ重要になってきている密結合マルチプロセッサに
+          対応するように設計されていなかったのです。</p><p>古い仮想記憶システムの実装を改良しようという試みは、
+          ますます失敗が運命づけられたように思われました。
+          その一方で、完全に新しい設計は大容量メモリを利用し、
+          ディスクへのデータ転送を低減し、
+          マルチプロセッサで動作することができる能力を持っていました。
+          その結果、仮想記憶システムは 4.4BSD で完全に置き換えられることになったのです。
+          4.4BSD 仮想記憶システムは Mach 2.0 VM システム <a class="xref" href="overview.html#biblio-tevanian">[<abbr class="abbrev">Tevanian, 1987</abbr>]</a>
+          をベースに、Mach 2.5 と Mach 2.0 の改良を採り入れたものです。
+          この実装は、
+          メモリ共有の効率が良く機種依存部分と機種非依存部分がきれいに分離されていて、
+          (現在は使われていませんが)
+          マルチプロセッサに対応しているという特徴を持っています。
+          各プロセスは自分のアドレス空間のあらゆる部分をファイルにマッピングすることができ、
+          互いに同一のファイルにアドレス空間をマッピングすることで、
+          プロセス間でアドレス空間の一部を共有することが可能になりました。
+          一つのプロセスが加えた変更は他のプロセスのアドレス空間にも反映され、
+          マッピングされたファイル自身にも書き込まれます。
+          また、プロセスはファイルをプライベートマッピングすることも可能です。
+          プライベートマッピングとは、プロセスが加えた変更が、
+          そのファイルをマッピングしている他のプロセスから見えないようにしたり、
+          ファイル自身に書き戻されないようにするものです。</p><p>仮想記憶システムの抱えるもう一つの問題は、
+          システムコールが発行された時にカーネルに情報を渡す方法です。
+          4.4BSD では、常にプロセスのアドレス空間からカーネル内のバッファに
+          データをコピーしていました。
+          大容量のデータを転送する読み書き操作が発生することを考えると、
+          このコピーの実行には時間がかかる可能性があります。
+          コピーを実現するもう一つの方法として、
+          プロセスのメモリをカーネル内に再マッピングする方法があります。
+          しかし 4.4BSD カーネルは、
+          以下の理由から常にデータをコピーします。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>ほとんどの場合ユーザデータはページ境界にアラインされていませんし、
+              ハードウェアページ長の倍数でもありません。</p></li><li class="listitem"><p>そのページをプロセスが破棄してしまうと、
+              カーネルがページを参照できなくなってしまいます。
+              プログラムの中には、カーネル内のバッファに
+              書かれたデータが残っていることを想定しているものがあります。
+            </p></li><li class="listitem"><p>(現在の 4.4BSD セマンティクスで可能なように)
+              プロセスがページのコピーを持てる場合、
+              そのページは必ず<span class="emphasis"><em>コピーオンライト(copy-on-write)</em></span>
+              になっています。
+              コピーオンライトのページとは、
+              読み込み専用に設定することで書き込みに対する保護機能を有効化したページのことです。
+              プロセスがそのページを変更しようとするとカーネルは書き込み例外を検出します。
+              その際カーネルは、プロセスが変更できるようにそのページのコピーを作成します。
+              残念ながら、プロセスは通常すぐに出力バッファに新しいデータを書こうとするため、
+              結局データのコピーが発生してしまいます。</p></li><li class="listitem"><p>ページが新しい仮想メモリアドレスに再マッピングされる際、
+              ほとんどのメモリ管理ハードウェアでは、
+              ハードウェアアドレス変換キャッシュの一部を破棄する必要があります。
+              多くの場合、このキャッシュの破棄は時間がかかるため、
+              4 から 8 キロバイトより小さいデータブロックに対しては、
+              コピーするよりも再マッピングする方が実質的に遅い、
+              という結果となります。</p></li></ul></div><p>メモリマッピングの最も大きな目的は、
+          巨大なファイルへのアクセスと、
+          プロセス間の大容量のデータ転送という要求に応えることです。
+          <span class="emphasis"><em>mmap</em></span> インタフェースは、
+          両方の要求をコピーを行なうことなく実現する一つの方法を提供します。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76634576"></a>2.5.2. カーネル内部のメモリ管理</h3></div></div></div><p>カーネルは一つのシステムコールの間だけ必要とされるメモリの割り当てを頻繁に行ないます。
+          ユーザプロセスではおそらく、
+          そのような短期間使われるメモリはランタイムスタックに割り当てられるでしょう。
+          カーネルのランタイムスタックには上限があるため、
+          小さめのメモリブロックだとしてもスタックにメモリを割り当てることはできません。
+          そのため、
+          そのようなメモリはもっと動的な機能を用いて割り当てる必要があります。
+          たとえば、システムがパス名の解釈を行なう場合、
+          パス名を保持するために 1 キロバイトのバッファを割り当てる必要があります。
+          しかしメモリブロックは一つのシステムコールよりも
+          長く持続していなければならないため、
+          スタックに空きがあったとしても、そこに割り当てることはできないでしょう。
+          こういう例の一つに、ネットワークが接続されている間維持している必要がある
+          プロトコル制御ブロックがあります。</p><p>カーネル内の動的なメモリ割り当てに対する需要は、
+          サービスが追加されるにつれて増加しています。
+          汎用のメモリアロケータがあれば、
+          カーネル内部のコードを書く際の複雑さを低減することができます。
+          そのため 4.4BSD カーネルでは、システムのあらゆる場面で利用可能な
+          単一のメモリアロケータを備えています。
+          これは、
+          アプリケーションプログラム用のメモリ割り付けを実現するために
+          C ライブラリルーチンに含まれている <span class="emphasis"><em>malloc</em></span> と
+          <span class="emphasis"><em>free</em></span> と類似したインタフェースを持っています
+          <a class="xref" href="overview.html#biblio-mckusick-2">[<abbr class="abbrev">McKusick &amp; Karels, 1988</abbr>]</a>。
+          この割り付けルーチンは C ライブラリインタフェースと同様、
+          引数として必要なメモリサイズを指定します。
+          割り当てるメモリサイズの上限はありませんが、
+          割り当てられるのは物理メモリであり、ページではありません。
+          メモリ解放ルーチンは解放するメモリへのポインタを引数にとります。
+          その際、解放するメモリサイズを指定する必要はありません。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="overview-process-management.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="overview.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="overview-io-system.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">2.4. プロセス管理〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓2.6. I/O システム</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

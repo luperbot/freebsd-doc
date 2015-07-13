@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>27.3. Using Kernel PPP</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 使用手冊" /><link rel="up" href="ppp-and-slip.html" title="章 27. PPP and SLIP" /><link rel="prev" href="userppp.html" title="27.2. Using User PPP" /><link rel="next" href="ppp-troubleshoot.html" title="27.4. Troubleshooting PPP Connections" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.3. Using Kernel PPP</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="userppp.html">前一頁</a> </td><th width="60%" align="center">章 27. PPP and SLIP</th><td width="20%" align="right"> <a accesskey="n" href="ppp-troubleshoot.html">下一頁</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ppp"></a>27.3. Using Kernel PPP</h2></div><div><span class="authorgroup">Parts originally contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Gennady B.</span> <span class="surname">Sorokopud</span></span> 且 <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Robert</span> <span class="surname">Huff</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86019920"></a>27.3.1. Setting Up Kernel PPP</h3></div></div></div><a id="idp86020560" class="indexterm"></a><p>Before you start setting up PPP on your machine, make sure
+	that <code class="command">pppd</code> is located in
+	<code class="filename">/usr/sbin</code> and the directory
+	<code class="filename">/etc/ppp</code> exists.</p><p><code class="command">pppd</code> can work in two modes:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>As a <span class="quote">“<span class="quote">client</span>”</span> —— you want to connect your
+	    machine to the outside world via a PPP serial connection or
+	    modem line.</p></li><li class="listitem"><p>As a <span class="quote">“<span class="quote">server</span>”</span><a id="idp86034000" class="indexterm"></a> —— your machine is located on
+	    the network, and is used to connect other computers using
+	    PPP.</p></li></ol></div><p>In both cases you will need to set up an options file
+        (<code class="filename">/etc/ppp/options</code> or
+	<code class="filename">~/.ppprc</code> if you have more than one user on
+	your machine that uses PPP).</p><p>You will also need some modem/serial software (preferably
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/comms/kermit/pkg-descr">comms/kermit</a>), so you can dial and
+	establish a connection with the remote host.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86037200"></a>27.3.2. Using <code class="command">pppd</code> as a Client</h3></div><div><span class="authorgroup">Based on information provided by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Trev</span> <span class="surname">Roydhouse</span></span>. </span></div></div></div><a id="idp86040016" class="indexterm"></a><a id="idp86040784" class="indexterm"></a><p>The following <code class="filename">/etc/ppp/options</code> might be
+        used to connect to a Cisco terminal server PPP line.</p><pre class="programlisting">crtscts         # enable hardware flow control
+modem           # modem control line
+noipdefault     # remote PPP server must supply your IP address
+                # if the remote host does not send your IP during IPCP
+                # negotiation, remove this option
+passive         # wait for LCP packets
+domain ppp.foo.com      # put your domain name here
+
+:&lt;remote_ip&gt;    # put the IP of remote PPP host here
+                # it will be used to route packets via PPP link
+                # if you didn't specified the noipdefault option
+                # change this line to &lt;local_ip&gt;:&lt;remote_ip&gt;
+
+defaultroute    # put this if you want that PPP server will be your
+                # default router</pre><p>To connect:</p><a id="idp86042960" class="indexterm"></a><a id="idp86043472" class="indexterm"></a><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Dial to the remote host using <span class="application">Kermit</span> (or some other modem
+	    program), and enter your user name and password (or whatever
+	    is needed to enable PPP on the remote host).</p></li><li class="step"><p>Exit <span class="application">Kermit</span> (without
+	  hanging up the line).</p></li><li class="step"><p>Enter the following:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/usr/src/usr.sbin/pppd.new/pppd /dev/tty01 19200</code></strong></pre><p>Be sure to use the appropriate speed and device name.</p></li></ol></div><p>Now your computer is connected with PPP.  If the connection
+	fails, you can add the <code class="option">debug</code> option to the
+	<code class="filename">/etc/ppp/options</code> file, and check console messages
+	to track the problem.</p><p>Following <code class="filename">/etc/ppp/pppup</code> script will make
+	all 3 stages automatic:</p><pre class="programlisting">#!/bin/sh
+ps ax |grep pppd |grep -v grep
+pid=`ps ax |grep pppd |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing pppd, PID=' ${pid}
+        kill ${pid}
+fi
+ps ax |grep kermit |grep -v grep
+pid=`ps ax |grep kermit |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing kermit, PID=' ${pid}
+        kill -9 ${pid}
+fi
+
+ifconfig ppp0 down
+ifconfig ppp0 delete
+
+kermit -y /etc/ppp/kermit.dial
+pppd /dev/tty01 19200</pre><a id="idp86051152" class="indexterm"></a><p><code class="filename">/etc/ppp/kermit.dial</code> is a <span class="application">Kermit</span>
+      script that dials and makes all necessary authorization on the
+      remote host (an example of such a script is attached to the end
+      of this document).</p><p>Use the following <code class="filename">/etc/ppp/pppdown</code> script
+        to disconnect the PPP line:</p><pre class="programlisting">#!/bin/sh
+pid=`ps ax |grep pppd |grep -v grep|awk '{print $1;}'`
+if [ X${pid} != "X" ] ; then
+        echo 'killing pppd, PID=' ${pid}
+        kill -TERM ${pid}
+fi
+
+ps ax |grep kermit |grep -v grep
+pid=`ps ax |grep kermit |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing kermit, PID=' ${pid}
+        kill -9 ${pid}
+fi
+
+/sbin/ifconfig ppp0 down
+/sbin/ifconfig ppp0 delete
+kermit -y /etc/ppp/kermit.hup
+/etc/ppp/ppptest</pre><p>Check to see if <code class="command">pppd</code> is still running by executing
+	<code class="filename">/usr/etc/ppp/ppptest</code>, which should look like
+	this:</p><pre class="programlisting">#!/bin/sh
+pid=`ps ax| grep pppd |grep -v grep|awk '{print $1;}'`
+if [ X${pid} != "X" ] ; then
+        echo 'pppd running: PID=' ${pid-NONE}
+else
+        echo 'No pppd running.'
+fi
+set -x
+netstat -n -I ppp0
+ifconfig ppp0</pre><p>To hang up the modem, execute
+	<code class="filename">/etc/ppp/kermit.hup</code>, which should
+	contain:</p><pre class="programlisting">set line /dev/tty01	; put your modem device here
+set speed 19200
+set file type binary
+set file names literal
+set win 8
+set rec pack 1024
+set send pack 1024
+set block 3
+set term bytesize 8
+set command bytesize 8
+set flow none
+
+pau 1
+out +++
+inp 5 OK
+out ATH0\13
+echo \13
+exit</pre><p>Here is an alternate method using <code class="command">chat</code>
+	instead of <code class="command">kermit</code>:</p><p>The following two files are sufficient to accomplish a
+	<code class="command">pppd</code>	connection.</p><p><code class="filename">/etc/ppp/options</code>:</p><pre class="programlisting">/dev/cuaa1 115200
+
+crtscts		# enable hardware flow control
+modem		# modem control line
+connect "/usr/bin/chat -f /etc/ppp/login.chat.script"
+noipdefault	# remote PPP serve must supply your IP address
+	        # if the remote host doesn't send your IP during
+                # IPCP negotiation, remove this option
+passive         # wait for LCP packets
+domain &lt;your.domain&gt;	# put your domain name here
+
+:		# put the IP of remote PPP host here
+	        # it will be used to route packets via PPP link
+                # if you didn't specified the noipdefault option
+                # change this line to &lt;local_ip&gt;:&lt;remote_ip&gt;
+
+defaultroute	# put this if you want that PPP server will be
+	        # your default router</pre><p><code class="filename">/etc/ppp/login.chat.script</code>:</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">The following should go on a single line.</p></div><pre class="programlisting">ABORT BUSY ABORT 'NO CARRIER' "" AT OK ATDT&lt;phone.number&gt;
+  CONNECT "" TIMEOUT 10 ogin:-\\r-ogin: &lt;login-id&gt;
+  TIMEOUT 5 sword: &lt;password&gt;</pre><p>Once these are installed and modified correctly, all you need
+	to do is run <code class="command">pppd</code>, like so:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pppd</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp86071376"></a>27.3.3. Using <code class="command">pppd</code> as a Server</h3></div></div></div><p><code class="filename">/etc/ppp/options</code> should contain something
+	similar to the following:</p><pre class="programlisting">crtscts                         # Hardware flow control
+netmask 255.255.255.0           # netmask (not required)
+192.114.208.20:192.114.208.165  # IP's of local and remote hosts
+                                # local ip must be different from one
+                                # you assigned to the Ethernet (or other)
+                                # interface on your machine.
+                                # remote IP is IP address that will be
+                                # assigned to the remote machine
+domain ppp.foo.com              # your domain
+passive                         # wait for LCP
+modem                           # modem line</pre><p>The following <code class="filename">/etc/ppp/pppserv</code> script
+	will tell <span class="application">pppd</span> to behave as a
+	server:</p><pre class="programlisting">#!/bin/sh
+ps ax |grep pppd |grep -v grep
+pid=`ps ax |grep pppd |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing pppd, PID=' ${pid}
+        kill ${pid}
+fi
+ps ax |grep kermit |grep -v grep
+pid=`ps ax |grep kermit |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing kermit, PID=' ${pid}
+        kill -9 ${pid}
+fi
+
+# reset ppp interface
+ifconfig ppp0 down
+ifconfig ppp0 delete
+
+# enable autoanswer mode
+kermit -y /etc/ppp/kermit.ans
+
+# run ppp
+pppd /dev/tty01 19200</pre><p>Use this <code class="filename">/etc/ppp/pppservdown</code> script to
+	stop the server:</p><pre class="programlisting">#!/bin/sh
+ps ax |grep pppd |grep -v grep
+pid=`ps ax |grep pppd |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing pppd, PID=' ${pid}
+        kill ${pid}
+fi
+ps ax |grep kermit |grep -v grep
+pid=`ps ax |grep kermit |grep -v grep|awk '{print $1;}'`
+if [ "X${pid}" != "X" ] ; then
+        echo 'killing kermit, PID=' ${pid}
+        kill -9 ${pid}
+fi
+ifconfig ppp0 down
+ifconfig ppp0 delete
+
+kermit -y /etc/ppp/kermit.noans</pre><p>The following <span class="application">Kermit</span> script
+	(<code class="filename">/etc/ppp/kermit.ans</code>) will enable/disable
+	autoanswer mode on your modem.  It should look like this:</p><pre class="programlisting">set line /dev/tty01
+set speed 19200
+set file type binary
+set file names literal
+set win 8
+set rec pack 1024
+set send pack 1024
+set block 3
+set term bytesize 8
+set command bytesize 8
+set flow none
+
+pau 1
+out +++
+inp 5 OK
+out ATH0\13
+inp 5 OK
+echo \13
+out ATS0=1\13   ; change this to out ATS0=0\13 if you want to disable
+                ; autoanswer mode
+inp 5 OK
+echo \13
+exit</pre><p>A script named <code class="filename">/etc/ppp/kermit.dial</code> is
+	used for dialing and authenticating on the remote host.  You will
+	need to customize it for your needs.  Put your login and password
+	in this script; you will also need to change the input statement
+	depending on responses from your modem and remote host.</p><pre class="programlisting">;
+; put the com line attached to the modem here:
+;
+set line /dev/tty01
+;
+; put the modem speed here:
+;
+set speed 19200
+set file type binary            ; full 8 bit file xfer
+set file names literal
+set win 8
+set rec pack 1024
+set send pack 1024
+set block 3
+set term bytesize 8
+set command bytesize 8
+set flow none
+set modem hayes
+set dial hangup off
+set carrier auto                ; Then SET CARRIER if necessary,
+set dial display on             ; Then SET DIAL if necessary,
+set input echo on
+set input timeout proceed
+set input case ignore
+def \%x 0                       ; login prompt counter
+goto slhup
+
+:slcmd                          ; put the modem in command mode
+echo Put the modem in command mode.
+clear                           ; Clear unread characters from input buffer
+pause 1
+output +++                      ; hayes escape sequence
+input 1 OK\13\10                ; wait for OK
+if success goto slhup
+output \13
+pause 1
+output at\13
+input 1 OK\13\10
+if fail goto slcmd              ; if modem doesn't answer OK, try again
+
+:slhup                          ; hang up the phone
+clear                           ; Clear unread characters from input buffer
+pause 1
+echo Hanging up the phone.
+output ath0\13                  ; hayes command for on hook
+input 2 OK\13\10
+if fail goto slcmd              ; if no OK answer, put modem in command mode
+
+:sldial                         ; dial the number
+pause 1
+echo Dialing.
+output atdt9,550311\13\10               ; put phone number here
+assign \%x 0                    ; zero the time counter
+
+:look
+clear                           ; Clear unread characters from input buffer
+increment \%x                   ; Count the seconds
+input 1 {CONNECT }
+if success goto sllogin
+reinput 1 {NO CARRIER\13\10}
+if success goto sldial
+reinput 1 {NO DIALTONE\13\10}
+if success goto slnodial
+reinput 1 {\255}
+if success goto slhup
+reinput 1 {\127}
+if success goto slhup
+if &lt; \%x 60 goto look
+else goto slhup
+
+:sllogin                        ; login
+assign \%x 0                    ; zero the time counter
+pause 1
+echo Looking for login prompt.
+
+:slloop
+increment \%x                   ; Count the seconds
+clear                           ; Clear unread characters from input buffer
+output \13
+;
+; put your expected login prompt here:
+;
+input 1 {Username: }
+if success goto sluid
+reinput 1 {\255}
+if success goto slhup
+reinput 1 {\127}
+if success goto slhup
+if &lt; \%x 10 goto slloop         ; try 10 times to get a login prompt
+else goto slhup                 ; hang up and start again if 10 failures
+
+:sluid
+;
+; put your userid here:
+;
+output ppp-login\13
+input 1 {Password: }
+;
+; put your password here:
+;
+output ppp-password\13
+input 1 {Entering SLIP mode.}
+echo
+quit
+
+:slnodial
+echo \7No dialtone.  Check the telephone line!\7
+exit 1
+
+; local variables:
+; mode: csh
+; comment-start: "; "
+; comment-start-skip: "; "
+; end:</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="userppp.html">前一頁</a> </td><td width="20%" align="center"><a accesskey="u" href="ppp-and-slip.html">上一層</a></td><td width="40%" align="right"> <a accesskey="n" href="ppp-troubleshoot.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">27.2. Using User PPP </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 27.4. Troubleshooting <acronym class="acronym">PPP</acronym> Connections</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

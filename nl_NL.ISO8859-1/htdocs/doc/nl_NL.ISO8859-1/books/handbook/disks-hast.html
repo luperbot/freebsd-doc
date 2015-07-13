@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.18. Highly Available Storage (HAST)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="disks.html" title="Hoofdstuk 19. Opslag" /><link rel="prev" href="swap-encrypting.html" title="19.17. Het versleutelen van de wisselbestand ruimte" /><link rel="next" href="GEOM.html" title="Hoofdstuk 20. GEOM: Modulair schijftransformatie raamwerk" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.18. Highly Available Storage (HAST)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="swap-encrypting.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 19. Opslag</th><td width="20%" align="right"> <a accesskey="n" href="GEOM.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-hast"></a>19.18. Highly Available Storage (HAST)</h2></div><div><span class="authorgroup">Bijgedragen door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div><div><span class="authorgroup">Met informatie van <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Freddie</span> <span class="surname">Cash</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Pawel Jakub</span> <span class="surname">Dawidek</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Michael W.</span> <span class="surname">Lucas</span></span> en <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Viktor</span> <span class="surname">Petersson</span></span>. </span></div></div></div><a id="idp80774352" class="indexterm"></a><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80775504"></a>19.18.1. Overzicht</h3></div></div></div><p>Hoge beschikbaarheid is een van de hoofdzaken in serieuze zakelijke
+	toepassingen en hoog beschikbare opslag is een sleutelonderdeel in zulke
+	omgevingen.  Hoog beschikbare opslag, of <acronym class="acronym">HAST<em><span class="remark">Highly Available STorage</span></em></acronym>, werd
+	ontwikkeld door Pawel Jakub Dawidek <code class="email">&lt;<a xmlns="" class="email" href="mailto:pjd@FreeBSD.org">pjd@FreeBSD.org</a>&gt;</code> als een raamwerk dat transparante opslag van
+	dezelfde gegevens toestaat over fysiek gescheiden machines die verbonden
+	zijn door een TCP/IP-netwerk.  <acronym class="acronym">HAST</acronym> kan gezien worden
+	als een netwerkgebaseerde RAID1 (spiegel) en is vergelijkbaar met het
+	DRBD® opslagsysteem bekend van het GNU/<span class="trademark">Linux</span>® platform.  In
+	combinatie met andere eigenschappen voor hoge beschikbaarheid van FreeBSD
+	zoals <acronym class="acronym">CARP</acronym> maakt <acronym class="acronym">HAST</acronym> het mogelijk
+	om een opslagcluster met hoge beschikbaarheid te bouwen dat resistent is
+	tegen falende hardware.</p><p>Na het lezen van deze sectie weet u:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Wat <acronym class="acronym">HAST</acronym> is, hoe het werkt en welke
+	    mogelijkheden het biedt.</p></li><li class="listitem"><p>Hoe <acronym class="acronym">HAST</acronym> op FreeBSD te op te zetten en te
+	    gebruiken.</p></li><li class="listitem"><p>Hoe <acronym class="acronym">CARP</acronym> en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> te integreren om een
+	    robuust opslagsysteem te bouwen.</p></li></ul></div><p>Voor het lezen van deze sectie dient u:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>De beginselen van <span class="trademark">UNIX</span>® en FreeBSD te begrijpen (<a class="xref" href="basics.html" title="Hoofdstuk 4. UNIX® beginselen">Hoofdstuk 4, <em><span class="trademark">UNIX</span>® beginselen</em></a>).</p></li><li class="listitem"><p>Te weten hoe de netwerkinterfaces en andere kerndeelsystemen van
+	    FreeBSD in te stellen (<a class="xref" href="config-tuning.html" title="Hoofdstuk 12. Instellingen en optimalisatie">Hoofdstuk 12, <em>Instellingen en optimalisatie</em></a>).</p></li><li class="listitem"><p>Netwerken op FreeBSD goed te begrijpen (<a class="xref" href="network-communication.html" title="Deel IV. Netwerkcommunicatie">Deel IV, &#8220;Netwerkcommunicatie&#8221;</a>).</p></li><li class="listitem"><p>FreeBSD 8.1-RELEASE of nieuwer te gebruiken.</p></li></ul></div><p>Het <acronym class="acronym">HAST</acronym>-project werd gesponsord door The FreeBSD
+	Foundation met ondersteuning van <a class="link" href="http://www.omc.net/" target="_top">
+	  OMCnet Internet Service GmbH</a> en <a class="link" href="http://www.transip.nl/" target="_top">TransIP BV</a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80804432"></a>19.18.2. Eigenschappen van HAST</h3></div></div></div><p>De belangrijkste eigenschappen van <acronym class="acronym">HAST</acronym>
+	zijn:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Het kan gebruikt worden om I/O-fouten op lokale harde schijven
+	    te maskeren.</p></li><li class="listitem"><p>Agnostisch qua bestandssysteem, dus het werkt met elk
+	    bestandssysteem dat door FreeBSD wordt ondersteund.</p></li><li class="listitem"><p>Efficiënte en snelle hersynchronisatie, alleen de blokken
+	    die zijn veranderd toen een knooppunt uitstond worden
+	    gesynchroniseerd.</p></li><li class="listitem"><p>Het kan gebruikt worden in reeds uitgerolde omgevingen om
+	    aanvullende redundantie toe te voegen.</p></li><li class="listitem"><p>Samen met <acronym class="acronym">CARP</acronym>,
+	    <span class="application">Heartbeat</span> of andere gereedschappen kan
+	    het worden gebruikt om een robuust en duurzaam opslagsysteem te
+	    bouwen.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80815440"></a>19.18.3. Werking van HAST</h3></div></div></div><p>Omdat <acronym class="acronym">HAST</acronym> synchrone replicatie op blokniveau
+	van elk opslagmedium naar verscheidene machines biedt, heeft het
+	tenminste twee knooppunten (fysieke machines) nodig &#8212; het
+	<code class="literal">primaire</code> (ook bekend als <code class="literal">meester</code>)
+	knooppunt en het <code class="literal">secundaire</code>
+	(<code class="literal">slaaf</code>) knooppunt.  Tezamen worden deze twee
+	machines een cluster genoemd.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">HAST is momenteel beperkt tot een totaal van twee
+	  clusterknooppunten.</p></div><p>Aangezien <acronym class="acronym">HAST</acronym> in een primaire-secundaire
+	configuratie werkt, kan er op elk moment slechts één van
+	de clusterknooppunten actief zijn.  Het <code class="literal">primaire</code>
+	knooppunt, ookwel <code class="literal">actief</code>, is degene die alle
+	I/O-verzoeken aan apparaten die door <acronym class="acronym">HAST</acronym> worden
+	beheerd afhandelt.  Het <code class="literal">secundaire</code> knooppunt wordt
+	dan automatisch gesynchroniseerd vanuit het <code class="literal">primaire</code>
+	knooppunt.</p><p>De fysieke componenten van het <acronym class="acronym">HAST</acronym>-systeem
+	zijn:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>lokale schijf (op primair knooppunt)</p></li><li class="listitem"><p>schijf op verre machine (secundair knooppunt)</p></li></ul></div><p><acronym class="acronym">HAST</acronym> werkt synchroon op blokniveau, wat het
+	transparant maakt voor bestandssystemen en toepassingen.
+	<acronym class="acronym">HAST</acronym> biedt reguliere GEOM-aanbieders aan in <code class="filename">/dev/hast/</code> voor zowel andere
+	gereedschappen als toepassingen, er is dus geen verschil tussen het
+	gebruik van apparaten die door <acronym class="acronym">HAST</acronym> worden geleverd
+	en rauwe schijven, partities, etc.</p><p>Elke bewerking met betrekking tot schrijven, verwijderen of spoelen
+	wordt naar de plaatselijke schijf en over TCP/IP naar de verre schijf
+	gestuurd.  Elke leesbewerking wordt gedaan door de plaatselijke schijf,
+	tenzij de plaatselijke schijf niet actueel is of er een I/O-fout
+	optreed.  In zulke gevallen wordt de leesbewerking naar het secundaire
+	knooppunt gestuurd.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80831184"></a>19.18.3.1. Synchronisatie- en replicatiemodi</h4></div></div></div><p><acronym class="acronym">HAST</acronym> probeert om een snel herstel van fouten
+	  te leveren.  Om deze reden is het heel belangrijk om de
+	  synchronisatietijd te verkorten nadat een knooppunt is hersteld van
+	  een uitval.  Om een snelle synchronisatie te leveren, beheert
+	  <acronym class="acronym">HAST</acronym> op de schijf een bitmap van gebruikte extents
+	  en synchroniseert het die alleen tijdens een reguliere synchronisatie
+	  (met uitzondering van de initiëe synchronisatie).</p><p>Er zijn vele manieren om synchronisatie af te handelen.
+	  <acronym class="acronym">HAST</acronym> implementeert meerdere replicatiemodi om
+	  verschillende synchronisatiemethodes af te handelen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><span class="emphasis"><em>memsync</em></span>: rapporteer een schrijfbewerking
+	      als voltooid wanneer de plaatselijke schrijfbewerking klaar is en
+	      wanneer het verre knooppunt de gegevensaankomst bevestigt, maar
+	      voordat het de gegevens daadwerkelijk heeft opgeslagen.  De
+	      gegevens op het verre knooppunt zullen meteen na het versturen van
+	      de bevestiging worden opgeslagen.  Deze modus is bedoeld om
+	      latency te verminderen en nog steeds een zeer goede
+	      betrouwbaarheid te bieden.  De replicatiemodus
+	      <span class="emphasis"><em>memsync</em></span> is momenteel niet
+	      geïmplementeerd.</p></li><li class="listitem"><p><span class="emphasis"><em>fullsync</em></span>: rapporteer een schrijfbewerking
+	      als voltooid wanneer zowel de plaatselijke en de verre
+	      schrijfbewerking voltooid zijn.  Dit is de veiligste en traagste
+	      replicatiemodus.  Dit is de standaardmodus.</p></li><li class="listitem"><p><span class="emphasis"><em>async</em></span>: rapporteer de schrijfbewerking als
+	      voltooid wanneer de plaatselijke schrijfbewerking klaar is.  Dit
+	      is de snelste en gevaarlijkste replicatiemodus.  Het dient
+	      gebruikt te worden wanneer er naar een ver knooppunt wordt
+	      gerepliceerd en de latency te hoog is voor andere modi.  De
+	      replicatiemodus <span class="emphasis"><em>async</em></span> is momenteel niet
+	      geïmplementeerd.</p></li></ul></div><div xmlns="" class="warning"><h3 class="admontitle">Waarschuwing: </h3><p xmlns="http://www.w3.org/1999/xhtml">Momenteel wordt alleen de replicatiemodus
+	    <span class="emphasis"><em>fullsync</em></span> ondersteund.</p></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80847568"></a>19.18.4. HAST-configuratie</h3></div></div></div><p><acronym class="acronym">HAST</acronym> heeft ondersteuning voor
+	<code class="literal">GEOM_GATE</code> nodig om te kunnen functioneren.  De kernel
+	<code class="literal">GENERIC</code> bevat standaard <span class="emphasis"><em>geen</em></span>
+	<code class="literal">GEOM_GATE</code>, de laadbare module
+	<code class="filename">geom_gate.ko</code> is echter beschikbaar in de
+	standaardinstallatie van FreeBSD.  Zorg ervoor dat deze module beschikbaar
+	is voor afgeslankte systemen.  Het is ook mogelijk om ondersteuning voor
+	<code class="literal">GEOM_GATE</code> statisch in de kernel te bouwen, door deze
+	regel aan het kernelconfiguratiebestand toe te voegen:</p><pre class="programlisting">options	GEOM_GATE</pre><p>Het <acronym class="acronym">HAST</acronym>-raamwerk bestaat vanuit het
+	besturingssysteem gezien uit verschillende delen:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>het daemon <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> dat verantwoordelijk is voor de
+	    gegevenssynchronisatie,</p></li><li class="listitem"><p>het beheerprogramma <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastctl</span>(8)</span></a> voor de gebruikers,</p></li><li class="listitem"><p>het configuratiebestand <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hast.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hast.conf</span>(5)</span></a>.</p></li></ul></div><p>Het volgende voorbeeld beschrijft hoe twee knooppunten in een
+	<code class="literal">meester</code>-<code class="literal">slaaf</code> /
+	<code class="literal">primaire</code>-<code class="literal">secundaire</code> opstelling te
+	configureren door <acronym class="acronym">HAST</acronym> te gebruiken om de gegevens
+	tussen de twee te repliceren.  De knooppunten worden
+	<code class="literal">hasta</code> met IP-adres
+	<em class="replaceable"><code>172.16.0.1</code></em> en
+	<code class="literal">hastb</code> met IP-adres
+	<em class="replaceable"><code>172.16.0.2</code></em> genoemd.  Beide knooppunten hebben
+	een toegewijde harde schijf
+	<code class="filename">/dev/ad6</code> van
+	dezelfde grootte om met <acronym class="acronym">HAST</acronym> te werken.  De
+	<acronym class="acronym">HAST</acronym>-pool (soms ook een hulpbron genoemd, i.e., de
+	GEOM-aanbieder in <code class="filename">/dev/hast/</code>)
+	wordt <code class="filename">test</code>
+	genoemd.</p><p>Het bestand <code class="filename">/etc/hast.conf</code> regelt de
+	configuratie van <acronym class="acronym">HAST</acronym>.  Dit bestand dient hetzelfde
+	te zijn op beide knooppunten.  Het volgende is de eenvoudigste
+	configuratie die mogelijk is:</p><pre class="programlisting">resource test {
+	on hasta {
+		local /dev/ad6
+		remote 172.16.0.2
+	}
+	on hastb {
+		local /dev/ad6
+		remote 172.16.0.1
+	}
+}</pre><p>Raadpleeg voor geavanceerdere configuraties de handleidingpagina
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hast.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hast.conf</span>(5)</span></a>.</p><div xmlns="" class="tip"><h3 class="admontitle">Tip: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het is ook mogelijk om hostnamen in de regels met
+	  <code class="literal">remote</code> te gebruiken.  Zorg er in dat geval voor dat
+	  deze hosts vindbaar zijn, bijvoorbeeld doordat ze zijn gedefinieerd in
+	  het bestand <code class="filename">/etc/hosts</code> of anders in het
+	  plaatselijke <acronym class="acronym">DNS</acronym>.</p></div><p>Nu de configuratie op beide knooppunten aanwezig is, kan de
+	<acronym class="acronym">HAST</acronym>-pool aangemaakt worden .  Voer deze commando's
+	op beide knooppunten uit om de initiële metagegevens op de
+	plaatselijke schijf te plaatsen en het <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a>-daemon te
+	starten:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl create test</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>service hastd onestart</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het is <span class="emphasis"><em>niet</em></span> mogelijk om GEOM-aanbieders met
+	  een bestaand bestandssysteem te gebruiken (i.e., een bestaande opslag
+	  omzetten naar een door <acronym class="acronym">HAST</acronym> beheerde pool), omdat
+	  deze procedure wat metagegevens op de aanbieder moet opslaan en er
+	  daarvoor niet genoeg beschikbare ruimte is.</p></div><p>De rol van een HAST-knooppunt (<code class="literal">primair</code> of
+	<code class="literal">secundair</code>) wordt uitgekozen door een beheerder of
+	software zoals <span class="application">Heartbeat</span> dat het gereedschap
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastctl</span>(8)</span></a> gebruikt.  Voer het volgende commando uit op het
+	primaire knooppunt (
+	<code class="literal">hasta</code>):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl role primary test</code></strong></pre><p>Voer dit soortgelijke commando uit op het secundaire knooppunt (
+	<code class="literal">hastb</code>):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl role secondary test</code></strong></pre><div xmlns="" class="caution"><h3 class="admontitle">Let op: </h3><p xmlns="http://www.w3.org/1999/xhtml">De situatie dat de knooppunten niet met elkaar kunnen
+	  communiceren en beide geconfigureerd zijn als primaire knooppunten;
+	  wordt <code class="literal">split-brain</code> genoemd.  Volg de stappen zoals
+	  beschreven in <a class="xref" href="disks-hast.html#disks-hast-sb" title="19.18.5.2. Herstellen van de Split-brain-conditie">Paragraaf 19.18.5.2, &#8220;Herstellen van de Split-brain-conditie&#8221;</a> om deze situatie op te
+	  lossen.</p></div><p>Verifieer met het gereedschap <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastctl</span>(8)</span></a> het resultaat
+	op elk knooppunt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl status test</code></strong></pre><p>De belangrijke tekst is de regel met <code class="literal">status</code> dat
+	voor alle knooppunten <code class="literal">complete</code> dient te bevatten.
+	Als het <code class="literal">degraded</code> bevat, is er iets verkeerd gegaan.
+	Op dat moment is de synchronisatie tussen de knooppunten al begonnen.
+	De synchronisatie is compleet wanneer <code class="command">hastctl status</code>
+	0 bytes aan <code class="literal">dirty</code> extents rapporteert.</p><p>De volgende stap is het aanmaken van een bestandssysteem op de
+	GEOM-aanbieder
+	<code class="filename">/dev/hast/test</code> en
+	het aan te koppelen.  Dit moet op het <code class="literal">primaire</code>
+	knooppunt gebeuren, aangezien
+	<code class="filename">/dev/hast/test</code> alleen
+	op het <code class="literal">primaire</code> knooppunt verschijnt.  Het aanmaken
+	van het bestandssysteem kan afhankelijk van de grootte van de harde
+	schijf enkele minuten duren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/hast/test</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir /hast/test</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/hast/test /hast/test</code></strong></pre><p>Wanneer het <acronym class="acronym">HAST</acronym>-raamwerk correct is
+	geconfigureerd, betreft de laatste stap het ervoor zorgen dat
+	<acronym class="acronym">HAST</acronym> automatisch tijdens het opstarten wordt gestart.
+	Voeg deze regel toe aan het bestand
+	<code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">hastd_enable="YES"</pre><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80902992"></a>19.18.4.1. Failover-configuratie</h4></div></div></div><p>Het doel van dit voorbeeld is om een robuust opslagsysteem te
+	  bouwen dat resistent is tegen het falen van alle knooppunten.  Het
+	  scenario is dat een <code class="literal">primair</code> knooppunt van het
+	  cluster faalt.  Als dit gebeurt, dan neemt het
+	  <code class="literal">secundaire</code> knooppunt het feilloos over, controleert
+	  het het bestandssysteem en koppelt het het bestandssysteem aan, en
+	  gaat het verder zonder dat er een bit aan gegevens ontbreekt.</p><p>Om dit voor elkaar te krijgen, is er een andere eigenschap die
+	  beschikbaar is op FreeBSD dat voorziet in automatische failover van de
+	  IP-laag &#8212; <acronym class="acronym">CARP</acronym>.
+	  <acronym class="acronym">CARP</acronym> (Common Address Redundancy Protocol)
+	  maakt het mogelijk dat meerdere hosts in hetzelfde netwerksegment
+	  een IP-adres delen.  Stel <acronym class="acronym">CARP</acronym> in op beide
+	  knooppunten van het cluster volgens de documentatie die beschikbaar is
+	  in <a class="xref" href="carp.html" title="31.13. Common Address Redundancy Protocol (CARP)">Paragraaf 31.13, &#8220;Common Address Redundancy Protocol (CARP)&#8221;</a>.  Nadat de opzet voltooid is, heeft elk
+	  knooppunt een eigen interface <code class="filename">carp0</code> met een
+	  gedeeld IP-adres <em class="replaceable"><code>172.16.0.254</code></em>.  Het
+	  primaire <acronym class="acronym">HAST</acronym>-knooppunt van het
+	  cluster moet het meester-<acronym class="acronym">CARP</acronym>-knooppunt
+	  zijn.</p><p>De <acronym class="acronym">HAST</acronym>-pool die in de vorige sectie is gemaakt
+	  is nu klaar om geëxporteerd te worden naar de andere hosts op het
+	  netwerk.  Dit kan gedaan worden door het te exporteren over
+	  <acronym class="acronym">NFS</acronym>, <span class="application">Samba</span>, etc., door
+	  gebruik te maken van het gedeelde IP-adres
+	  <em class="replaceable"><code>172.16.0.254</code></em>.  Het enige overgebleven
+	  probleem is een automatische failover in het geval dat het primaire
+	  knooppunt het begeeft.</p><p>Als een <acronym class="acronym">CARP</acronym>-interface aan- of uitgaat,
+	  genereert FreeBSD een <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a>-gebeurtenis, wat het mogelijk maakt om
+	  toestandsveranderingen op de <acronym class="acronym">CARP</acronym>-interfaces in de
+	  gaten te houden.  Een toestandsverandering op het
+	  <acronym class="acronym">CARP</acronym>-interface geeft aan dat een van de knooppunten
+	  het begaf of weer online kwam.  Deze toestandsveranderingen maken het
+	  mogelijk om een script te draaien dat automatisch de HAST-failover
+	  afhandelt.</p><p>Voeg, om toestandsverandering op de
+	  <acronym class="acronym">CARP</acronym>-interfaces af te vangen, het volgende
+	  toe aan het bestand
+	  <code class="filename">/etc/devd.conf</code> op elk knooppunt:</p><pre class="programlisting">notify 30 {
+	match "system" "IFNET";
+	match "subsystem" "carp0";
+	match "type" "LINK_UP";
+	action "/usr/local/sbin/carp-hast-switch master";
+};
+
+notify 30 {
+	match "system" "IFNET";
+	match "subsystem" "carp0";
+	match "type" "LINK_DOWN";
+	action "/usr/local/sbin/carp-hast-switch slave";
+};</pre><p>Herstart <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> op beide knooppunten om de nieuwe
+	  configuratie te laten gelden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service devd restart</code></strong></pre><p>Als het interface <code class="filename">carp0</code> aan of uit gaat
+	  (i.e., de toestand van het interface verandert), genereert het systeem
+	  een notificatie wat het subsysteem <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a> in staat stelt om een
+	  willekeurig script te draaien, in dit geval
+	  <code class="filename">/usr/local/sbin/carp-hast-switch</code>.  Dit is het
+	  script dat de automatische failover afhandelt.  Raadpleeg de
+	  handleidingpagina <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devd.conf</span>(5)</span></a> voor verdere uitleg over de
+	  bovenstaande configuratie van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devd</span>(8)</span></a>.</p><p>Dit zou een voorbeeld van zo'n script kunnen zijn:</p><pre class="programlisting">#!/bin/sh
+# Origineel script door Freddie Cash &lt;fjwcash@gmail.com&gt;
+# Gewijzigd door Michael W. Lucas &lt;mwlucas@BlackHelicopters.org&gt;
+# en Viktor Petersson &lt;vpetersson@wireload.net&gt;
+
+# De namen van de HAST-hulpbronnen, zoals vermeld in /etc/hast.conf
+resources="test"
+
+# vertraging voor het aankoppelen van de HAST-hulpbron na het worden van meester
+# doe een gok
+delay=3
+
+# logging
+log="local0.debug"
+name="carp-hast"
+
+# einde van gebruiker-instelbare dingen
+
+case "$1" in
+	master)
+		logger -p $log -t $name "Omschakelen naar primaire aanbieder voor ${resources}."
+		sleep ${delay}
+
+		# Wacht totdat de "hastd secondary" processen zijn gestopt
+		for disk in ${resources}; do
+			while $( pgrep -lf "hastd: ${disk} \(secondary\)" &gt; /dev/null 2&gt;&amp;1 ); do
+				sleep 1
+			done
+
+			# Verwissel de rol voor elke schijf
+			hastctl role primary ${disk}
+			if [ $? -ne 0 ]; then
+				logger -p $log -t $name "Omschakelen van rol naar primair voor hulpbron ${disk} mislukt."
+				exit 1
+			fi
+		done
+
+		# Wacht totdat de apparaten /dev/hast/* verschijnen
+		for disk in ${resources}; do
+			for I in $( jot 60 ); do
+				[ -c "/dev/hast/${disk}" ] &amp;&amp; break
+				sleep 0.5
+			done
+
+			if [ ! -c "/dev/hast/${disk}" ]; then
+				logger -p $log -t $name "GEOM-aanbieder /dev/hast/${disk} is niet verschenen."
+				exit 1
+			fi
+		done
+
+		logger -p $log -t $name "Rollen van HAST-hulpbronnen ${resources} omgeschakeld naar primair."
+
+
+		logger -p $log -t $name "Schijven aankoppelen."
+		for disk in ${resources}; do
+			mkdir -p /hast/${disk}
+			fsck -p -y -t ufs /dev/hast/${disk}
+			mount /dev/hast/${disk} /hast/${disk}
+		done
+
+	;;
+
+	slave)
+		logger -p $log -t $name "Omschakelen naar secundaire aanbieder voor ${resources}."
+
+		# Schakel de rollen van de HAST-hulpbronnen om
+		for disk in ${resources}; do
+			if ! mount | grep -q "^/dev/hast/${disk} on "
+			then
+			else
+				umount -f /hast/${disk}
+			fi
+			sleep $delay
+			hastctl role secondary ${disk} 2&gt;&amp;1
+			if [ $? -ne 0 ]; then
+				logger -p $log -t $name "Omschakelen van rol naar secundair voor hulpbron ${disk} mislukt."
+				exit 1
+			fi
+			logger -p $log -t $name "Rol van hulpbron ${disk} omgeschakeld naar secundair."
+		done
+	;;
+esac</pre><p>In een notendop neemt het script deze acties wanneer een knooppunt
+	  <code class="literal">meester</code> / <code class="literal">primair</code> wordt:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>De <acronym class="acronym">HAST</acronym>-pools opwaarderen naar primair op
+	      een gegeven knooppunt.</p></li><li class="listitem"><p>Het bestandssysteem onder de <acronym class="acronym">HAST</acronym>-pool
+	      controleren.</p></li><li class="listitem"><p>De pools op een juiste plaats aankoppelen.</p></li></ul></div><p>Wanneer een knooppunt <code class="literal">back-up</code> /
+	  <code class="literal">secundair</code> wordt:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>De <acronym class="acronym">HAST</acronym>-pools afkoppelen.</p></li><li class="listitem"><p>De <acronym class="acronym">HAST</acronym>-pools degraderen naar
+	      secundair.</p></li></ul></div><div xmlns="" class="caution"><h3 class="admontitle">Let op: </h3><p xmlns="http://www.w3.org/1999/xhtml">Houd in gedachte dat dit slechts een voorbeeldscript is om aan
+	    te tonen dat alles werkt.  Het behandeld niet alle mogelijke
+	    situaties en kan op elke manier worden uitgebreid of veranderd, het
+	    kan bijvoorbeeld benodigde diensten starten en stoppen.</p></div><div xmlns="" class="tip"><h3 class="admontitle">Tip: </h3><p xmlns="http://www.w3.org/1999/xhtml">Voor dit voorbeeld hebben we een standaard UFS-bestandssysteem
+	    gebruikt.  Om de tijd die nodig is voor herstel te verkorten, kan
+	    een bestandssysteem met UFS-journalling of ZFS worden
+	    gebruikt.</p></div><p>Meer gedetailleerde informatie met aanvullende voorbeelden kunnen
+	  gevonden worden op de <a class="link" href="http://wiki.FreeBSD.org/HAST" target="_top">HAST Wiki</a>-pagina.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80948304"></a>19.18.5. Problemen oplossen</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp80948944"></a>19.18.5.1. Algemene tips om problemen op te lossen</h4></div></div></div><p><acronym class="acronym">HAST</acronym> zou over het algemeen zonder problemen
+	  moeten werken.  Net als met elk ander software-product zijn er
+	  momenten waarop het anders werkt dan het zou moeten.  De oorzaken van
+	  de problemen kunnen verschillen, maar de vuistregel is om ervoor te
+	  zorgen dat de klokken zijn gesynchroniseerd op alle knooppunten in het
+	  cluster.</p><p>Wanneer problemen met <acronym class="acronym">HAST</acronym> worden verholpen,
+	  dient het debug-niveau van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> verhoogd te worden door het
+	  daemon <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> met het argument <code class="literal">-d</code> op te
+	  starten.  Merk op dat dit argument meerdere malen kan worden opgegeven
+	  om het debug-niveau nog verder op te hogen.  Op deze manier kan veel
+	  nuttige informatie worden vergaard.  Overweeg ook om het argument
+	  <code class="literal">-F</code> te gebruiken, dat het daemon <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hastd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">hastd</span>(8)</span></a> in
+	  de voorgrond zal starten.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="disks-hast-sb"></a>19.18.5.2. Herstellen van de Split-brain-conditie</h4></div></div></div><p><code class="literal">Split-brain</code> treedt op waneer de knooppunten van
+	  het cluster niet met elkaar kunnen communiceren, en beide als primair
+	  zijn geconfigureerd.  Dit is een gevaarlijke situatie omdat het beide
+	  knooppunten in staat stelt om incompatibele veranderingen aan de
+	  gegevens te maken.  Dit probleem dient handmatig door de
+	  systeembeheerder te worden gecorrigeerd.</p><p>De beheerder moet besluiten welk knooppunt de belangrijkere
+	  veranderingen bevat (of ze handmatig samenvoegen) en
+	  <acronym class="acronym">HAST</acronym> een volledige synchronisatie op het knooppunt
+	  dat de kapotte gegevens heeft laten uitvoeren.  Voer hiervoor deze
+	  commando's uit op het knooppunt dat opnieuw gesynchroniseerd moet
+	  worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>hastctl role init &lt;resource&gt;</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>hastctl create &lt;resource&gt;</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>hastctl role secondary &lt;resource&gt;</code></strong></pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="swap-encrypting.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="GEOM.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">19.17. Het versleutelen van de wisselbestand ruimte </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> Hoofdstuk 20. GEOM: Modulair schijftransformatie raamwerk</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

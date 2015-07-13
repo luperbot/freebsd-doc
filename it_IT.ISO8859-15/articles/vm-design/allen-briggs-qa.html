@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>9. Sessione Bonus di Domande e Risposte di Allen Briggs &lt;briggs@ninthwonder.com&gt;</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="up" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="prev" href="conclusion.html" title="8. Conclusione" /><link rel="copyright" href="trademarks.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">9. Sessione Bonus di Domande e Risposte di Allen Briggs
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="conclusion.html">Indietro</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> </td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="allen-briggs-qa"></a>9. Sessione Bonus di Domande e Risposte di Allen Briggs
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></h2></div></div></div><div class="qandaset"><a id="idp72221136"></a><dl><dt>9.1. <a href="allen-briggs-qa.html#idp72221392">Cos'è «l'algoritmo di interleaving» a cui
+            fai riferimento nell'elenco delle debolezze della gestione dello
+            swap in FreeBSD 3.X ?</a></dt><dt>9.2. <a href="allen-briggs-qa.html#idp72247632">Non ho capito questo:</a></dt><dt>9.3. <a href="allen-briggs-qa.html#idp72272592"> Nell'esempio di ls(1) / vmstat 1,
+            alcuni dei page fault non potrebbero essere data page faults
+            (COW da file eseguibili a pagine private)?  Cioè, io mi
+            aspetterei che i page fault fossero degli zero-fill e dei dati di
+            programma.  O si implica che FreeBSD effettui il pre-COW per i dati
+            di programma?</a></dt><dt>9.4. <a href="allen-briggs-qa.html#idp72281424">Nella sezione sull'ottimizzazione della tabella delle pagine,
+            potresti fornire maggiori dettagli su pv_entry e
+            vm_page (forse vm_page dovrebbe essere
+            vm_pmap-come in 4.4, cf. pp. 180-181 di
+            McKusick, Bostic, Karel, Quarterman)?  Specificamente, che tipo di
+            operazioni/reazioni richiederebbero la scansione delle
+            mappature?</a></dt><dt>9.5. <a href="allen-briggs-qa.html#idp72323664">Infine, nella sezione sulla colorazione delle pagine, potrebbe
+            esser d'aiuto avere qualche descrizione in più di quello che
+            intendi.  Non sono riuscito a seguire molto bene.</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp72221392"></a><a id="idp72222288"></a><p><strong>9.1.</strong></p></td><td align="left" valign="top"><p>Cos'è <span class="quote">«<span class="quote">l'algoritmo di interleaving</span>»</span> a cui
+            fai riferimento nell'elenco delle debolezze della gestione dello
+            swap in FreeBSD 3.X ?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>FreeBSD usa un intervallo tra zone di swap fissato, con un
+            valore predefinito di 4.  Questo significa che FreeBSD riserva
+            spazio per quattro aree di swap anche se ne hai una sola o due o
+            tre.  Poiché lo swap è intervallato lo spazio di
+            indirizzamento lineare che rappresenta le <span class="quote">«<span class="quote">quattro aree di
+              swap</span>»</span> verrà frammentato se non si possiedono
+            veramente quattro aree di swap.  Ad esempio, se hai due aree di
+            swap A e B la rappresentazione dello spazio di FreeBSD per
+            quell'area di swap verrà interrotta in blocchi di 16
+            pagine:</p><div class="literallayout"><p>A B C D A B C D A B C D A B C D</p></div><p>FreeBSD 3.X usa una <span class="quote">«<span class="quote">lista sequenziale delle
+            regioni libere </span>»</span> per registrare le aree di swap libere.
+            L'idea è che grandi blocchi di spazio libero e lineare
+            possano essere rappresentati con un nodo singolo
+            (<code class="filename">kern/subr_rlist.c</code>).
+            Ma a causa della frammentazione la lista sequenziale risulta
+            assurdamente frammentata.
+            Nell'esempio precedente, uno spazio di swap completamente non
+            allocato farà si che A e B siano mostrati come
+            <span class="quote">«<span class="quote">liberi</span>»</span> e C e D come <span class="quote">«<span class="quote">totalmente
+              allocati</span>»</span>.  Ogni sequenza A-B richiede un nodo per essere
+            registrato perché C e D sono buchi, dunquei nodi di lista non
+            possono essere combinati con la sequenza A-B seguente.</p><p>Perché organizziamo lo spazio in intervalli invece di
+            appiccicare semplicemente le area di swap e facciamo qualcosa di
+            più carino?  Perché è molto più semplice
+            allocare strisce lineari di uno spazio di indirizzamento ed ottenere
+            il risultato già ripartito tra dischi multipli piuttosto che
+            cercare di spostare questa complicazione altrove.</p><p>La frammentazione causa altri problemi.  Essendoci una lista
+            lineare nella serie 3.X, ed avendo una tale quantità di
+            frammentazione implicita, l'allocazione e la liberazione dello swap
+            finisce per essere un algoritmo O(N) invece di uno O(1).
+            Combinalo con altri fattori (attività di swap pesante)
+            e comincerai a trovarti con livelli di overhead come O(N^2) e
+            O(N^3), e ciò è male.  Il sistema dela serie 3.X
+            può anche avere necessità di allocare KVM durante
+            un'operazione di swap per creare un nuovo nodo lista, il che
+            può portare ad un deadlock se il sistema sta cercando di
+            liberare pagine nella memoria fisica in un momento di
+            scarsità di memoria.</p><p>Nella serie 4.X non usiamo una lista sequenziale.  Invece usiamo
+            un albero radicato e mappe di bit di blocchi di swap piuttosto che
+            nodi lista.
+            Ci prendiamo il peso di preallocare tutte le mappe di bit richieste
+            per l'intera area di swap ma ciò finisce per consumare meno
+            memoria grazie all'uso di una mappa di bit (un bit per blocco)
+            invece di una lista collegata di nodi.  L'uso di un albero radicato
+            invece di una lista sequenziale ci fornisce una performance quasi
+            O(1) qualunque sia il livello di frammentazione dell'albero.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp72247632"></a><a id="idp72248656"></a><p><strong>9.2.</strong></p></td><td align="left" valign="top"><p>Non ho capito questo:</p><div class="blockquote"><blockquote class="blockquote"><p>È importante notare che il sistema della VM di FreeBSD
+              tenta di separare pagine pulite e sporche per l'espressa ragione di
+              evitare scritture non necessarie di pagine sporche (che divorano
+              banda di I/O), e non sposta le pagine tra le varie code
+              gratuitamente se il sottosistema non viene stressato.  Questo
+              è il motivo per cui dando un <code class="command">systat -vm</code>
+              vedrai sistemi con contatori della coda di cache bassi e contatori
+              della coda delle pagine attive molto alti.</p></blockquote></div><p>Come entra in relazione la separazione delle pagine pulite e
+            sporche (inattive) con la situazione nella quale vediamo contatori
+            bassi per la coda di cache e valori alti per la coda delle pagine
+            attive in <code class="command">systat -vm</code>?  I dati di systat derivano
+            da una fusione delle pagine attive e sporche per la coda delle
+            pagine attive?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Si, questo può confondere.  La relazione è
+            <span class="quote">«<span class="quote">obiettivo</span>»</span> contro <span class="quote">«<span class="quote">realtà</span>»</span>.  Il
+            nostro obiettivo è separare le pagine ma la realtà
+            è che se non siamo in crisi di memoria, non abbiamo bisogno
+            di farlo.</p><p>Questo significa che FreeBSD non cercherà troppo di
+            separare le pagine sporche (coda inattiva) da quelle pulite
+            (code della cache), ne cercherà di disattivare le pagine
+            (coda pagine attive -&gt; coda pagine inattive) quando il sistema non
+            è sotto sforzo, anche se non vengono effettivamente
+            usate.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp72272592"></a><a id="idp72273616"></a><p><strong>9.3.</strong></p></td><td align="left" valign="top"><p> Nell'esempio di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> / <code class="command">vmstat 1</code>,
+            alcuni dei page fault non potrebbero essere data page faults
+            (COW da file eseguibili a pagine private)?  Cioè, io mi
+            aspetterei che i page fault fossero degli zero-fill e dei dati di
+            programma.  O si implica che FreeBSD effettui il pre-COW per i dati
+            di programma?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Un fault COW può essere o legato a uno zero-fill o a dati
+            di programma.
+            Il meccanismo è lo stesso in entrambi i casi poiché
+            i dati di programma da copiare sono quasi certamente già
+            presenti nella cache.  E infatti li tratto insieme.  FreeBSD non
+            effettua preventivamentela copia dei dati di programma o lo
+            zero-fill, <span class="emphasis"><em>effettua</em></span> la mappatura preventiva
+            delle pagine che sono presenti nella sua cache.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp72281424"></a><a id="idp72281680"></a><p><strong>9.4.</strong></p></td><td align="left" valign="top"><p>Nella sezione sull'ottimizzazione della tabella delle pagine,
+            potresti fornire maggiori dettagli su <code class="literal">pv_entry</code> e
+            <code class="literal">vm_page</code> (forse vm_page dovrebbe essere
+            <code class="literal">vm_pmap</code>-come in 4.4, cf. pp. 180-181 di
+            McKusick, Bostic, Karel, Quarterman)?  Specificamente, che tipo di
+            operazioni/reazioni richiederebbero la scansione delle
+            mappature?</p><p>Come funziona Linux nel caso in cui FreeBSD fallisce
+            (la condivisione di un grosso file mappato tra molti
+            processi)?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Una <code class="literal">vm_page</code> rappresenta una tupla
+            (oggetto,indice#).
+            Una <code class="literal">pv_entry</code> rappresenta una voce nella tabella
+            delle pagine hardware (pte).  Se hai cinque processi che condividono
+            la stessa pagina fisica, e tre delle tabelle delle pagine di questi
+            processi mappano effettivamente la pagina, questa pagina
+            verrà rappresentata da una struttura
+            <code class="literal">vm_page</code> singola e da tre strutture
+            <code class="literal">pv_entry</code>.</p><p>Le strutture <code class="literal">pv_entry</code> rappresentano solo
+            le pagine mappate dalla MMU (una <code class="literal">pv_entry</code>
+            rappresenta un pte).  Ciò significa che è necessario
+            rimuovere tutti i riferimenti hardware a <code class="literal">vm_page</code>
+            (in modo da poter riutilizzare la pagina per qualcos'altro,
+            effettuare il page out, ripulirla, sporcarla,  e così via)
+            possiamo semplicemente scansionare la lista collegata di
+            <code class="literal">pv_entry</code> associate con quella
+            <code class="literal">vm_page</code> per rimuovere o modificare i pte
+            dalla loro tabella delle pagine.</p><p>Sotto Linux non c'è una lista collegata del genere.  Per
+            poter rimuovere tutte le mappature della tabella delle pagine
+            hardware per una <code class="literal">vm_page</code> linux deve indicizzare
+            ogni oggetto VM che <span class="emphasis"><em>potrebbe</em></span> aver mappato la
+            pagina.  Ad esempio, se si hanno 50 processi che mappano la stessa
+            libreria condivisa e si vuole liberarsi della pagina X in quella
+            libreria, sarà necessario cercare nella tabella delle pagine
+            per ognuno dei 50 processi anche se solo 10 di essi ha
+            effettivamente mappato la pagina.  Così Linux sta barattando
+            la semplicità del design con le prestazioni.  Molti algoritmi
+            per la VM che sono O(1) o (piccolo N) in FreeBSD finiscono per
+            diventare O(N), O(N^2), o anche peggio in Linux.
+            Poiché i pte che rappresentano una particolare pagina in un
+            oggetto tendono ad essere allo stesso offset in tutte le tabelle
+            delle pagine nelle quali sono mappati, la riduzione del numero di
+            accessi alla tabela delle pagine allo stesso offset eviterà
+            che la la linea di cache L1 per quell'offset venga cancellata,
+            portando ad una performance migliore.</p><p>FreeBSD ha aggiunto complessità (lo schema
+            <code class="literal">pv_entry</code>) in modo da incrementare le prestazioni
+            (per limitare gli accessi alla tabella delle pagine
+            <span class="emphasis"><em>solo</em></span> a quelle pte che necessitino di essere
+            modificate).</p><p>Ma FreeBSD ha un problema di scalabilità che linux non ha
+            nell'avere un numero limitato di strutture
+            <code class="literal">pv_entry</code> e questo provoca problemi quando si
+            hanno condivisioni massicce di dati.  In questo caso c'è la
+            possibilità che finiscano le strutture
+            <code class="literal">pv_entry</code> anche se c'è ancora una grande
+            quantità di memoria disponibile.
+            Questo può essere risolto abbastanza facilmente
+            aumentando il numero di struttre <code class="literal">pv_entry</code> nella
+            configurazione del kernel, ma c'è veramente bisogno di
+            trovare un modo migliore di farlo.</p><p>Riguardo il sovrapprezzo in memoria di una tabella delle pagine
+            rispetto allo schema delle <code class="literal">pv_entry</code>: Linux usa
+            tabelle delle pagine <span class="quote">«<span class="quote">permanenti</span>»</span> che non vengono
+            liberate, ma non necessita una <code class="literal">pv_entry</code> per ogni
+            pte potenzialmente mappato.
+            FreeBSD usa tabelle delle pagine <span class="quote">«<span class="quote">throw away</span>»</span>,
+            eliminabili, ma aggiunge una struttura <code class="literal">pv_entry</code>
+            per ogni pte effettivamente mappato.  Credo che l'utilizzo della
+            memoria finisca per essere più o meno lo stesso, fornendo a
+            FreeBSD un vantaggio algoritmico con la capacità di
+            eliminare completamente le tabelle delle pagine con un
+            sovraccarico prestazionale minimo.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp72323664"></a><a id="idp72324560"></a><p><strong>9.5.</strong></p></td><td align="left" valign="top"><p>Infine, nella sezione sulla colorazione delle pagine, potrebbe
+            esser d'aiuto avere qualche descrizione in più di quello che
+            intendi.  Non sono riuscito a seguire molto bene.</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Sai come funziona una memoria cache hardware L1?  Spiego:
+            Considera una macchina con 16MB di memoria principale ma solo 128K
+            di cache L1.  In genere il modo in cui funziona la cache è
+            che ogni blocco da 128K di memoria principale usa gli
+            <span class="emphasis"><em>stessi</em></span> 128K di cache.
+            Se si accede all'offset 0 della memoria principale e poi al 128K si
+            può finire per cancellare i dati che si erano messi nella
+            cache dall'offset 0!</p><p>Ora, sto semplificando di molto.  Ciò che ho appena
+            descritto è quella che viene detta memoria cache a
+            <span class="quote">«<span class="quote">corrispondenza diretta</span>»</span>, o direct mapped.
+            La maggior parte delle cache moderne sono quelle che
+            vengono dette set-associative a 2 o 4 vie.
+            L'associatività di questo tipo permette di accedere fino ad N
+            regioni di memoria differenti che si sovrappongano sulla stessa
+            cache senza distruggere i dati preventivamente immagazzinati.
+            Ma solo N.</p><p>Dunque se ho una cache set associativa a 4 vie posso accedere
+            agli offset 0, 128K, 256K 384K ed essere ancora in grado di
+            accedere all'offset 0 ritrovandolo nella cache L1.  Se poi accedessi
+            all'offset 512K, ad ogni modo, uno degli oggetti dato immagazzinati
+            precedentemente verrebbero cancellati dalla cache.</p><p>È estremamente importante ...
+            <span class="emphasis"><em>estremamente</em></span> importante che la maggior parte
+            degli accessi del processore alla memoria vengano dalla cache L1,
+            poiché la cache L1 opera alla stessa frequenza del
+            processore.  Nel momento in cui si ha un miss <a href="#ftn.idp72346448" class="footnote" id="idp72346448"><sup class="footnote">[6]</sup></a> nella cache L1 si deveandare a cercare nella cache L2 o
+            nella memoria principale, il processore andrà in stallo, e
+            potenzialmente potrà sedersi a girarsi i pollici per un tempo
+            equivalente a <span class="emphasis"><em>centinaia</em></span> di istruzioni
+            attendendo che la lettura dalla memoria principale venga
+            completata.  La memoria principale (la RAM che metti nel tuo
+            computer) è <span class="emphasis"><em>lenta</em></span>, se comparata alla
+            velocità del nucleo di un moderno processore.</p><p>Ok, ora parliamo della colorazione dele pagine:
+            tutte le moderne cache sono del tipo noto come cache
+            <span class="emphasis"><em>fisiche</em></span>.  Esse memorizzano indirizzi di memoria
+            fisica, non indirizzi di memoria virtual.  Ciò permette alla
+            cache di rimanere anche nel momento in cui ci sia un cambio di
+            contesto tra processi, e ciò è molto
+            importante.</p><p>Ma nel mondo <span class="trademark">UNIX</span>® devi lavorare con spazi di indirizzamento
+            virtuali, non con spazi di indirizzamento fisici.  Ogni programma
+            che scrivi vedrà lo spazio di indirizzamento virtuale
+            assegnatogli.  Le effettive pagine <span class="emphasis"><em>fisiche</em></span>
+            nascoste sotto quello spazio di indirizzi virtuali
+            non saranno necessariamente contigue fisicamente! In effetti,
+            potresti avere due pagine affiancate nello spazio di
+            indirizzamento del processo cge finiscono per trovarsi agli
+            offset 0 e 128K nella memoria <span class="emphasis"><em>fisica</em></span>.</p><p>Un programma normalmente assume che due pagine
+            affiancate verranno poste in cache in maniera ottimale.
+            Cioè, che possa accedere agli oggetti dato in
+            entrambe le pagine senza che esse si cancellino a vicenda le
+            rispettiva informazioni in cache.
+            Ma ciò è vero solo se le pagine fisiche sottostanti lo
+            spazio di indirizzo virtuale sono contigue (per quel che riguarda
+            la cache).</p><p>Questo è ciò che viene fatto dalla colorazione
+            delle pagine.
+            Invece di assegnare pagine fisiche <span class="emphasis"><em>casuali</em></span> agli
+            indirizzi virtuali, che potrebbe causare prestazioni non ottimali
+            della cache, la colorazione dele pagine assegna pagine fisiche
+            <span class="emphasis"><em>ragionevolmente contigue</em></span>.
+            Dunque i programmi possono essere scritti assumendo che
+            le caratteristiche per lo spazio di indirizzamento virtuale del
+            programma della cache hardware sottostante siano uguali a come
+            sarebbero state se avessero usato lo spazio di indirizzamento
+            fisico.</p><p>Si note ho detto <span class="quote">«<span class="quote">ragionevolmente</span>»</span> contigue invece
+            che semplicemente <span class="quote">«<span class="quote">contigue</span>»</span>.  Dal punto di vista di
+            una cache di 128K a corrispondenza diretta, l'indirizzo fisico 0
+            è lo stesso che l'indirizzo fisico 128K.
+            Dunque due agine affiancate nello spzio di indirizzamento virtuale
+            potrebbero finire per essere all'offset 128K e al 132K nella memoria
+            fisica, ma potrebbero trovarsi tranquillamente anche agli offset
+            128K e 4K della memoria fisica e mantenera comunque le stesse
+            caratteristiche prestazionali nei riguardi della cache.  Dunque la
+            colorazione delle pagine <span class="emphasis"><em>non</em></span> deveassegnare
+            pagine di memoria fisica veramente contigue a pagine di memoria
+            virtuale contigue, deve solo assicurarsi che siano assegnate pagine
+            contigue dal punto di vista delle prestazioni/operazioni della
+            cache.</p></td></tr></tbody></table></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp72346448" class="footnote"><p><a href="#idp72346448" class="para"><sup class="para">[6] </sup></a>Un miss nella cache è equivalente a un page fault per
+                la memoria fisica, ed allo stesso modo implica un accesso a
+                dispositivi molto più lenti, da L1 a L2 come da RAM a
+                disco.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="conclusion.html">Indietro</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> </td></tr><tr><td width="40%" align="left" valign="top">8. Conclusione </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>4. 可配置的虚拟脚本</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="up" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="prev" href="rcng-dummy.html" title="3. 虚拟的脚本" /><link rel="next" href="rcng-daemon.html" title="5. 启动并停止简单守护进程" /><link rel="copyright" href="trademarks.html" title="法律通告" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4. 可配置的虚拟脚本</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="rcng-dummy.html">上一页</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="rcng-daemon.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rcng-confdummy"></a>4. 可配置的虚拟脚本</h2></div></div></div><p>现在我们来给我们的虚拟脚本增加一些控制参数吧。正如你所知，
+      <code class="filename">rc.d</code> 脚本是由 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 所控制的。
+      幸运的是，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 隐藏了所有复杂化的东西。
+      下面这个脚本使用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 通过 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+      来查看它是否在第一个地方被启用，并获取一条信息在启动时显示。
+      事实上这两个任务是相互独立的。一方面，<code class="filename">rc.d</code>
+      脚本要能够支持启动和禁用它的服务。另一方面，
+      <code class="filename">rc.d</code> 脚本必须能具备配置信息变量。
+      我们将通过下面同一脚本来演示这两方面的内容：</p><div class="informalexample"><pre class="programlisting">#!/bin/sh
+
+. /etc/rc.subr
+
+name=dummy
+rcvar=dummy_enable<a id="rcng-confdummy-rcvar"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+
+start_cmd="${name}_start"
+stop_cmd=":"
+
+load_rc_config $name<a id="rcng-confdummy-loadconfig"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+eval "${rcvar}=\${${rcvar}:-'NO'}"<a id="rcng-confdummy-enable"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+dummy_msg=${dummy_msg:-"Nothing started."}<a id="rcng-confdummy-opt"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+
+dummy_start()
+{
+	echo "$dummy_msg"<a id="rcng-confdummy-msg"></a><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span>
+}
+
+run_rc_command "$1"</pre></div><p>在这个样例中改变了什么？</p><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-confdummy-rcvar"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>变量 <code class="envar">rcvar</code> 指定了 ON/OFF
+          开关变量的名字。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-confdummy-loadconfig"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>现在 <code class="function">load_rc_config</code> 在任何
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量被访问之前就在脚本中被预先调用。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">检查 <code class="filename">rc.d</code> 脚本时，切记 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>
+            会把函数延迟到其被调用时才对其中的表达式进行求值运算。
+            因此尽可能晚地在 <code class="function">run_rc_command</code>
+            之前调用 <code class="function">load_rc_config</code>，
+            以及仍然访问从方法函数输出到
+            <code class="function">run_rc_command</code> 的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>
+            变量并不是一个错误。这是因为方法函数将在
+            <code class="function">load_rc_config</code> <span class="emphasis"><em>之后</em></span>，
+            被调用的 <code class="function">run_rc_command</code> 调用。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-confdummy-enable"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>如果自身设置了 <code class="envar">rcvar</code>，
+          但指示开关变量却未被设置，那么 <code class="function">run_rc_command</code>
+          将发出一个警告。如果你的 <code class="filename">rc.d</code>
+          脚本是为基本系统所用的，你应当在
+          <code class="filename">/etc/defaults/rc.conf</code>
+          中给开关变量添加一个默认的设置并将其标注在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 中。
+          否则的话你的脚本应该给开关变量提供一个默认设置。
+          范例中演示了一个可移植接近于后者情况的案例。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">你可以通过将开关变量设置为 ON 来使 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 有效，
+            使用 <code class="literal">one</code> 或 <code class="literal">force</code>
+            为脚本的参数加前缀，如 <code class="literal">onestart</code> 或
+            <code class="literal">forcestop</code> 这样，会忽略其当前的设置。
+            切记 <code class="literal">force</code>
+            在我们下面要提到的情况下有额外的危险后果，那就是当用
+            <code class="literal">one</code> 改写了 ON/OFF 开关变量。例如，
+            假定 <code class="envar">dummy_enable</code> 是 <code class="literal">OFF</code>
+            的，而下面的命令将忽略系统设置而强行运行
+            <code class="option">start</code>方法：</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/dummy onestart</code></strong></pre></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-confdummy-opt"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>现在启动时显示的信息不再是硬编码在脚本中的了。
+          它是由一个命名为 <code class="envar">dummy_msg</code> 的
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量所指定的。这就是 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>
+          变量如何来控制 <code class="filename">rc.d</code>
+          脚本的一个小例子。</p><div xmlns="" class="important"><h3 class="admontitle">重要: </h3><p xmlns="http://www.w3.org/1999/xhtml">我们的脚本所独占使用的所有 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量名，
+            都必须具有同样的前缀：<code class="envar">${name}</code>。
+            例如：<code class="envar">dummy_mode</code>，
+            <code class="envar">dummy_state_file</code>，等等。</p></div><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">当可以内部使用一个简短的名字时，如 <code class="envar">msg</code>
+            这样，为我们的脚本所引进的全部的共用名添加唯一的前缀
+            <code class="envar">${name}</code>，能够避免我们与 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+            命名空间冲突的可能。</p><p xmlns="http://www.w3.org/1999/xhtml">只要一个 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量与其内部等同值是相同的，
+            我们就能够使用一个更加兼容的表达式来设置默认值：</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">: ${dummy_msg:="Nothing started."}</pre><p xmlns="http://www.w3.org/1999/xhtml">尽管目前的风格是使用了更详细的形式。</p><p xmlns="http://www.w3.org/1999/xhtml">通常，基本系统的 <code class="filename">rc.d</code>
+            脚本不需要为它们的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 变量提供默认值，
+            因为默认值应该是在 <code class="filename">/etc/defaults/rc.conf</code>
+            设置过了。但另一方面，为 ports 所用的 <code class="filename">rc.d</code>
+            脚本应提供如范例所示的默认设置。</p></div></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-confdummy-msg"><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></a> </p></td><td valign="top" align="left"><p>这里我们使用 <code class="envar">dummy_msg</code>
+          来实际地控制我们的脚本，即，发一个变量信息。</p></td></tr></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="rcng-dummy.html">上一页</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="rcng-daemon.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">3. 虚拟的脚本 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 5. 启动并停止简单守护进程</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

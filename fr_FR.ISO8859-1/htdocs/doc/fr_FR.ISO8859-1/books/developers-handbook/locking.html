@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Chapitre 8. Notes sur le verrouillage</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="kernel.html" title="Partie III. Le noyau" /><link rel="prev" href="kernelhistory.html" title="Chapitre 7. Histoire du noyau Unix" /><link rel="next" href="ch08s02.html" title="8.2. Les verrous du gestionnaire de verrous (Lock Manager)" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Chapitre 8. Notes sur le verrouillage</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="kernelhistory.html">Précédent</a> </td><th width="60%" align="center">Partie III. Le noyau</th><td width="20%" align="right"> <a accesskey="n" href="ch08s02.html">Suivant</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="locking"></a>Chapitre 8. Notes sur le verrouillage</h2></div></div></div><div class="toc"><div class="toc-title">Table des matières</div><dl class="toc"><dt><span class="sect1"><a href="locking.html#idp67728336">8.1. Les mutex</a></span></dt><dt><span class="sect1"><a href="ch08s02.html">8.2. Les verrous du gestionnaire de verrous (Lock Manager)</a></span></dt><dt><span class="sect1"><a href="ch08s03.html">8.3. Variables protégées atomiquement</a></span></dt></dl></div><p><span class="emphasis"><em>Ce chapître est maintenu par The FreeBSD SMP Next
+    Generation Project. Envoyez leur directement les commentaires et
+    les suggestions à <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-smp" target="_top">liste de diffusion concernant le traitement symétrique multiprocesseurs (SMP) sous FreeBSD</a>.</em></span></p><p>Ce document souligne le verrouillage utilisé dans le noyau FreeBSD
+    pour permettre d'utiliser du vrai multi-processeur à l'intérieur du noyau.
+    Le verrouillage peut être réalisé par différents moyens.
+    Les structures de données puvent être protégées par des mutex ou <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lockmgr&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">lockmgr</span>(9)</span></a> verrous.
+    Quelques variables sont protégées simplement par l'utilisation continuelle d'opérations
+    atomiques pour y accéder.
+   </p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp67728336"></a>8.1. Les mutex</h2></div></div></div><p>Un mutex est simplement un verrou utilisé pour garantir exclusion mutuelle.
+      Spécifiquement, un mutex ne peut appartenir qu'à une entité à la fois.
+      Si une autre entité désire obtenir un mutex déjà pris
+      , elle doit attendre jusqu'à ce que le mutex soit relaché. Dans le noyau
+      FreeBSD, les mutex appartiennent aux processus.</p><p>Les mutex peuvent être acquis récursivement, mais ils sont conçus
+      pour n'être pris que pendant une courte période. Spécifiquement, le détenteur
+      ne doit pas se suspendre pendant qu'il retient un mutex. Si vous avez besoin de
+      maintenir un verrouillage pendant une suspension, utilisez un <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lockmgr&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">lockmgr</span>(9)</span></a> verrou ("lock").</p><p>Chaque mutex a plusieurs intérêts :</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Nom de la variable</span></dt><dd><p>Nom de la variable <span class="type">struct mtx</span> dans
+	    le code source du noyau.</p></dd><dt><span class="term">Nom logique</span></dt><dd><p>Le nom du mutex lui est assigné par
+	    <code class="function">mtx_init</code>. Ce nom est affiché dans
+	    les messages de trace KTR, témoigne des erreurs et avertissements et est
+	    utilisé pour distinguer les mutex dans les traces.</p></dd><dt><span class="term">Type</span></dt><dd><p>Le type du mutex en termes de constantes nommées
+	    <code class="constant">MTX_*</code>.  La signification de chaque
+	    constante nommée est documentée dans <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mutex&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">mutex</span>(9)</span></a>.</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="constant">MTX_DEF</code></span></dt><dd><p>Un mutex endormi</p></dd><dt><span class="term"><code class="constant">MTX_SPIN</code></span></dt><dd><p>Un mutex tournant</p></dd><dt><span class="term"><code class="constant">MTX_COLD</code></span></dt><dd><p>Ce mutex est initialisé très tard.  Toutefois, il
+		  doit être déclaré via
+		  <code class="function">MUTEX_DECLARE</code>, et la constante nommée
+		  <code class="constant">MTX_COLD</code> doit être passée à
+		  <code class="function">mtx_init</code>.</p></dd><dt><span class="term"><code class="constant">MTX_TOPHALF</code></span></dt><dd><p>Ce mutex tournant ne désactive pas les
+		  interruptions.</p></dd><dt><span class="term"><code class="constant">MTX_NORECURSE</code></span></dt><dd><p>Ce mutex n'a pas la permission d'être recursif.</p></dd></dl></div></dd><dt><span class="term">Protégés</span></dt><dd><p>Une liste de structures de données ou des membres de structure de données
+	    que cette entrée protège.  Pour les membres de structures de données,
+	    le nom sera de la forme <code class="varname">structure name</code>.<code class="varname">member name</code>.</p></dd><dt><span class="term">Fonctions dépendantes</span></dt><dd><p>Les fonctions qui peuvent seulement être appelées si ce mutex est
+	    pris.</p></dd></dl></div><div class="table"><a id="idp67760336"></a><div class="table-title">Tableau 8.1. Liste du mutex</div><div class="table-contents"><table summary="Liste du mutex" width="100%" border="1"><colgroup><col /><col /><col /><col /><col /></colgroup><thead><tr><th>Nom de la variable</th><th>Nom logique</th><th>Type</th><th>Protégés</th><th>Fonctions dépendantes</th></tr></thead><tbody><tr><td>sched_lock</td><td><span class="quote">« <span class="quote">sched lock</span> »</span></td><td>
+	      <code class="constant">MTX_SPIN</code> |
+	      <code class="constant">MTX_COLD</code>
+	    </td><td>
+	      <code class="varname">_gmonparam</code>,
+	      <code class="varname">cnt.v_swtch</code>,
+	      <code class="varname">cp_time</code>,
+	      <code class="varname">curpriority</code>,
+	      <code class="varname">mtx</code>.<code class="varname">mtx_blocked</code>,
+	      <code class="varname">mtx</code>.<code class="varname">mtx_contested</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_contested</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_blocked</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_flag</code>
+		(<code class="constant">P_PROFIL</code> XXX,
+		 <code class="constant">P_INMEM</code>,
+	         <code class="constant">P_SINTR</code>,
+	         <code class="constant">P_TIMEOUT</code>,
+	         <code class="constant">P_SWAPINREQ</code> XXX,
+	         <code class="constant">P_INMEN</code> XXX),
+	      <code class="varname">proc</code>.<code class="varname">p_nice</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_procq</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_blocked</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_estcpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_nativepri</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_priority</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_usrpri</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_rtprio</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_rqindex</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_stats-&gt;p_prof</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_stats-&gt;p_ru</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_stat</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_cpticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_iticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_uticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_sticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_swtime</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_slptime</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_runtime</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_pctcpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_oncpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_asleep</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_wchan</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_wmesg</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_slpq</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_vmspace</code>
+		(XXX - in <code class="function">statclock</code>),
+	      <code class="varname">pscnt</code>,
+	      <code class="varname">slpque</code>,
+	      <code class="varname">itqueuebits</code>,
+	      <code class="varname">itqueues</code>,
+	      <code class="varname">rtqueuebits</code>,
+	      <code class="varname">rtqueues</code>,
+	      <code class="varname">queuebits</code>,
+	      <code class="varname">queues</code>,
+	      <code class="varname">idqueuebits</code>,
+	      <code class="varname">idqueues</code>,
+	      <code class="varname">switchtime</code>,
+	    </td><td>
+	      <code class="function">setrunqueue</code>,
+	      <code class="function">remrunqueue</code>,
+	      <code class="function">mi_switch</code>,
+	      <code class="function">chooseproc</code>,
+	      <code class="function">schedclock</code>,
+	      <code class="function">resetpriority</code>,
+	      <code class="function">updatepri</code>,
+	      <code class="function">maybe_resched</code>,
+	      <code class="function">cpu_switch</code>,
+	      <code class="function">cpu_throw</code>
+	    </td></tr><tr><td>vm86pcb_lock</td><td><span class="quote">« <span class="quote">vm86pcb lock</span> »</span></td><td>
+	      <code class="constant">MTX_DEF</code> |
+	      <code class="constant">MTX_COLD</code>
+	    </td><td>
+	      <code class="varname">vm86pcb</code>
+	    </td><td>
+	      <code class="function">vm86_bioscall</code>
+	    </td></tr><tr><td>Giant</td><td><span class="quote">« <span class="quote">Giant</span> »</span></td><td>
+	      <code class="constant">MTX_DEF</code> |
+	      <code class="constant">MTX_COLD</code>
+	    </td><td>nearly everything</td><td>lots</td></tr><tr><td>callout_lock</td><td><span class="quote">« <span class="quote">callout lock</span> »</span></td><td>
+	      <code class="constant">MTX_SPIN</code>
+	    </td><td>
+	      <code class="varname">callfree</code>,
+	      <code class="varname">callwheel</code>,
+	      <code class="varname">nextsoftcheck</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_itcallout</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_slpcallout</code>,
+	      <code class="varname">softticks</code>,
+	      <code class="varname">ticks</code>
+	    </td><td>
+	    </td></tr></tbody></table></div></div><br class="table-break" /></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="kernelhistory.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="kernel.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch08s02.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">Chapitre 7. Histoire du noyau Unix </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 8.2. Les verrous du gestionnaire de verrous (Lock Manager)</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

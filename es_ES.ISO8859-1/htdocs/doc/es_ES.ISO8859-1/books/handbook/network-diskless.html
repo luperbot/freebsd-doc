@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>29.7. Ejecución sin disco duro</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="advanced-networking.html" title="Capítulo 29. Networking avanzado" /><link rel="prev" href="network-nfs.html" title="29.6. NFS" /><link rel="next" href="network-isdn.html" title="29.8. RDSI" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">29.7. Ejecución sin disco duro</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-nfs.html">Anterior</a> </td><th width="60%" align="center">Capítulo 29. Networking avanzado</th><td width="20%" align="right"> <a accesskey="n" href="network-isdn.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-diskless"></a>29.7. Ejecución sin disco duro</h2></div><div><span class="authorgroup">Actualizado por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Jean-François</span> <span class="surname">Dockès</span></span>. </span></div><div><span class="authorgroup">Reorganizado y ampliado por <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Alex</span> <span class="surname">Dupre</span></span>. </span></div></div></div><a id="idp82681296" class="indexterm"></a><a id="idp82681808" class="indexterm"></a><p>Una máquina FreeBSD se puede arrancar a través
+      de la red y operar sin que necesite poseer ningún disco,
+      utilizando sistemas de ficheros de un servidor de
+      <acronym class="acronym">NFS</acronym>. No se necesita realizar ninguna
+      modificación al sistema, salvo configurar determinados ficheros.
+      Este tipo de sistemas se pueden configurar fácilmente puesto
+      que FreeBSD dispone de todos los elementos necesarios:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Existen al menos dos formas de cargar el núcleo
+          del sistema operativo a través de la red:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><acronym class="acronym">PXE</acronym>: El sistema de <span class="trademark">Intel</span>® conocido como
+              Preboot Execution Environment.  Se trata de una especie de
+              arranque inteligente a partir de una memoria de sólo
+              lectura (ROM) que se encuentra en algunas placas bases y
+              tarjetas de red.  Se puede obtener más información
+	      en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a>.</p></li><li class="listitem"><p>El port <span class="application">etherboot</span>
+	      (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/etherboot/pkg-descr">net/etherboot</a>)
+              genera código de sólo lectura (código ROM)
+              que se puede utilizar para arrancar máquinas a
+	      través de la red.  Dicho código se puede instalar
+              en una memoria de arranque tipo PROM en algunas tarjetas de red
+              o se puede cargar en una disquetera (o disco duro), y
+              también en un sistema de ficheros <span class="trademark">MS-DOS</span>® que
+              esté en ejecución.  Varias tarjetas de red soportan
+	      este mecanismo.</p></li></ul></div></li><li class="listitem"><p>Existe un script de ejemplo
+	  (<code class="filename">/usr/share/examples/diskless/clone_root</code>) que
+          facilita la creación y el mantenimiento del sistema de
+          ficheros raíz de la estación de trabajo en el
+          servidor.  La configuración de este <span class="quote">&#8220;<span class="quote">script</span>&#8221;</span> se
+          debe retocar ligeramente pero sirve como punto de partida para
+          comenzar rápidamente.</p></li><li class="listitem"><p>Existen ficheros estándar de arranque bajo
+          <code class="filename">/etc</code> que dan soporte al arranque de
+          máquinas sin disco.</p></li><li class="listitem"><p>El <span class="quote">&#8220;<span class="quote">swapping</span>&#8221;</span>, en caso de ser necesario, se puede
+          realizar usando <acronym class="acronym">NFS</acronym> y tambíen
+          usando un disco duro local.</p></li></ul></div><p>Existen varias formas de ejecutar una estación de trabajo sin
+      discos.  En el proceso se involucran distintos elementos y la
+      mayoría se pueden adaptar a las necesidades del usuario.
+      A continuación se describen variaciones sobre la
+      configuración de un sistema sin discos, haciendo incapié
+      en la simplicidad y compatibilidad con los <span class="quote">&#8220;<span class="quote">scripts</span>&#8221;</span> de
+      arranque de FreeBSD.  El sistema que vamos a describir tiene las
+      siguientes características.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Las estaciones de trabajo sin disco utilizan un sistema
+          de ficheros <code class="filename">raíz</code> de sólo lectura
+          y un sistema de ficheros compartido, también de
+          sólo lectura, bajo <code class="filename">/usr</code>.</p><p>El sistema de ficheros <code class="filename">raíz</code>
+          es una copia del sistema raíz estandar de FreeBSD (normalmente
+          del sistema raíz del servidor), donde se sobreescriben
+          algunos archivos de configuración necesarios para la
+          ejecución sin discos y para la configuración local
+          específica de la máquina objetivo.</p><p>Las partes del sistema de ficheros
+          <code class="filename">raíz</code> que tiene que tener permisos de
+          lectura y escritura se superponen con los sistemas de ficheros
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mfs</span>(8)</span></a> (FreeBSD 4.X) o <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=md&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">md</span>(4)</span></a>.  Cualquier cambio que se
+          produzca en dichas partes se perderá cuando se reinicie el
+          sistema.</p></li><li class="listitem"><p>El núcleo se transmite y se carga utilizando
+	  <span class="application">etherboot</span> o bien
+          <acronym class="acronym">PXE</acronym>, dependiendo del hardware y los mecanismos
+          que se soporten.</p></li></ul></div><div xmlns="" class="caution"><h3 class="admontitle">Atención: </h3><p xmlns="http://www.w3.org/1999/xhtml">Como se ha comentado con anterioridad estos sistemas son
+        inseguros.  Se debe confinar dentro de una red protegida y el resto
+        de las máquinas por defecto no deben confiar en estos
+	métodos.</p></div><p>Toda la información que se presenta en esta
+      sección se ha probado utilizando FreeBSD 4.9-RELEASE y
+      5.2.1-RELEASE.  El texto se encuentra estructurado principalmente para
+      utilización en sistemas 4.X.  Se insertan notas para indicar
+      cambios producidos en las versiones 5.X.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82710352"></a>29.7.1. Conocimientos previos</h3></div></div></div><p>Configurar estaciones de trabajo sin discos es una
+        operación relativamente sencilla pero en la que pueden
+        cometerse errores.  Estos errores resultan algunas veces
+        difíciles de diagnosticar debido a razones que vamos a
+        exponer a continuación. Por ejemplo:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Diferentes opciones de tiempo de compilación pueden
+            determinar comportamientos distintos en tiempo de
+            ejecución.</p></li><li class="listitem"><p>Los mensajes de error a menudo resultan crípticos o
+            incluso no existen.</p></li></ul></div><p>Se se quieren resolver los posibles problemas que puedan surgir
+        resulta muy útil conocer el funcionamiento conceptual del
+        mecanismo.</p><p>Para que el arranque se produzca exitosamente se deben realizar
+        varias operaciones:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>La máquina necesita obtener algunos
+            parámetros iniciales, tales como su dirección IP,
+            el fichero ejecutable, el nombre del servidor y la ruta
+            raíz.  Esto se realiza utilizando los protocolos
+            <acronym class="acronym">DHCP</acronym> o <acronym class="acronym">BOOTP</acronym>.
+            <acronym class="acronym">DHCP</acronym> es una extensión compatible del
+            protocolo <acronym class="acronym">BOOTP</acronym> y utiliza los mismos
+            números de puertos y los mismos formatos de paquete
+            básicos.</p><p>Es posible configurar un sistema de tal forma que utilice
+            sólamente <acronym class="acronym">BOOTP</acronym>.  En el sistema base de
+            FreeBSD se incluye el programa servidor <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bootpd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bootpd</span>(8)</span></a>.</p><p>No obstante <acronym class="acronym">DHCP</acronym> posee varias ventajas sobre
+            BOOTP (archivos de configuración más limpios,
+            posibilidad de ejecutar <acronym class="acronym">PXE</acronym>, junto con otras
+	    características  que no se relacionan directamente con el
+            tema que estamos tratando tratando) por lo que principalmente se
+            va a describir la configuración de <acronym class="acronym">DHCP</acronym>,
+            proporcionando ejemplos equivalentes en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bootpd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bootpd</span>(8)</span></a> siempre que
+            sea posible.  La configuración de ejemplo se basa en el
+            paquete software de <span class="application">ISC DHCP</span> (en el
+            servidor de prueba se instaló la versión
+            3.0.1.r12).</p></li><li class="listitem"><p>La máquina sin disco necesita transferir uno o varios
+            programas a la memoria local.  Para ello se usa
+            <acronym class="acronym">TFTP</acronym> o bien <acronym class="acronym">NFS</acronym>.
+            La elección entre ambos se produce mediante la
+            configuración de la compilación que se produce en
+            varios lugares.  Una fuente de error típica aparece cuando
+            se especifican ficheros con el protocolo incorrecto:
+            <acronym class="acronym">TFTP</acronym> normalmente transfiere todos los ficheros
+            desde un único directorio del servidor, de modo que espera
+            nombres de ficheros relativos a dicho directorio.  Por otro lado
+            <acronym class="acronym">NFS</acronym> necesita recibir rutas de fichero
+            absolutas.</p></li><li class="listitem"><p>El kernel y los programas de arranque intermedios deben ser
+	    inicializados y ejecutados.  Existen diferencias importantes en
+	    este área:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem"><p><acronym class="acronym">PXE</acronym> carga <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a>, una
+                versión modificada de la tercera fase del cargador de
+                arranque de FreeBSD.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a> obtiene la mayoría de
+                los parámetros necesarios para arrancar el sistema
+                y los deposita en variables de entorno del kernel antes de
+                tranferir el control. En este caso es posible utilizar un
+                un núcleo <code class="filename">GENERIC</code>
+                .</p></li><li class="listitem"><p><span class="application">etherboot</span> carga directamente el
+                directamente el núcleo con menos trabajo previo que
+                el método anterior.  Para ello se debe compilar un
+                núcleo con ciertas opciones.</p></li></ul></div><p><acronym class="acronym">PXE</acronym> y <span class="application">etherboot</span>
+	    funcionan muy bien en los sistemas 4.X.  Dado que los
+            núcleos de los sistemas 5.X permiten que el <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>
+            realice más tareas, se prefiere usar <acronym class="acronym">
+	    PXE</acronym>.</p><p>Si su <acronym class="acronym">BIOS</acronym> y su tarjeta de red soportan
+	    <acronym class="acronym">PXE</acronym> lo normal es utilizarlo.  No obstante se
+            puede arrancar un sistema 5.X utilizando <span class="application">
+	    etherboot</span>.</p></li><li class="listitem"><p>Para acabar la tarea la máquina necesita acceder al
+            sistema de ficheros.  En todos los casos se utiliza
+            <acronym class="acronym">NFS</acronym>.</p></li></ul></div><p>No olvide consultar <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diskless&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">diskless</span>(8)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82739152"></a>29.7.2. Instrucciones de configuración</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82739792"></a>29.7.2.1. Configuración utilizando <span class="application">ISC
+            DHCP</span></h4></div></div></div><a id="idp82740688" class="indexterm"></a><p>El servidor <span class="application">ISC DHCP</span> puede
+          responder tanto a peticiones de BOOTP como a peticiones de
+            <acronym class="acronym">DHCP</acronym>.</p><p><span class="application">ISC DHCP</span> no forma parte de
+          la versión 4.9 de FreeBSD por lo que se debe instalar el port
+            <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/isc-dhcp3-server/pkg-descr">net/isc-dhcp3-server</a> o el
+          paquete correspondiente.  Por favor, consulte <a class="xref" href="ports.html" title="Capítulo 4. Instalación de aplicaciones: «packages» y ports">Capítulo 4, <em>Instalación de aplicaciones: «packages» y ports</em></a> para obtener
+          más información sobre los ports y los
+          paquetes.</p><p>Una vez que <span class="application">ISC DHCP</span> se encuentra
+          instalado necesita un fichero de configuración para poder
+            ejecutarse
+          <code class="filename">/usr/local/etc/dhcpd.conf</code>).  A
+          continuación se muestra un ejemplo comentado, donde la
+          máquina <code class="systemitem">margaux</code> utiliza
+          <span class="application">etherboot</span> y
+            la máquina <code class="systemitem">corbieres</code> utiliza
+          <acronym class="acronym">PXE</acronym>:</p><pre class="programlisting">
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+
+option domain-name "example.com";
+option domain-name-servers 192.168.4.1;
+option routers 192.168.4.1;
+
+subnet 192.168.4.0 netmask 255.255.255.0 {
+  use-host-decl-names on; <a id="co-dhcp-host-name"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+  option subnet-mask 255.255.255.0;
+  option broadcast-address 192.168.4.255;
+
+  host margaux {
+    hardware ethernet 01:23:45:67:89:ab;
+    fixed-address margaux.example.com;
+    next-server 192.168.4.4; <a id="co-dhcp-next-server"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+    filename "/data/misc/kernel.diskless"; <a id="co-dhcp-filename"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+    option root-path "192.168.4.4:/data/misc/diskless"; <a id="co-dhcp-root-path"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+  }
+  host corbieres {
+    hardware ethernet 00:02:b3:27:62:df;
+    fixed-address corbieres.example.com;
+    next-server 192.168.4.4;
+    filename "pxeboot";
+    option root-path "192.168.4.4:/data/misc/diskless";
+  }
+}
+          </pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-host-name"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Esta
+              opción indica a
+		<span class="application">dhcpd</span> que envíe el
+              valor que se encuentra en las declaraciones
+                de <code class="literal">host</code> como el nombre de
+              máquina para la máquina sin disco.  Otra forma
+              de hacer esto sería añadiendo una opción
+		<code class="literal">option host-name
+                margaux</code> dentro de las
+              declaraciones de máquina.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-next-server"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>La directiva
+               <code class="literal">next-server</code> selecciona el servidor
+              de <acronym class="acronym">TFTP</acronym> o de <acronym class="acronym">NFS</acronym>
+              que se debe utilizar para cargar el núcleo
+              o el fichero cargador del núcleo (por defecto se
+              utiliza la misma máquina que actúa como servidor
+              de <acronym class="acronym">DHCP</acronym>).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-filename"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>La directiva
+		<code class="literal">filename</code> define el archivo que
+		<span class="application">etherboot</span> o <acronym class="acronym">PXE</acronym>
+                cargará en el siguiente paso de ejecución.
+                Debe especificarse de acuerdo con el método de
+                transferencia seleccionado.
+		<span class="application">Etherboot</span> se puede compilar para
+		que use <acronym class="acronym">NFS</acronym> o <acronym class="acronym">TFTP</acronym>.  El
+                sistema FreeBSD se configura por defecto para <acronym class="acronym">
+                NFS</acronym>.
+		<acronym class="acronym">PXE</acronym> utiliza <acronym class="acronym">TFTP</acronym> por lo
+                que se utiliza una ruta relativa para especificar el nombre del
+                fichero (esto puede depender de la configuración del
+                servidor de <acronym class="acronym">TFTP</acronym> pero suele ser lo
+                normal).  Además <acronym class="acronym">PXE</acronym> no carga el
+                núcleo, lo hace <code class="filename">pxeboot</code>.
+                Existen otras posibilidades interesantes, como cargar
+		<code class="filename">pxeboot</code> desde el directorio
+              <code class="filename">/boot</code>
+                de una unidad de CD-ROM de FreeBSD (ya que <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> puede
+               cargar un núcleo
+              <code class="filename">GENERIC</code> surge la posibilidad de utilizar
+              <acronym class="acronym">PXE</acronym> para arrancar desde una unidad de
+              CD-ROM remota).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-dhcp-root-path"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>La opción
+		<code class="literal">root-path</code> define la ruta para el
+              sistema de ficheros raíz utilizando la notación
+              típica de <acronym class="acronym">NFS</acronym>.  Cuando se utiliza
+              <acronym class="acronym">PXE</acronym>, es posible dejar la
+               dirección IP siempre y cuando no se active la
+              opción del núcleo de BOOTP.  El servidor
+              <acronym class="acronym">NFS</acronym> será en este caso el mismo que el
+              servidor de <acronym class="acronym">TFTP</acronym>.</p></td></tr></table></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82772816"></a>29.7.2.2. Configuración utilizando BOOTP</h4></div></div></div><a id="idp82773456" class="indexterm"></a><p>A continuación se muestra la configuración
+          equivalente utilizando <span class="application">bootpd</span>
+	    (reducida a un único cliente).  Esta configuración
+	    se debe situar en <code class="filename">/etc/bootptab</code>.</p><p>Por favor, recuerde que  <span class="application">etherboot</span>
+            se debe compilar con la opción específica de
+	    <code class="literal">NO_DHCP_SUPPORT</code> para que pueda utilizar BOOTP
+	    y que <acronym class="acronym">PXE</acronym> <span class="emphasis"><em>requiere</em></span>
+          <acronym class="acronym">DHCP</acronym>.  La única ventaja obvia de
+            <span class="application">bootpd</span> es que se encuentra disponible en
+           el sistema base.</p><pre class="programlisting">
+.def100:\
+  :hn:ht=1:sa=192.168.4.4:vm=rfc1048:\
+  :sm=255.255.255.0:\
+  :ds=192.168.4.1:\
+  :gw=192.168.4.1:\
+  :hd="/tftpboot":\
+  :bf="/kernel.diskless":\
+  :rp="192.168.4.4:/data/misc/diskless":
+
+margaux:ha=0123456789ab:tc=.def100
+          </pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82779088"></a>29.7.2.3. Preparación de un programa de arranque con
+	  <span class="application">Etherboot</span></h4></div></div></div><a id="idp82779984" class="indexterm"></a><p><a class="link" href="http://etherboot.sourceforge.net" target="_top">La
+            página web de Etherboot
+	  </a> contiene
+	  <a class="link" href="http://etherboot.sourceforge.net/doc/html/userman/t1.html" target="_top">
+	  una amplia documentación</a> enfocada
+          principalmente a los sistemas Linux pero en cualquier caso contiene
+          información que puede resultar útil.  En los siguientes
+          párrafos se describe brevemente como se puede utilizar
+          <span class="application">etherboot</span> en un sistema FreeBSD.</p><p>Lo primero es instalar el port o paquete <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/etherboot/pkg-descr">net/etherboot</a>.  El port de
+          <span class="application">etherboot</span> está en
+          <code class="filename">/usr/ports/net/etherboot</code>.  Si el árbol
+          de ports está instalado en el sistema basta con ejecutar
+	  <code class="literal">make</code> en dicho directorio.  Por favor,
+          lea  <a class="xref" href="ports.html" title="Capítulo 4. Instalación de aplicaciones: «packages» y ports">Capítulo 4, <em>Instalación de aplicaciones: «packages» y ports</em></a> para saber más sobre los ports y
+          los paquetes.</p><p>Se puede modificar la configuración de
+          <span class="application">etherboot</span> (por ejemplo, para que use
+	  <acronym class="acronym">TFTP</acronym> en lugar de <acronym class="acronym">NFS</acronym>) editando
+          el fichero <code class="filename">Config</code> que se encuentra en el
+          directorio fuente de <span class="application">etherboot</span>.</p><p>Para nuestros propósitos se utilizará un disquete
+          de arranque.  Para utilizar otros métodos (PROM o un
+	  programa <span class="trademark">MS-DOS</span>®) por favor consulte la documentación de
+	  <span class="application">etherboot</span>.</p><p>Para crear un disco de arranque se debe insertar un disco en la
+          unidad de disquetes de la máquina donde se ha instalado
+          <span class="application">etherboot</span>, cambiar al directorio
+	  <code class="filename">src</code> dentro del árbol de directorios de
+          <span class="application">etherboot</span> y teclear:</p><pre class="screen">
+<code class="prompt">#</code> <strong class="userinput"><code>gmake bin32/tipo_de_dispositivo.fd0</code></strong>
+	</pre><p><em class="replaceable"><code>tipo_de_dispositivo</code></em> depende del tipo
+          de tarjeta Ethernet que se encuentre instalada en la estación
+          de trabajo sin disco.  Consulte el fichero
+	  <code class="filename">NIC</code> en el mismo directorio para determinar
+          cúal es el <em class="replaceable"><code>tipo_de_dispositivo</code></em> que
+	  debe usted usar.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82797136"></a>29.7.2.4. Arranque con <acronym class="acronym">PXE</acronym></h4></div></div></div><p>Por defecto el cargador <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> carga, valga la
+          redundancia, el kernel vía <acronym class="acronym">NFS</acronym>.  El
+	  El cargador se puede compilar para que utilice <acronym class="acronym">
+          TFTP</acronym> en lugar de <acronym class="acronym">NFS</acronym> especificando la
+	  opción <code class="literal">LOADER_TFTP_SUPPORT</code> dentro de
+	  <code class="filename">/etc/make.conf</code>.  Observe los comentarios de
+	  <code class="filename">/etc/defaults/make.conf</code> (o de
+	  <code class="filename">/usr/share/examples/etc/make.conf</code> para
+          sistemas 5.X) para saber más detalles.</p><p>Existen otras dos opciones de
+          <code class="filename">make.conf</code> no documentadas que pueden
+          ser útiles para arrancar una máquina sin disco a
+          través del puerto serie:
+	  <code class="literal">BOOT_PXELDR_PROBE_KEYBOARD</code> y
+	  <code class="literal">BOOT_PXELDR_ALWAYS_SERIAL</code> (esta
+          última sólo existe en FreeBSD 5.X).</p><p>Para utilizar <acronym class="acronym">PXE</acronym> cuando arranca la
+          máquina normalmente el usuario tiene que seleccionar la
+          opción <code class="literal">Boot from network</code> dentro del
+          menú de opciones de la <acronym class="acronym">BIOS</acronym> o pulsar un
+	  tecla de función cuando la máquina se está
+          inicializando.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82805072"></a>29.7.2.5. Configuración de servidores de
+          <acronym class="acronym">TFTP</acronym> y de <acronym class="acronym">NFS</acronym></h4></div></div></div><a id="idp82810576" class="indexterm"></a><a id="idp82811728" class="indexterm"></a><p>Si <acronym class="acronym">PXE</acronym> o
+	  <span class="application">etherboot</span> se encuentran configurados para
+	  utilizar <acronym class="acronym">TFTP</acronym> se necesita activar
+	  <span class="application">tftpd</span> en el servidor de ficheros:
+          </p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Crear un directorio desde el cual el dæmon
+              <span class="application">tftpd</span> servirá los
+            ficheros, por ejemplo <code class="filename">/tftpboot</code>.</p></li><li class="step"><p>Añadir la siguiente línea a
+	      <code class="filename">/etc/inetd.conf</code>:</p><pre class="programlisting">tftp	dgram	udp	wait	root	/usr/libexec/tftpd	tftpd -l -s /tftpboot</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Parece que al menos algunas versiones de
+                <acronym class="acronym">PXE</acronym> utilizan la versión
+                <acronym class="acronym">TCP</acronym>
+                de <acronym class="acronym">TFTP</acronym>.  En este caso se puede
+                añadir una segunda línea, donde se reemplace
+                <code class="literal">dgram udp</code> por <code class="literal">stream
+                tcp</code>.</p></div></li><li class="step"><p>Indicar a <span class="application">inetd</span> que
+              vuelva a leer su fichero de configuración:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kill -HUP `cat
+                /var/run/inetd.pid`</code></strong></pre></li></ol></div><p>Se puede situar el directorio
+          <code class="filename">tftpboot</code> en cualquier parte del servidor.
+          Debe asegurarse de que la localización se encuentra
+          correctamente configurada tanto en
+          <code class="filename">inetd.conf</code> como en
+          <code class="filename">dhcpd.conf</code>.</p><p>En todos los casos también resulta necesario activar el
+          sistema de <acronym class="acronym">NFS</acronym> y exportar los sistemas de
+          ficheros adecuados, todo ello en el servidor de
+          <acronym class="acronym">NFS</acronym>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Añadir lo siguiente a
+              <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">nfs_server_enable="YES"</pre></li><li class="step"><p>Exportar el sistema de ficheros donde el directorio
+              raíz sin disco se encuentra localizado añadiendo
+              lo siguiente a <code class="filename">/etc/exports</code> (ajuste el
+              punto de montaje de la unidad y sustituya
+              <em class="replaceable"><code>margaux corbieres</code></em> por el
+              nombre de las estaciones de trabajo sin disco, según
+              corresponda):</p><pre class="programlisting"><em class="replaceable"><code>/data/misc</code></em> -alldirs -ro <em class="replaceable"><code>margaux corbieres</code></em></pre></li><li class="step"><p>Indicar a <span class="application">mountd</span> que vuelva a leer
+	      su archivo de configuración.  Si en un primer paso se ha
+              configurado la activación automática del sistema de
+              <acronym class="acronym">NFS</acronym> en
+              <code class="filename">/etc/rc.conf</code> lo mejor es reiniciar para que
+              los cambios surtan efecto.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kill -HUP `cat
+                /var/run/mountd.pid`</code></strong></pre></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82837456"></a>29.7.2.6. Construcción de un kernel sin
+          disco</h4></div></div></div><a id="idp82842320" class="indexterm"></a><p>Si se utiliza <span class="application">etherboot</span>, se necesita
+          crear un archivo de configuración para el kernel de la
+          máquina sin disco que posea las siguientes opciones
+          (además de las opciones del núcleo habituales):</p><pre class="programlisting">
+options     BOOTP          # Use BOOTP to obtain IP address/hostname
+options     BOOTP_NFSROOT  # NFS mount root filesystem using BOOTP info
+	</pre><p>Puede resultar interesante utilizar además
+          <code class="literal">BOOTP_NFSV3</code>,
+	  <code class="literal">BOOT_COMPAT</code> y
+          <code class="literal">BOOTP_WIRED_TO</code>
+	  (consultar <code class="filename">LINT</code> en 4.X o
+	  <code class="filename">NOTES</code> en sistemas 5.X).</p><p>Los nombres de estas opciones son nombres
+          históricos y ligeramente confusos ya que permiten un uso
+          indistinto tanto de <acronym class="acronym">DHCP</acronym> como de BOOTP dentro del
+          núcleo (también resulta posible forzar la
+          utilización única de o bien BOOTP o bien de
+          <acronym class="acronym">DHCP</acronym>).</p><p>Contruir el núcleo (vea <a class="xref" href="kernelconfig.html" title="Capítulo 8. Configuración del kernel de FreeBSD">Capítulo 8, <em>Configuración del kernel de FreeBSD</em></a>) y copiarlo al lugar especificado
+          en el archivo <code class="filename">dhcpd.conf</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Cuando se utiliza <acronym class="acronym">PXE</acronym>, la
+            construcción del núcleo con las opciones anteriores
+            no resulta ser algo estrictamente necesario (aunque se
+            recomienda).  Activar dichas opciones provoca un mayor
+            tráfico de peticiones de <acronym class="acronym">DHCP</acronym> durante el
+            arranque del núcleo, lo que puede dar lugar a
+            pequeñas inconsistencias entre los nuevos valores y los
+            los valores recuperados por <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pxeboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">pxeboot</span>(8)</span></a> en casos muy
+            específicos. La ventaja de utilizarlas consiste en que como
+            un efecto colateral se configurará el nombre de la
+            máquina. De otro modo tendríamos que configurar dicho
+            nombre mediante otro método por ejemplo mediante la
+            configuración específica de la máquina cliente
+            a través del archivo <code class="filename">rc.conf</code>.</p></div><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Para que el núcleo se pueda cargar sin problemas con
+	    <span class="application">etherboot</span> en sistemas 5.X dicho
+            núcleo tiene que tener compilado el soporte para
+            <span class="emphasis"><em>device hints</em></span>.  Para ello normalmente se
+            especifica la siguiente opción dentro del fichero
+            de configuración del núcleo (consulte los comentarios
+            del fichero <code class="filename">NOTES</code>):</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">hints		"GENERIC.hints"</pre></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82858704"></a>29.7.2.7. Preparación del sistema de ficheros
+          raíz</h4></div></div></div><a id="idp82859344" class="indexterm"></a><p>Se debe crear un sistema de ficheros raíz en las
+          estaciones de trabajo sin disco, concretamente en la
+          localización especificada por <code class="literal">root-path</code>
+	  dentro de <code class="filename">dhcpd.conf</code>.  Las siguientes secciones
+          describen dos formas de hacer esto.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82861648"></a>29.7.2.7.1. Utilización del <span class="quote">&#8220;<span class="quote">script</span>&#8221;</span>
+            <code class="filename">clone_root</code></h5></div></div></div><p>Este es el modo más rápido de crear un sistema de
+          ficheros raíz, pero actulamente sólo se encuentra
+          soportado en FreeBSD 4.X.  El <span class="quote">&#8220;<span class="quote">script</span>&#8221;</span> de shell se
+	  encuentra en <code class="filename">/usr/share/examples/diskless/clone_root</code>
+	  y debe ser configurado al menos para ajustar el lugar donde se
+          construirá el sistema de ficheros (concretamente la
+          variable <code class="literal">DEST</code>).</p><p>Consulte los comentarios que se encuentran al comienzo del
+            <span class="quote">&#8220;<span class="quote">script</span>&#8221;</span> para conocer cuales son las instrucciones que
+            debe seguir.  Allí se explica cómo se construye el
+            sistema de ficheros base y como determinados ficheros se pueden
+            sobreescribir de manera selectiva por versiones
+            específicas para funcionar sin discos, para toda una subred
+            o para una máquina individual.  También allí
+            se muestran ejemplos de los ficheros
+	    <code class="filename">/etc/fstab</code> y
+            <code class="filename">/etc/rc.conf</code> para máquinas sin
+            disco.</p><p>Los archivos <code class="filename">README</code> que se encuentran
+	    dentro de <code class="filename">/usr/share/examples/diskless</code>
+            contienen mucha información de base, que junto con
+            el resto de ejemplos dentro del directorio
+            <code class="filename">diskless</code> sirven para documentar un
+            método de configuración distinto del que se
+            utiliza en <code class="filename">clone_root</code> y en los <span class="quote">&#8220;<span class="quote">
+	    scripts</span>&#8221;</span> del sistema de <code class="filename">/etc</code>, que resultan ser un tanto
+            confusos.  No obstante se pueden utilizar a modo de referencia,
+            excepto si se prefiere utilizar el método que se describe
+            en ellos, en cuyo caso se necesitará modificar y
+            adaptar los <span class="quote">&#8220;<span class="quote">scripts</span>&#8221;</span> de forma adecuada.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82893904"></a>29.7.2.7.2. Utilización del procedimiento estándar de
+            <code class="command">make world</code>
+	    </h5></div></div></div><p>Este método se puede utilizar tanto en
+            FreeBSD 4.X o 5.X y se instalará un sistema completamente
+            nuevo (no sólo el sistema de ficheros raíz) dentro de
+            <code class="envar">DESTDIR</code>.  Basta con ejecutar el siguiente <span class="quote">&#8220;<span class="quote">
+            script</span>&#8221;</span>:</p><pre class="programlisting">#!/bin/sh
+export DESTDIR=/data/misc/diskless
+mkdir -p ${DESTDIR}
+cd /usr/src; make world &amp;&amp; make kernel
+cd /usr/src/etc; make distribution</pre><p>Una vez ejecutado puede ser necesario ajustar los ficheros
+	    <code class="filename">/etc/rc.conf</code> y
+	    <code class="filename">/etc/fstab</code> que se encuentran en
+	    <code class="envar">DESTDIR</code> de acuerdo con nuestras necesidades.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82898512"></a>29.7.2.8. Configuración de la partición de
+          intercambio</h4></div></div></div><p>En caso de ser necesario se puede acceder a un fichero
+          de intercambio (swap) a través del sistema
+	  <acronym class="acronym">NFS</acronym>.  Uno de los métodos
+          típicamente utilizados para realizar esta tarea ha sido
+          retirado de la distribución 5.X.</p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82900048"></a>29.7.2.8.1. <acronym class="acronym">NFS</acronym> swap en sistemas FreeBSD 4.X</h5></div></div></div><p>La ubicación del fichero de intercambio y su
+            tamaño se puede especificar con las opciones
+	    FreeBSD-specific 128 y 129 de BOOTP/<acronym class="acronym">DHCP</acronym>.
+            A continuación se muestran varios ejemplos de ficheros de
+	    de configuración para <span class="application">
+	    ISC DHCP 3.0</span> o
+            <span class="application">bootpd</span>:</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Añadir las siguientes líneas al fichero
+                <code class="filename">dhcpd.conf</code>:</p><pre class="programlisting">
+# Global section
+option swap-path code 128 = string;
+option swap-size code 129 = integer 32;
+
+host margaux {
+  ... # Standard lines, see above
+  option swap-path <em class="replaceable"><code>"192.168.4.4:/netswapvolume/netswap"</code></em>;
+  option swap-size <em class="replaceable"><code>64000</code></em>;
+}
+	    </pre><p><code class="literal">swap-path</code> es la ruta al directorio donde
+              se instalarán los archivos de intercambio.  Cada
+              Cada fichero se denomina
+                <code class="filename">swap.direccion-ip-del-cliente</code>.</p><p>Versiones más antiguas de
+              <span class="application">dhcpd</span> usaban una sintáxis del
+	      estilo de <code class="literal">option option-128 "...</code>, lo cual ya
+	      no está soportado.</p><p><code class="filename">/etc/bootptab</code> normalmente
+                utiliza la siguiente sintaxis:</p><pre class="programlisting">T128="192.168.4.4:/netswapvolume/netswap":T129=0000fa00</pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">El tamaño del fichero dedicado a intercambio
+	            se debe expresar en <code class="filename">/etc/bootptab</code>
+		    en formato hexadecimal.</p></div></li><li class="step"><p>En el servidor de ficheros <acronym class="acronym">NFS</acronym>
+                donde va a residir el fichero de <span class="quote">&#8220;<span class="quote">swap</span>&#8221;</span> se debe(n)
+		crear dicho(s) fichero(s)</p><pre class="screen">
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir /volumenintercambiored/intercambiored</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /volumenintercambiored/intercambiored</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/zero bs=1024 count=64000 of=swap.192.168.4.6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 0600 swap.192.168.4.6</code></strong>
+            </pre><p><em class="replaceable"><code>192.168.4.6</code></em> es la dirección IP del cliente sin disco.</p></li><li class="step"><p>En el servidor <acronym class="acronym">NFS</acronym> añadir a
+                <code class="filename">/etc/exports</code> la siguiente línea:
+                </p><pre class="programlisting">
+<em class="replaceable"><code>/volumenintercambiored</code></em>  -maproot=0:10 -alldirs <em class="replaceable"><code>margaux corbieres</code></em>
+	    </pre><p>A continuación indicar a
+                <span class="application">mountd</span> que vuelva a leer el fichero
+                <code class="filename">/etc/exports</code> como se ha indicado
+                anteriormente.</p></li></ol></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82923216"></a>29.7.2.8.2. <acronym class="acronym">NFS</acronym> swap en FreeBSD 5.X</h5></div></div></div><p>El núcleo no soporta la activación del
+            intercambio a través de <acronym class="acronym">NFS</acronym> en tiempo de
+            arranque.  De esta forma la <span class="quote">&#8220;<span class="quote">swap</span>&#8221;</span> se debe activar
+	    mediante los <span class="quote">&#8220;<span class="quote">scripts</span>&#8221;</span> montando un sistema de ficheros
+            de lectura-escritura y creando y activando el fichero de
+            intercambio.  Para crear un fichero de intercambio de un
+            determinado tamaño se puede ejecutar lo siguiente:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/zero of=/ruta/al/fichero/de/intercambio bs=1k count=1 oseek=100000</code></strong></pre><p>Para activar el intercambio se tiene que añadir
+            la siguiente línea al fichero de configuración
+	    <code class="filename">rc.conf</code>:</p><pre class="programlisting">swapfile=<em class="replaceable"><code>/ruta/al/fichero/de/intercambio</code></em></pre></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82932432"></a>29.7.2.9. Varios</h4></div></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82933072"></a>29.7.2.9.1. Ejecución con un <code class="filename">/usr</code> de
+            sólo lectura</h5></div></div></div><a id="idp82934096" class="indexterm"></a><p>Si la estación de trabajo sin disco se configura para
+            utilizar el sistema X-Window se tiene que ajustar el fichero de
+            configuración de xdm debido a que dicho fichero
+            sitúa por defecto el fichero de <span class="quote">&#8220;<span class="quote">logs</span>&#8221;</span> de
+            errores en el directorio <code class="filename">/usr</code>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82940752"></a>29.7.2.9.2. Uso de un servidor no-FreeBSD</h5></div></div></div><p>Cuando el servidor del sistema de ficheros raíz no
+            ejecuta FreeBSD se tiene que crear un sistema de ficheros
+            raíz sobre una máquina FreeBSD para después
+            copiarlo al servidor original mediante las órdenes
+	    <code class="command">tar</code> o <code class="command">cpio</code>.</p><p>En esta situación algunas veces surgen varios
+            problemas relacionados con los dispositivos especiales que
+            se encuentran en el directorio
+            <code class="filename">/dev</code> debido a los diferentes
+            tamaños de los enteros mayor/menor.  Una solución
+            para este problema consiste en exportar un directorio del servidor
+            no-FreeBSD, montar este directorio en la máquina FreeBSD anterior
+            y ejecutar <code class="command">MAKEDEV</code> en dicha máquina para
+            crear las entradas de dispositivo correctas (FreeBSD 5.0 y
+            posteriores utilizan <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs</span>(5)</span></a> para ubicar nodos de
+            dispositivos de forma transparente para el usuario de tal modo que
+            la ejecución de <code class="command">MAKEDEV</code>  en estos
+            sistemas no sirve para nada).</p></div></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-nfs.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="network-isdn.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">29.6. NFS </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> 29.8. RDSI</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

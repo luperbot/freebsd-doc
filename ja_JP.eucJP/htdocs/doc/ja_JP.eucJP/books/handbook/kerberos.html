@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>15.6. Kerberos</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD ハンドブック" /><link rel="up" href="security.html" title="第15章 セキュリティ" /><link rel="prev" href="skey.html" title="15.5. S/Key" /><link rel="next" href="firewalls.html" title="15.7. ファイアウォール" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.6. Kerberos</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="skey.html">戻る</a>〓</td><th width="60%" align="center">第15章 セキュリティ</th><td width="20%" align="right">〓<a accesskey="n" href="firewalls.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kerberos"></a>15.6. Kerberos</h2></div><div><span class="authorgroup">寄稿: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Murray</span> <span class="firstname">Mark</span> [FAMILY Given]</span>. </span></div><div><span class="authorgroup">基にした文書の執筆: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Dapoz</span> <span class="firstname">Mark</span> [FAMILY Given]</span>. </span></div></div></div><a id="idp90061264" class="indexterm"></a><p><span class="emphasis"><em>訳: 有村 光晴 <code class="email">&lt;<a xmlns="" class="email" href="mailto:arimura@jp.FreeBSD.org">arimura@jp.FreeBSD.org</a>&gt;</code>.</em></span></p><p>Kerberosは、
+      サーバのサービスによってユーザが安全に認証を受けられる
+      ようにするための、ネットワークの付加システム及びプロトコルです。
+      リモートログイン、リモートコピー、
+      システム間での安全なファイルのコピ
+      ーやその他のリスクの高い仕事がかなり安全に、
+      そしてこれまでより制御 できるようになります。</p><p>以下の文章は、
+      FreeBSD用として配布されているKerberosをセットアップ
+      する際のガイドとして読むことができます。しかし、
+      完全な説明が必要な場合には、マニュアルページを読んだ方がよい
+      でしょう。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90063440"></a>15.6.1. Kerberos のインストール</h3></div></div></div><a id="idp90064080" class="indexterm"></a><a id="idp90064592" class="indexterm"></a><p>Kerberos は選択が任意な FreeBSD のコンポーネントです。
+	もっとも簡単なインストール方法は、FreeBSD
+	のインストール時に <span class="application">sysinstall</span>
+	で 'krb4' または 'krb5' 配布物を選択することです。
+	そうすると、Kerberos の 'eBones' (KerberosIV) または
+	'Heimdal' (Kerberos5) 実装がインストールされます。
+	これらの実装が入っているのは、
+	これがアメリカ合衆国およびカナダの外で開発されたものであるため、
+	アメリカ合衆国からの暗号ソフトウェアの輸出が制限されていた時代でも
+	アメリカ合衆国およびカナダ以外の国に住んでいるシステム所有者の手に入るものだったからです。</p><p>ほかに、MIT で実装された Kerberos が Ports Collection
+	の <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/krb5/pkg-descr">security/krb5</a>
+	から利用できます。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90092112"></a>15.6.2. 初期データベースの作成</h3></div></div></div><p>この作業はKerberosサーバだけでおこないます。まず、
+	古いKerberosの データベースが存在しないことを確認してください。
+	ディレクトリ<code class="filename">/etc/kerberosIV</code>に移って、
+	次のファイルだけが 存在することをチェックします。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/kerberosIV</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ls</code></strong>
+README          krb.conf        krb.realms</pre><p>もし他のファイル (<code class="filename">principal.*</code> や
+	<code class="filename">master_key</code>) が 存在する場合には、
+	<code class="command">kdb_destroy</code>というコマンドで古い
+	Kerberosデータベースを消してください。
+	Kerberosが走っていなければ、
+	単に余計なファイルを消せばよいです。</p><p>まず、<code class="filename">krb.conf</code> と
+	<code class="filename">krb.realms</code>を編集してKerberosの 管理領域
+	(realm) を定義してください。
+	ここでは管理領域が <code class="filename">EXAMPLE.COM</code>
+	で、サーバ名が <code class="systemitem">grunt.example.com</code>
+	であるとします。
+	<code class="filename">krb.conf</code>
+	というファイルを次のように編集してください。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat krb.conf</code></strong>
+EXAMPLE.COM
+EXAMPLE.COM grunt.example.com admin server
+CS.BERKELEY.EDU okeeffe.berkeley.edu
+ATHENA.MIT.EDU kerberos.mit.edu
+ATHENA.MIT.EDU kerberos-1.mit.edu
+ATHENA.MIT.EDU kerberos-2.mit.edu
+ATHENA.MIT.EDU kerberos-3.mit.edu
+LCS.MIT.EDU kerberos.lcs.mit.edu
+TELECOM.MIT.EDU bitsy.mit.edu
+ARC.NASA.GOV trident.arc.nasa.gov</pre><p>この例にあるような他の管理領域は、実際には必要ありません。
+	この例は複数の管理領域を認識する方法を示したものですので、
+	これらの行は含めなくても結構です。</p><p>1行目はこのシステムが動いている管理領域の名前です。
+	他の行は管理領域とホスト名のエントリです。
+	行の1つめの単語が管理領域で、2つめがその管理領域の中で
+	<span class="quote">「<span class="quote">鍵配布センター</span>」</span>(Key Distribution Center)
+	として働くホスト名です。ホスト名の次に <code class="literal">admin
+	server</code> と書いてある場合には、そのホストが
+	管理データベースサーバ (Administrative Database Server)
+	も提供することを意味します。
+	これらの単語について詳しく知りたい場合には Kerberos
+	のマニュアルページをご覧ください。</p><p>ここで、<code class="filename">EXAMPLE.COM</code> という管理領域に
+	<code class="systemitem">grunt.example.com</code>
+	およびその他の <code class="systemitem">.example.com</code>
+	ドメインのすべてのホストを追加しなければなりません。
+	<code class="filename">krb.realms</code> は次のようになります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat krb.realms</code></strong>
+grunt.example.com EXAMPLE.COM
+.example.com EXAMPLE.COM
+.berkeley.edu CS.BERKELEY.EDU
+.MIT.EDU ATHENA.MIT.EDU
+.mit.edu ATHENA.MIT.EDU</pre><p>もう一度注意しますが、他の管理領域を書く必要はありません。
+	これらは複数の管理領域を認識できるようにマシンを設定する方法を
+	示した例ですので、これらの行は消して構いません。</p><p>1行目は名前をつけた管理領域に <span class="emphasis"><em>特定の</em></span>
+	システムを含めるための ものです。
+	残りの行は名前をつけた管理領域にサブドメインのデフォルトの
+	システムを含めるためのものです。</p><p>これでデータベースを作成する準備ができました。
+	この操作はKerberos サーバ (鍵配布センター) を起動するだけです。
+	<code class="command">kdb_init</code>コ
+	マンドを次のように実行してください。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_init</code></strong>
+<code class="prompt">Realm name [default  ATHENA.MIT.EDU ]:</code> <strong class="userinput"><code>EXAMPLE.COM</code></strong>
+You will be prompted for the database Master Password.
+It is important that you NOT FORGET this password.
+
+<code class="prompt">Enter Kerberos master key:</code> </pre><p>ここで鍵を保存して、
+	ローカルのマシンにあるサーバが取り出せるように します。
+	それには<code class="command">kstash</code>コマンドを使用します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kstash</code></strong>
+
+<code class="prompt">Enter Kerberos master key: </code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!</pre><p>これで暗号化されたマスタパスワードが
+	<code class="filename">/etc/kerberosIV/master_key</code>
+	に保存されました。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90116560"></a>15.6.3. すべてが動くようにするための設定</h3></div></div></div><p>Kerberosを導入する <span class="emphasis"><em>それぞれの</em></span>
+	システムのデータベースに、2つ のprincipal (主体名)
+	を追加する必要があります。その名前は
+	<code class="literal">kpasswd</code>と<code class="literal">rcmd</code>です。
+	これら2つのprincipalは、個々 のシステムにおいて、
+	システム名と同じ名前のインスタンスと組にして作成
+	されます。</p><p>これらの <code class="command">kpasswd</code> と
+	<code class="command">rcmd</code> というデーモンによって、他の
+	システムからKerberosのパスワードを変更したり、
+	<code class="command">rcp</code>や <code class="command">rlogin</code>,
+	<code class="command">rsh</code>といったコマンドを実行したりできるよ
+	うになります。</p><p>それでは実際にこれらのエントリを追加しましょう。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_edit</code></strong>
+Opening database...
+
+<code class="prompt">Enter Kerberos master key: </code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Previous or default values are in [brackets] ,
+enter return to leave the same, or new value.
+
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>passwd</code></strong>
+<code class="prompt">Instance:</code> <strong class="userinput"><code>grunt</code></strong>
+
+&lt;Not found&gt;, <code class="prompt">Create [y] ?</code> <strong class="userinput"><code>y</code></strong>
+
+Principal: passwd, Instance: grunt, kdc_key_ver: 1
+<code class="prompt">New Password:</code>                    &lt;---- ここは「RANDOM」と入力してください
+Verifying password
+
+<code class="prompt">New Password:</code>                    &lt;---- ここは「RANDOM」と入力してください
+
+<code class="prompt">Random password [y] ?</code> <strong class="userinput"><code>y</code></strong>
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ? </code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ? </code>
+<code class="prompt">Attributes [ 0 ] ? </code>
+Edit O.K.
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>rcmd</code></strong>
+<code class="prompt">Instance:</code> <strong class="userinput"><code>grunt</code></strong>
+
+&lt;Not found&gt;, <code class="prompt">Create [y] ?</code>
+
+Principal: rcmd, Instance: grunt, kdc_key_ver: 1
+<code class="prompt">New Password:</code>                    &lt;---- ここは「RANDOM」と入力してください
+Verifying password
+
+<code class="prompt">New Password:</code>                    &lt;---- ここは「RANDOM」と入力してください
+
+<code class="prompt">Random password [y] ? </code>
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ? </code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ? </code>
+<code class="prompt">Attributes [ 0 ] ? </code>
+Edit O.K.
+<code class="prompt">Principal name:</code>                  &lt;---- 何も入力しないと終了します</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90136912"></a>15.6.4. サーバファイルの作成</h3></div></div></div><p>次に、各マシンにおけるサービスを定義している、
+	すべてのインスタンスを展開します。
+	これには <code class="command">ext_srvtab</code> というコマンドを使用します。
+	このコマンドで作成されるファイルは、Kerberos
+	の各クライアントの <code class="filename">/etc/kerberosIV</code>
+	ディレクトリに<span class="emphasis"><em>安全な方法で</em></span>
+	コピーまたは移動する必要があります。
+	このファイルはそれぞれのサーバとクライアントに存在しなければならず、
+	また Kerberos の運用において重要なものです。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ext_srvtab grunt</code></strong>
+
+<code class="prompt">Enter Kerberos master key: </code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Generating 'grunt-new-srvtab'....</pre><p>このコマンドは一時的なファイルを作成するだけです。
+	ファイル名をすべ てのサーバが読めるような
+	<code class="filename">srvtab</code> という名前に変更しな
+	ければなりません。
+	<code class="command">mv</code>コマンドを用いてシステムの場所に移動
+	してください。</p><pre class="screen"><code class="prompt">#</code> mv grunt-new-srvtab srvtab</pre><p>そのファイルがクライアントに配るためのもので、
+	ネットワークが安全で はないと思われる場合には、<code class="filename">
+	  client-new-srvtab</code>
+	を移動
+	可能なメディアにコピーして物理的に安全な方法で運んでください。
+	クラ
+	イアントの<code class="filename">/etc/kerberosIV</code>ディレクトリで、
+	名前を <code class="filename">srvtab</code>に変更し、
+	modeを600にするのを忘れないでください。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mv grumble-new-srvtab srvtab</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 600 srvtab</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90149968"></a>15.6.5. データベースへのユーザの追加</h3></div></div></div><p>ここで、
+	ユーザのエントリをデータベースに追加する必要があります。
+	始めに、
+	ユーザ<code class="systemitem">jane</code>のエントリを作成してみましょう。
+	<code class="command">kdb_edit</code>
+	を用いて次のように作成してください。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_edit</code></strong>
+Opening database...
+
+<code class="prompt">Enter Kerberos master key: </code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Previous or default values are in [brackets] ,
+enter return to leave the same, or new value.
+
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>jane</code></strong>
+<code class="prompt">Instance:</code>
+
+&lt;Not found&gt;, <code class="prompt">Create [y] ?</code> <strong class="userinput"><code>y</code></strong>
+
+Principal: jane, Instance: , kdc_key_ver: 1
+<code class="prompt">New Password:</code>                    &lt;---- 安全なパスワードを入れてください
+Verifying password
+
+<code class="prompt">New Password:</code>                    &lt;---- もう一度パスワードを入れてください
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ? </code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ? </code>
+<code class="prompt">Attributes [ 0 ] ? </code>
+Edit O.K.
+<code class="prompt">Principal name:</code>                  &lt;---- 何も入力しないと終了します</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90158032"></a>15.6.6. すべてのテスト</h3></div></div></div><p>まず始めにKerberosデーモンを起動する必要があります。
+	<code class="filename">/etc/rc.conf</code>
+	ファイルを正しく編集してあれば、マシンを再
+	起動することでに自動的にデーモンが起動します。
+	これはKerberosサー バでのみ必要です。
+	Kerberosクライアントは<code class="filename">/etc/kerberosIV</code>か
+	ら必要なものを自動的に入手します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kerberos &amp;</code></strong>
+Kerberos server starting
+Sleep forever on error
+Log file is /var/log/kerberos.log
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+
+Current Kerberos master key version is 1
+Local realm: EXAMPLE.COM
+<code class="prompt">#</code> <strong class="userinput"><code>kadmind -n &amp;</code></strong>
+KADM Server KADM0.0A initializing
+Please do not use 'kill -9' to kill this job, use a
+regular kill instead
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!</pre><p>さあ、これで上で作成した <code class="systemitem">jane</code>
+	というIDのチケットを
+	<code class="command">kinit</code>コマンドで得ることができます。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kinit jane</code></strong>
+MIT Project Athena (grunt.example.com)
+Kerberos Initialization for "jane"
+<code class="prompt">Password:</code> </pre><p><code class="command">klist</code> コマンドを用いてトークンを見て、
+	きちんとチケットを持って いるかどうか確認してください。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>klist</code></strong>
+Ticket file:    /tmp/tkt245
+Principal:      jane@EXAMPLE.COM
+
+  Issued           Expires          Principal
+Apr 30 11:23:22  Apr 30 19:23:22  krbtgt.EXAMPLE.COM@EXAMPLE.COM</pre><p><code class="command">passwd</code>
+	コマンドを用いてパスワードを変更して、
+	<span class="application">kpasswd</span> デーモンが Kerberos
+	データベースに対して認証されるかどうかチェックして
+	ください。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>passwd</code></strong>
+realm EXAMPLE.COM
+<code class="prompt">Old password for jane:</code>
+<code class="prompt">New Password for jane:</code>
+Verifying password
+<code class="prompt">New Password for jane:</code>
+Password changed.</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90169552"></a>15.6.7. <code class="command">su</code> 特権の追加</h3></div></div></div><p>Kerberos は <code class="systemitem">root</code> 権限が必要な
+	<span class="emphasis"><em>各</em></span> ユーザに対し、
+	<code class="command">su</code> コマンドのパスワードをユーザ毎に
+	<span class="emphasis"><em>別のもの</em></span> として持つことを可能にします。
+	<code class="systemitem">root</code> に <code class="command">su</code>
+	できる権利を与えられた id を追加します。これは、
+	principal に付いている <code class="systemitem">root</code>
+	というインスタンスに よって制御されています。
+	<code class="command">kdb_edit</code>を用いて
+	<code class="literal">jane.root</code>というエントリを
+	Kerberosデータベースに作成します。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kdb_edit</code></strong>
+Opening database...
+
+<code class="prompt">Enter Kerberos master key: </code>
+
+Current Kerberos master key version is 1.
+
+Master key entered.  BEWARE!
+Previous or default values are in [brackets] ,
+enter return to leave the same, or new value.
+
+<code class="prompt">Principal name:</code> <strong class="userinput"><code>jane</code></strong>
+<code class="prompt">Instance:</code> <strong class="userinput"><code>root</code></strong>
+
+&lt;Not found&gt;, Create [y] ? y
+
+Principal: jane, Instance: root, kdc_key_ver: 1
+<code class="prompt">New Password:</code>                    &lt;---- 安全なパスワードを入れます
+Verifying password
+
+<code class="prompt">New Password:</code>                    &lt;---- もう一回パスワードを入れます
+
+Principal's new key version = 1
+<code class="prompt">Expiration date (enter yyyy-mm-dd) [ 2000-01-01 ] ? </code>
+<code class="prompt">Max ticket lifetime (*5 minutes) [ 255 ] ?</code> <strong class="userinput"><code>12</code></strong> &lt;--- ここは短くしてください
+<code class="prompt">Attributes [ 0 ] ? </code>
+Edit O.K.
+<code class="prompt">Principal name:</code>                  &lt;---- 何も入力しないと終了します</pre><p>実際にトークンをもらって、
+	ちゃんと働いているかどうか確認しましょう。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kinit jane.root</code></strong>
+MIT Project Athena (grunt.example.com)
+Kerberos Initialization for "jane.root"
+<code class="prompt">Password: </code></pre><p>ここで <code class="systemitem">root</code> ユーザの
+	<code class="filename">.klogin</code>
+	ファイルにユーザを追加する必要があります。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat /root/.klogin</code></strong>
+jane.root@EXAMPLE.COM</pre><p><code class="command">su</code> してみましょう。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su</code></strong>
+<code class="prompt">Password: </code></pre><p>どのトークンを持っているか見てみましょう。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>klist</code></strong>
+Ticket file:	/tmp/tkt_root_245
+Principal:      jane.root@EXAMPLE.COM
+
+  Issued           Expires          Principal
+May  2 20:43:12  May  3 04:43:12  krbtgt.EXAMPLE.COM@EXAMPLE.COM</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp90196304"></a>15.6.8. 他のコマンドの使用</h3></div></div></div><p>ここまでの例では、<code class="literal">jane</code> という principal
+	を <code class="literal">root</code> とい
+	うインスタンス付きで作成しました。
+	これはユーザと同じ名前をprincipalと しており、
+	Kerberosのデフォルトの値です;
+	<code class="literal">&lt;username&gt;.</code><code class="systemitem">root</code>
+	という形式の
+	<code class="literal">&lt;principal&gt;.&lt;instance&gt;</code>で、
+	必要なエントリが <code class="systemitem">root</code> のホームディレクトリの
+	<code class="filename">.klogin</code> ファイルにあれば、
+	<code class="literal">&lt;username&gt;</code> が
+	<code class="systemitem">root</code> に
+	<code class="command">su</code> できます。</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat /root/.klogin</code></strong>
+jane.root@EXAMPLE.COM</pre><p>同様に、ユーザのホームディレクトリの
+	<code class="filename">.klogin</code>ファイルに次の
+	ような行がある場合には</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cat ~/.klogin</code></strong>
+jane@EXAMPLE.COM
+jack@EXAMPLE.COM</pre><p><code class="systemitem">jane</code> または <code class="systemitem">jack</code>
+	という名前で (前述の<code class="command">kinit</code> によって)
+	認証されている <code class="filename">EXAMPLE.COM</code>
+	という管理領域のユーザ なら誰でも<code class="command">rlogin</code> や
+	<code class="command">rsh</code>, <code class="command">rcp</code>等によってこ
+	のシステム (<code class="systemitem">grunt</code>)
+	の<code class="systemitem">jane</code>のアカウントまたはファ
+	イルにアクセスできます。</p><p>たとえば、<code class="systemitem">jane</code> が他のシステムに
+	Kerberos を用いて login します。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kinit</code></strong>
+MIT Project Athena (grunt.example.com)
+<code class="prompt">Password: </code>
+<code class="prompt">%</code> <strong class="userinput"><code>rlogin grunt</code></strong>
+Last login: Mon May  1 21:14:47 from grumble
+Copyright (c) 1980, 1983, 1986, 1988, 1990, 1991, 1993, 1994
+	The Regents of the University of California.   All rights reserved.
+
+FreeBSD BUILT-19950429 (GR386) #0: Sat Apr 29 17:50:09 SAT 1995</pre><p>次の例では、Jack が同じマシンの Jane
+	のアカウントに login します。<code class="systemitem">jane</code> は
+	<code class="filename">.klogin</code> ファイルを前述のように設定しており、
+	Kerberos では <span class="emphasis"><em>jack</em></span> という principal
+	をインスタンスなしで設定してあります。</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>kinit</code></strong>
+<code class="prompt">%</code> <strong class="userinput"><code>rlogin grunt -l jane</code></strong>
+MIT Project Athena (grunt.example.com)
+<code class="prompt">Password: </code>
+Last login: Mon May  1 21:16:55 from grumble
+Copyright (c) 1980, 1983, 1986, 1988, 1990, 1991, 1993, 1994
+	The Regents of the University of California.   All rights reserved.
+
+FreeBSD BUILT-19950429 (GR386) #0: Sat Apr 29 17:50:09 SAT 1995</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="skey.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="security.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="firewalls.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">15.5. S/Key〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓15.7. ファイアウォール</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

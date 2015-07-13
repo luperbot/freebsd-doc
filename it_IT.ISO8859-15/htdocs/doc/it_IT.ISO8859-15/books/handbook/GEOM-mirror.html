@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>19.4. RAID1 - Mirroring</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="GEOM.html" title="Capitolo 19. GEOM: Framework modulare per la trasformazione del disco" /><link rel="prev" href="GEOM-striping.html" title="19.3. RAID0 - Striping" /><link rel="next" href="vinum-vinum.html" title="Capitolo 20. Il Gestore di Volumi Vinum" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.4. RAID1 - Mirroring</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-striping.html">Indietro</a> </td><th width="60%" align="center">Capitolo 19. GEOM: Framework modulare per la trasformazione del disco</th><td width="20%" align="right"> <a accesskey="n" href="vinum-vinum.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-mirror"></a>19.4. RAID1 - Mirroring</h2></div></div></div><a id="idp84933840" class="indexterm"></a><a id="idp84934608" class="indexterm"></a><p>Il mirroring è una tecnologia utilizzata da molte aziende e
+      utenti casalinghi per il salvataggio dei dati senza interruzioni.
+      La presenza di un "mirror" significa semplicemente che il disco B replica
+      il disco A;oppure che i dischi C e D replicano i dischi A e B.
+      Indipendentemente dalla configurazione del disco, l'aspetto importante
+      è che le informazioni presenti su un disco o una partizione sono
+      letteralmente "replicati".  Successivamente queste informazioni possono
+      essere facilmente ripristinate,salvate senza che si verifichino
+      disservizi o interruzioni nel loro accesso e, addirittura, conservate
+      fisicamente in cassaforte.</p><p>Per cominciare assicurati che il sistema disponga di due dischi di
+      identica capacità.  Questo esercizio si riferisce a dischi
+      <acronym class="acronym">SCSI</acronym>ad accesso diretto (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=da&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">da</span>(4)</span></a>),</p><p>Comincia installando FreeBSD sul primo disco creando solamente due
+      partizioni.  Una dovrebbe essere una partizione di swap, pari al doppio
+      della <acronym class="acronym">RAM</acronym> presente nel sistema e il resto dello spazio
+      dedicato al filesystem di root (<code class="filename">/</code>).
+      È possibile creare partizioni separate per gli altri mount points,
+      aumentando parecchio la difficoltà di realizzazione del progetto;
+      questo è dovuto alla necessità di alterare manualmente i
+      settaggi di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a> e <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fdisk&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fdisk</span>(8)</span></a>.</p><p>Riavvia e aspetta che il sistema sia completamente attivo.
+      Non appena il boot è completato effettua il login come
+      <code class="systemitem">root</code>.</p><p>Crea il device <code class="filename">/dev/mirror/gm</code> e fai un link
+      dello stesso a <code class="filename">/dev/da1</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror label -vnb round-robin gm0 /dev/da1</code></strong></pre><p>Il sistema dovrebbe rispondere con:</p><pre class="screen">Metadata value stored on /dev/da1.
+Done.</pre><p>Avvia GEOM,questa procedura caricherà nel kernel il modulo
+      <code class="filename">/boot/kernel/geom_mirror.ko</code></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror load</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Questo comando dovrebbe ora avere creato i nodi di
+        device<code class="filename">gm0</code>,<code class="filename">gm0s1</code>,
+	<code class="filename">gm0s1a</code> e <code class="filename">gm0s1c</code> nella
+	directory <code class="filename">/dev/mirror</code>.</p></div><p>Crea una label generica e un codice di boot nel device
+      <code class="filename">gm0</code> appena creato utilizzando il comando
+      <code class="command">fdisk</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fdisk -vBI /dev/mirror/gm0</code></strong></pre><p>Ora crea una label di informazioni generica con
+      <code class="command">bsdlabel</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/mirror/gm0s1</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Se sono presenti più slices e partizioni, i flags dei due
+        comandi precedenti richiederanno delle modifiche.  Queste modifiche
+        devono combaciare con la grandezza delle slices e delle partizioni
+        dell'altro disco.</p></div><p>Utilizza l'utility <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> per creare un filesystem di default
+      sul nodo di device<code class="filename">gm0s1a</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/mirror/gm0s1a</code></strong></pre><p>Questo dovrebbe causare la visualizzazione di un bel pò di
+      numeri e informazioni varie da parte del sistema.  È corretto.
+      Esamina bene lo schermo per vedere se ci sono messaggi di errore e monta
+      il device in <code class="filename">/mnt</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/mirror/gm0s1a /mnt</code></strong></pre><p>Ora sposta tutti i dati presenti sul tuo disco di boot nel nuovo
+      filesystem.  Questo esempio usa i comandi <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a> e <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=restore&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">restore</span>(8)</span></a>
+      comunque anche <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dd&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">dd</span>(1)</span></a> dovrebbe funzionare nel contesto che stiamo
+      trattando.  Evita di utilizzare <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tar&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tar</span>(1)</span></a> dal momento che non copia il
+      codice di boot.  In caso contrario il fallimento è
+      garantito.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dump -L -0 -f- / |(cd /mnt &amp;&amp; restore -r -v -f-)</code></strong></pre><p>Questo deve essere fatto per ciascun filesystem.  Disponi
+      semplicemente il filesystem appropriato nella posizione corretta quando
+      digiti il suddetto comando.</p><p>Ora edita il file <code class="filename">/mnt/etc/fstab</code> "replicato" e
+      rimuovi,o commenta (#) la riga relativa al file di swap.
+      <a href="#ftn.idp84970704" class="footnote" id="idp84970704"><sup class="footnote">[8]</sup></a>
+      Per utilizzare il nuovo disco cambia le altre informazioni di filesystem.
+      Dai un' occhiata al seguente esempio:</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+#/dev/da0s2b             none            swap    sw              0       0
+/dev/mirror/gm0s1a       /               ufs     rw              1       1
+    </pre><p>Ora crea un file <code class="filename">boot.conf</code> in entrambe le
+      partizioni di root; quella corrente e quella nuova.  Questo file
+      aiuterà il <acronym class="acronym">BIOS</acronym> di sistema ad effettuare il
+      boot dal drive corretto.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "1:da(1,a)/boot/loader" &gt; /boot.config</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo "1:da(1,a)/boot/loader" &gt; /mnt/boot.config</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Nota: </h3><p xmlns="http://www.w3.org/1999/xhtml">Lo abbiamo inserito in entrambe le partizioni di root per
+         assicurarci un boot corretto.  Se per qualche ragione il sistema non
+         potesse leggere la nuova partizione di root, è disponibile una
+         procedura di recupero.</p></div><p>Adesso aggiungi la seguente linea al nuovo file
+      <code class="filename">/boot/loader.conf</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_mirror_load="YES"' &gt;&gt; /mnt/boot/loader.conf</code></strong></pre><p>Questo indicherà a  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a> come caricare il modulo
+      <code class="filename">geom_mirror.ko</code> durante l'inizializzazione del
+      sistema.</p><p>Riavvia il sistema:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown -r now</code></strong></pre><p>Se tutto è andato liscio il sistema dovrebbe aver effettuato
+      il boot di device<code class="filename">gm0s1a</code> e il prompt di
+      <code class="command">login</code> dovrebbe essere in attesa.  Se qualcosa è
+      andato storto fai riferimento alla sezione successiva "risoluzione dei
+      problemi".  Ora aggiungi al disco<code class="filename">da0</code> al device
+      <code class="filename">gm0</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror configure -a gm0</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da0</code></strong></pre><p>Il flag <code class="option">-a</code> dice a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a> di usare la
+      sincronizzazione automatica; ovvero mirrorare
+      automaticamente le scritture sul disco.  La manpage descrive come
+      ricostruire o rimpiazzare i dischi, utilizzando
+      <code class="filename">data</code> al posto di
+      <code class="filename">gm0</code>.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84995408"></a>19.4.1. Risoluzione dei problemi</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84996048"></a>19.4.1.1. Il sistema non effettua il boot</h4></div></div></div><p>Se al boot il sistema mostra un prompt simile a questo:</p><pre class="programlisting">ffs_mountroot: can't find rootvp
+Root mount failed: 6 mountroot&gt;
+</pre><p>Riavvia la macchina utilizzando il tasto di reset o il pulsante
+          di accensione.  Arrivato al menu del boot, scegli l'opzione sei (6).
+          Questo forzerà il sistema al prompt di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>.
+          Carica manualmente il modulo del kernel:</p><pre class="screen">OK? <strong class="userinput"><code>load geom_mirror.ko</code></strong>
+OK? <strong class="userinput"><code>boot</code></strong></pre><p>Se funziona significa che per qualche ragione il modulo non era
+          stato caricato correttamente.  Inserisci:</p><pre class="programlisting">options	GEOM_MIRROR</pre><p>nel file di configurazione del kernek,ricompilalo e reinstallalo.
+          Questo dovrebbe risolvere il problema.</p></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp84970704" class="footnote"><p><a href="#idp84970704" class="para"><sup class="para">[8] </sup></a>È opportuno chiarire che commentando la riga relativa
+          allo swap nel file <code class="filename">fstab</code> ti sarà chiesto
+          di ristabilire in un' altra maniera l'utilizzo dello spazio di
+          swapping. Per maggiori informazioni a riguardo fai riferimento a
+          <a class="xref" href="adding-swap-space.html" title="11.14. Aggiunta di Spazio di Swap">Sezione 11.14, «Aggiunta di Spazio di Swap»</a>, grazie.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-striping.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-vinum.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">19.3. RAID0 - Striping </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> Capitolo 20. Il Gestore di Volumi Vinum</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

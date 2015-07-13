@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>6.25. Запуск и остановка служб (сценарии rc)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD по созданию портов" /><link rel="up" href="special.html" title="Глава 6. Особые соглашения" /><link rel="prev" href="using-databases.html" title="6.24. Использование баз данных" /><link rel="next" href="users-and-groups.html" title="6.26. Добавление пользователей и групп" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6.25. Запуск и остановка служб (сценарии
+      <code class="literal">rc</code>)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="using-databases.html">Пред.</a> </td><th width="60%" align="center">Глава 6. Особые соглашения</th><td width="20%" align="right"> <a accesskey="n" href="users-and-groups.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rc-scripts"></a>6.25. Запуск и остановка служб (сценарии
+      <code class="literal">rc</code>)</h2></div></div></div><p>Сценарии <code class="filename">rc.d</code> используются для запуска
+      служб при запуске системы и дают администратору стандартный
+      способ остановки, запуска и перезапуска службы.  Порты
+      интегрируются в системную инфраструктуру
+      <code class="filename">rc.d</code>.  Подробности по её использованию
+      можно найти в <a class="link" href="../../../../doc/ru_RU.KOI8-R/books/handbook/configtuning-rcd.html" target="_top">главе
+	rc.d Руководства</a>.  Подробное объяснение доступных
+      команд находится в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc</span>(8)</span></a> и <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>.  Наконец, есть
+      <a class="link" href="../../../../doc/ru_RU.KOI8-R/articles/rc-scripting" target="_top">статья</a>о
+      практических аспектах написания сценариев
+      <code class="filename">rc.d</code>.</p><p>Установить можно один или более сценариев
+      <code class="filename">rc.d</code>:</p><pre class="programlisting">USE_RC_SUBR=	doormand</pre><p>Сценарии обязаны размещаться в подкаталоге
+      <code class="filename">files</code> с обязательным добавлением суффикса
+      <code class="literal">.in</code> к имени файла.  Для этого файла будут
+      использоваться стандартные расширения
+      <code class="varname">SUB_LIST</code>.  Также особенно приветствуется
+      использование расширений <code class="literal">%%PREFIX%%</code> и
+      <code class="literal">%%LOCALBASE%%</code>.  Подробнее о
+      <code class="varname">SUB_LIST</code> в <a class="link" href="using-sub-files.html" title="8.5. Использование SUB_FILES и SUB_LIST">соответствующей
+	главе</a>.</p><p>Начиная с FreeBSD 6.1-RELEASE локальные сценарии
+      <code class="filename">rc.d</code> (включая установленные из портов)
+      включены в общий <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> основной системы.</p><p>Пример простого сценария <code class="filename">rc.d</code>:</p><pre class="programlisting">#!/bin/sh
+
+# $FreeBSD$
+#
+# PROVIDE: doormand
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf.local or /etc/rc.conf
+# to enable this service:
+#
+# doormand_enable (bool):	Set to NO by default.
+#				Set it to YES to enable doorman.
+# doormand_config (path):	Set to %%PREFIX%%/etc/doormand/doormand.cf
+#				by default.
+
+. /etc/rc.subr
+
+name=doormand
+rcvar=doormand_enable
+
+load_rc_config $name
+
+: ${doormand_enable:="NO"}
+: ${doormand_config="%%PREFIX%%/etc/doormand/doormand.cf"}
+
+command=%%PREFIX%%/sbin/${name}
+pidfile=/var/run/${name}.pid
+
+command_args="-p $pidfile -f $doormand_config"
+
+run_rc_command "$1"</pre><p>Если нет стоящей причины запускать службы раньше всех
+      портов, сценарии должны использовать</p><pre class="programlisting">REQUIRE: LOGIN</pre><p>Если служба работает под определенным пользователем
+      (отличным от root), то это делается принудительно.  В сценарий
+      выше включена конструкция</p><pre class="programlisting">KEYWORD: shutdown</pre><p>потому что вымышленный порт, который мы используем в
+      качестве примера, запускает службу, и она должна корректно
+      завершиться при выключении системы.  Если сценарий не запускает
+      постоянную службу, то это не является необходимым.</p><p>Для необязательных элементов конфигурации присвоение
+      переменной по умолчанию в стиле "=" является более
+      предпочтительным по сравнению со стилем ":=",
+      используемым здесь, поскольку первый устанавливает значение по
+      умолчанию только если переменная не установлена, а последний
+      устанавливает её, если переменная не установлена
+      <span class="emphasis"><em>или</em></span> обнулена.  Пользователь вполне может
+      написать в своем файле <code class="filename">rc.conf.local</code>
+      что-нибудь типа</p><pre class="programlisting">doormand_flags=""</pre><p>и тогда произойдет неуместная подстановка переменной с
+      использованием ":=", что переопределит намерения
+      пользователя.  Переменная <code class="literal">_enable</code> является
+      обязательной; значением по умолчанию должно быть
+      ":".</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78641744"></a>6.25.1. Контрольный список перед внесением изменений</h3></div></div></div><p>Перед тем, как отсылать порт со сценарием
+	<code class="filename">rc.d</code>, и тем более перед его коммитом,
+	сверьтесь со следующим контрольным списком, чтобы убедиться,
+	что порт для этого готов.</p><p>Большинство из этих проверок умеет выполнять порт
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/devel/rclint/pkg-descr">devel/rclint</a>, но это не
+	является заменой надлежащему просмотру.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Если это новый файл, заканчивается ли он на
+	    <code class="filename">.sh</code>?  Если это так, то имя файла
+	    должно быть изменено на <code class="filename">file.in</code>,
+	    поскольку файлы <code class="filename">rc.d</code> не могут
+	    оканчиваться на такое расширение.</p></li><li class="step"><p>Присутствует ли в файле тег
+	    <code class="literal">$FreeBSD$</code>?</p></li><li class="step"><p>Соответствуют ли друг другу имя файла
+	    (без <code class="filename">.in</code>), строка
+	    <code class="literal">PROVIDE</code> и
+	    <code class="literal">$</code><em class="replaceable"><code>name</code></em>?
+	    Имя файла, совпадающее с <code class="literal">PROVIDE</code>,
+	    упрощает отладку, особенно для проблем, связанных с
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>.  Соответствие имени файла и
+	    <code class="literal">$</code><em class="replaceable"><code>name</code></em>
+	    также упрощает понимание, какие переменные имеют
+	    отношение к сценарию в
+	    <code class="filename">rc.conf[.local]</code>.  Последнее также
+	    является тем, что вы могли бы назвать
+	    "политикой" для всех новых сценариев, включая
+	    те, что входят в базовую систему.</p></li><li class="step"><p>Содержит ли строка <code class="literal">REQUIRE</code>
+	    значение LOGIN?  Это условие обязательно для сценариев,
+	    работающих не из-под суперпользователя.  Если сценарий
+	    запускается из-под суперпользователя, то стоит ли его
+	    запускать до <code class="literal">LOGIN</code>?  Если нет, то его
+	    следует запускать после, так чтобы мы могли свободно
+	    сгруппировать локальные сценарии в той точке
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a>, когда почти все сценарии в базовой
+	    системе уже стартовали.</p></li><li class="step"><p>Запускает ли сценарий постоянную службу?  Если да, то
+	    он должен иметь <code class="literal">KEYWORD:
+	      shutdown</code>.</p></li><li class="step"><p>Убедитесь в том, что в сценарии отсутствует
+	    <code class="literal">KEYWORD: FreeBSD</code>.  Это перестало быть
+	    нужным и нежелательно уже много лет.  Это также служит
+	    индикатором того, что новый сценарий был скопирован со
+	    старого, поэтому особое внимание должно быть уделено при
+	    проверке.</p></li><li class="step"><p>Если сценарий использует интерпретируемый язык, такой
+	    как <code class="command">perl</code>, <code class="command">python</code>
+	    или <code class="command">ruby</code>, то убедитесь, что значение
+	    <code class="varname">command_interpreter</code> установлено
+	    должным образом.  В противном случае</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service name stop</code></strong></pre><p>возможно будет работать неправильно.  Смотрите
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=service&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">service</span>(8)</span></a> для дополнительной информации.</p></li><li class="step"><p>Все ли вхождения <code class="filename">/usr/local</code> были
+	    заменены на <code class="literal">%%PREFIX%%</code>?</p></li><li class="step"><p>Идет ли присвоение переменным значений по умолчанию
+	    после <code class="function">load_rc_config</code>?</p></li><li class="step"><p>Используются ли пустые строки при присвоении значений
+	    по умолчанию?  Такие присвоения должны быть удалены, но
+	    перепроверьте, что эти параметры задокументированы в
+	    комментариях в начале файла.</p></li><li class="step"><p>Действительно ли в сценариях используются значения,
+	    присвоенные переменным?</p></li><li class="step"><p>Являются ли параметры по умолчанию, перечисленные в
+	    <em class="replaceable"><code>name</code></em><code class="varname">_flags</code>,
+	    обязательными?  Если это так, то их следует поместить в
+	    <code class="varname">command_args</code>.  Параметр
+	    <code class="option">-d</code> здесь - это как красный флаг (прошу
+	    прощения за каламбур), поскольку обычно он применяется
+	    для "демонизации" процесса и поэтому на самом
+	    деле обязательный.</p></li><li class="step"><p>Никогда не включайте переменную
+	    <em class="replaceable"><code>name</code></em><code class="varname">_flags</code>
+	    в <code class="varname">command_args</code> (и наоборот; в прочем,
+	    такая ошибка встречается реже).</p></li><li class="step"><p>Запускает ли сценарий какой-либо код безусловно?  Это
+	    нехорошо.  Обычно такие вещи могут/должны помещаться в
+	    <code class="function">start_precmd</code>.</p></li><li class="step"><p>Все логические условия должны использовать функцию
+	    <code class="function">checkyesno</code>.  Не пишите самописных
+	    проверок для <code class="literal">[Yy][Ee][Ss]</code>, и так
+	    далее.</p></li><li class="step"><p>Если в сценарии выполняется цикл (например, ожидание
+	    чего-либо перед стартом), используется ли счетчик для
+	    завершения цикла?  Мы не хотим бесконечного ожидания
+	    загрузки в случае возникновения ошибки.</p></li><li class="step"><p>Создает ли сценарий файлы или каталоги, которым нужны
+	    особые права доступа?  Например, файл
+	    <code class="filename">pid</code>, который должен принадлежать
+	    пользователю, из-под которого запускается процесс.
+	    Вместо традиционных команд
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=touch&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">touch</span>(1)</span></a>/<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chown&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chown</span>(8)</span></a>/<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chmod&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">chmod</span>(1)</span></a> подумайте об
+	    использовании <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=install&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">install</span>(1)</span></a> с подходящими аргументами
+	    командной строки, для того чтобы выполнить всю процедуру
+	    за один шаг.</p></li></ol></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="using-databases.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="special.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="users-and-groups.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">6.24. Использование баз данных </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 6.26. Добавление пользователей и групп</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

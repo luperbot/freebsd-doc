@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="euc-jp" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp" /><title>2.4. プロセス管理</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="4.4BSD オペレーティングシステムの設計と実装" /><link rel="up" href="overview.html" title="第2章 4.4BSD の設計の概要" /><link rel="prev" href="overview-kernel-service.html" title="2.3. カーネル サービス" /><link rel="next" href="overview-memory-management.html" title="2.5. メモリ管理" /><link rel="copyright" href="legalnotice.html" title="法律上の通知" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.4. プロセス管理</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="overview-kernel-service.html">戻る</a>〓</td><th width="60%" align="center">第2章 4.4BSD の設計の概要</th><td width="20%" align="right">〓<a accesskey="n" href="overview-memory-management.html">次へ</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="overview-process-management"></a>2.4. プロセス管理</h2></div></div></div><p>4.4BSD はマルチタスク環境をサポートしています。
+	実行されたそれぞれのタスクまたはスレッドは
+	<span class="emphasis"><em>プロセス</em></span>と呼ばれています。
+	4.4BSD のプロセスの<span class="emphasis"><em>コンテキスト</em></span>は、
+	アドレス空間の内容とランタイム環境を含むユーザレベルの状態と、
+	スケジューリングのパラメータやリソース制御、識別情報を含む
+	カーネルレベルの状態から構成されています。
+	コンテキストにはカーネルがプロセスにサービスを
+	提供する際に使用するすべてが含まれています。
+	ユーザはプロセスを生成し、その実行を制御し、
+	プロセスの実行状態が変化したときに通知を受け取ることができます。
+	すべてのプロセスには<span class="emphasis"><em>プロセス ID</em></span> (PID)
+	と呼ばれる一意の値が割り当てられます。
+	この値はカーネルがユーザに実行状態の変化を報告するときにプロセスの身元を確認したり、
+	ユーザがシステムコールを実行するために参照する際に使用されます。</p><p>カーネルは他のプロセスのコンテキストを複製してプロセスを生成します。
+	新しく生成されたプロセスを
+	元の<span class="emphasis"><em>親プロセス</em></span>の
+	<span class="emphasis"><em>子プロセス</em></span>と呼びます。
+	プロセス生成時に複製されたコンテキストは、ユーザレベルのプロセスの実行状態と
+	カーネルが管理しているプロセスのシステム状態の両方を含んでいます。
+	カーネルの状態に関する重要な構成要素については、4 章で解説しています。</p><div class="figure"><a id="fig-process-lifecycle"></a><div class="figure-title">図2.1 プロセスのライフサイクル</div><div class="figure-contents"><div class="mediaobject"><img src="fig1.png" alt="プロセス管理システムコール" /></div></div></div><br class="figure-break" /><p><a class="xref" href="overview-process-management.html#fig-process-lifecycle" title="図2.1 プロセスのライフサイクル">図2.1「プロセスのライフサイクル」</a>ではプロセスのライフサイクルを示しています。
+	プロセスは <span class="emphasis"><em>fork</em></span> システムコールを用いて、
+	元のプロセスのコピーとして新しいプロセスを生成することができます。
+	<span class="emphasis"><em>fork</em></span> は呼び出されると
+	二度戻ります。一方は親プロセスに子プロセスのプロセス ID を返し、
+	もう一方は子プロセスに 0 を返します。
+	プロセスの親子関係はシステム上のプロセスの組に階層構造をもたらします。
+	新しく生成されたプロセスはファイル記述子やシグナルハンドラの状態、
+	メモリレイアウトのような親が持っているリソースすべてを共有します。</p><p>親のコピーとして生成された新しいプロセスであっても、
+	別のプログラムをロードし実行することでより便利で特有の動作をすることもできます。
+	プロセスは <span class="emphasis"><em>execve</em></span> システムコールを用いることで、
+	別のプログラムのメモリイメージで自分自身を上書きして、
+	新しい引数の組をその新しく作成したイメージに引き渡すことができます。
+	引数の一つは、システムで認識されるフォーマット
+	(バイナリ実行ファイルや指定されたインタプリタプログラムの起動を促すファイル)
+        をしたファイルの名前です。</p><p>プロセスは <span class="emphasis"><em>exit</em></span> システムコールを実行することで、
+	親プロセスに 8 ビットの exit ステータスを送信して終了することができます。
+	もしプロセスが 1 バイト以上の情報を親プロセスに伝えたい場合には、
+	パイプやソケット、または仲介ファイルを用いて
+	プロセス間通信チャネルをセットアップする必要があります。
+	プロセス間通信については 11 章で大きく取り上げています。</p><p>プロセスは、<span class="emphasis"><em>wait</em></span> システムコールを用いて
+	子プロセスのいずれかが終了するまで実行を中断することができ、
+	wait システムコールは終了した子プロセスの PID と終了ステータスを返します。
+	親プロセスは、子プロセスが終了または異常終了したときのシグナルによる通知のされ方を調整できます。
+	<span class="emphasis"><em>wait4</em></span> システムコールを使用することで、
+	親プロセスは子プロセスの終了を引き起こしたイベントについての情報と、
+	子プロセスが生存期間の間に消費したリソースについての情報を取得することができます。
+	もし親プロセスが先に終了したためにリソースがオーファンド (親のない状態) になってしまった場合、カーネルは
+	
+	<span class="emphasis"><em>init</em></span>
+	という特別なプロセスにその子プロセスの
+	終了ステータスが渡されるよう調整します。これについては
+	3.1 節および 14.6 節を参照してください。</p><p>5 章では、カーネルがどのようにしてプロセスを生成し
+        消滅させるかについての詳細を述べています。</p><p>プロセスは<span class="emphasis"><em>プロセス優先度</em></span>というパラメータに従って
+	実行をスケジュールされます。
+	この優先度はカーネルベースのスケジューリングアルゴリズムによって管理されています。
+	スケジューリングの優先度全体に重みづけする特別なパラメータ
+	(<span class="emphasis"><em>nice</em></span>) によって、ユーザはプロセスの実行優先度に影響を与えることができますが、
+	カーネルのスケジューリングポリシに従って、基本となる CPU リソースを共有する必要があります。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76568144"></a>2.4.1. シグナル</h3></div></div></div><p>システムはプロセスに送ることができる
+	  <span class="emphasis"><em>シグナル</em></span>のセットを定義しています。
+	  4.4BSD におけるシグナルはハードウェア割り込みをモデルとしています。
+	  プロセスはユーザレベルのサブルーチンをシグナルが送られるべき
+	  <span class="emphasis"><em>ハンドラ</em></span>として指定できます。
+	  シグナルが発生して、それがハンドラによって<span class="emphasis"><em>捕捉</em></span>されている間は
+	  さらなるシグナルの発生はブロックされます。
+	  シグナルを捕捉することで、現在のプロセスのコンテキストを保存し、
+	  ハンドラを実行するための新たなコンテキストを構築することになります。
+	  シグナルがハンドラに伝わると、そのハンドラはプロセスをアボートさせたり、
+	  (おそらく大域変数に値を設定した後で) 実行中のプロセスに戻ることもできます。
+	  ハンドラから戻ると、そのシグナルはブロックされなくなり、
+	  発生する (そして捕捉される) ことが再び可能になります。</p><p>また、プロセスはシグナルを<span class="emphasis"><em>無視</em></span>することや、
+	  カーネルで定義されているデフォルトの動作を行なうように指定することができます。
+	  ある種のシグナルのデフォルトでの動作はプロセスを終了させることです。
+	  このような場合の終了は、事後のデバッグに使用できるようにその時のプロセスのメモリイメージを含んだ
+	  <span class="emphasis"><em>コアファイル</em></span>の生成を伴います。</p><p>いくつかのシグナルは捕捉することも無視することもできません。
+	  そのシグナルは、暴走したプロセスを停止させる
+	  <span class="emphasis"><em>SIGKILL</em></span> や、
+	  ジョブコントロールシグナルである
+	  <span class="emphasis"><em>SIGSTOP</em></span> です。</p><p>プロセスはシグナルを特別なスタックに伝達させることも選択できます。
+	  これにより、洗練されたソフトウェアスタック操作が可能です。
+	  たとえば、コルーチンをサポートしている言語では
+	  それぞれのコルーチンにスタックを提供する必要があります。
+	  その言語の実行システムは、4.4BSD で提供される単一のスタックを分割することで、
+	  これらのスタックを割り当てることができます。
+	  もしカーネルが独立したシグナルスタックをサポートしていない場合、
+	  それぞれのコルーチンに割り当てられた領域を
+	  シグナルの捕捉に必要な分だけ拡張しなければなりません。</p><p>すべてのシグナルは、同じ<span class="emphasis"><em>優先度</em></span>を持っています。
+	  もし複数のシグナルが同時に未処理となっている場合は、
+	  シグナルの届く順序は実装に依存します。
+	  シグナルハンドラは、そのシグナルがブロックされるようにして実行しますが、
+	  他のシグナルは依然発生可能です。
+	  このメカニズムにより、プロセスは
+	  コードのクリティカルな部分を特定のシグナルの発生に対して保護することができるのです。</p><p>シグナルの設計と実装の詳細は、4.7 節で解説しています。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp76581968"></a>2.4.2. プロセスグループとセッション</h3></div></div></div><p>複数のプロセスを組織して<span class="emphasis"><em>プロセスグループ</em></span>が作られます。
+	  プロセスグループは端末へのアクセスの制御や
+	  関係プロセスの集合にシグナルを送る手段を提供するのに使用されます。
+	  プロセスは親プロセスからプロセスグループを引き継ぎます。
+	  プロセスが自分自身または自分の子孫のプロセスグループを変更できるようにする
+	  メカニズムをカーネルは提供しています。
+	  新しいプロセスグループを作成することは簡単です。
+	  新しいプロセスグループの値はたいてい
+	  作成したプロセスのプロセス ID となります。</p><p>プロセスグループにおけるプロセスの集合は、<span class="emphasis"><em>ジョブ</em></span>と呼ばれることがあり、
+	  シェルのような高レベルのシステムソフトウェアで操作されます。
+	  シェルによって生成されるよくある類のジョブは、いくつかのプロセスをパイプでつないだ
+	  <span class="emphasis"><em>パイプライン</em></span>で、最初のプロセスの出力が 2 番目の入力となり、
+	  2 番目の出力が 3 番目の入力となり、4 番目も同様に… というものです。
+	  シェルはパイプラインの各段階においてプロセスを fork して、
+	  これらすべてのプロセスを別個のプロセスグループにおくことで
+	  このようなジョブを生成します。</p><p>ユーザプロセスは、単独のプロセスに送る場合と同様に
+	  プロセスグループのそれぞれのプロセスにまとめてシグナルを送ることができます。
+	  指定されたプロセスグループに属するプロセスが
+	  そのプロセスグループに影響するソフトウェア割り込みを受け取ると、
+	  それによってプロセスグループは実行を中断や再開をしたり、
+	  割り込みを受けたり、終了させられたりします。</p><p>端末にはプロセスグループ ID が割り当てられています。
+	  この ID は、端末に関連づけられたプロセスグループの ID が通常セットされます。
+	  ジョブコントロール機能を持つシェルは、同じ端末に関連づけされた
+	  プロセスグループを多数作成することができます。
+	  その端末は、これらのプロセスグループに属するプロセスの<span class="emphasis"><em>制御端末</em></span>となります。
+	  プロセスは、端末のプロセスグループ ID とそのプロセスのプロセスグループ ID が一致したときのみ、
+	  制御端末を記述子から読むことができます。
+	  もしプロセスグループ ID が一致していなければ、
+          プロセスがその端末から読み込もうとする際にブロックされます。
+	  端末のプロセスグループ ID を変更することで、
+	  シェルはいくつかの異なるジョブの間で端末を調停することができます。
+	  この調停は<span class="emphasis"><em>ジョブコントロール</em></span>と呼ばれ、
+	  プロセスグループとともに 4.8 節で解説しています。</p><p>関連するプロセスの集合をプロセスグループとしてまとめることができるのと同じように、
+	  プロセスグループの集合を<span class="emphasis"><em>セッション</em></span>としてまとめることができます。
+	  セッションのおもな用途は、デーモンプロセスとその子プロセスに対して隔離した環境を作り出したり、
+	  ユーザのログインシェルとそのシェルが作り出すジョブをひとまとめにすることです。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="overview-kernel-service.html">戻る</a>〓</td><td width="20%" align="center"><a accesskey="u" href="overview.html">上に戻る</a></td><td width="40%" align="right">〓<a accesskey="n" href="overview-memory-management.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top">2.3. カーネル サービス〓</td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top">〓2.5. メモリ管理</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文書、および他の文書は
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>
+    からダウンロードできます。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>FreeBSD に関する質問がある場合には、
+    <a href="http://www.FreeBSD.org/ja/docs.html">ドキュメント</a> を読んだ上で
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt; まで (英語で) 連絡してください。<br></br>
+    本文書に関する質問については、
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt; まで電子メールを (英語で) 送ってください。</small></p></body></html>

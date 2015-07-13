@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>3. Уровни области подкачки</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Элементы архитектуры системы виртуальной памяти во FreeBSD" /><link rel="up" href="index.html" title="Элементы архитектуры системы виртуальной памяти во FreeBSD" /><link rel="prev" href="vm-objects.html" title="2. Объекты VM" /><link rel="next" href="freeing-pages.html" title="4. Когда освобождать страницу" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">3. Уровни области подкачки</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vm-objects.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="freeing-pages.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="swap-layers"></a>3. Уровни области подкачки</h2></div></div></div><p>Страницы с собственными данными первоначально являются страницами,
+      копируемыми при записи или заполняемыми нулями.  Когда выполняется
+      изменение, и, соответственно, копирование, начальное хранилище объекта
+      (обычно файл) не может больше использоваться для хранения копии страницы,
+      когда VM-системе нужно использовать ее повторно для других целей.  В
+      этот момент на помощь приходит область подкачки.  Область подкачки
+      выделяется для организации хранилища памяти, которая иначе не может быть
+      доступна.  FreeBSD создает структуру управления подкачкой для объекта
+      VM, только когда это действительно нужно.  Однако структура управления
+      подкачкой исторически имела некоторые проблемы:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Во FreeBSD 3.X в структуре управления областью подкачки
+	  предварительно выделяется массив, который представляет целый объект,
+	  требующий хранения в области подкачки-даже если только
+	  несколько страниц этого объекта хранятся в области подкачки.  Это
+	  создает проблему фрагментации памяти ядра в случае, когда в память
+	  отображаются большие объекты или когда ветвятся процессы, занимающие
+	  большой объем памяти при работе (RSS).</p></li><li class="listitem"><p>Также для отслеживания памяти подкачки в памяти ядра
+	  поддерживается <span class="quote"><<<span class="quote">список дыр</span>>></span>, и он также несколько
+	  фрагментирован.  Так как <span class="quote"><<<span class="quote">список дыр</span>>></span> является
+	  последовательным списком, то производительность при распределении
+	  и высвобождении памяти в области подкачки неоптимально и ее
+	  сложность зависит от количества страниц как O(n).</p></li><li class="listitem"><p>Также в процессе высвобождения памяти в области подкачки
+	  требуется выделение памяти в ядре, и это приводит к проблемам
+	  блокировки при недостатке памяти.</p></li><li class="listitem"><p>Проблема еще более обостряется из-за дыр, создаваемых
+	  по чередующемуся алгоритму.</p></li><li class="listitem"><p>Кроме того, список распределения блоков в
+	  области подкачки легко оказывается фрагментированным, что приводит
+	  к распределению непоследовательных областей.</p></li><li class="listitem"><p>Память ядра также должна распределяться по ходу работы
+	  для дополнительных структур по управлению областью подкачки при
+	  выгрузке страниц памяти в эту область.</p></li></ul></div><p>Очевидно, что мест для усовершенствований предостаточно.
+      Во FreeBSD 4.X подсистема управления областью подкачки была полностью
+      переписана мною:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Структуры управления областью подкачки распределяются при помощи
+	  хэш-таблицы, а не через линейный массив, что дает им фиксированный
+	  размер при распределении и работу с гораздо меньшими
+	  структурами.</p></li><li class="listitem"><p>Вместо того, чтобы использовать однонаправленный
+	  связный список для отслеживания выделения пространства в области
+	  подкачки, теперь используется побитовая карта блоков области
+	  подкачки, выполненная в основном в виде древовидной структуры
+	  с информацией о свободном пространстве, находящейся в узлах структур.
+	  Это приводит к тому, что выделение и высвобождение памяти в области
+	  подкачки становится операцией сложности O(1).</p></li><li class="listitem"><p>Все дерево также распределяется заранее для
+	  того, чтобы избежать распределения памяти ядра во время операций с
+	  областью подкачки при критически малом объеме свободной памяти.
+	  В конце концов, система обращается к области подкачки при нехватке
+	  памяти, так что мы должны избежать распределения памяти ядра в такие
+	  моменты для избежания потенциальных блокировок.</p></li><li class="listitem"><p>Для уменьшения фрагментации дерево может распределять большой
+	  последовательный кусок за раз, пропуская меньшие фрагментированные
+	  области.</p></li></ul></div><p>Я не сделал последний шаг к заведению <span class="quote"><<<span class="quote">указателя на
+	распределение</span>>></span>, который будет передвигаться
+      по участку области подкачки при выделении памяти для обеспечения в
+      будущем распределения последовательных участков, или по крайней мере
+      местоположения ссылки, но я убежден, что это может быть сделано.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vm-objects.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="freeing-pages.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">2. Объекты VM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 4. Когда освобождать страницу</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

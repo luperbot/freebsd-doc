@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>5. Configurazione del Firewall</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Filtering Bridges" /><link rel="up" href="index.html" title="Filtering Bridges" /><link rel="prev" href="filtering-bridges-enabling.html" title="4. Attivazione del Bridge" /><link rel="next" href="filtering-bridges-contributors.html" title="6. Contributi" /><link rel="copyright" href="trademarks.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5. Configurazione del Firewall</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="filtering-bridges-enabling.html">Indietro</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="filtering-bridges-contributors.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="filtering-bridges-ipfirewall"></a>5. Configurazione del Firewall</h2></div></div></div><p>Ora è arrivato il momento di creare il proprio file con le
+      regole per il firewall, in modo da rendere sicura la rete interna.
+      Ci sono delle complicazioni nel fare questo, perché non tutte le
+      funzionalità del firewall sono disponibili sui pacchetti inoltrati
+      dal bridge.  Inoltre, c'è una differenza tra i pacchetti che stanno
+      per essere inoltrati dal bridge e quelli indirizzati alla macchina locale.
+      In generale, i pacchetti che entrano nel bridge vengono processati dal
+      firewall solo una volta, non due come al solito; infatti vengono filtrati
+      solo in ingresso, quindi qualsiasi regola che usi <code class="option">out</code>
+      oppure <code class="option">xmit</code> non verrà mai eseguita.  Personalmente
+      uso <code class="option">in via</code> che è una sintassi più antica,
+      ma che ha un senso quando la si legge.
+      Un'altra limitazione è che si possono usare solo i comandi
+      <code class="option">pass</code> e <code class="option">drop</code> per i pacchetti filtrati
+      dal bridge.  Cose avanzate come <code class="option">divert</code>,
+      <code class="option">forward</code> o <code class="option">reject</code> non sono disponibili.
+      Queste opzioni possono ancora essere usate, ma solo per il traffico da
+      e verso la macchina bridge stessa (sempre che le sia stato assegnato
+      un IP).</p><p>Nuovo in FreeBSD 4.0 è il concetto di stateful filtering.
+      Questo è un grande miglioramento per il traffico
+      <acronym class="acronym">UDP</acronym>, che consiste tipicamente di una richiesta in
+      uscita, seguita a breve termine da una risposta con la stessa coppia di
+      indirizzi IP e numeri di porta (ma con mittente e destinatario invertiti,
+      ovviamente).  Per i firewall che non supportano il mantenimento di stato,
+      non c'è modo di gestire questo breve scambio di dati come una
+      sessione unica.  Ma con un firewall che può
+      <span class="quote">«<span class="quote">ricordarsi</span>»</span> di un pacchetto <acronym class="acronym">UDP</acronym> in
+      uscita e permette una risposta nei minuti successivi, gestire i
+      servizi <acronym class="acronym">UDP</acronym> è semplice.
+      L'esempio seguente mostra come fare.  La stessa cosa è
+      possibile farla con i pacchetti <acronym class="acronym">TCP</acronym>.  Questo
+      permette di evitare qualche tipo di attacco denial of service e altri
+      sporchi trucchi, ma tipicamente fa anche crescere velocemente la
+      tabella di stato.</p><p>Vediamo un esempio di configurazione.  Bisogna notare che all'inizio
+      del file <code class="filename">/etc/rc.firewall</code> ci sono già delle
+      regole standard per l'interfaccia di loopback
+      <code class="filename">lo0</code>, quindi non ce ne occuperemo più ora.
+      Le regole personalizzate andrebbero messe in un file a parte (per esempio
+      <code class="filename">/etc/rc.firewall.local</code>) e caricate all'avvio
+      modificando la riga del file <code class="filename">/etc/rc.conf</code> dove era
+      stata definita la modalità <code class="option">open</code> con:</p><pre class="programlisting">firewall_type="/etc/rc.firewall.local"</pre><div xmlns="" class="important"><h3 class="admontitle">Importante: </h3><p xmlns="http://www.w3.org/1999/xhtml">Bisogna specificare il path <span class="emphasis"><em>completo</em></span>
+        del file, altrimenti non verrà caricato con il rischio di
+        rimanere tagliati fuori dalla rete.</p></div><p>Per il nostro esempio immaginiamo di avere l'interfaccia
+      <code class="filename">fxp0</code> collegata all'esterno (Internet) e la
+      <code class="filename">xl0</code> verso l'interno (<acronym class="acronym">LAN</acronym>).
+      La macchina bridge ha assegnato l'IP
+      <code class="systemitem">1.2.3.4</code>
+      (è impossibile che il vostro <acronym class="acronym">ISP</acronym> vi assegni un
+      indirizzo simile a questo, ma per l'esempio va bene).</p><pre class="programlisting"># Le connessioni di cui abbiamo mantenuto lo stato vengono fatte passare subito
+add check-state
+
+# Esclude le reti locali definite nell'RFC 1918
+add drop all from 10.0.0.0/8 to any in via fxp0
+add drop all from 172.16.0.0/12 to any in via fxp0
+add drop all from 192.168.0.0/16 to any in via fxp0
+
+# Permette alla macchina bridge di connettersi con chi vuole
+# (se la macchina è IP-less non includere questi comandi)
+add pass tcp from 1.2.3.4 to any setup keep-state
+add pass udp from 1.2.3.4 to any keep-state
+add pass ip from 1.2.3.4 to any
+
+# Permette agli host della rete interna di connettersi con chi vogliono
+add pass tcp from any to any in via xl0 setup keep-state
+add pass udp from any to any in via xl0 keep-state
+add pass ip from any to any in via xl0
+
+# Sezione TCP
+# Permette SSH
+add pass tcp from any to any 22 in via fxp0 setup keep-state
+# Permette SMTP solo verso il mail server
+add pass tcp from any to relay 25 in via fxp0 setup keep-state
+# Permette i trasferimenti di zona solo dal name server secondario [dns2.nic.it]
+add pass tcp from 193.205.245.8 to ns 53 in via fxp0 setup keep-state
+# Lascia passare i controlli ident:
+# è meglio che aspettare che vadano in timeout
+add pass tcp from any to any 113 in via fxp0 setup keep-state
+# Permette connessioni nel range di "quarantena".
+add pass tcp from any to any 49152-65535 in via fxp0 setup keep-state
+
+# Sezione UDP
+# Permette DNS solo verso il name server
+add pass udp from any to ns 53 in via fxp0 keep-state
+# Permette connessioni nel range di "quarantena".
+add pass udp from any to any 49152-65535 in via fxp0 keep-state
+
+# Sezione ICMP
+# Abilita le funzioni di 'ping'
+add pass icmp from any to any icmptypes 8 keep-state
+# Permette il passaggio dei messaggi di errori del comando 'traceroute'
+add pass icmp from any to any icmptypes 3
+add pass icmp from any to any icmptypes 11
+
+# Tutto il resto è sospetto
+add drop log all from any to any</pre><p>Coloro che hanno configurato un firewall in precedenza potrebbero aver
+      notato che manca qualcosa.  In particolare, non ci sono regole contro lo
+      spoofing, difatti <span class="emphasis"><em>non</em></span> abbiamo aggiunto:</p><pre class="programlisting">add deny all from 1.2.3.4/8 to any in via fxp0</pre><p>Ovvero, non far entrare dall'esterno pacchetti che affermano di venire
+      dalla rete interna.  Questa è una cosa che solitamente viene fatta
+      per essere sicuri che qualcuno non provi a eludere il packet filter,
+      generando falsi pacchetti che sembrano venire dall'interno.  Il problema
+      è che c'è <span class="emphasis"><em>almeno</em></span> un host
+      sull'interfaccia esterna che non si può ignorare: il router.
+      Solitamente, però, gli <acronym class="acronym">ISP</acronym> eseguono il controllo
+      anti-spoof sui loro router e quindi non ce ne dobbiamo preoccupare.</p><p>L'ultima riga sembra un duplicato della regola di default, ovvero non
+      far passare nulla che non sia stato specificatamente permesso.  In
+      verità c'è una differenza: tutto il traffico sospetto
+      verrà loggato.</p><p>Ci sono due regole per permettere il traffico <acronym class="acronym">SMTP</acronym>
+      e <acronym class="acronym">DNS</acronym> verso il mail server e il name server, se ne
+      avete.  Ovviamente l'intero set di regole deve essere personalizzato
+      per le proprie esigenze, questo non è altro che uno specifico
+      esempio (il formato delle regole è spiegato dettagliatamente nella
+      man page <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>).  Bisogna notare che, affinché
+      <span class="quote">«<span class="quote">relay</span>»</span> e <span class="quote">«<span class="quote">ns</span>»</span>
+      siano interpretati correttamente, la risoluzione dei nomi deve funzionare
+      <span class="emphasis"><em>prima</em></span> che il bridge sia attivato.  Questo è un
+      chiaro esempio che dimostra l'importanza di settare l'IP sulla corretta
+      scheda di rete.  In alternativa è possibile specificare
+      direttamente l'indirizzo IP anziché il nome host (cosa necessaria
+      se la macchina è IP-less).</p><p>Le persone che sono solite configurare un firewall probabilmente
+      avranno sempre usato una regola <code class="option">reset</code> o
+      <code class="option">forward</code> per i pacchetti
+      ident (porta 113 <acronym class="acronym">TCP</acronym>).  Sfortunatamente, questa non
+      è una scelta applicabile con il bridge, quindi la cosa migliore
+      è lasciarli passare fino alla destinazione.  Finché la
+      macchina di destinazione non ha un demone ident attivo, questa tecnica
+      è relativamente sicura.  L'alternativa è proibire le
+      connessioni sulla porta 113, creando qualche problema con servizi tipo
+      <acronym class="acronym">IRC</acronym> (le richieste ident devono andare in
+      timeout).</p><p>L'unica altra cosa un po' particolare che potete aver notato è
+      che c'è una regola per lasciar comunicare la macchina bridge e
+      un'altra per gli host della rete interna.  Ricordate che questo è
+      dovuto al fatto che i due tipi di traffico prendono percorsi differenti
+      attraverso il kernel e di conseguenza anche dentro il packet filter.  La
+      rete interna passerà attraverso il bridge, mentre la macchina
+      locale userà il normale stack IP per le connessioni.  Perciò
+      due regole per gestire due casi differenti.  Le regole <code class="literal">in via
+      fxp0</code> funzionano in entrambi i casi.
+      In generale, se usate regole <code class="option">in via</code> attraverso il
+      packet filter, dovrete fare un'eccezione per i pacchetti generati
+      localmente, in quanto non entrano tramite nessuna interfaccia.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="filtering-bridges-enabling.html">Indietro</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="filtering-bridges-contributors.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">4. Attivazione del Bridge </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 6. Contributi</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

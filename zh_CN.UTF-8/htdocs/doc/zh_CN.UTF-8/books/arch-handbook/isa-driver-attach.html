@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>10.9. xxx_isa_attach</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="isa-driver.html" title="第 10 章 ISA设备驱动程序" /><link rel="prev" href="isa-driver-probe.html" title="10.8. xxx_isa_probe" /><link rel="next" href="isa-driver-detach.html" title="10.10. xxx_isa_detach" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.9. xxx_isa_attach</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="isa-driver-probe.html">上一页</a> </td><th width="60%" align="center">第 10 章 ISA设备驱动程序</th><td width="20%" align="right"> <a accesskey="n" href="isa-driver-detach.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="isa-driver-attach"></a>10.9. xxx_isa_attach</h2></div></div></div><p>如果探测例程返回成功并且系统选择连接那个驱动程序，则连接例程
+          负责将驱动程序实际连接到系统。如果探测例程返回0 ，则连接例程期望
+          接收完整的设备结构softc，此结构由探测例程设置。同时，如果探测例程
+          返回0，它可能期望这个设备的连接例程应当在将来的某点被调用。如果
+          探测例程返回负值，则驱动程序可能不会作此假设。
+        </p><p>如果成功完成，连接例程返回0，否则返回错误码。
+        </p><p>连接例程的启动跟探测例程相似，将一些常用数据取到一些更容易
+          访问的变量中。
+        </p><pre class="programlisting">          struct xxx_softc *sc = device_get_softc(dev);
+          int unit = device_get_unit(dev);
+          int error = 0;</pre><p>然后分配并激活所需资源。由于端口范围通常在从探测返回前就
+          被释放，因此需要重新分配。我们希望探测例程已经适当地设置了
+          所有的资源范围，并将它们保存在结构softc中。如果探测例程留下了
+          一些被分配的资源，就不需要再次分配（重新分配被视为错误）。
+        </p><pre class="programlisting">          sc-&gt;port0_rid = 0;
+          sc-&gt;port0_r = bus_alloc_resource(dev, SYS_RES_IOPORT,  &amp;sc-&gt;port0_rid,
+              /*start*/ 0, /*end*/ ~0, /*count*/ 0, RF_ACTIVE);
+
+          if(sc-&gt;port0_r == NULL)
+               return ENXIO;
+
+          /* 板上内存 */
+          sc-&gt;mem0_rid = 0;
+          sc-&gt;mem0_r = bus_alloc_resource(dev, SYS_RES_MEMORY,  &amp;sc-&gt;mem0_rid,
+              /*start*/ 0, /*end*/ ~0, /*count*/ 0, RF_ACTIVE);
+
+          if(sc-&gt;mem0_r == NULL)
+                goto bad;
+
+          /* 取得虚地址 */
+          sc-&gt;mem0_v = rman_get_virtual(sc-&gt;mem0_r);</pre><p>DMA请求通道(DRQ)以相似方式被分配。使用
+          <code class="function">isa_dma*()</code>函数族进行初始化。例如：
+        </p><p><code class="function">isa_dmacascade(sc-&gt;drq0);</code></p><p>中断请求线(IRQ)有点特殊。除了分配以外，驱动程序的中断处理
+          函数也应当与它关联。在古老的ISA驱动程序中，由系统传递给中断处理
+          函数的参量是设备单元号。但在现代驱动程序中，按照约定，建议传递
+          指向结构softc的指针。一个很重要的原因在于当结构softc被动态分配后，
+          从softc取得单元号很容易，而从单元号取得softc很困难。同时，这个
+          约定也使得用于不同总线的应用程序看起来统一，并允许它们共享代码：
+          每个总线有其自己的探测，连接，分离和其他总线相关的例程，而它们
+          之间可以共享大块的驱动程序代码。
+        </p><pre class="programlisting">
+          sc-&gt;intr_rid = 0;
+          sc-&gt;intr_r = bus_alloc_resource(dev, SYS_RES_MEMORY,  &amp;sc-&gt;intr_rid,
+                /*start*/ 0, /*end*/ ~0, /*count*/ 0, RF_ACTIVE);
+
+          if(sc-&gt;intr_r == NULL)
+              goto bad;
+
+          /*
+           * 假定对XXX_INTR_TYPE的定义依赖于驱动程序的类型，
+           * 例如INTR_TYPE_CAM用于CAM的驱动程序
+           */
+          error = bus_setup_intr(dev, sc-&gt;intr_r, XXX_INTR_TYPE,
+              (driver_intr_t *) xxx_intr, (void *) sc, &amp;sc-&gt;intr_cookie);
+          if(error)
+              goto bad;
+
+        </pre><p>如果驱动程序需要与内存进行DMA，则这块内存应当按前述方式分配：
+        </p><pre class="programlisting">          error=bus_dma_tag_create(NULL, /*alignment*/ 4,
+              /*boundary*/ 0, /*lowaddr*/ BUS_SPACE_MAXADDR_24BIT,
+              /*highaddr*/ BUS_SPACE_MAXADDR, /*filter*/ NULL, /*filterarg*/ NULL,
+              /*maxsize*/ BUS_SPACE_MAXSIZE_24BIT,
+              /*nsegments*/ BUS_SPACE_UNRESTRICTED,
+              /*maxsegsz*/ BUS_SPACE_MAXSIZE_24BIT, /*flags*/ 0,
+              &amp;sc-&gt;parent_tag);
+          if(error)
+              goto bad;
+
+          /* 很多东西是从父标签继承而来
+           * 假设sc-&gt;data指向存储共享数据的结构，例如一个环缓冲区可能是：
+           * struct {
+           *   u_short rd_pos;
+           *   u_short wr_pos;
+           *   char    bf[XXX_RING_BUFFER_SIZE]
+           * } *data;
+           */
+          error=bus_dma_tag_create(sc-&gt;parent_tag, 1,
+              0, BUS_SPACE_MAXADDR, 0, /*filter*/ NULL, /*filterarg*/ NULL,
+              /*maxsize*/ sizeof(* sc-&gt;data), /*nsegments*/ 1,
+              /*maxsegsz*/ sizeof(* sc-&gt;data), /*flags*/ 0,
+              &amp;sc-&gt;data_tag);
+          if(error)
+              goto bad;
+
+          error = bus_dmamem_alloc(sc-&gt;data_tag, &amp;sc-&gt;data, /* flags*/ 0,
+              &amp;sc-&gt;data_map);
+          if(error)
+               goto bad;
+
+          /* 在&amp;sc-&gt;data_p的情况下，xxx_alloc_callback()只是将物理地址
+           * 保存到作为其参量传递进去的指针中。
+           * 参看关于总线内存映射一节中的详细内容。
+           * 其实现可以像这样：
+           *
+           * static void
+           * xxx_alloc_callback(void *arg, bus_dma_segment_t *seg,
+           *     int nseg, int error)
+           * {
+           *    *(bus_addr_t *)arg = seg[0].ds_addr;
+           * }
+           */
+          bus_dmamap_load(sc-&gt;data_tag, sc-&gt;data_map, (void *)sc-&gt;data,
+              sizeof (* sc-&gt;data), xxx_alloc_callback, (void *) &amp;sc-&gt;data_p,
+              /*flags*/0);</pre><p>分配了所有的资源后，设备应当被初始化。初始化可能包括测试
+          所有特性，确保它们起作用。</p><pre class="programlisting">          if(xxx_initialize(sc) &lt; 0)
+               goto bad;        </pre><p>总线子系统将自动在控制台上打印由探测例程设置的设备描述。但
+          如果驱动程序想打印一些关于设备的额外信息，也是可能的，例如：</p><pre class="programlisting">
+        device_printf(dev, "has on-card FIFO buffer of %d bytes\n", sc-&gt;fifosize);
+        </pre><p>如果初始化例程遇到任何问题，建议返回错误之前打印有关信息。</p><p>连接例程的最后一步是将设备连接到内核中的功能子系统。完成
+          这个步骤的精确方式依赖于驱动程序的类型：字符设备、块设备、网络
+          设备、CAM SCSI总线设备等等。</p><p>如果所有均工作正常则返回成功。</p><pre class="programlisting">          error = xxx_attach_subsystem(sc);
+          if(error)
+              goto bad;
+
+          return 0;        </pre><p>最后，处理棘手情况。返回错误前，所有资源应当被取消分配。
+          我们利用这样一个事实：结构softc传递给我们之前被零化，因此我们
+          能找出是否分配了某些资源：如果分配则它们的描述符非零。</p><pre class="programlisting">          bad:
+
+          xxx_free_resources(sc);
+          if(error)
+              return error;
+          else /* exact error is unknown */
+              return ENXIO;</pre><p>这就是连接例程的全部。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="isa-driver-probe.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="isa-driver.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="isa-driver-detach.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">10.8. xxx_isa_probe </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 10.10. xxx_isa_detach</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

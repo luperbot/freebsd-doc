@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>第 7 章 虚拟内存系统</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="kernel.html" title="部分 I. 内核" /><link rel="prev" href="mac-conclusion.html" title="6.9. 小结" /><link rel="next" href="vm-cache.html" title="7.2. 统一的缓存信息结构体──vm_object_t" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第 7 章 虚拟内存系统</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-conclusion.html">上一页</a> </td><th width="60%" align="center">部分 I. 内核</th><td width="20%" align="right"> <a accesskey="n" href="vm-cache.html">下一页</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vm"></a>第 7 章 虚拟内存系统</h2></div><div><span class="authorgroup">供稿：<span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></span>. </span></div><div><span class="authorgroup">翻译：<span xmlns="http://www.w3.org/1999/xhtml" class="author"></span>. </span></div></div></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="vm.html#vm-physmem">7.1. 物理内存的管理──<code class="literal">vm_page_t</code></a></span></dt><dt><span class="sect1"><a href="vm-cache.html">7.2. 统一的缓存信息结构体──<code class="literal">vm_object_t</code></a></span></dt><dt><span class="sect1"><a href="vm-fileio.html">7.3. 文件系统输入/输出──<code class="literal">buf</code>结构体</a></span></dt><dt><span class="sect1"><a href="vm-pagetables.html">7.4. 映射页表──<code class="literal">vm_map_t, vm_entry_t</code></a></span></dt><dt><span class="sect1"><a href="vm-kvm.html">7.5. KVM存储映射</a></span></dt><dt><span class="sect1"><a href="vm-tuning.html">7.6. 调整FreeBSD的虚拟内存系统</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vm-physmem"></a>7.1. 物理内存的管理──<code class="literal">vm_page_t</code></h2></div></div></div><a id="idp70834896" class="indexterm"></a><a id="idp70835408" class="indexterm"></a><a id="idp70835920" class="indexterm"></a><p>物理内存通过结构体<code class="literal">vm_page_t</code>以页为基础进行管理。
+        物理内存的页由它们各自对应的结构体<code class="literal">vm_page_t</code>所代表，
+        这些结构体存放在若干个页管理队列中的一个里面。</p><p>一页可以处于在线(wired)、活动(active)，去活(inactive)、缓存(cache)、
+        自由(free)状态。除了在线状态，页一般被放置在一个双向链表队列里，
+        代表了它所处的状态。在线页不放置在任何队列里。</p><p>FreeBSD为缓存页和自由页实现了一个更为复杂的页队列机制，
+        以实现对页的分类管理。每一种状态都对应着多个队列，
+        队列的安排对应着处理器的一级、二级缓存。当需要分配一个新页时，
+        FreeBSD会试图把一个按一级、二级缓存对齐的页面分配给虚拟内存对象。</p><p>此外，一个页可以有一个引用计数，可以被一个忙计数锁定。
+        虚拟内存系统也实现了<span class="quote">“<span class="quote">终极锁定</span>”</span>(ultimate locked)状态，
+        一个页可以用页标志PG_BUSY表示这一状态。</p><p>总之，每个页队列都按照LRU(Least-Recently Used)的原则工作。
+        </p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">短语Least-Recently Used有两种理解方式：
+        1.将“least-recently”理解为反向比较级，意义为“最早”，整个短语理解为
+         “最近的使用时间最早”；2.将“least”和“recently”理解为副词，
+          都修饰“used”，整个短语理解为“最近最少使用”。
+          这两种理解方式的实际意义基本相同。</p></div><p>
+          一个页常常最初处于在线或活动状态。在线时，页常常关联于某处的页表。
+          虚拟内存系统通过扫描在一个较活跃的页队列(LRU)确定页的年龄，
+          以便将他们移到一个较不活跃的页队列中。
+          移动到缓存中的页依然与一个VM对象关联，但被作为立即再用的候选。
+          在自由对列中的页是真正未被使用的。FreeBSD尽量不将页放在自由队列中，
+          但是必须保持一定数量的自由页，以便响应中断时分配。</p><p>如果一个进程试图访问一个不在页表中而在某一队列中的页
+         (例如去活队列或缓存队列)，一个相对耗费资源少的页错误发生，
+         导致页被重激活。如果页根本不存在于系统内存之中，进程必须被阻塞，
+         此时页被从磁盘中载入。</p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">Intel等厂商的CPU工作在保护模式时，可用来实现虚拟内存。
+         当寻址的地址空间对应着真实内存时，则正常读写；
+         当寻址的地址空间没有对应的真实内存时，CPU会产生一个“错误”，
+         通知操作系统与磁盘等设备进行交换，读寻址则调入存储内容，
+         写寻址则写出存储内容。这个“错误”
+         并非操作系统或应用程序开发人员犯下的错误，
+         尽管在CPU硬件实现中这与应用程序或操作系统内核崩溃的错误的发生机制相同。
+         参见Intel的CPU保护模式开发手册。</p></div><a id="idp70850128" class="indexterm"></a><p>FreeBSD动态的调整页队列，试图将各个队列中的页数维护在一个适当的比例上，
+        同时管理程序崩溃的已清理和未清理页。重新平衡的比例数值决定于系统内存的负担。
+        这种重新平衡由pageout守护进程实现，包括清理未清理页(与他们的后备存储同步)、
+        监视页被引用的活跃程度
+        (重置它们在LRU队列中的位置或在不同活跃程度的页队列间移动)、
+        当比例不平衡时在队列间迁移页，如此等等。
+        FreeBSD的VM系统会将重激活页而产生的错误频率调低到一个合理的数值，
+        由此确定某一页活跃/闲置的实际程度。
+        这可以为更好的决定何时清理/分配一个页做出决策。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-conclusion.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="kernel.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="vm-cache.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">6.9. 小结 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 7.2. 统一的缓存信息结构体──<code class="literal">vm_object_t</code></td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

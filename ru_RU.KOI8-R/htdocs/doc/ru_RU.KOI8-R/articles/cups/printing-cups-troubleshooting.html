@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>6. Устранение неполадок с CUPS</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Универсальная Система Печати Unix на FreeBSD" /><link rel="up" href="index.html" title="Универсальная Система Печати Unix на FreeBSD" /><link rel="prev" href="printing-cups-clients.html" title="5. Конфигурирование клиентов CUPS" /><link rel="next" href="ix01.html" title="Предметный указатель" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6. Устранение неполадок с CUPS</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="printing-cups-clients.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ix01.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="printing-cups-troubleshooting"></a>6. Устранение неполадок с CUPS</h2></div></div></div><p>Проблемы c <span class="application">CUPS</span> часто возникают
+      из-за неверных прав доступа.  Сначала дважды проверьте права доступа
+      в <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devfs</span>(8)</span></a> (сверьтесь с уже описанными выше).  Затем, проверьте
+      реальные права устройств, созданных в файловой системе.  Также бывает
+      полезным удостовериться, что ваш пользователь входит в группу
+      <code class="systemitem">cups</code>.  Если у вас складывается впечатление,
+      что флажки прав доступа на странице администрирования веб-интерфейса
+      <span class="application">CUPS</span> не работают, то иным решением
+      может быть резервное копирование конфигурационного файла
+      <code class="filename">/usr/local/etc/cups/cupsd.conf</code> и редактирование
+      разных опций конфигурации с подбором их комбинаций.
+      Ниже приведено содержимое тестового файла конфигурации
+      <code class="filename">/usr/local/etc/cups/cupsd.conf</code>.
+      Пожалуйста, обратите внимание на то, что безопасность в этом примере
+      <code class="filename">cupsd.conf</code> была пожертвована в угоду простоте
+      настройки; как только администратор успешно подсоединится к серверу
+      <span class="application">CUPS</span> и сконфигурирует клиентов,
+      рекомендуется пересмотреть данную конфигурацию и добавить разграничение
+      доступа.</p><pre class="programlisting"># Log general information in error_log - change "info" to "debug" for
+# troubleshooting...
+LogLevel info
+
+# Administrator user group...
+SystemGroup wheel
+
+# Listen for connections on Port 631.
+Port 631
+#Listen localhost:631
+Listen /var/run/cups.sock
+
+# Show shared printers on the local network.
+Browsing On
+BrowseOrder allow,deny
+#BrowseAllow @LOCAL
+BrowseAllow 192.168.1.* # change to local LAN settings
+BrowseAddress 192.168.1.* # change to local LAN settings
+
+# Default authentication type, when authentication is required...
+DefaultAuthType Basic
+DefaultEncryption Never # comment this line to allow encryption
+
+# Allow access to the server from any machine on the LAN
+&lt;Location /&gt;
+  Order allow,deny
+  #Allow localhost
+  Allow 192.168.1.* # change to local LAN settings
+&lt;/Location&gt;
+
+# Allow access to the admin pages from any machine on the LAN
+&lt;Location /admin&gt;
+  #Encryption Required
+  Order allow,deny
+  #Allow localhost
+  Allow 192.168.1.* # change to local LAN settings
+&lt;/Location&gt;
+
+# Allow access to configuration files from any machine on the LAN
+&lt;Location /admin/conf&gt;
+  AuthType Basic
+  Require user @SYSTEM
+  Order allow,deny
+  #Allow localhost
+  Allow 192.168.1.* # change to local LAN settings
+&lt;/Location&gt;
+
+# Set the default printer/job policies...
+&lt;Policy default&gt;
+  # Job-related operations must be done by the owner or an adminstrator...
+  &lt;Limit Send-Document Send-URI Hold-Job Release-Job Restart-Job Purge-Jobs \
+Set-Job-Attributes Create-Job-Subscription Renew-Subscription Cancel-Subscription \
+Get-Notifications Reprocess-Job Cancel-Current-Job Suspend-Current-Job Resume-Job \
+CUPS-Move-Job&gt;
+    Require user @OWNER @SYSTEM
+    Order deny,allow
+  &lt;/Limit&gt;
+
+  # All administration operations require an adminstrator to authenticate...
+  &lt;Limit Pause-Printer Resume-Printer Set-Printer-Attributes Enable-Printer \
+Disable-Printer Pause-Printer-After-Current-Job Hold-New-Jobs Release-Held-New-Jobs \
+Deactivate-Printer Activate-Printer Restart-Printer Shutdown-Printer Startup-Printer \
+Promote-Job Schedule-Job-After CUPS-Add-Printer CUPS-Delete-Printer CUPS-Add-Class \
+CUPS-Delete-Class CUPS-Accept-Jobs CUPS-Reject-Jobs CUPS-Set-Default&gt;
+    AuthType Basic
+    Require user @SYSTEM
+    Order deny,allow
+  &lt;/Limit&gt;
+
+  # Only the owner or an administrator can cancel or authenticate a job...
+  &lt;Limit Cancel-Job CUPS-Authenticate-Job&gt;
+    Require user @OWNER @SYSTEM
+    Order deny,allow
+  &lt;/Limit&gt;
+
+  &lt;Limit All&gt;
+    Order deny,allow
+  &lt;/Limit&gt;
+&lt;/Policy&gt;</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="printing-cups-clients.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ix01.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">5. Конфигурирование клиентов CUPS </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Предметный указатель</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

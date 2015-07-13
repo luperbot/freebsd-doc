@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>8.19. Comment mettre en oeuvre le courrier électronique avec une connexion temporaire à un réseau ?</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Questions Fréquemment Posées sur FreeBSD 2.X, 3.X et 4.X" /><link rel="up" href="admin.html" title="Chapitre 8. Administration système. **Mise à jour en cours**" /><link rel="prev" href="ch08s18.html" title="8.18. Comment configurer sendmail pour fonctionner avec UUCP ?" /><link rel="next" href="ch08s20.html" title="8.20. Horreur !! J'ai perdu le mot de passe de root !!" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8.19. Comment mettre en oeuvre le courrier électronique avec une connexion temporaire à un réseau ?</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch08s18.html">Précédent</a> </td><th width="60%" align="center">Chapitre 8. Administration système. **Mise à jour en cours**</th><td width="20%" align="right"> <a accesskey="n" href="ch08s20.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp67887440"></a>8.19. Comment mettre en oeuvre le courrier électronique avec une connexion temporaire à un réseau ?</h2></div></div></div><p>Si vous disposez d'un adresse IP statique, vous ne devez rien changer. Definissez juste votre nom de machine pour qu'il corresponde à votre nom de machine internet et sendmail s'occupera du reste.</p><p>Dans le cas ou vous disposez d'une adresse IP
+dynamiquement assignée et que vous utilisez une connexion ppp pour
+accèder à l'internet, vous diposez probablement d'une boite aux
+lettres chez votre fournisseur d'accès. Prenons comme exemple que le
+domaine de votre fournisseur soit <code class="filename">monISP.com</code>, que
+votre nom d'utilisateur soit <code class="filename">monlogin</code>, que votre nom
+de machine soit <code class="filename">bsd.perso</code> et que votre
+fournisseur vous aie indiqué la machine
+<code class="filename">relai.monISP.com</code> comme serveur relai de
+messagerie électronique.</p><p>Pour pouvoir recevoir votre courrier depuis votre boite à
+lettres, vous devez installer un agent de rapatriement de
+mail.<span class="emphasis"><em>Fetchmail</em></span> est un bon choix, car
+il supporte la plupart des protocoles de messagerie. La plupart du
+temps, votre fournisseur offre l'accès à travers le protocole POP3. Si
+vous avez décidé d'utiliser la partie utilisateur de ppp, vous pouvez
+automatiquement rapatrier votre courrier lorsque la connexion vers le
+réseau est établie en ajoutant la ligne suivante au fichier
+<code class="filename">/etc/ppp/ppp.linkup</code> :</p><pre class="programlisting">
+MYADDR:
+!bg su monlogin -c fetchmail
+</pre><p>Ici nous assumons que vous disposez d'un compte nommé
+<code class="filename">monlogin</code> sur la machine
+<code class="filename">bsd.perso</code>. Vous devez alors créer un fichier
+<code class="filename">.fetchmailrc</code> dans votre répertoire principal
+contenant :</p><pre class="programlisting">
+poll monISP.com protocol pop3 fetchall pass monPasswd:
+</pre><p>Naturellement, ce fichier ne doit être lisible que par
+l'utilisateur <code class="filename">monlogin</code> car il contient le mot de
+passe <code class="filename">monPasswd</code>.</p><p>Pour permettre d'envoyer du courrier avec l'entête
+<span class="emphasis"><em>from:</em></span> correcte, vous devez configurer
+sendmail pour utiliser l'adresse
+<code class="filename">monlogin@monISP.com</code> plutôt que
+<code class="filename">monlogin@bsd.perso</code>. Vous devez aussi dire à votre
+sendmail d'envoyer tout le courrier via le serveur
+<code class="filename">relai.monISP.com</code>, permettant au courrier
+d'être envoyé plus rapidement.</p><p>Le fichier de configuration <code class="filename">.mc</code> suivant doit convenir :</p><pre class="programlisting">
+VERSIONID(`bsd.perso.mc version 1.0')
+OSTYPE(bsd4.4)dnl
+FEATURE(nouucp)dnl
+MAILER(local)dnl
+MAILER(smtp)dnl
+Cwlocalhost
+Cwbsd.perso
+MASQUERADE_AS(`monISP.com')dnl
+FEATURE(allmasquerade)dnl
+FEATURE(masquerade_envelope)dnl
+FEATURE(nocanonify)dnl
+FEATURE(nodns)dnl
+define(SMART_HOST, `relai.monISP.com')
+Dmbsd.perso
+define(`confDOMAIN_NAME',`bsd.perso')dnl
+define(`confDELIVERY_MODE',`deferred')dnl
+</pre><p>Reférez-vous à la section précédente pour l'explication
+détaillée de conversion du fichier <code class="filename">.mc</code>en fichier
+<code class="filename">sendmail.cf</code>. N'oubliez pas non plus de redémarrer
+sendmail après avoir modifié le fichier
+<code class="filename">/etc/sendmail.cf</code></p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch08s18.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="admin.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch08s20.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">8.18. Comment configurer sendmail pour fonctionner avec UUCP ? </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 8.20. Horreur !! J'ai perdu le mot de passe de root !! </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

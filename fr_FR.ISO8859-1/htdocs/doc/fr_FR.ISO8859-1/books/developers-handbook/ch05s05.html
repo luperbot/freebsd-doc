@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>5.5. Make</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="tools.html" title="Chapitre 5. Outils de programmation" /><link rel="prev" href="ch05s04.html" title="5.4. Compiler avec cc" /><link rel="next" href="debugging.html" title="5.6. Déverminer" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5.5. Make</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s04.html">Précédent</a> </td><th width="60%" align="center">Chapitre 5. Outils de programmation</th><td width="20%" align="right"> <a accesskey="n" href="debugging.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp64522320"></a>5.5. Make</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64524496"></a>5.5.1. Qu'est-ce que <code class="command">make</code>?</h3></div></div></div><p>Quand vous travaillez sur un programme simple avec seulement
+      un ou deux fichiers source, taper
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cc fichier1.c fichier2.c</code></strong>
+      </pre><p>n'est pas si mal, mais cela devient rapidement fastidieux quand
+      il y a plusieurs fichiers&#8212;et cela peut prendre du temps à compiler aussi.
+      </p><p>Une façon de contourner cela est d'utiliser les fichiers objet
+      et de recompiler le fichier source seulement si le code source a changé.
+      Aussi, nous pourrions avoir quelque chose comme ça:
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>cc fichier1.o fichier2.o</code></strong> &#8230; <strong class="userinput"><code>fichier37.c</code></strong> &#8230;
+      </pre><p>si nous avions changé le fichier <code class="filename">fichier37.c</code> mais aucun
+      des autres depuis la dernère compilation. Cela pourrait accélerer assez bien
+      la compilation mais cela ne resoud pas le problème de la frappe au clavier.
+      </p><p>Ou nous pourrions écrire une procédure pour résoudre ce
+      problème de frappe, mais celle-ci devrait tout re-compiler, devenant
+      ainsi inefficace sur un gros projet.
+      </p><p>Que se passe-t-il si nous avons des centaines de fichiers source ?
+      Que se passe-t-il si nous travaillons dans une équipe avec
+      d'autres personnes qui oublient de nous dire quand ils ont changé
+      un de leurs fichiers source que nous utilisons ?
+      </p><p>Peut-être pourrions nous mettre ensemble les deux solutions et
+      écrire quelque chose comme une procédure qui contiendrait
+      quelque règle magique disant quand notre fichier source doit être
+      compilé. Maintenant, tout ce dont nous avons besoin est un programme
+      qui comprend ces règles, alors que c'est trop compliqué pour
+      l'interpréteur.
+      </p><p>Ce programme s'appelle <code class="command">make</code>. Il lit
+      dans un fichier, appelé un <em class="firstterm">makefile</em>,
+      qui lui dit comment les différents fichiers dépendent les
+      uns des autres, et détermine quels fichiers ont besoin d'être
+      recompilés et quels n'en ont pas besoin.
+      Par exemple, une règle pourrait dire quelque chose comme
+      <span class="quote">« <span class="quote">si <code class="filename">fromboz.o</code> est plus ancien que
+      <code class="filename">fromboz.c</code>, cela signifie que quelqu'un a dû
+      changer <code class="filename">fromboz.c</code>, aussi il a besoin d'être
+      recompilé.</span> »</span> Le makefile possède aussi des règles
+      pour dire à <code class="command">make</code> <span class="emphasis"><em>comment</em></span>
+      re-compiler un fichier source, en faisant ainsi un outil encore plus
+      puissant.
+      </p><p>Les <code class="filename">Makefile</code>s sont typiquement stockés dans le même
+      répertoire que le source auxquels il s'appliquent, et peuvent être
+      appelés <code class="filename">makefile</code>, <code class="filename">Makefile</code>
+      ou <code class="filename">MAKEFILE</code>. La plupart des programmeurs utilise le nom
+      <code class="filename">Makefile</code>, celui-ci se trouvant proche du début de la
+      liste du contenu du répertoire où il peut être facilement vu.
+
+	<a href="#ftn.idp64574544" class="footnote" id="idp64574544"><sup class="footnote">[7]</sup></a>
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64578256"></a>5.5.2. Exemple d'utilisation de <code class="command">make</code></h3></div></div></div><p>Voici un exemple très simple de <code class="filename">Makefile</code>:
+      </p><pre class="programlisting">foo: foo.c
+	cc -o foo foo.c</pre><p>Il consiste en deux lignes, une ligne de dépendance et une ligne
+      de création.
+      </p><p>La ligne de dépendance ici consiste en le nom du programme (connu comme
+      <em class="firstterm">cible</em>), suivi de deux-points puis un espace et enfin
+      le nom du fichier source.
+      Quand <code class="command">make</code> lit cette ligne, il vérifie si
+       <code class="filename">foo</code> existe; s'il existe, il compare la date à laquelle
+       <code class="filename">foo</code> a été modifié la dernière fois
+       avec la date de dernière modification de <code class="filename">foo.c</code>.
+       Si <code class="filename">foo</code> n'existe pas ou est plus ancien que <code class="filename">foo.c</code>,
+       il regarde la ligne de création pour trouver ce qu'il doit faire.
+       En d'autres termes, il s'agit de la règle à utiliser quand
+       <code class="filename">foo.c</code> a besoin d'être re-compilé.
+       </p><p>La ligne de création commence avec un <span class="token">tab</span> (appuyez
+      sur la touche <span class="keycap"><strong>tab</strong></span>) suivi de la commande que vous taperiez
+      pour créer <code class="filename">foo</code> si vous deviez le faire à l'invite
+      de commandes. Si <code class="filename">foo</code> n'est pas à jour ou n'existe
+      pas, <code class="command">make</code> exécute alors cette commande pour
+      le créer. En d'autres termes, il s'agit de la règle permettant
+      à make de re-compiler <code class="filename">foo.c</code>.
+      </p><p>Aussi, quand vous tapez <strong class="userinput"><code>make</code></strong>, il vérifiera
+      que <code class="filename">foo</code> est à jour en respect de vos derniers
+      changements sur <code class="filename">foo.c</code>. Ce principe peut être
+      étendu à des <code class="filename">Makefile</code>s de plusieurs
+      centaines de cibles&#8212;en fait, sur FreeBSD, il est possible de
+      compiler un système d'exploitation entier en tapant juste
+      <strong class="userinput"><code>make world</code></strong> dans le répertoire approprié !
+      </p><p>Une autre propriété utile des makefiles est que les cibles
+      n'ont pas nécessairement besoin d'être des programmes.
+      Par exemple, nous pourrions avoir un <code class="filename">Makefile</code>
+      qui ressemble à cela:
+      </p><pre class="programlisting">foo: foo.c
+	cc -o foo foo.c
+
+install:
+	cp foo /home/moi</pre><p>Nous pouvons dire à <code class="command">make</code> quelle cible nous
+      voulons en tapant:
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>make cible</code></strong>
+      </pre><p><code class="command">make</code> ira seulement voir cette cible
+      et ingorera les autres. Par exemple, si nous tapons
+      <strong class="userinput"><code>make foo</code></strong> avec le <code class="filename">Makefile</code> du dessus,
+      <code class="command">make</code> ignorera la cible <span class="phrase">install</span>.
+      </p><p>Si nous tapons juste <strong class="userinput"><code>make</code></strong>,
+      <code class="command">make</code> regardera toujours la première cible et s'arrêtera
+      sans regarder aucune autre. Aussi, si nous avions tapé <strong class="userinput"><code>make</code></strong>
+      seul, <code class="command">make</code> serait juste allé à la cible <span class="phrase">foo</span>,
+      aurait recompilé <code class="filename">foo</code> si nécessaire et se
+      serait arrêté sans aller à la cible <span class="phrase">install</span>.
+      </p><p>Notez que la cible <span class="phrase">install</span> ne dépend pour l'instant
+      de rien ! Cela signifie que la commande qui suit est toujours exécutée
+      lorsque nous essayons de créer cette cible en tapant <strong class="userinput"><code>make install</code></strong>.
+      Dans ce cas, <code class="command">make</code> va copier <code class="filename">foo</code> dans le
+      répertoire de l'utilisateur. Cela est souvent utilisé par les
+      <code class="filename">Makefile</code>s des applications, ainsi l'application
+      peut être installée dans le répertoire correct
+      quand elle a été correctement compilée
+      </p><p>Il s'agit d'un sujet légèrement embrouillant à essayer
+      et expliquer.
+      Si vous ne comprenez pas bien comment <code class="command">make</code>
+      fonctionne, la meilleure chose à faire est d'écrire un petit
+      programme comme <span class="quote">« <span class="quote">bonjour monde</span> »</span> et un fichier <code class="filename">Makefile</code>
+      comme le précédent et de le tester. Ensuite continuez en
+      utilisant plus d'un fichier source ou en ayant un fichier source
+      incluant un fichier d'en-tête. La commande <code class="command">touch</code> est
+      très utile ici&#8212;elle change la date sur un fichier sans avoir
+      à l'éditer.
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64695760"></a>5.5.3. Les <code class="filename">Makefiles</code>de FreeBSD</h3></div></div></div><p>Les <code class="filename">Makefile</code>s peuvent être plutôt compliqués
+      à écrire. Heureusement, les systèmes BSD comme FreeBSD sont fournis avec
+      des fichiers très puissants comme partie intégrante du système.
+      Un très bon exemple est le système des logiciels portés. Voici
+      la partie essentielle d'un <code class="filename">Makefile</code> typique des logiciels portés:
+      </p><pre class="programlisting">MASTER_SITES=   ftp://freefall.cdrom.com/pub/FreeBSD/LOCAL_PORTS/
+DISTFILES=      scheme-microcode+dist-7.3-freebsd.tgz
+
+.include &lt;bsd.port.mk&gt;</pre><p>Maintenant, si nous allons dans le répertoire de ce logiciel porté et
+      tapons <strong class="userinput"><code>make</code></strong>, la chose suivante se passe :
+      </p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Une vérification est faite pour voir si le code source de ce logiciel porté
+	  est déjà dans le système.
+	  </p></li><li class="step"><p>Si celui-ci n'y est pas, une connexion FTP à l'URL dans
+	  <span class="symbol">MASTER_SITES</span> est faite pour télécharger le source.
+	  </p></li><li class="step"><p>La somme de contrôle (<code class="literal">checksum</code>) du source est calculée
+	  et comparée avec celle d'une bonne et connue copie du source. Cela est fait pour
+	  être sûr que le source n'a pas été corrompu pendant le transfert.
+	  </p></li><li class="step"><p>Tout changement requis pour faire fonctionner le source sur FreeBSD est appliqué&#8212;
+	  cela est connu sous le nom de <em class="firstterm">correctif</em><a href="#ftn.idp64725968" class="footnote" id="idp64725968"><sup class="footnote">[8]</sup></a>.
+	  </p></li><li class="step"><p>Toute configuration spéciale nécessaire pour le source est faite.
+	  (Beaucoup de distributions de programmes Unix essaye de fonctionner quelle que soit
+	  la version d'Unix sur laquelle elles sont compilées et quelles que soient les
+	  caractéristiques optionnelles qui sont présentes&#8212;c'est ce qui se trouve
+	  dans le scénario des logiciels portés pour FreeBSD).
+	  </p></li><li class="step"><p>Le code source pour ce programme est compilé. En effet, nous changeons
+	  de répertoire pour le répertoire où le source a été
+	  décompressé et faisons <code class="command">make</code>&#8212;le fichier <code class="filename">Makefile</code>
+	  du programme contient les informations nécessaires pour construire le programme.
+	  </p></li><li class="step"><p>Nous avons maintenant une version compilée du programme. Si nous le désirons,
+	  nous pouvons le tester maintenant; quand nous sommes confiant dans le programme, nous pouvons
+	  taper <strong class="userinput"><code>make install</code></strong>. Cela va installer le programme et ses fichiers de
+	  soutien nécessaires au bon endroit; une entrée est aussi créée dans
+	  la <span class="database">base de données des logiciels pré-compilés</span>, ainsi
+	  le logiciel porté peut être facilement désinstallé plus tard si
+	  nous changeons d'avis sur ce programme.
+	  </p></li></ol></div><p>Maintenant je pense que vous serez d'accord que c'est plus impressionnant qu'une
+      procédure de quatre lignes !
+      </p><p>Le secret réside dans la dernière ligne qui dit à
+      <code class="command">make</code> de regarder dans le <code class="filename">Makefile</code> système
+      appelé <code class="filename">bsd.port.mk</code>. Il est facile de fermer les yeux sur cette
+      ligne mais c'est ici que tous les trucs forts se passent&#8212;quelqu'un a écrit un <code class="filename">Makefile</code>
+      qui dit à <code class="command">make</code> de faire tout ce qu'il y a au-dessus (plus un couple d'autres choses
+      que je n'ai pas mentionnées, comme la gestion des erreurs) et n'importe qui peut avoir accès
+      à cela simplement est ajoutant une simple ligne dans son propre fichier <code class="filename">Makefile</code> !
+      </p><p>Si vous voulez jeter un regard sur ces <code class="filename">Makefile</code>s système,
+      ils se trouvent <code class="filename">/usr/share/mk</code> mais il est probablement mieux
+      d'attendre un moment jusqu'à ce que vous ayez un peu d'entrainement avec les
+      <code class="filename">Makefile</code>s car ceux-ci sont très compliqués (et
+      si vous les lisez, soyez sûr d'avoir un thermos de café fort à portée
+      de main !)
+      </p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64760016"></a>5.5.4. Utilisations plus avancées de <code class="command">make</code></h3></div></div></div><p><code class="command">Make</code> est un outil très puissant et peut
+      faire beaucoup plus que le simple exemple précédent ne l'a montré.
+      Malheureusement, il y a différentes versions de <code class="command">make</code>
+      et elles diffèrent considérablement.
+      Le meilleur moyen d'apprendre ce qu'elles peuvent faire est probablement de lire
+      la documentation&#8212;heureusement cette introduction vous donnera la base
+      à partir de laquelle vous pourrez faire cela.
+      </p><p>La version de <code class="command">make</code> fournies avec FreeBSD est le
+      <span class="application">Berkeley make</span>(make de Berkeley); il y a un cours d'instruction
+      pour celui-ci dans <code class="filename">/usr/share/doc/psd/12.make</code>. Pour le voir, faites
+      </p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>zmore paper.ascii.gz</code></strong>
+      </pre><p>dans ce répertoire.</p><p>Beaucoup d'applications dans les logiciels portés utilisent
+      <span class="application">GNU make</span>, qui possède un très bon ensemble de page
+      d'<span class="quote">« <span class="quote">info</span> »</span>. Si vous avez installé un de ces logiciels portés,
+      <span class="application">GNU make</span> aura été automatiquement installé
+      sous le nom de <code class="command">gmake</code>. Il est aussi disponible comme logiciel porté ou
+      logiciel pré-compilé seul.
+      </p><p>Pour voir les pages d'info pour <span class="application">GNU make</span>, vous devrez
+      editer le fichier <code class="filename">dir</code> dans le répertoire
+      <code class="filename">/usr/local/info</code> pour ajouter une entrée pour celui-ci.
+      Cela implique d'ajouter une ligne
+      </p><pre class="programlisting"> * Make: (make).                 l'utilitaire GNU Make.</pre><p>au fichier. Une fois que vous avez fait ceci, vous pouvez taper
+	<strong class="userinput"><code>info</code></strong> et ensuite sélectionner
+	<span class="guimenuitem">make</span> dans le menu (ou dans <span class="application">Emacs</span>,
+	faites <strong class="userinput"><code>C-h i</code></strong>).
+      </p></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp64574544" class="footnote"><p><a href="#idp64574544" class="para"><sup class="para">[7] </sup></a>Ils n'utilisent pas la forme <code class="filename">MAKEFILE</code>
+	  car les bloques de majuscules sont souvent utilisés pour les
+	  fichiers de documentation comme <code class="filename">README</code>.
+	  </p></div><div id="ftn.idp64725968" class="footnote"><p><a href="#idp64725968" class="para"><sup class="para">[8] </sup></a>NDT: On entendra plus souvent parler de
+	  <code class="literal">patch</code>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s04.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="tools.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="debugging.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">5.4. Compiler avec <code class="command">cc</code> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 5.6. Déverminer</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

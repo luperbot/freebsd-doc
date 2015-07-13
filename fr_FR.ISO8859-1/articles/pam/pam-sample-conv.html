@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>C. Exemple d'une fonction de conversation PAM</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Pluggable Authentication Modules" /><link rel="up" href="index.html" title="Pluggable Authentication Modules" /><link rel="prev" href="pam-sample-module.html" title="B. Exemple d'un module PAM" /><link rel="next" href="pam-further.html" title="Lectures complémentaires" /><link rel="copyright" href="pam-legalnotice.html" title="Note légale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">C. Exemple d'une fonction de conversation PAM</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="pam-sample-module.html">Précédent</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pam-further.html">Suivant</a></td></tr></table><hr /></div><div class="appendix"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="pam-sample-conv"></a>C. Exemple d'une fonction de conversation PAM</h2></div></div></div><p>La  fonction  de conversation  présentée  ci-dessous est  une
+    version      grandement     simplifiée     de      la     fonction
+    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=openpam_ttyconv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">openpam_ttyconv</span>(3)</span></a> d'OpenPAM. Elle est pleinement fonctionnelle
+    et devrait  donner au  lecteur une bonne  idée de comment  doit se
+    comporter une fonction de  conversation, mais elle est trop simple
+    pour une utilisation réelle.  Même si vous n'utilisez pas OpenPAM,
+    N'hésitez pas à  télécharger le  code  source et  d'adapter
+    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=openpam_ttyconv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">openpam_ttyconv</span>(3)</span></a>  à vos besoins,  nous pensons  qu'elle est
+    raisonnablement  aussi  robuste  qu'une fonction  de  conversation
+    orientée tty peut l'être.</p><pre class="programlisting">
+/*-
+ * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * All rights reserved.
+ *
+ * This software was developed for the FreeBSD Project by ThinkSec AS and
+ * Network Associates Laboratories, the Security Research Division of
+ * Network Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+#include &lt;security/pam_appl.h&gt;
+
+int
+converse(int n, const struct pam_message **msg,
+	struct pam_response **resp, void *data)
+{
+	struct pam_response *aresp;
+	char buf[PAM_MAX_RESP_SIZE];
+	int i;
+
+	data = data;
+	if (n &lt;= 0 || n &gt; PAM_MAX_NUM_MSG)
+		return (PAM_CONV_ERR);
+	if ((aresp = calloc(n, sizeof *aresp)) == NULL)
+		return (PAM_BUF_ERR);
+	for (i = 0; i &lt; n; ++i) {
+		aresp[i].resp_retcode = 0;
+		aresp[i].resp = NULL;
+		switch (msg[i]-&gt;msg_style) {
+		case PAM_PROMPT_ECHO_OFF:
+			aresp[i].resp = strdup(getpass(msg[i]-&gt;msg));
+			if (aresp[i].resp == NULL)
+				goto fail;
+			break;
+		case PAM_PROMPT_ECHO_ON:
+			fputs(msg[i]-&gt;msg, stderr);
+			if (fgets(buf, sizeof buf, stdin) == NULL)
+				goto fail;
+			aresp[i].resp = strdup(buf);
+			if (aresp[i].resp == NULL)
+				goto fail;
+			break;
+		case PAM_ERROR_MSG:
+			fputs(msg[i]-&gt;msg, stderr);
+			if (strlen(msg[i]-&gt;msg) &gt; 0 &amp;&amp;
+			    msg[i]-&gt;msg[strlen(msg[i]-&gt;msg) - 1] != '\n')
+				fputc('\n', stderr);
+			break;
+		case PAM_TEXT_INFO:
+			fputs(msg[i]-&gt;msg, stdout);
+			if (strlen(msg[i]-&gt;msg) &gt; 0 &amp;&amp;
+			    msg[i]-&gt;msg[strlen(msg[i]-&gt;msg) - 1] != '\n')
+				fputc('\n', stdout);
+			break;
+		default:
+			goto fail;
+		}
+	}
+	*resp = aresp;
+	return (PAM_SUCCESS);
+ fail:
+        for (i = 0; i &lt; n; ++i) {
+                if (aresp[i].resp != NULL) {
+                        memset(aresp[i].resp, 0, strlen(aresp[i].resp));
+                        free(aresp[i].resp);
+                }
+        }
+        memset(aresp, 0, n * sizeof *aresp);
+	*resp = NULL;
+	return (PAM_CONV_ERR);
+}
+
+</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pam-sample-module.html">Précédent</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="pam-further.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">B. Exemple d'un module PAM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Lectures complémentaires</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

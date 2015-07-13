@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>16.6. Εφαρμογή των Jails</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Εγχειρίδιο του FreeBSD" /><link rel="up" href="jails.html" title="Κεφάλαιο 16. Jails" /><link rel="prev" href="jails-tuning.html" title="16.5. Λεπτομερής Ρύθμιση και Διαχείριση" /><link rel="next" href="mac.html" title="Κεφάλαιο 17. Υποχρεωτικός Έλεγχος Πρόσβασης" /><link rel="copyright" href="legalnotice.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">16.6. Εφαρμογή των Jails</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="jails-tuning.html">Προηγ</a> </td><th width="60%" align="center">Κεφάλαιο 16. Jails</th><td width="20%" align="right"> <a accesskey="n" href="mac.html">Επόμενο</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="jails-application"></a>16.6. Εφαρμογή των Jails</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails"></a>16.6.1. Service Jails</h3></div><div><span class="authorgroup">Συνεισφορά του <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p>Η ενότητα αυτή είναι βασισμένη στην ιδέα που παρουσιάστηκε αρχικά
+	από τον Simon L. B. Nielsen στο <code class="uri"><a class="uri" href="http://simon.nitro.dk/service-jails.html" target="_top">http://simon.nitro.dk/service-jails.html</a></code>, καθώς και
+	σε ένα ανανεωμένο άρθρο του Ken Tom <code class="email">&lt;<a xmlns="" class="email" href="mailto:locals@gmail.com">locals@gmail.com</a>&gt;</code>.
+	Στην ενότητα αυτή θα σας δείξουμε πως να στήσετε ένα σύστημα FreeBSD το
+	οποίο να διαθέτει ένα επιπλέον επίπεδο ασφάλειας, με τη χρήση του
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jail</span>(8)</span></a>.  Υποθέτουμε ότι το σύστημα τρέχει τουλάχιστον RELENG_6_0
+	και ότι έχετε κατανοήσει όλες τις προηγούμενες πληροφορίες του
+	κεφαλαίου.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-design"></a>16.6.1.1. Σχεδιασμός</h4></div></div></div><p>Ένα από τα σημαντικότερα προβλήματα με τα jails είναι η
+	  διαχείριση της διαδικασίας αναβαθμίσεων.  Αυτό τείνει να είναι
+	  πρόβλημα διότι το κάθε jail πρέπει να δημιουργηθεί από την αρχή σε
+	  κάθε αναβάθμιση.  Συνήθως δεν είναι πρόβλημα αν έχετε ένα μόνο jail,
+	  μια και πρόκειται για σχετικά απλή διαδικασία, αλλά γίνεται
+	  κουραστική και χρονοβόρα αν έχετε πολλά jails.</p><div xmlns="" class="warning"><h3 class="admontitle">Προειδοποίηση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Οι παρακάτω ρυθμίσεις προϋποθέτουν εμπειρία με το FreeBSD και τη
+	    χρήση των διάφορων χαρακτηριστικών του.  Εάν τα παρακάτω βήματα
+	    σας φαίνονται πολύ περίπλοκα, είναι καλύτερα να ρίξετε μια ματιά
+	    σε κάτι ποιο απλό όπως το
+	    <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/ezjail/pkg-descr">sysutils/ezjail</a>, το οποίο
+	    παρέχει έναν ευκολότερο τρόπο διαχείρισης των jails του FreeBSD και
+	    δεν είναι τόσο εξειδικευμένο όσο οι παρακάτω ρυθμίσεις.</p></div><p>Η ιδέα αυτή έχει παρουσιαστεί για να λύσει τέτοιου είδους
+	  προβλήματα, με την βοήθεια της κοινής χρήσης όσο το δυνατόν
+	  περισσότερων αρχείων μεταξύ των jails, με έναν ασφαλή
+	  όμως τρόπο - χρησιμοποιώντας προσαρτήσεις τύπου
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mount_nullfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mount_nullfs</span>(8)</span></a> και μόνο για ανάγνωση (read only)
+	  έτσι ώστε η αναβάθμιση να είναι ευκολότερη, και η χρήση μεμονωμένων
+	  jails για κάθε υπηρεσία να καθίσταται επιθυμητή.  Επιπλέον, παρέχει
+	  έναν απλό τρόπο για να προσθέσετε και να αφαιρέσετε jails όπως
+	  επίσης και να τα αναβαθμίσετε.</p><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Παραδείγματα υπηρεσιών τέτοιου τύπου: ένας
+	  <acronym class="acronym">HTTP</acronym> server, ένας <acronym class="acronym">DNS</acronym>
+	  server, ένας <acronym class="acronym">SMTP</acronym> server, κλπ.</p></div><p>Οι στόχοι των παρακάτω ρυθμίσεων είναι:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Δημιουργία απλών και κατανοητών jails.
+	      Αυτό σημαίνει ότι <span class="emphasis"><em>δεν</em></span> θα τρέξουμε ένα
+	      πλήρες installworld σε κάθε jail.</p></li><li class="listitem"><p>Εύκολη προσθήκη και διαγραφή jails.</p></li><li class="listitem"><p>Εύκολη αναβάθμιση υπαρχόντων jails.</p></li><li class="listitem"><p>Δυνατότητα δημιουργίας προσαρμοσμένου τμήματος
+	      του FreeBSD.</p></li><li class="listitem"><p>Όσο περισσότερη ασφάλεια είναι δυνατόν, με ελαχιστοποίηση
+	      της πιθανότητας κακόβουλης χρήσης.</p></li><li class="listitem"><p>Εξοικονόμηση χώρου και inodes.</p></li></ul></div><p>Όπως έχουμε ήδη πει, ο σχεδιασμός αυτός εξαρτάται ιδιαίτερα από
+	  την ύπαρξη ενός αρχικού template στο οποίο δεν επιτρέπεται η
+	  εγγραφή δεδομένων (γνωστό ως <span class="application">nullfs</span>) και
+	  το οποίο πρέπει να έχει προσαρτηθεί σε κάθε jail, όπως επίσης και
+	  στην ύπαρξη για κάθε jail μιας συσκευής που να επιτρέπει τόσο την
+	  ανάγνωση όσο και την εγγραφή.  Μια τέτοια συσκευή μπορεί να είναι
+	  κάποιος ξεχωριστός φυσικός δίσκος, μια κατάτμηση, ή κάποια συσκευή
+	  vnode <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=md&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">md</span>(4)</span></a>.  Στο παρακάτω παράδειγμα, θα χρησιμοποιήσουμε
+	  προσαρτήσεις τύπου <span class="application">nullfs</span> στις οποίες
+	  θα επιτρέπεται εγγραφή και ανάγνωση.</p><p>Η δομή του συστήματος αρχείων περιγράφεται στην παρακάτω
+	  λίστα:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Κάθε jail θα προσαρτάται κάτω από τον κατάλογο <code class="filename">/home/j</code>.</p></li><li class="listitem"><p>Το <code class="filename">/home/j/mroot</code>
+	      είναι το template για το κάθε jail και η κατάτμηση μόνο
+	      ανάγνωσης για όλα τα jails.</p></li><li class="listitem"><p>Θα δημιουργηθεί ένας κενός κατάλογος για κάθε jail κάτω
+	      από τον κατάλογο
+	      <code class="filename">/home/j</code>.</p></li><li class="listitem"><p>Κάθε jail θα έχει έναν κατάλογο
+	      <code class="filename">/s</code>, ο οποίος θα είναι
+	      σύνδεσμος προς το εγγράψιμο μέρος του συστήματος.</p></li><li class="listitem"><p>Κάθε jail θα έχει το δικό εγγράψιμο μέρος το οποίο
+	      θα βασίζεται στο
+	      <code class="filename">/home/j/skel</code>.</p></li><li class="listitem"><p>Κάθε jailspace (το εγγράψιμο μέρος κάθε jail) θα πρέπει
+	      να δημιουργηθεί στον κατάλογο
+	      <code class="filename">/home/js</code>.</p></li></ul></div><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Όλα αυτά προϋποθέτουν ότι τα jails βρίσκονται κάτω από τον
+	    κατάλογο <code class="filename">/home</code>.  Αυτό
+	    βέβαια μπορεί να αλλάξει σε οτιδήποτε εσείς θέλετε, αλλά θα
+	    επηρεάσει όλα τα παρακάτω παραδείγματα.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-template"></a>16.6.1.2. Δημιουργώντας το Template</h4></div></div></div><p>Η ενότητα αυτή θα περιγράψει τα βήματα που χρειάζονται
+	  προκειμένου να δημιουργήσετε το πρωταρχικό template το οποίο θα
+	  περιέχει το τμήμα των jails που είναι μόνο για ανάγνωση.</p><p>Είναι πάντοτε καλή ιδέα να αναβαθμίζετε το FreeBSD στη τελευταία
+	  έκδοση -RELEASE.  Για το σκοπό αυτό, διαβάστε το αντίστοιχο
+	  <a class="link" href="../../../../doc/el_GR.ISO8859-7/books/handbook/makeworld.html" target="_top">κεφάλαιο</a>
+	  στο Εγχειρίδιο.  Στη περίπτωση που η αναβάθμιση
+	  δεν είναι εφικτή, θα χρειαστείτε buildworld για να μπορέσετε να
+	  συνεχίσετε.  Επιπλέον θα χρειαστείτε το πακέτο
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a>.  Θα
+	  χρησιμοποιήσουμε το βοηθητικό πρόγραμμα <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=portsnap&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">portsnap</span>(8)</span></a> για να
+	  κατεβάσουμε τη συλλογή των Ports.  Για τους νεο-εισερχόμενους,
+	  συνίσταται η ανάγνωση του <a class="link" href="../../../../doc/el_GR.ISO8859-7/books/handbook/portsnap.html" target="_top">κεφαλαίου για το
+	    Portsnap</a> στο Εγχειρίδιο του FreeBSD.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Αρχικά, δημιουργήστε μια δομή καταλόγων για το σύστημα
+	      αρχείων το οποίο θα είναι μόνο για ανάγνωση, και το οποίο θα
+	      περιέχει τα εκτελέσιμα (binaries) του FreeBSD για τα jails.
+	      Στη συνέχεια πηγαίνετε στον κατάλογο όπου βρίσκονται τα αρχεία
+	      πηγαίου κώδικα (source tree) του FreeBSD και
+	      εγκαταστήστε τα αντίστοιχα αρχεία στο jail template:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot</code></strong></pre></li><li class="step"><p>Επόμενο βήμα είναι να προετοιμάσετε τη συλλογή των Ports
+	      του FreeBSD για τα jails όπως επίσης και ένα FreeBSD source tree, το
+	      οποίο θα χρειαστεί για το
+	      <span class="application">mergemaster</span>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir usr/ports</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>portsnap -p /home/j/mroot/usr/ports fetch extract</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src /home/j/mroot/usr/src</code></strong></pre></li><li class="step"><p>Δημιουργήστε το σκελετό για το τμήμα του συστήματος όπου
+	      προορίζεται για ανάγνωση και εγγραφή:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/skel /home/j/skel/home /home/j/skel/usr-X11R6 /home/j/skel/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv etc /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv usr/local /home/j/skel/usr-local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv tmp /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv var /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv root /home/j/skel</code></strong></pre></li><li class="step"><p>Χρησιμοποιήστε το <span class="application">mergemaster</span>
+	      για να εγκαταστήσετε τα αρχεία ρυθμίσεων που λείπουν.  Στη
+	      συνέχεια διαγράψτε όλους τους έξτρα καταλόγους
+	      που δημιουργεί το <span class="application">mergemaster</span>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mergemaster -t /home/j/skel/var/tmp/temproot -D /home/j/skel -i</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/skel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R bin boot lib libexec mnt proc rescue sbin sys usr dev</code></strong></pre></li><li class="step"><p>Τώρα, δημιουργήστε συνδέσμους από το σύστημα αρχείων στο
+	      οποίο επιτρέπεται η εγγραφή, προς το σύστημα αρχείων που είναι
+	      μόνο για ανάγνωση.  Βεβαιωθείτε ότι οι σύνδεσμοι έχουν
+	      δημιουργηθεί στις σωστές θέσεις <code class="filename">s/</code>.  Η ύπαρξη πραγματικών
+	      καταλόγων ή η δημιουργία καταλόγων σε λάθος θέσεις θα οδηγήσουν
+	      την εγκατάσταση σε αποτυχία.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../../s/distfiles usr/ports/distfiles</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Σαν τελευταίο βήμα, δημιουργήστε ένα γενικό αρχείο
+	      <code class="filename">/home/j/skel/etc/make.conf</code> με τα παρακάτω
+	      δεδομένα:</p><pre class="programlisting">WRKDIRPREFIX?=  /s/portbuild</pre><p>Έχοντας ορίσει το <code class="literal">WRKDIRPREFIX</code> με
+	      αυτόν τον τρόπο, θα μπορείτε να μεταγλωττίσετε ports του FreeBSD
+	      μέσα σε κάθε jail.  Θυμηθείτε ότι ο κατάλογος των ports είναι
+	      μέρος του συστήματος αρχείων που έχει προσαρτηθεί μόνο για
+	      ανάγνωση.  Η προσαρμοσμένη διαδρομή για το
+	      <code class="literal">WRKDIRPREFIX</code> επιτρέπει την μεταγλώττιση
+	      των ports στο εγγράψιμο μέρος του κάθε jail.</p></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-creating"></a>16.6.1.3. Δημιουργώντας Jails</h4></div></div></div><p>Τώρα που έχουμε ένα ολοκληρωμένο FreeBSD jail template, μπορούμε να
+	  εγκαταστήσουμε και να ρυθμίσουμε τα jails στο
+	  <code class="filename">/etc/rc.conf</code>.  Το παράδειγμα αυτό δείχνει
+	  τη δημιουργία τριών jails: <span class="quote">«<span class="quote">NS</span>»</span>,
+	  <span class="quote">«<span class="quote">MAIL</span>»</span> και <span class="quote">«<span class="quote">WWW</span>»</span>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Εισάγετε τις παρακάτω γραμμές στο αρχείο
+	      <code class="filename">/etc/fstab</code>, ώστε το μόνο για ανάγνωση
+	      template για τα jails και ο εγγράψιμος χώρος
+	      να είναι διαθέσιμα στα αντίστοιχα jails:</p><pre class="programlisting">/home/j/mroot   /home/j/ns     nullfs  ro  0   0
+/home/j/mroot   /home/j/mail   nullfs  ro  0   0
+/home/j/mroot   /home/j/www    nullfs  ro  0   0
+/home/js/ns     /home/j/ns/s   nullfs  rw  0   0
+/home/js/mail   /home/j/mail/s nullfs  rw  0   0
+/home/js/www    /home/j/www/s  nullfs  rw  0   0</pre><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Οι κατατμήσεις που είναι σημειωμένες με 0 pass number δεν
+		ελέγχονται κατά την εκκίνηση από το <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a>, ενώ για τις
+		κατατμήσεις με 0 dump number, η <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a> δεν θα
+		δημιουργεί αντίγραφα ασφαλείας.  Προφανώς, δεν θέλουμε το
+		<span class="application">fsck</span> να ελέγχει τις προσαρτήσεις
+		τύπου <span class="application">nullfs</span>, ούτε και το
+		<span class="application">dump</span> να κρατά αντίγραφα από τα
+		μόνο για ανάγνωση nullfs συστήματα αρχείων των jails.  Αυτός
+		είναι και ο λόγος που βάλαμε <span class="quote">«<span class="quote">0 0</span>»</span> στις δύο
+		τελευταίες στήλες κάθε εγγραφής του
+		<code class="filename">fstab</code>.</p></div></li><li class="step"><p>Ρυθμίστε τα jails στο
+	      <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">jail_enable="YES"
+jail_set_hostname_allow="NO"
+jail_list="ns mail www"
+jail_ns_hostname="ns.example.org"
+jail_ns_ip="192.168.3.17"
+jail_ns_rootdir="/home/j/ns"
+jail_ns_devfs_enable="YES"
+jail_mail_hostname="mail.example.org"
+jail_mail_ip="192.168.3.18"
+jail_mail_rootdir="/home/j/mail"
+jail_mail_devfs_enable="YES"
+jail_www_hostname="www.example.org"
+jail_www_ip="62.123.43.14"
+jail_www_rootdir="/home/j/www"
+jail_www_devfs_enable="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Προειδοποίηση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ο λόγος για τον οποίο θέτουμε τη μεταβλητή
+		<code class="varname">jail_<em class="replaceable"><code>name</code></em>_rootdir</code>
+		να δείχνει στο
+		<code class="filename">/usr/home</code>
+		αντί για το <code class="filename">/home</code>
+		είναι ότι η φυσική διαδρομή για τον κατάλογο
+		<code class="filename">/home </code> σε μια τυπική
+		εγκατάσταση του FreeBSD είναι το
+		<code class="filename">/usr/home</code>.  Η μεταβλητή
+		<code class="varname">jail_<em class="replaceable"><code>name</code></em>_rootdir</code>
+		<span class="emphasis"><em>δεν</em></span> δεν πρέπει να δείχνει προς διαδρομή
+		που περιλαμβάνει συμβολικό δεσμό, διαφορετικά τα jails θα
+		αρνηθούν να ξεκινήσουν.  Χρησιμοποιήστε το βοηθητικό πρόγραμμα
+		<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=realpath&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">realpath</span>(1)</span></a> για να προσδιορίσετε την τιμή που θα πρέπει
+		να λάβει αυτή η μεταβλητή.  Δείτε το FreeBSD-SA-07:01.jail
+		Security Advisory για περισσότερες πληροφορίες.</p></div></li><li class="step"><p>Δημιουργήστε τα απαραίτητα σημεία προσαρτήσεων για το
+	      σύστημα αρχείων μόνο ανάγνωσης του κάθε jail:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/ns /home/j/mail /home/j/www</code></strong></pre></li><li class="step"><p>Εγκαταστήστε το εγγράψιμο template μέσα στο κάθε jail.
+	      Προσέξτε εδώ τη χρήση του
+	      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/sysutils/cpdup/pkg-descr">sysutils/cpdup</a>, το οποίο
+	      επιβεβαιώνει ότι δημιουργείται το σωστό αντίγραφο του κάθε
+	      καταλόγου:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/js</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /home/j/skel /home/js/www</code></strong></pre></li><li class="step"><p>Σε αυτή τη φάση, τα jails έχουν δημιουργηθεί και είναι
+	      έτοιμα να ξεκινήσουν.  Προσαρτήστε το σωστό σύστημα αρχείων
+	      για το κάθε jail, και στη συνέχεια εκκινήστε τα,
+	      χρησιμοποιώντας το script
+	      <code class="filename">/etc/rc.d/jail</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>Τα jails θα πρέπει τώρα να εκτελούνται κανονικά.  Γα να ελέγξετε
+	  αν έχουν ξεκινήσει σωστά, χρησιμοποιείστε την εντολή <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a>.
+	  Θα πρέπει να δείτε κάτι αντίστοιχο με το παρακάτω:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jls</code></strong>
+   JID  IP Address      Hostname                      Path
+     3  192.168.3.17    ns.example.org                /home/j/ns
+     2  192.168.3.18    mail.example.org              /home/j/mail
+     1  62.123.43.14    www.example.org               /home/j/www</pre><p>Σε αυτό το σημείο, θα πρέπει να μπορείτε να συνδεθείτε σε κάθε
+	  jail, να προσθέσετε νέους χρήστες ή να ρυθμίσετε υπηρεσίες.  Η στήλη
+	  <code class="literal">JID</code> δηλώνει το χαρακτηριστικό αναγνωριστικό
+	  αριθμό κάθε ενεργού jail.  Χρησιμοποιήστε την παρακάτω εντολή
+	  προκειμένου να εκτελέσετε εργασίες διαχείρισης του jail, με
+	  <code class="literal">JID</code> 3:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>jexec 3 tcsh</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="jails-service-jails-upgrading"></a>16.6.1.4. Αναβάθμιση</h4></div></div></div><p>Κάποια στιγμή, θα χρειαστεί να αναβαθμίσετε το σύστημά σας σε
+	  μια νέα έκδοση του FreeBSD, είτε για λόγους ασφάλειας, είτε γιατί
+	  υπάρχουν νέες δυνατότητες στην νεώτερη έκδοση οι οποίες είναι
+	  χρήσιμες για τα jails που ήδη έχετε.  Ο τρόπος που χρησιμοποιήσαμε
+	  για την δημιουργία των jails, επιτρέπει την εύκολη αναβάθμιση τους.
+	  Επιπλέον, ελαχιστοποιεί το χρόνο διακοπής της λειτουργίας τους, μια
+	  και θα χρειαστεί να τα σταματήσετε μόνο κατά τα λίγα τελευταία
+	  λεπτά.  Επίσης, παρέχει έναν τρόπο να επιστρέψετε σε παλαιότερες
+	  εκδόσεις εάν προκύψουν οποιαδήποτε σφάλματα.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Το πρώτο βήμα είναι να αναβαθμίσετε το σύστημα στο οποίο
+	      φιλοξενούνται τα jails, με το συνήθη τρόπο.  Στη συνέχεια
+	      δημιουργήστε ένα νέο προσωρινό template κατάλογο, μόνο για
+	      ανάγνωση, στο
+	      <code class="filename">/home/j/mroot2</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>make installworld DESTDIR=/home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cd /home/j/mroot2</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cpdup /usr/src usr/src</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir s</code></strong></pre><p>Το <code class="buildtarget">installworld</code> δημιουργεί
+	      μερικούς καταλόγους που δε χρειάζονται, και θα πρέπει
+	      να διαγραφούν:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chflags -R 0 var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>rm -R etc var root usr/local tmp</code></strong></pre></li><li class="step"><p>Δημιουργήστε ξανά τους συνδέσμους για το σύστημα αρχείων
+	      ανάγνωσης - εγγραφής:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s s/etc etc</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/root root</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/home home</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-local usr/local</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s ../s/usr-X11R6 usr/X11R6</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/tmp tmp</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s s/var var</code></strong></pre></li><li class="step"><p>Τώρα είναι η σωστή στιγμή για να σταματήσετε τα
+	      jails:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail stop</code></strong></pre></li><li class="step"><p>Αποπροσαρτήστε τα αρχικά συστήματα αρχείων:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/ns</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/mail</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www/s</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>umount /home/j/www</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Τα συστήματα αρχείων ανάγνωσης - εγγραφής είναι
+		προσαρτημένα στο σύστημα αρχείων μόνο ανάγνωσης
+		(<code class="filename">/s</code>) και πρέπει να
+		είναι τα πρώτα που θα αποπροσαρτηθούν.</p></div></li><li class="step"><p>Μετακινήστε τον παλιό μόνο για ανάγνωση κατάλογο, και
+	      αντικαταστήστε τον με τον καινούργιο.  Ο παλιός θα παραμείνει ως
+	      αντίγραφο ασφαλείας του παλιού συστήματος σε περίπτωση
+	      προβλήματος.  Ο τρόπος ονομασίας που ακολουθήσαμε εδώ
+	      αντιστοιχεί στη χρονική στιγμή δημιουργίας του νέου συστήματος
+	      αρχείων μόνο ανάγνωσης.  Μετακινήστε την αρχική συλλογή των
+	      Ports του FreeBSD στο νέο σύστημα, αρχείων προκειμένου να
+	      εξοικονομήσετε χώρο και inodes:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /home/j</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot mroot.20060601</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot2 mroot</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mv mroot.20060601/usr/ports mroot/usr</code></strong></pre></li><li class="step"><p>Σε αυτό το σημείο το μόνο για ανάγνωση template είναι
+	      έτοιμο, οπότε το μόνο που απομένει είναι να προσαρτήσετε ξανά
+	      τα συστήματα αρχείων και να ξεκινήσετε τα jails:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -a</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/jail start</code></strong></pre></li></ol></div><p>Χρησιμοποιείτε την εντολή <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jls&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">jls</span>(8)</span></a> για να ελέγξετε εάν τα
+	  jails ξεκίνησαν σωστά.  Μην ξεχάσετε να εκτελέσετε το mergemaster
+	  για το κάθε jail.  Θα χρειαστεί να αναβαθμίσετε τόσο τα αρχεία
+	  ρυθμίσεων, όσο και τα rc.d scripts.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="jails-tuning.html">Προηγ</a> </td><td width="20%" align="center"><a accesskey="u" href="jails.html">Πάνω</a></td><td width="40%" align="right"> <a accesskey="n" href="mac.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top">16.5. Λεπτομερής Ρύθμιση και Διαχείριση </td><td width="20%" align="center"><a accesskey="h" href="index.html">Αρχή</a></td><td width="40%" align="right" valign="top"> Κεφάλαιο 17. Υποχρεωτικός Έλεγχος Πρόσβασης</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

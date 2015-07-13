@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>17.15. Nagios in een MAC-jail</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="mac.html" title="Hoofdstuk 17. Verplichte Toegangscontrole (MAC)" /><link rel="prev" href="mac-lomac.html" title="17.14. MAC-module LOMAC" /><link rel="next" href="mac-userlocked.html" title="17.16. Gebruikers afsluiten" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">17.15. Nagios in een MAC-jail</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="mac-lomac.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 17. Verplichte Toegangscontrole (MAC)</th><td width="20%" align="right"> <a accesskey="n" href="mac-userlocked.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="mac-implementing"></a>17.15. Nagios in een MAC-jail</h2></div></div></div><a id="idp78908240" class="indexterm"></a><p>De volgende demonstratie zal een veilige omgeving
+      implementeren door verschillende <acronym class="acronym">MAC</acronym>-modules te
+      gebruiken met juist ingestelde beleiden.  Dit is slechts een
+      test en dient niet gezien te worden als het volledige antwoord op
+      de beveiligingszorgen van iedereen.  Gewoon een beleid
+      implementeren en het verder negeren werkt nooit en kan rampzalig
+      zijn in een productieomgeving.</p><p>Voordat met dit proces wordt begonnen, moet de optie
+      <code class="literal">multilabel</code> zijn geactiveerd op elk
+      bestandssysteem zoals vermeld aan het begin van dit hoofdstuk.
+      Nalatigheid zal in fouten resulteren.  Zorg er ook voor dat de
+      ports <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/nagios-plugins/pkg-descr">net-mgmt/nagios-plugins</a>,
+      <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/nagios/pkg-descr">net-mgmt/nagios</a>, en <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/www/apache22/pkg-descr">www/apache22</a> allemaal
+      geïnstalleerde en geconfigureerd zijn en correct werken.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78911440"></a>17.15.1. Gebruikersklasse <code class="literal">insecure</code> maken</h3></div></div></div><p>Begin de procedure door de volgende gebruikersklasse toe te
+	voegen aan het bestand <code class="filename">/etc/login.conf</code>:</p><pre class="programlisting">insecure:\
+        :copyright=/etc/COPYRIGHT:\
+        :welcome=/etc/motd:\
+        :setenv=MAIL=/var/mail/$,BLOCKSIZE=K:\
+        :path=~/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+        :manpath=/usr/share/man /usr/local/man:\
+        :nologin=/usr/sbin/nologin:\
+        :cputime=1h30m:\
+        :datasize=8M:\
+        :vmemoryuse=100M:\
+        :stacksize=2M:\
+        :memorylocked=4M:\
+        :memoryuse=8M:\
+        :filesize=8M:\
+        :coredumpsize=8M:\
+        :openfiles=24:\
+        :maxproc=32:\
+        :priority=0:\
+        :requirehome:\
+        :passwordtime=91d:\
+        :umask=022:\
+        :ignoretime@:\
+        :label=biba/10(10-10):</pre><p>Voeg de volgende regel toe aan de standaard
+	gebruikersklasse:</p><pre class="programlisting">:label=biba/high:</pre><p>Wanneer dit voltooid is, moet het volgende commando gedraaid
+	worden om de database te herbouwen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cap_mkdb /etc/login.conf</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78920016"></a>17.15.2. Opstartinstellingen</h3></div></div></div><p>Start nog niet opnieuw op, voeg alleen de volgende regels
+	toe aan <code class="filename">/boot/loader.conf</code> zodat de
+	benodigde modules worden geladen tijdens systeeminitialisatie:</p><pre class="programlisting">mac_biba_load="YES"
+mac_seeotheruids_load="YES"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78921936"></a>17.15.3. Gebruikers instellen</h3></div></div></div><p>Stel de gebruiker <code class="systemitem">root</code> in op de
+	standaardklasse met:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod root -L default</code></strong></pre><p>Alle gebruikersaccounts die geen <code class="systemitem">root</code>
+	of systeemgebruikers zijn hebben nu een aanmeldklasse nodig.  De
+	aanmeldklasse is nodig om te voorkomen dat gebruikers geen
+	toegang hebben tot gewone commando's als <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a>.  Het
+	volgende <code class="command">sh</code>-script zou moeten werken:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>for x in `awk -F: '($3 &gt;= 1001) &amp;&amp; ($3 != 65534) { print $1 }' \</code></strong>
+	<strong class="userinput"><code>/etc/passwd`; do pw usermod $x -L default; done;</code></strong></pre><p>Laat de gebruikers <code class="systemitem">nagios</code> en
+	<code class="systemitem">www</code> in de klasse insecure vallen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod nagios -L insecure</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>pw usermod www -L insecure</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78935248"></a>17.15.4. Het contextbestand aanmaken</h3></div></div></div><p>Nu dient een contextbestand aangemaakt te worden; het
+	volgende voorbeeld dient geplaatst te worden in
+	<code class="filename">/etc/policy.contexts</code>.</p><pre class="programlisting"># Dit is het standaard-BIBA-beleid voor dit systeem.
+# Systeem:
+/var/run                        biba/equal
+/var/run/*                      biba/equal
+
+/dev                            biba/equal
+/dev/*                          biba/equal
+
+/var                            biba/equal
+/var/spool                      biba/equal
+/var/spool/*                    biba/equal
+
+/var/log                        biba/equal
+/var/log/*                      biba/equal
+
+/tmp                            biba/equal
+/tmp/*                          biba/equal
+/var/tmp                        biba/equal
+/var/tmp/*                      biba/equal
+
+/var/spool/mqueue               biba/equal
+/var/spool/clientmqueue         biba/equal
+
+#Voor Nagios:
+/usr/local/etc/nagios
+/usr/local/etc/nagios/*         biba/10
+/var/spool/nagios               biba/10
+/var/spool/nagios/*             biba/10
+
+#Voor Apache:
+/usr/local/etc/apache           biba/10
+/usr/local/etc/apache/*         biba/10</pre><p>Dit beleid zal beveiliging afdwingen door beperkingen aan de
+	informatiestroom te stellen.  In deze specifieke configuratie
+	mogen gebruikers, inclusief <code class="systemitem">root</code>, nooit
+	toegang hebben tot <span class="application">Nagios</span>.
+	Instellingenbestanden en processen die deel zijn van
+	<span class="application">Nagios</span> zullen geheel in zichzelf
+	of in een jail zitten.</p><p>Dit bestand kan nu in ons systeem worden gelezen door ons
+	systeem door het volgende commando uit te voeren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>setfsmac -ef /etc/policy.contexts /</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">De bovenstaande indeling van het bestandssysteem kan
+	  afhankelijk van de omgeving verschillen; het moet echter op
+	  elk bestandssysteem gedraaid worden.</p></div><p>Het bestand <code class="filename">/etc/mac.conf</code> dient als
+	volgt in de hoofdsectie gewijzigd te worden:</p><pre class="programlisting">default_labels file ?biba
+default_labels ifnet ?biba
+default_labels process ?biba
+default_labels socket ?biba</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78942928"></a>17.15.5. Het netwerk activeren</h3></div></div></div><p>Voeg de volgende regel toe aan
+	<code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">security.mac.biba.trust_all_interfaces=1</pre><p>En voeg het volgende toe aan de instellingen van de
+	netwerkkaart opgeslagen in <code class="filename">rc.conf</code>.  Als de
+	primaire Internetconfiguratie via <acronym class="acronym">DHCP</acronym> wordt
+	gedaan, kan het nodig zijn om dit handmatig te configureren
+	telkens nadat het systeem is opgestart:</p><pre class="programlisting">maclabel biba/equal</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp78946384"></a>17.15.6. De configuratie testen</h3></div></div></div><a id="idp78947152" class="indexterm"></a><p>Controleer dat de webserver en
+	<span class="application">Nagios</span> niet tijdens de
+	systeeminitialisatie worden gestart, en start opnieuw op.
+	Controleer dat de gebruiker <code class="systemitem">root</code> geen enkel
+	bestand in de instellingenmap van
+	<span class="application">Nagios</span> kan benaderen.  Als
+	<code class="systemitem">root</code> het commando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> op
+	<code class="filename">/var/spool/nagios</code> kan uitvoeren, is er iets
+	verkeerd.  Anders zou er een fout <span class="quote">&#8220;<span class="quote">Permission
+	  denied</span>&#8221;</span> teruggegeven moeten worden.</p><p>Als alles er goed uitziet, kunnen
+	<span class="application">Nagios</span>,
+	<span class="application">Apache</span>, en
+	<span class="application">Sendmail</span> nu gestart worden op een
+	manier die past in het beveiligingsbeleid.  De volgende
+	commando's zorgen hiervoor:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /etc/mail &amp;&#8614; make stop &amp;&amp; \
+setpmac biba/equal make start &amp;&amp; setpmac biba/10\(10-10\) apachectl start &amp;&amp; \
+setpmac biba/10\(10-10\) /usr/local/etc/rc.d/nagios.sh forcestart</code></strong></pre><p>Controleer nogmaals om er zeker van te zijn dat alles juist
+	werkt.  Indien niet, controleer dan de logbestanden of de
+	foutmeldingen.  Gebruik het hulpprogramma <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> om de
+	beveiligingsbeleidsmodule <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mac_biba&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">mac_biba</span>(4)</span></a> uit te schakelen en
+	probeer om alles opnieuw op te starten, zoals gewoonlijk.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">De gebruiker <code class="systemitem">root</code> kan zonder angst de
+	  afgedwongen beveiliging veranderen en de instellingenbestanden
+	  bewerken.  Het volgende commando staat toe om het
+	  beveiligingsbeleid naar een lagere graad te degraderen voor
+	  een nieuw voortgebrachte shell:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>setpmac biba/10 csh</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Om te voorkomen dat dit gebeurt, kan de gebruiker via
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=login.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">login.conf</span>(5)</span></a> in een bereik worden gedwongen.  Als
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=setpmac&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">setpmac</span>(8)</span></a> probeert om een commando buiten het bereik van
+	  het compartiment te draaien, zal er een fout worden
+	  teruggegeven en wordt het commando niet uitgevoerd.  Zet in
+	  dit geval root op <code class="literal">biba/high(high-high)</code>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="mac-lomac.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="mac.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="mac-userlocked.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">17.14. MAC-module LOMAC </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 17.16. Gebruikers afsluiten</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

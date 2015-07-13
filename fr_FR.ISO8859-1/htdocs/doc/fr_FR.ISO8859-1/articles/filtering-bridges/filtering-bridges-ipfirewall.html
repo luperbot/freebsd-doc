@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>5. Configurer le coupe-feu</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Ponts filtrants" /><link rel="up" href="index.html" title="Ponts filtrants" /><link rel="prev" href="filtering-bridges-enabling.html" title="4. Activer le pont" /><link rel="next" href="filtering-bridges-contributors.html" title="6. Participants" /><link rel="copyright" href="trademarks.html" title="Note légale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5. Configurer le coupe-feu</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="filtering-bridges-enabling.html">Précédent</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="filtering-bridges-contributors.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="filtering-bridges-ipfirewall"></a>5. Configurer le coupe-feu</h2></div></div></div><p>Il est maintenant temps de créer votre propre fichier de
+      règle personnalisé pour le coupe-feu, afin de
+      sécuriser le réseau
+      interne.  Il y aura quelques complications à faire cela parce que
+      toutes les fonctionnalités du coupe-feu ne sont pas disponibles sur
+      un pont.  En outre, il y a une différence entre les paquets qui
+      sont en cours de transmission et les paquets qui sont reçus par la
+      machine locale.  En général, les paquets entrants
+      traversent le coupe-feu une seule fois, et pas deux comme c'est
+      normalement le cas; en fait ils sont filtrés à la
+      réception, aussi les règles qui
+      utilisent &#8220;out&#8221; ou &#8220;xmit&#8221; n'agiront
+      jamais.  Personnellement, j'utilise &#8220;in via&#8221; qui est
+      une ancienne syntaxe, mais qui a un sens quand vous la lisez.  Une
+      autre limitation est que vous êtes réduit à
+      l'utilisation seulement des commandes &#8220;pass&#8221; ou
+      &#8220;drop&#8221; pour les paquets filtrés par un pont.
+      Les choses sophistiquées comme &#8220;divert&#8221;,
+      &#8220;forward&#8221; ou &#8220;reject&#8221; ne sont pas
+      disponibles.  De telles options peuvent toujours être
+      utilisées, mais uniquement sur le trafic à
+      destination ou depuis le pont lui-même (s'il possède
+      une adresse IP).</p><p>Une nouveauté de FreeBSD 4.0, est le concept de filtrage avec
+      gestion des états (stateful).  C'est une grande
+      amélioration pour le trafic <acronym class="acronym">UDP</acronym>, qui
+      typiquement est une requête de sortie, suivie peu de temps
+      après par une réponse avec le même ensemble
+      d'adresses IP et de numéro de ports (mais avec
+      une source et une destination réservée, bien sûr).
+      Pour les coupe-feux qui n'ont pas de gestion des états,
+      il n'y a presque pas de possibilité de gérer ce type
+      de trafic en une seule session.  Mais avec un coupe-feu qui peut se
+      &#8220;souvenir&#8221; d'un paquet <acronym class="acronym">UDP</acronym> sortant et
+      qui, pour quelques minutes, autorise une réponse, la gestion
+      des services <acronym class="acronym">UDP</acronym> est triviale.  L'exemple suivant
+      montre comment le faire.  Il est possible de faire la même
+      chose avec les paquets <acronym class="acronym">TCP</acronym>.  Cela vous permet
+      d'éviter certaines attaques par refus de service et autres
+      désagréables problèmes, mais augmente
+      également rapidement la taille de votre
+      table des états.</p><p>Regardons un exemple de configuration.  Notez tout d'abord
+      qu'au début du fichier <code class="filename">/etc/rc.firewall</code>
+      il y a déjà des règles standards pour
+      l'interface de boucle locale
+      <code class="filename">lo0</code>, aussi nous ne devrions pas y faire
+      attention.  Les règles personnalisées devraient
+      être placées dans un fichier séparé (disons
+      <code class="filename">/etc/rc.firewall.local</code>) et chargées au
+      démarrage du système, en modifiant la ligne de
+      <code class="filename">/etc/rc.conf</code> où nous avions défini le
+      coupe-feu &#8220;ouvert&#8221;:</p><pre class="programlisting">firewall_type="/etc/rc.firewall.local"</pre><div xmlns="" class="important"><h3 class="admontitle">Important: </h3><p xmlns="http://www.w3.org/1999/xhtml">Vous devez préciser le chemin <span class="emphasis"><em>complet</em></span>,
+	sinon il ne sera pas chargé avec le risque de rester
+	isolé du réseau.</p></div><p>Pour notre exemple imaginez que nous avons l'interface
+      <code class="filename">fxp0</code> connectée vers l'extérieur
+      (Internet) et l'interface <code class="filename">xl0</code> vers
+      l'intérieur (<acronym class="acronym">LAN</acronym>).  Le pont possède
+      une adresse IP <code class="systemitem">1.2.3.4</code> (il n'est pas
+      possible que votre fournisseur d'accès puisse vous donner une
+      adresse de classe A comme celle-ci, mais pour cet exemple cela
+      ira).</p><pre class="programlisting"># Les choses dont nous avons gardé l'état avant de
+continuer
+add check-state
+
+# Rejeter les réseaux RFC 1918
+add drop all from 10.0.0.0/8 to any in via fxp0
+add drop all from 172.16.0.0/12 to any in via fxp0
+add drop all from 192.168.0.0/16 to any in via fxp0
+
+# Autorise la machine pont à communiquer si elle le désire
+# (si la machine est sans adresse IP, ne pas inclure ces lignes)
+add pass tcp from 1.2.3.4 to any setup keep-state
+add pass udp from 1.2.3.4 to any keep-state
+add pass ip from 1.2.3.4 to any
+
+# Autorise les hôtes internes à communiquer
+add pass tcp from any to any in via xl0 setup keep-state
+add pass udp from any to any in via xl0 keep-state
+add pass ip from any to any in via xl0
+
+# Section TCP
+# Autoriser SSH
+add pass tcp from any to any 22 in via fxp0 setup keep-state
+# Autoriser SMTP seulement vers le serveur de courrier
+add pass tcp from any to relay 25 in via fxp0 setup keep-state
+# Autoriser le transfert de zone seulement par le serveur de noms esclave [dns2.nic.it]
+add pass tcp from 193.205.245.8 to ns 53 in via fxp0 setup keep-state
+# Laisser passer les sondes d'ident.  C'est préférable plutôt que d'attendre
+# qu'elles s'arrêtent
+add pass tcp from any to any 113 in via fxp0 setup keep-state
+# Laisser passer la zone de "quarantaine"
+add pass tcp from any to any 49152-65535 in via fxp0 setup keep-state
+
+# Section UDP
+# Autorise le DNS seulement vers le serveur de noms
+add pass udp from any to ns 53 in via fxp0 keep-state
+# Laisser passer la zone de "quarantaine"
+add pass udp from any to any 49152-65535 in via fxp0 keep-state
+
+# Section ICMP
+# Laisser passer 'ping'
+add pass icmp from any to any icmptypes 8 keep-state
+# Laisser passer les messages d'erreurs générés par 'traceroute'
+add pass icmp from any to any icmptypes 3
+add pass icmp from any to any icmptypes 11
+
+# Tout le reste est suspect
+add drop log all from any to any</pre><p>Ceux qui parmi vous ont déjà installé
+      des coupe-feux auparavant pourront noter l'absence de certaines
+      choses.  En particulier, il n'y a pas de règles contre le
+      forgeage d'adresses, en fait nous n'avons <span class="emphasis"><em>pas</em></span>
+      ajouté:</p><pre class="programlisting">add deny all from 1.2.3.4/8 to any in via fxp0</pre><p>Cela, bloque les paquets provenant de l'extérieur et clamant
+      être en provenance de votre réseau.  C'est quelque chose
+      que vous devriez habituellement faire pour être sûr que
+      personne n'essaie de passer outre votre filtre de paquet, en
+      générant d'infames paquets qui sont comme s'il venaient
+      de l'intérieur.  Le problème
+      avec cela est qu'il y a <span class="emphasis"><em>au moins</em></span> un hôte de
+      l'extérieur que vous ne voulez pas ignorer: le routeur.  Mais
+      habituellement, les fournisseurs d'accès contrent le forgeage sur
+      leur routeur, aussi nous ne devons pas nous en préoccuper plus que
+      cela.</p><p>La dernière règle semble être une copie
+      conforme de la règle par défaut, qui ne laisse passer
+      rien de ce qui n'est pas spécifiquement autorisé.  Mais
+      il y a une différence: tout le
+      trafic suspect sera tracé.</p><p>Il y a deux règles pour faire passer le trafic
+      <acronym class="acronym">SMTP</acronym> et <acronym class="acronym">DNS</acronym> vers le serveur
+      de courrier et le serveur de noms, si vous en avez.  Evidemment
+      l'ensemble du jeu de règle devra être arrangé
+      selon vos goûts
+      personnels, c'est juste un exemple particulier (le format des
+      règles est décrit précisément dans la
+      page de manuel <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>).  Notez qu'afin que &#8220;relay&#8221; et
+      &#8220;ns&#8221; puissent fonctionner, les services de résolution
+      de nom doivent fonctionner <span class="emphasis"><em>avant</em></span> que le pont
+      soit activé.  C'est un exemple pour être sûr que
+      vous avez configuré l'adresse IP sur la bonne carte
+      réseau.  Alternativement
+      il est possible de spécifier l'adresse IP au lieu du nom
+      (nécessaire si la machine est sans adresse IP).</p><p>Les personnes qui ont l'habitude de configurer des coupe-feux
+      ont probablement également utilisé soit une règle
+      &#8220;reset&#8221; soit une règle &#8220;forward&#8221; pour les
+      paquets ident (<acronym class="acronym">TCP</acronym> port 113).  Malheureusement,
+      ce n'est pas une option applicable avec un pont, aussi la
+      meilleure solution est de les laisser passer vers leur
+      destination.  Aussi longtemps que la machine de destination ne
+      fait pas tourner un daemon ident, cela est relativement
+      inoffensif.  L'alternative est de bloquer les connexions sur le
+      port 113, ce qui pose problème avec des services comme
+      l'<acronym class="acronym">IRC</acronym> (la sonde d'ident doit s'arrêter).</p><p>La seule autre chose qui est un peu étrange que vous avez
+      peut-être noté est qu'il y a une règle pour
+      laisser le pont communiquer, et une autre pour les hôtes
+      internes.  Rappelez-vous que c'est parce que les deux ensembles de
+      trafic prendront un chemin différent à travers le noyau
+      et dans le filtre de paquet.  Le réseau interne ira à
+      travers le pont, alors que la machine
+      locale utilisera la pile IP normale pour communiquer.  Ainsi les
+      deux règles s'occupent de cas différents.  La
+      règle &#8220;in via <code class="filename">fxp0</code>&#8221;
+      fonctionne pour les deux chemins.  En général, si
+      vous employez des règles &#8220;in via&#8221; dans tout le
+      filtre, vous devrez faire une exception pour les paquets
+      générés localement, parce qu'ils ne sont pas
+      passés par une de nos interfaces.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="filtering-bridges-enabling.html">Précédent</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="filtering-bridges-contributors.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">4. Activer le pont </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 6. Participants</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

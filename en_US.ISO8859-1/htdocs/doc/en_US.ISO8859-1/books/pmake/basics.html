@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Chapter 2. The Basics of PMake</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="prev" href="intro.html" title="Chapter 1. Introduction" /><link rel="next" href="shellcmds.html" title="2.2. Shell Commands" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Chapter 2. The Basics of PMake</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="intro.html">Prev</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="shellcmds.html">Next</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="basics"></a>Chapter 2. The Basics of PMake</h1></div></div></div><div class="toc"><div class="toc-title">Table of Contents</div><dl class="toc"><dt><span class="section"><a href="basics.html#deplines">2.1. Dependency Lines</a></span></dt><dt><span class="section"><a href="shellcmds.html">2.2. Shell Commands</a></span></dt><dt><span class="section"><a href="variables.html">2.3. Variables</a></span></dt><dt><span class="section"><a href="comments.html">2.4. Comments</a></span></dt><dt><span class="section"><a href="parellelism.html">2.5. Parallelism</a></span></dt><dt><span class="section"><a href="writeanddebug.html">2.6. Writing and Debugging a Makefile</a></span></dt><dt><span class="section"><a href="invoking.html">2.7. Invoking PMake</a></span></dt><dt><span class="section"><a href="summary.html">2.8. Summary</a></span></dt></dl></div><p><span class="application">PMake</span> takes as input a file that
+    tells which files depend on which other files to be complete and
+    what to do about files that are <span class="quote">&#8220;<span class="quote">out-of-date</span>&#8221;</span>.
+    This file is known as a <span class="quote">&#8220;<span class="quote">makefile</span>&#8221;</span> and is usually
+    kept in the top-most directory of the system to be built.
+    While you can call the makefile anything you want,
+    <span class="application">PMake</span> will look for
+    <code class="filename">Makefile</code> and <code class="filename">makefile</code>
+    (in that order) in the current directory if you do not tell it
+    otherwise.  To specify a different makefile, use the
+    <code class="option">-f</code> flag, e.g.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>pmake -f <em class="replaceable"><code>program.mk</code></em></code></strong></pre><p>A makefile has four different types of lines in it:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>File dependency specifications</p></li><li class="listitem"><p>Creation commands</p></li><li class="listitem"><p>Variable assignments</p></li><li class="listitem"><p>Comments, include statements and conditional directives</p></li></ul></div><p>Any line may be continued over multiple lines by ending it
+    with a backslash.  The backslash, following newline and any
+    initial whitespace on the following line are compressed into a
+    single space before the input line is examined by
+    <span class="application">PMake</span>.</p><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="deplines"></a>2.1. Dependency Lines</h2></div></div></div><p>As mentioned in the introduction, in any system, there are
+      dependencies between the files that make up the system.
+      For instance, in a program made up of several C source files and
+      one header file, the C files will need to be re-compiled should
+      the header file be changed.  For a document of several chapters
+      and one macro file, the chapters will need to be reprocessed if
+      any of the macros changes.  These are dependencies and are
+      specified by means of dependency lines in the makefile.</p><p>On a dependency line, there are targets and sources,
+      separated by a one- or two-character operator.  The targets
+      <span class="quote">&#8220;<span class="quote">depend</span>&#8221;</span> on the sources and are usually created
+      from them.  Any number of targets and sources may be specified
+      on a dependency line.  All the targets in the line are made to
+      depend on all the sources.  Targets and sources need not be
+      actual files, but every source must be either an actual file or
+      another target in the makefile.  If you run out of room, use a
+      backslash at the end of the line to continue onto the next
+      one.</p><p>Any file may be a target and any file may be a source, but
+      the relationship between the two (or however many) is determined
+      by the <span class="quote">&#8220;<span class="quote">operator</span>&#8221;</span> that separates them.  Three types
+      of operators exist: one specifies that the datedness of a target
+      is determined by the state of its sources, while another
+      specifies other files (the sources) that need to be dealt with
+      before the target can be re-created.  The third operator is very
+      similar to the first, with the additional condition that the
+      target is out-of-date if it has no sources.  These operations
+      are represented by the colon, the exclamation point and the
+      double-colon, respectively, and are mutually exclusive.
+      Their exact semantics are as follows:</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr valign="top"><td valign="top"><code class="literal">:</code></td><td valign="top">If a colon is used, a target on the line is
+	      considered to be <span class="quote">&#8220;<span class="quote">out-of-date</span>&#8221;</span> (and in need
+	      of creation) if any of the sources has been modified
+	      more recently than the target, or the target does not
+	      exist.  Under this operation, steps will be taken to
+	      re-create the target only if it is found to be
+	      out-of-date by using these two rules.</td></tr><tr valign="top"><td valign="top"><code class="literal">!</code></td><td valign="top">If an exclamation point is used, the target will
+	      always be re-created, but this will not happen until all
+	      of its sources have been examined and re-created, if
+	      necessary.</td></tr><tr valign="top"><td valign="top"><code class="literal">::</code></td><td valign="top">If a double-colon is used, a target is
+	      <span class="quote">&#8220;<span class="quote">out-of-date</span>&#8221;</span> if any of the sources has
+	      been modified more recently than the target, or the
+	      target does not exist, or the target has no sources.
+	      If the target is out-of-date according to these rules,
+	      it will be re-created.  This operator also does
+	      something else to the targets, but I will go into that
+	      in the next section
+	      (see <a class="xref" href="shellcmds.html" title="2.2. Shell Commands">Shell Commands</a>).</td></tr></tbody></table></div><p>Enough words, now for an example.  Take that C program I
+      mentioned earlier.  Say there are three C files
+      (<code class="filename">a.c</code>, <code class="filename">b.c</code> and
+      <code class="filename">c.c</code>) each of which includes the file
+      <code class="filename">defs.h</code>.  The dependencies between the files
+      could then be expressed as follows:</p><pre class="programlisting">program         : a.o b.o c.o
+
+a.o b.o c.o     : defs.h
+
+a.o             : a.c
+
+b.o             : b.c
+
+c.o             : c.c</pre><p>You may be wondering at this point, where
+      <code class="filename">a.o</code>, <code class="filename">b.o</code> and
+      <code class="filename">c.o</code> came in and why they depend on
+      <code class="filename">defs.h</code> and the C files do not.
+      The reason is quite simple: <code class="buildtarget">program</code>
+      cannot be made by linking together <code class="filename">.c</code>
+      files&#8212;it must be made from <code class="filename">.o</code> files.
+      Likewise, if you change <code class="filename">defs.h</code>, it is not
+      the <code class="filename">.c</code> files that need to be re-created,
+      it is the <code class="filename">.o</code> files.  If you think of
+      dependencies in these terms&#8212;which files (targets) need to
+      be created from which files (sources)&#8212;you should have no
+      problems.</p><p>An important thing to notice about the above example, is
+      that all the <code class="filename">.o</code> files appear as targets on
+      more than one line.  This is perfectly all right: the target is
+      made to depend on all the sources mentioned on all the
+      dependency lines.  For example, <code class="filename">a.o</code> depends
+      on both <code class="filename">defs.h</code> and <code class="filename">a.c</code>.</p><p>The order of the dependency lines in the makefile is
+      important: the first target on the first dependency line in the
+      makefile will be the one that gets made if you do not say
+      otherwise.  That is why program comes first in the example
+      makefile, above.</p><p>Both targets and sources may contain the standard C-Shell wildcard
+      characters (<code class="literal">{</code>, <code class="literal">}</code>,
+      <code class="literal">*</code>, <code class="literal">?</code>, <code class="literal">[</code>, and
+      <code class="literal">]</code>), but the non-curly-brace ones may only appear in
+      the final component (the file portion) of the target or source.
+      The characters mean the following things:</p><div class="informaltable"><table border="0"><colgroup><col /><col /></colgroup><tbody><tr valign="top"><td valign="top"><code class="literal">{}</code></td><td valign="top">These enclose a comma-separated list of options and
+	      cause the pattern to be expanded once for each element
+	      of the list.  Each expansion contains a different
+	      element.  For example,
+	      <code class="filename">src/{whiffle,beep,fish}.c</code> expands
+	      to the three words <code class="filename">src/whiffle.c</code>,
+	      <code class="filename">src/beep.c</code>, and
+	      <code class="filename">src/fish.c</code>.  These braces may be
+	      nested and, unlike the other wildcard characters, the
+	      resulting words need not be actual files.  All other
+	      wildcard characters are expanded using the files that
+	      exist when <span class="application">PMake</span> is
+	      started.</td></tr><tr valign="top"><td valign="top"><code class="literal">*</code></td><td valign="top">This matches zero or more characters of any sort.
+	      <code class="filename">src/*.c</code> will expand to the same
+	      three words as above as long as src contains those three
+	      files  (and  no other files that end in
+	      <code class="filename">.c</code>).&gt;</td></tr><tr valign="top"><td valign="top"><code class="literal">?</code></td><td valign="top">Matches any single character.</td></tr><tr valign="top"><td valign="top"><code class="literal">[]</code></td><td valign="top">This is known as a character class and contains
+	      either a list of single characters, or a series of
+	      character ranges (<code class="literal">a-z</code>, for example
+	      means all characters between <code class="literal">a</code> and
+	      <code class="literal">z</code>), or both.  It matches any single
+	      character contained in the list.  For example,
+	      <code class="literal">[A-Za-z]</code> will match all letters,
+	      while <code class="literal">[0123456789]</code> will match all
+	      numbers.</td></tr></tbody></table></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="intro.html">Prev</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="shellcmds.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 1. Introduction </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 2.2. Shell Commands</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

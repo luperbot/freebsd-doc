@@ -1,0 +1,550 @@
+====================================
+8.3.?General Architecture and Design
+====================================
+
+.. raw:: html
+
+   <div class="navheader">
+
+8.3.?General Architecture and Design
+`Prev <smp-lock-fundamentals.html>`__?
+Chapter?8.?SMPng Design Document
+?\ `Next <smp-lock-strategies.html>`__
+
+--------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect1">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.?General Architecture and Design
+------------------------------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.1.?Interrupt Handling
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Following the pattern of several other multi-threaded UNIX? kernels,
+FreeBSD deals with interrupt handlers by giving them their own thread
+context. Providing a context for interrupt handlers allows them to block
+on locks. To help avoid latency, however, interrupt threads run at
+real-time kernel priority. Thus, interrupt handlers should not execute
+for very long to avoid starving other kernel threads. In addition, since
+multiple handlers may share an interrupt thread, interrupt handlers
+should not sleep or use a sleepable lock to avoid starving another
+interrupt handler.
+
+The interrupt threads currently in FreeBSD are referred to as
+heavyweight interrupt threads. They are called this because switching to
+an interrupt thread involves a full context switch. In the initial
+implementation, the kernel was not preemptive and thus interrupts that
+interrupted a kernel thread would have to wait until the kernel thread
+blocked or returned to userland before they would have an opportunity to
+run.
+
+To deal with the latency problems, the kernel in FreeBSD has been made
+preemptive. Currently, we only preempt a kernel thread when we release a
+sleep mutex or when an interrupt comes in. However, the plan is to make
+the FreeBSD kernel fully preemptive as described below.
+
+Not all interrupt handlers execute in a thread context. Instead, some
+handlers execute directly in primary interrupt context. These interrupt
+handlers are currently misnamed “fast” interrupt handlers since the
+``INTR_FAST`` flag used in earlier versions of the kernel is used to
+mark these handlers. The only interrupts which currently use these types
+of interrupt handlers are clock interrupts and serial I/O device
+interrupts. Since these handlers do not have their own context, they may
+not acquire blocking locks and thus may only use spin mutexes.
+
+Finally, there is one optional optimization that can be added in MD code
+called lightweight context switches. Since an interrupt thread executes
+in a kernel context, it can borrow the vmspace of any process. Thus, in
+a lightweight context switch, the switch to the interrupt thread does
+not switch vmspaces but borrows the vmspace of the interrupted thread.
+In order to ensure that the vmspace of the interrupted thread does not
+disappear out from under us, the interrupted thread is not allowed to
+execute until the interrupt thread is no longer borrowing its vmspace.
+This can happen when the interrupt thread either blocks or finishes. If
+an interrupt thread blocks, then it will use its own context when it is
+made runnable again. Thus, it can release the interrupted thread.
+
+The cons of this optimization are that they are very machine specific
+and complex and thus only worth the effort if their is a large
+performance improvement. At this point it is probably too early to tell,
+and in fact, will probably hurt performance as almost all interrupt
+handlers will immediately block on Giant and require a thread fix-up
+when they block. Also, an alternative method of interrupt handling has
+been proposed by Mike Smith that works like so:
+
+.. raw:: html
+
+   <div class="orderedlist">
+
+#. Each interrupt handler has two parts: a predicate which runs in
+   primary interrupt context and a handler which runs in its own thread
+   context.
+
+#. If an interrupt handler has a predicate, then when an interrupt is
+   triggered, the predicate is run. If the predicate returns true then
+   the interrupt is assumed to be fully handled and the kernel returns
+   from the interrupt. If the predicate returns false or there is no
+   predicate, then the threaded handler is scheduled to run.
+
+.. raw:: html
+
+   </div>
+
+Fitting light weight context switches into this scheme might prove
+rather complicated. Since we may want to change to this scheme at some
+point in the future, it is probably best to defer work on light weight
+context switches until we have settled on the final interrupt handling
+architecture and determined how light weight context switches might or
+might not fit into it.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.2.?Kernel Preemption and Critical Sections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect3">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.2.1.?Kernel Preemption in a Nutshell
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Kernel preemption is fairly simple. The basic idea is that a CPU should
+always be doing the highest priority work available. Well, that is the
+ideal at least. There are a couple of cases where the expense of
+achieving the ideal is not worth being perfect.
+
+Implementing full kernel preemption is very straightforward: when you
+schedule a thread to be executed by putting it on a run queue, you check
+to see if its priority is higher than the currently executing thread. If
+so, you initiate a context switch to that thread.
+
+While locks can protect most data in the case of a preemption, not all
+of the kernel is preemption safe. For example, if a thread holding a
+spin mutex preempted and the new thread attempts to grab the same spin
+mutex, the new thread may spin forever as the interrupted thread may
+never get a chance to execute. Also, some code such as the code to
+assign an address space number for a process during ``exec`` on the
+Alpha needs to not be preempted as it supports the actual context switch
+code. Preemption is disabled for these code sections by using a critical
+section.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect3">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.2.2.?Critical Sections
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+The responsibility of the critical section API is to prevent context
+switches inside of a critical section. With a fully preemptive kernel,
+every ``setrunqueue`` of a thread other than the current thread is a
+preemption point. One implementation is for ``critical_enter`` to set a
+per-thread flag that is cleared by its counterpart. If ``setrunqueue``
+is called with this flag set, it does not preempt regardless of the
+priority of the new thread relative to the current thread. However,
+since critical sections are used in spin mutexes to prevent context
+switches and multiple spin mutexes can be acquired, the critical section
+API must support nesting. For this reason the current implementation
+uses a nesting count instead of a single per-thread flag.
+
+In order to minimize latency, preemptions inside of a critical section
+are deferred rather than dropped. If a thread that would normally be
+preempted to is made runnable while the current thread is in a critical
+section, then a per-thread flag is set to indicate that there is a
+pending preemption. When the outermost critical section is exited, the
+flag is checked. If the flag is set, then the current thread is
+preempted to allow the higher priority thread to run.
+
+Interrupts pose a problem with regards to spin mutexes. If a low-level
+interrupt handler needs a lock, it needs to not interrupt any code
+needing that lock to avoid possible data structure corruption.
+Currently, providing this mechanism is piggybacked onto critical section
+API by means of the ``cpu_critical_enter`` and ``cpu_critical_exit``
+functions. Currently this API disables and re-enables interrupts on all
+of FreeBSD's current platforms. This approach may not be purely optimal,
+but it is simple to understand and simple to get right. Theoretically,
+this second API need only be used for spin mutexes that are used in
+primary interrupt context. However, to make the code simpler, it is used
+for all spin mutexes and even all critical sections. It may be desirable
+to split out the MD API from the MI API and only use it in conjunction
+with the MI API in the spin mutex implementation. If this approach is
+taken, then the MD API likely would need a rename to show that it is a
+separate API.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect3">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.2.3.?Design Tradeoffs
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+As mentioned earlier, a couple of trade-offs have been made to sacrifice
+cases where perfect preemption may not always provide the best
+performance.
+
+The first trade-off is that the preemption code does not take other CPUs
+into account. Suppose we have a two CPU's A and B with the priority of
+A's thread as 4 and the priority of B's thread as 2. If CPU B makes a
+thread with priority 1 runnable, then in theory, we want CPU A to switch
+to the new thread so that we will be running the two highest priority
+runnable threads. However, the cost of determining which CPU to enforce
+a preemption on as well as actually signaling that CPU via an IPI along
+with the synchronization that would be required would be enormous. Thus,
+the current code would instead force CPU B to switch to the higher
+priority thread. Note that this still puts the system in a better
+position as CPU B is executing a thread of priority 1 rather than a
+thread of priority 2.
+
+The second trade-off limits immediate kernel preemption to real-time
+priority kernel threads. In the simple case of preemption defined above,
+a thread is always preempted immediately (or as soon as a critical
+section is exited) if a higher priority thread is made runnable.
+However, many threads executing in the kernel only execute in a kernel
+context for a short time before either blocking or returning to
+userland. Thus, if the kernel preempts these threads to run another
+non-realtime kernel thread, the kernel may switch out the executing
+thread just before it is about to sleep or execute. The cache on the CPU
+must then adjust to the new thread. When the kernel returns to the
+preempted thread, it must refill all the cache information that was
+lost. In addition, two extra context switches are performed that could
+be avoided if the kernel deferred the preemption until the first thread
+blocked or returned to userland. Thus, by default, the preemption code
+will only preempt immediately if the higher priority thread is a
+real-time priority thread.
+
+Turning on full kernel preemption for all kernel threads has value as a
+debugging aid since it exposes more race conditions. It is especially
+useful on UP systems were many races are hard to simulate otherwise.
+Thus, there is a kernel option ``FULL_PREEMPTION`` to enable preemption
+for all kernel threads that can be used for debugging purposes.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.3.?Thread Migration
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Simply put, a thread migrates when it moves from one CPU to another. In
+a non-preemptive kernel this can only happen at well-defined points such
+as when calling ``msleep`` or returning to userland. However, in the
+preemptive kernel, an interrupt can force a preemption and possible
+migration at any time. This can have negative affects on per-CPU data
+since with the exception of ``curthread`` and ``curpcb`` the data can
+change whenever you migrate. Since you can potentially migrate at any
+time this renders unprotected per-CPU data access rather useless. Thus
+it is desirable to be able to disable migration for sections of code
+that need per-CPU data to be stable.
+
+Critical sections currently prevent migration since they do not allow
+context switches. However, this may be too strong of a requirement to
+enforce in some cases since a critical section also effectively blocks
+interrupt threads on the current processor. As a result, another API has
+been provided to allow the current thread to indicate that if it
+preempted it should not migrate to another CPU.
+
+This API is known as thread pinning and is provided by the scheduler.
+The API consists of two functions: ``sched_pin`` and ``sched_unpin``.
+These functions manage a per-thread nesting count ``td_pinned``. A
+thread is pinned when its nesting count is greater than zero and a
+thread starts off unpinned with a nesting count of zero. Each scheduler
+implementation is required to ensure that pinned threads are only
+executed on the CPU that they were executing on when the ``sched_pin``
+was first called. Since the nesting count is only written to by the
+thread itself and is only read by other threads when the pinned thread
+is not executing but while ``sched_lock`` is held, then ``td_pinned``
+does not need any locking. The ``sched_pin`` function increments the
+nesting count and ``sched_unpin`` decrements the nesting count. Note
+that these functions only operate on the current thread and bind the
+current thread to the CPU it is executing on at the time. To bind an
+arbitrary thread to a specific CPU, the ``sched_bind`` and
+``sched_unbind`` functions should be used instead.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+8.3.4.?Callouts
+~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+The ``timeout`` kernel facility permits kernel services to register
+functions for execution as part of the ``softclock`` software interrupt.
+Events are scheduled based on a desired number of clock ticks, and
+callbacks to the consumer-provided function will occur at approximately
+the right time.
+
+The global list of pending timeout events is protected by a global spin
+mutex, ``callout_lock``; all access to the timeout list must be
+performed with this mutex held. When ``softclock`` is woken up, it scans
+the list of pending timeouts for those that should fire. In order to
+avoid lock order reversal, the ``softclock`` thread will release the
+``callout_lock`` mutex when invoking the provided ``timeout`` callback
+function. If the ``CALLOUT_MPSAFE`` flag was not set during
+registration, then Giant will be grabbed before invoking the callout,
+and then released afterwards. The ``callout_lock`` mutex will be
+re-grabbed before proceeding. The ``softclock`` code is careful to leave
+the list in a consistent state while releasing the mutex. If
+``DIAGNOSTIC`` is enabled, then the time taken to execute each function
+is measured, and a warning is generated if it exceeds a threshold.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="navfooter">
+
+--------------
+
++----------------------------------------------+-------------------------+------------------------------------------+
+| `Prev <smp-lock-fundamentals.html>`__?       | `Up <smp.html>`__       | ?\ `Next <smp-lock-strategies.html>`__   |
++----------------------------------------------+-------------------------+------------------------------------------+
+| 8.2.?Basic Tools and Locking Fundamentals?   | `Home <index.html>`__   | ?8.4.?Specific Locking Strategies        |
++----------------------------------------------+-------------------------+------------------------------------------+
+
+.. raw:: html
+
+   </div>
+
+All FreeBSD documents are available for download at
+http://ftp.FreeBSD.org/pub/FreeBSD/doc/
+
+| Questions that are not answered by the
+  `documentation <http://www.FreeBSD.org/docs.html>`__ may be sent to
+  <freebsd-questions@FreeBSD.org\ >.
+|  Send questions about this document to <freebsd-doc@FreeBSD.org\ >.

@@ -1,0 +1,373 @@
+==================================
+14.11.?FreeBSD Security Advisories
+==================================
+
+.. raw:: html
+
+   <div class="navheader">
+
+14.11.?FreeBSD Security Advisories
+`Prev <security-pkg.html>`__?
+Chapter?14.?Security
+?\ `Next <security-accounting.html>`__
+
+--------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect1">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+14.11.?FreeBSD Security Advisories
+----------------------------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div>
+
+Contributed by Tom Rhodes.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Like many producers of quality operating systems, the FreeBSD Project
+has a security team which is responsible for determining the End-of-Life
+(EoL) date for each FreeBSD release and to provide security updates for
+supported releases which have not yet reached their EoL. More
+information about the FreeBSD security team and the supported releases
+is available on the `FreeBSD security page <../../../../security>`__.
+
+One task of the security team is to respond to reported security
+vulnerabilities in the FreeBSD operating system. Once a vulnerability is
+confirmed, the security team verifies the steps necessary to fix the
+vulnerability and updates the source code with the fix. It then
+publishes the details as a “Security Advisory”. Security advisories are
+published on the `FreeBSD
+website <../../../../security/advisories.html>`__ and mailed to the
+`freebsd-security-notifications <http://lists.FreeBSD.org/mailman/listinfo/freebsd-security-notifications>`__,
+`freebsd-security <http://lists.FreeBSD.org/mailman/listinfo/freebsd-security>`__,
+and
+`freebsd-announce <http://lists.FreeBSD.org/mailman/listinfo/freebsd-announce>`__
+mailing lists.
+
+This section describes the format of a FreeBSD security advisory.
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+14.11.1.?Format of a Security Advisory
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Here is an example of a FreeBSD security advisory:
+
+.. code:: programlisting
+
+    =============================================================================
+    -----BEGIN PGP SIGNED MESSAGE-----
+    Hash: SHA512
+
+    =============================================================================
+    FreeBSD-SA-14:04.bind                                       Security Advisory
+                                                              The FreeBSD Project
+
+    Topic:          BIND remote denial of service vulnerability
+
+    Category:       contrib
+    Module:         bind
+    Announced:      2014-01-14
+    Credits:        ISC
+    Affects:        FreeBSD 8.x and FreeBSD 9.x
+    Corrected:      2014-01-14 19:38:37 UTC (stable/9, 9.2-STABLE)
+                    2014-01-14 19:42:28 UTC (releng/9.2, 9.2-RELEASE-p3)
+                    2014-01-14 19:42:28 UTC (releng/9.1, 9.1-RELEASE-p10)
+                    2014-01-14 19:38:37 UTC (stable/8, 8.4-STABLE)
+                    2014-01-14 19:42:28 UTC (releng/8.4, 8.4-RELEASE-p7)
+                    2014-01-14 19:42:28 UTC (releng/8.3, 8.3-RELEASE-p14)
+    CVE Name:       CVE-2014-0591
+
+    For general information regarding FreeBSD Security Advisories,
+    including descriptions of the fields above, security branches, and the
+    following sections, please visit <URL:http://security.FreeBSD.org/>.
+
+    I.   Background
+
+    BIND 9 is an implementation of the Domain Name System (DNS) protocols.
+    The named(8) daemon is an Internet Domain Name Server.
+
+    II.  Problem Description
+
+    Because of a defect in handling queries for NSEC3-signed zones, BIND can
+    crash with an "INSIST" failure in name.c when processing queries possessing
+    certain properties.  This issue only affects authoritative nameservers with
+    at least one NSEC3-signed zone.  Recursive-only servers are not at risk.
+
+    III. Impact
+
+    An attacker who can send a specially crafted query could cause named(8)
+    to crash, resulting in a denial of service.
+
+    IV.  Workaround
+
+    No workaround is available, but systems not running authoritative DNS service
+    with at least one NSEC3-signed zone using named(8) are not vulnerable.
+
+    V.   Solution
+
+    Perform one of the following:
+
+    1) Upgrade your vulnerable system to a supported FreeBSD stable or
+    release / security branch (releng) dated after the correction date.
+
+    2) To update your vulnerable system via a source code patch:
+
+    The following patches have been verified to apply to the applicable
+    FreeBSD release branches.
+
+    a) Download the relevant patch from the location below, and verify the
+    detached PGP signature using your PGP utility.
+
+    [FreeBSD 8.3, 8.4, 9.1, 9.2-RELEASE and 8.4-STABLE]
+    # fetch http://security.FreeBSD.org/patches/SA-14:04/bind-release.patch
+    # fetch http://security.FreeBSD.org/patches/SA-14:04/bind-release.patch.asc
+    # gpg --verify bind-release.patch.asc
+
+    [FreeBSD 9.2-STABLE]
+    # fetch http://security.FreeBSD.org/patches/SA-14:04/bind-stable-9.patch
+    # fetch http://security.FreeBSD.org/patches/SA-14:04/bind-stable-9.patch.asc
+    # gpg --verify bind-stable-9.patch.asc
+
+    b) Execute the following commands as root:
+
+    # cd /usr/src
+    # patch < /path/to/patch
+
+    Recompile the operating system using buildworld and installworld as
+    described in <URL:http://www.FreeBSD.org/handbook/makeworld.html>.
+
+    Restart the applicable daemons, or reboot the system.
+
+    3) To update your vulnerable system via a binary patch:
+
+    Systems running a RELEASE version of FreeBSD on the i386 or amd64
+    platforms can be updated via the freebsd-update(8) utility:
+
+    # freebsd-update fetch
+    # freebsd-update install
+
+    VI.  Correction details
+
+    The following list contains the correction revision numbers for each
+    affected branch.
+
+    Branch/path                                                      Revision
+    - -------------------------------------------------------------------------
+    stable/8/                                                         r260646
+    releng/8.3/                                                       r260647
+    releng/8.4/                                                       r260647
+    stable/9/                                                         r260646
+    releng/9.1/                                                       r260647
+    releng/9.2/                                                       r260647
+    - -------------------------------------------------------------------------
+
+    To see which files were modified by a particular revision, run the
+    following command, replacing NNNNNN with the revision number, on a
+    machine with Subversion installed:
+
+    # svn diff -cNNNNNN --summarize svn://svn.freebsd.org/base
+
+    Or visit the following URL, replacing NNNNNN with the revision number:
+
+    <URL:http://svnweb.freebsd.org/base?view=revision&revision=NNNNNN>
+
+    VII. References
+
+    <URL:https://kb.isc.org/article/AA-01078>
+
+    <URL:http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-0591>
+
+    The latest revision of this advisory is available at
+    <URL:http://security.FreeBSD.org/advisories/FreeBSD-SA-14:04.bind.asc>
+    -----BEGIN PGP SIGNATURE-----
+
+    iQIcBAEBCgAGBQJS1ZTYAAoJEO1n7NZdz2rnOvQP/2/68/s9Cu35PmqNtSZVVxVG
+    ZSQP5EGWx/lramNf9566iKxOrLRMq/h3XWcC4goVd+gZFrvITJSVOWSa7ntDQ7TO
+    XcinfRZ/iyiJbs/Rg2wLHc/t5oVSyeouyccqODYFbOwOlk35JjOTMUG1YcX+Zasg
+    ax8RV+7Zt1QSBkMlOz/myBLXUjlTZ3Xg2FXVsfFQW5/g2CjuHpRSFx1bVNX6ysoG
+    9DT58EQcYxIS8WfkHRbbXKh9I1nSfZ7/Hky/kTafRdRMrjAgbqFgHkYTYsBZeav5
+    fYWKGQRJulYfeZQ90yMTvlpF42DjCC3uJYamJnwDIu8OhS1WRBI8fQfr9DRzmRua
+    OK3BK9hUiScDZOJB6OqeVzUTfe7MAA4/UwrDtTYQ+PqAenv1PK8DZqwXyxA9ThHb
+    zKO3OwuKOVHJnKvpOcr+eNwo7jbnHlis0oBksj/mrq2P9m2ueF9gzCiq5Ri5Syag
+    Wssb1HUoMGwqU0roS8+pRpNC8YgsWpsttvUWSZ8u6Vj/FLeHpiV3mYXPVMaKRhVm
+    067BA2uj4Th1JKtGleox+Em0R7OFbCc/9aWC67wiqI6KRyit9pYiF3npph+7D5Eq
+    7zPsUdDd+qc+UTiLp3liCRp5w6484wWdhZO6wRtmUgxGjNkxFoNnX8CitzF8AaqO
+    UWWemqWuz3lAZuORQ9KX
+    =OQzQ
+    -----END PGP SIGNATURE-----
+
+Every security advisory uses the following format:
+
+.. raw:: html
+
+   <div class="itemizedlist">
+
+-  Each security advisory is signed by the PGP key of the Security
+   Officer. The public key for the Security Officer can be verified at
+   `Appendix?D, *OpenPGP Keys* <pgpkeys.html>`__.
+
+-  The name of the security advisory always begins with ``FreeBSD-SA-``
+   (for FreeBSD Security Advisory), followed by the year in two digit
+   format (``14:``), followed by the advisory number for that year
+   (``04.``), followed by the name of the affected application or
+   subsystem (``bind``). The advisory shown here is the fourth advisory
+   for 2014 and it affects BIND.
+
+-  The ``Topic`` field summarizes the vulnerability.
+
+-  The ``Category`` refers to the affected part of the system which may
+   be one of ``core``, ``contrib``, or ``ports``. The ``core`` category
+   means that the vulnerability affects a core component of the FreeBSD
+   operating system. The ``contrib`` category means that the
+   vulnerability affects software included with FreeBSD, such as BIND.
+   The ``ports`` category indicates that the vulnerability affects
+   software available through the Ports Collection.
+
+-  The ``Module`` field refers to the component location. In this
+   example, the ``bind`` module is affected; therefore, this
+   vulnerability affects an application installed with the operating
+   system.
+
+-  The ``Announced`` field reflects the date the security advisory was
+   published. This means that the security team has verified that the
+   problem exists and that a patch has been committed to the FreeBSD
+   source code repository.
+
+-  The ``Credits`` field gives credit to the individual or organization
+   who noticed the vulnerability and reported it.
+
+-  The ``Affects`` field explains which releases of FreeBSD are affected
+   by this vulnerability.
+
+-  The ``Corrected`` field indicates the date, time, time offset, and
+   releases that were corrected. The section in parentheses shows each
+   branch for which the fix has been merged, and the version number of
+   the corresponding release from that branch. The release identifier
+   itself includes the version number and, if appropriate, the patch
+   level. The patch level is the letter ``p`` followed by a number,
+   indicating the sequence number of the patch, allowing users to track
+   which patches have already been applied to the system.
+
+-  The ``CVE Name`` field lists the advisory number, if one exists, in
+   the public `cve.mitre.org <http://cve.mitre.org>`__ security
+   vulnerabilities database.
+
+-  The ``Background`` field provides a description of the affected
+   module.
+
+-  The ``Problem Description`` field explains the vulnerability. This
+   can include information about the flawed code and how the utility
+   could be maliciously used.
+
+-  The ``Impact`` field describes what type of impact the problem could
+   have on a system.
+
+-  The ``Workaround`` field indicates if a workaround is available to
+   system administrators who cannot immediately patch the system .
+
+-  The ``Solution`` field provides the instructions for patching the
+   affected system. This is a step by step tested and verified method
+   for getting a system patched and working securely.
+
+-  The ``Correction Details`` field displays each affected Subversion
+   branch with the revision number that contains the corrected code.
+
+-  The ``References`` field offers sources of additional information
+   regarding the vulnerability.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="navfooter">
+
+--------------
+
++--------------------------------------------------+--------------------------+------------------------------------------+
+| `Prev <security-pkg.html>`__?                    | `Up <security.html>`__   | ?\ `Next <security-accounting.html>`__   |
++--------------------------------------------------+--------------------------+------------------------------------------+
+| 14.10.?Monitoring Third Party Security Issues?   | `Home <index.html>`__    | ?14.12.?Process Accounting               |
++--------------------------------------------------+--------------------------+------------------------------------------+
+
+.. raw:: html
+
+   </div>
+
+All FreeBSD documents are available for download at
+http://ftp.FreeBSD.org/pub/FreeBSD/doc/
+
+| Questions that are not answered by the
+  `documentation <http://www.FreeBSD.org/docs.html>`__ may be sent to
+  <freebsd-questions@FreeBSD.org\ >.
+|  Send questions about this document to <freebsd-doc@FreeBSD.org\ >.

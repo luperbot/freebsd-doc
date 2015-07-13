@@ -1,0 +1,379 @@
+======================
+14.13.?Resource Limits
+======================
+
+.. raw:: html
+
+   <div class="navheader">
+
+14.13.?Resource Limits
+`Prev <security-accounting.html>`__?
+Chapter?14.?Security
+?\ `Next <jails.html>`__
+
+--------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect1">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+14.13.?Resource Limits
+----------------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div>
+
+Contributed by Tom Rhodes.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+FreeBSD provides several methods for an administrator to limit the
+amount of system resources an individual may use. Disk quotas limit the
+amount of disk space available to users. Quotas are discussed in
+`Section?18.11, “Disk Quotas” <quotas.html>`__.
+
+Limits to other resources, such as CPU and memory, can be set using
+either a flat file or a command to configure a resource limits database.
+The traditional method defines login classes by editing
+``/etc/login.conf``. While this method is still supported, any changes
+require a multi-step process of editing this file, rebuilding the
+resource database, making necessary changes to ``/etc/master.passwd``,
+and rebuilding the password database. This can become time consuming,
+depending upon the number of users to configure.
+
+Beginning with FreeBSD?9.0-RELEASE, ``rctl`` can be used to provide a
+more fine-grained method for controlling resource limits. This command
+supports more than user limits as it can also be used to set resource
+constraints on processes and jails.
+
+This section demonstrates both methods for controlling resources,
+beginning with the traditional method.
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+14.13.1.?Configuring Login Classes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+In the traditional method, login classes and the resource limits to
+apply to a login class are defined in ``/etc/login.conf``. Each user
+account can be assigned to a login class, where ``default`` is the
+default login class. Each login class has a set of login capabilities
+associated with it. A login capability is a ``name``\ =\ *``value``*
+pair, where *``name``* is a well-known identifier and *``value``* is an
+arbitrary string which is processed accordingly depending on the
+*``name``*.
+
+.. raw:: html
+
+   <div class="note" xmlns="">
+
+Note:
+~~~~~
+
+Whenever ``/etc/login.conf`` is edited, the ``/etc/login.conf.db`` must
+be updated by executing the following command:
+
+.. code:: screen
+
+    # cap_mkdb /etc/login.conf
+
+.. raw:: html
+
+   </div>
+
+Resource limits differ from the default login capabilities in two ways.
+First, for every limit, there is a *soft* and *hard* limit. A soft limit
+may be adjusted by the user or application, but may not be set higher
+than the hard limit. The hard limit may be lowered by the user, but can
+only be raised by the superuser. Second, most resource limits apply per
+process to a specific user.
+
+`Table?14.1, “Login Class Resource
+Limits” <security-resourcelimits.html#resource-limits>`__ lists the most
+commonly used resource limits. All of the available resource limits and
+capabilities are described in detail in
+`login.conf(5) <http://www.FreeBSD.org/cgi/man.cgi?query=login.conf&sektion=5>`__.
+
+.. raw:: html
+
+   <div class="table">
+
+.. raw:: html
+
+   <div class="table-title">
+
+Table?14.1.?Login Class Resource Limits
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="table-contents">
+
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Resource Limit   | Description                                                                                                                                                                                                                                                                                                                                                                                           |
++==================+=======================================================================================================================================================================================================================================================================================================================================================================================================+
+| coredumpsize     | The limit on the size of a core file generated by a program is subordinate to other limits on disk usage, such as ``filesize`` or disk quotas. This limit is often used as a less severe method of controlling disk space consumption. Since users do not generate core files and often do not delete them, this setting may save them from running out of disk space should a large program crash.   |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| cputime          | The maximum amount of CPU time a user's process may consume. Offending processes will be killed by the kernel. This is a limit on CPU *time* consumed, not the percentage of the CPU as displayed in some of the fields generated by ``top`` and ``ps``.                                                                                                                                              |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| filesize         | The maximum size of a file the user may own. Unlike disk quotas (`Section?18.11, “Disk Quotas” <quotas.html>`__), this limit is enforced on individual files, not the set of all files a user owns.                                                                                                                                                                                                   |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| maxproc          | The maximum number of foreground and background processes a user can run. This limit may not be larger than the system limit specified by ``kern.maxproc``. Setting this limit too small may hinder a user's productivity as some tasks, such as compiling a large program, start lots of processes.                                                                                                  |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| memorylocked     | The maximum amount of memory a process may request to be locked into main memory using `mlock(2) <http://www.FreeBSD.org/cgi/man.cgi?query=mlock&sektion=2>`__. Some system-critical programs, such as `amd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=amd&sektion=8>`__, lock into main memory so that if the system begins to swap, they do not contribute to disk thrashing.                     |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| memoryuse        | The maximum amount of memory a process may consume at any given time. It includes both core memory and swap usage. This is not a catch-all limit for restricting memory consumption, but is a good start.                                                                                                                                                                                             |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| openfiles        | The maximum number of files a process may have open. In FreeBSD, files are used to represent sockets and IPC channels, so be careful not to set this too low. The system-wide limit for this is defined by ``kern.maxfiles``.                                                                                                                                                                         |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| sbsize           | The limit on the amount of network memory a user may consume. This can be generally used to limit network communications.                                                                                                                                                                                                                                                                             |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| stacksize        | The maximum size of a process stack. This alone is not sufficient to limit the amount of memory a program may use, so it should be used in conjunction with other limits.                                                                                                                                                                                                                             |
++------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+There are a few other things to remember when setting resource limits:
+
+.. raw:: html
+
+   <div class="itemizedlist">
+
+-  Processes started at system startup by ``/etc/rc`` are assigned to
+   the ``daemon`` login class.
+
+-  Although the default ``/etc/login.conf`` is a good source of
+   reasonable values for most limits, they may not be appropriate for
+   every system. Setting a limit too high may open the system up to
+   abuse, while setting it too low may put a strain on productivity.
+
+-  Xorg takes a lot of resources and encourages users to run more
+   programs simultaneously.
+
+-  Many limits apply to individual processes, not the user as a whole.
+   For example, setting ``openfiles`` to ``50`` means that each process
+   the user runs may open up to ``50`` files. The total amount of files
+   a user may open is the value of ``openfiles`` multiplied by the value
+   of ``maxproc``. This also applies to memory consumption.
+
+.. raw:: html
+
+   </div>
+
+For further information on resource limits and login classes and
+capabilities in general, refer to
+`cap\_mkdb(1) <http://www.FreeBSD.org/cgi/man.cgi?query=cap_mkdb&sektion=1>`__,
+`getrlimit(2) <http://www.FreeBSD.org/cgi/man.cgi?query=getrlimit&sektion=2>`__,
+and
+`login.conf(5) <http://www.FreeBSD.org/cgi/man.cgi?query=login.conf&sektion=5>`__.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+14.13.2.?Enabling and Configuring Resource Limits
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+By default, kernel support for ``rctl`` is not built-in, meaning that
+the kernel will first need to be recompiled using the instructions in
+`Chapter?9, *Configuring the FreeBSD Kernel* <kernelconfig.html>`__. Add
+these lines to either ``GENERIC`` or a custom kernel configuration file,
+then rebuild the kernel:
+
+.. code:: programlisting
+
+    options         RACCT
+    options         RCTL
+
+Once the system has rebooted into the new kernel, ``rctl`` may be used
+to set rules for the system.
+
+Rule syntax is controlled through the use of a subject, subject-id,
+resource, and action, as seen in this example rule:
+
+.. code:: programlisting
+
+    user:trhodes:maxproc:deny=10/user
+
+In this rule, the subject is ``user``, the subject-id is ``trhodes``,
+the resource, ``maxproc``, is the maximum number of processes, and the
+action is ``deny``, which blocks any new processes from being created.
+This means that the user, ``trhodes``, will be constrained to no greater
+than ``10`` processes. Other possible actions include logging to the
+console, passing a notification to
+`devd(8) <http://www.FreeBSD.org/cgi/man.cgi?query=devd&sektion=8>`__,
+or sending a sigterm to the process.
+
+Some care must be taken when adding rules. Since this user is
+constrained to ``10`` processes, this example will prevent the user from
+performing other tasks after logging in and executing a ``screen``
+session. Once a resource limit has been hit, an error will be printed,
+as in this example:
+
+.. code:: screen
+
+    % man test
+        /usr/bin/man: Cannot fork: Resource temporarily unavailable
+    eval: Cannot fork: Resource temporarily unavailable
+
+As another example, a jail can be prevented from exceeding a memory
+limit. This rule could be written as:
+
+.. code:: screen
+
+    # rctl -a jail:httpd:memoryuse:deny=2G/jail
+
+Rules will persist across reboots if they have been added to
+``/etc/rctl.conf``. The format is a rule, without the preceding command.
+For example, the previous rule could be added as:
+
+.. code:: programlisting
+
+    # Block jail from using more than 2G memory:
+    jail:httpd:memoryuse:deny=2G/jail
+
+To remove a rule, use ``rctl`` to remove it from the list:
+
+.. code:: screen
+
+    # rctl -r user:trhodes:maxproc:deny=10/user
+
+A method for removing all rules is documented in
+`rctl(8) <http://www.FreeBSD.org/cgi/man.cgi?query=rctl&sektion=8>`__.
+However, if removing all rules for a single user is required, this
+command may be issued:
+
+.. code:: screen
+
+    # rctl -r user:trhodes
+
+Many other resources exist which can be used to exert additional control
+over various ``subjects``. See
+`rctl(8) <http://www.FreeBSD.org/cgi/man.cgi?query=rctl&sektion=8>`__ to
+learn about them.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="navfooter">
+
+--------------
+
++----------------------------------------+--------------------------+----------------------------+
+| `Prev <security-accounting.html>`__?   | `Up <security.html>`__   | ?\ `Next <jails.html>`__   |
++----------------------------------------+--------------------------+----------------------------+
+| 14.12.?Process Accounting?             | `Home <index.html>`__    | ?Chapter?15.?Jails         |
++----------------------------------------+--------------------------+----------------------------+
+
+.. raw:: html
+
+   </div>
+
+All FreeBSD documents are available for download at
+http://ftp.FreeBSD.org/pub/FreeBSD/doc/
+
+| Questions that are not answered by the
+  `documentation <http://www.FreeBSD.org/docs.html>`__ may be sent to
+  <freebsd-questions@FreeBSD.org\ >.
+|  Send questions about this document to <freebsd-doc@FreeBSD.org\ >.

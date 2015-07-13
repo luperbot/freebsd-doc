@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>10.7. Выявление проблем</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD" /><link rel="up" href="printing.html" title="Глава 10. Печать" /><link rel="prev" href="printing-lpd-alternatives.html" title="10.6. Альтернативы стандартному спулеру" /><link rel="next" href="linuxemu.html" title="Глава 11. Двоичная совместимость с Linux" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">10.7. Выявление проблем</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="printing-lpd-alternatives.html">Пред.</a> </td><th width="60%" align="center">Глава 10. Печать</th><td width="20%" align="right"> <a accesskey="n" href="linuxemu.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="printing-troubleshooting"></a>10.7. Выявление проблем</h2></div></div></div><p>После выполнения простого тестирования с помощью команды
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lptest&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">lptest</span>(1)</span></a> вы можете получить один из следующих результатов вместо
+      корректной распечатки:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">Все работает, после определенной задержки; или не выдается
+	  распечатанная страница.</span></dt><dd><p>Принтер напечатал все, что нужно, но он на некоторое время
+	    задумывался и ничего не делал. Фактически, могло потребоваться
+	    нажать кнопку PRINT REMAINING или FORM FEED на принтере, чтобы
+	    результаты были выданы.</p><p>Если это произошло, вероятно, принтер ждал, нет ли в задании
+	    еще данных, прежде чем что бы то ни было печатать. Для решения
+	    этой проблемы можно посылать в текстовом фильтре на принтер символ
+	    FORM FEED (или любую необходимую последовательность символов).
+	    Этого обычно достаточно, чтобы принтер немедленно распечатал
+	    любой остающийся в его внутреннем буфере текст. Также полезно
+	    убедиться, что каждое задание печати заканчивается полной страницей,
+	    чтобы следующее задание не начиналось где-то с середины последней
+	    страницы предыдущего задания.</p><p>Следующий измененный скрипт командного интерпретатора
+	    <code class="filename">/usr/local/libexec/if-simple</code> выдает символ
+	    прогона страницы после посылки задания на принтер:</p><pre class="programlisting">#!/bin/sh
+#
+# if-simple - Простой текстовый входной фильтр для lpd
+# Установлен в /usr/local/libexec/if-simple
+#
+# Просто копирует stdin в stdout. Игнорирует все аргументы фильтра.
+# Выдает символ прогона страницы (\f) после печати задания.
+
+/bin/cat &amp;&amp; printf "\f" &amp;&amp; exit 0
+exit 2</pre></dd><dt><span class="term">Принтер печатает <span class="quote"><<<span class="quote">лесенкой</span>>></span>.</span></dt><dd><p>Вы получаете на бумаге следующее:</p><pre class="programlisting">!"#$%&amp;'()*+,-./01234
+                "#$%&amp;'()*+,-./012345
+                                 #$%&amp;'()*+,-./0123456</pre><a id="idp84858960" class="indexterm"></a><a id="idp84859472" class="indexterm"></a><a id="idp84859984" class="indexterm"></a><p>Вы стали очередной жертвой <span class="emphasis"><em>эффекта лесенки</em></span>,
+	    вызванного различными интерпретациями того, какие символы должны
+	    обозначать новую строку. Операционные системы <span class="trademark">UNIX</span>(R)-стиля используют
+	    один символ: ASCII-код 10, перевод строки (line feed - LF). <span class="trademark">MS-DOS</span>(R),
+	    <span class="trademark">OS/2</span>(R) и другие используют пару символов, ASCII-код 10
+	    <span class="emphasis"><em>и</em></span> ASCII-код 13 (возврат каретки, carriage return
+	    или CR). Многие принтеры используют соглашение <span class="trademark">MS-DOS</span>(R) для
+	    представления новых строк.</p><p>При печати из FreeBSD в тексте используется только символ перевода
+	    строки. Принтер, встретив символ перевода строки, переходит на
+	    следующую строку, но оставляет ту же горизонтальную позицию на
+	    строке для следующего печатаемого символа. Вот зачем нужен символ
+	    возврата каретки: чтобы перенести следующий печатаемый символ
+	    на левый край бумаги.</p><p>Вот что ОС FreeBSD хочет от принтера:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>Принтер получает CR</td><td>Принтер печатает CR</td></tr><tr><td>Принтер получает LF</td><td>Принтер печатает CR + LF</td></tr></tbody></table></div><p>Вот несколько способов этого добиться:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Использовать переключатели конфигурации принтера или панель
+		управления, чтобы изменить его интерпретацию этих символов.
+		Поищите как это сделать в руководстве по своему принтеру.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Если вы загружаете другие операционные системы, кроме
+		  FreeBSD, может иметь смысл <span class="emphasis"><em>переконфигурировать</em></span>
+		  принтер для использования такой интерпретации символов CR и LF,
+		  которая принята в этих операционных системах. Затем можно
+		  использовать одно из представленных далее решений.</p></div></li><li class="listitem"><p>Заставить драйвер последовательного порта FreeBSD автоматически
+		преобразовывать LF в CR+LF. Конечно, это подойдет
+		<span class="emphasis"><em>только</em></span> для принтеров, подключенных к
+		последовательным портам. Для включения этой возможности используйте
+		характеристику <code class="literal">ms#</code> и установите режим
+		<code class="literal">onlcr</code> для принтера в файле
+		<code class="filename">/etc/printcap</code>.</p></li><li class="listitem"><p>Послать <span class="emphasis"><em>управляющий код</em></span> на принтер,
+		заставляющий его временно обрабатывать символы LF по-другому.
+		Управляющие коды, которые может поддерживать ваш принтер, поищите
+		в руководстве своего принтера. Когда найдете соответствующий
+		управляющий код, измените текстовый фильтр для посылки сначала
+		этого кода, а затем - задания печати.</p><a id="idp84878672" class="indexterm"></a><p>Вот пример текстового фильтра для принтеров, понимающих
+		управляющие последовательности языка Hewlett-Packard PCL. Этот
+		фильтр заставляет принтер обрабатывать символы LF как LF и CR;
+		затем он посылает задание; наконец, он посылает символ
+		прогона страницы для выдачи последней страницы задания. Он должен
+		работать практически со всеми принтерами Hewlett Packard.</p><pre class="programlisting">#!/bin/sh
+#
+# hpif - Простой текстовый входной фильтр для lpd для принтеров на базе HP-PCL
+# Установлен в /usr/local/libexec/hpif
+#
+# Просто копирует stdin в stdout. Игнорирует все аргументы фильтра.
+# Требует от принтера обрабатывать LF как CR+LF. Выдает страницу по окончании.
+
+printf "\033&amp;k2G" &amp;&amp; cat &amp;&amp; printf "\033&amp;l0H" &amp;&amp; exit 0
+exit 2</pre><p>Вот пример файла <code class="filename">/etc/printcap</code> с хоста
+		<code class="systemitem">orchid</code>. К нему через первый параллельный порт
+		подключен один принтер, Hewlett Packard LaserJet 3Si, по имени
+		<code class="literal">teak</code>. Для него в качестве текстового фильтра
+		используется представленный выше скрипт:</p><pre class="programlisting">#
+#  /etc/printcap для хоста orchid
+#
+teak|hp|laserjet|Hewlett Packard LaserJet 3Si:\
+        :lp=/dev/lpt0:sh:sd=/var/spool/lpd/teak:mx#0:\
+        :if=/usr/local/libexec/hpif:</pre></li></ul></div></dd><dt><span class="term">Строки напечатаны одна поверх другой.</span></dt><dd><p>Принтер так и не перешел на следующую строку. Все строки текста
+	    были напечатаны одна поверх другой, на одной строке.</p><p>Эта проблема <span class="quote"><<<span class="quote">обратна</span>>></span> эффекту лесенки, описанному
+	    выше, и встречается намного реже. Каким-то образом, символы LF,
+	    которые ОС FreeBSD использует для завершения строк, обрабатывались
+	    как символы CR и вызывали перевод позиции печати на левый край
+	    бумаги, но не переход на следующую строку.</p><p>Используйте переключатели конфигурации принтера или панель управления
+	    для обеспечения следующей интерпретации символов LF и CR:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Принтер получает</th><th>Принтер печатает</th></tr></thead><tbody><tr><td>CR</td><td>CR</td></tr><tr><td>LF</td><td>CR + LF</td></tr></tbody></table></div></dd><dt><span class="term">Принтер теряет символы.</span></dt><dd><p>По ходу печати принтер не печатает несколько символов в каждой
+	    строке. Проблема со временем может становиться все хуже, так что
+	    теряется все больше символов.</p><p>Проблема состоит в том, что принтер не справляется с той скоростью,
+	    с которой компьютер посылает данные по последовательной линии (эта
+	    проблема не должна возникать на принтерах, подключенных к параллельным
+	    портам). Есть два способа решить проблему:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Если принтер поддерживает управление потоком XON/XOFF,
+		заставить FreeBSD использовать его, указав режим
+		<code class="literal">ixon</code> в характеристике <code class="literal">ms#</code>.</p></li><li class="listitem"><p>Если принтер поддерживает управление несущим потоком
+		(carrier flow control), укажите режим <code class="literal">crtscts</code>
+		в характеристике <code class="literal">ms#</code>. Убедитесь, что кабель,
+		соединяющий принтер с компьютером, правильно распаян для управления
+		несущим потоком.</p></li></ul></div></dd><dt><span class="term">Напечатан мусор.</span></dt><dd><p>Принтер напечатал нечто похожее на случайный мусор, а не
+	    требуемый текст.</p><p>Это, обычно, - еще один симптом неправильных параметров
+	    взаимодействия с последовательным принтером. Перепроверьте
+	    скорость взаимодействия в характеристике <code class="literal">br</code>
+	    и установку четности в характеристике <code class="literal">ms#</code>;
+	    проверьте, что принтер использует те же установки, которые
+	    заданы в файле <code class="filename">/etc/printcap</code>.</p></dd><dt><span class="term">Ничего не произошло.</span></dt><dd><p>Если ничего не произошло, проблема, вероятно, связана с FreeBSD, а
+	    не с оборудованием. Добавьте характеристику журнального файла
+	    (<code class="literal">lf</code>) в файл <code class="filename">/etc/printcap</code> для
+	    принтера, работу с которым отлаживаете. Например, вот запись для
+	    принтера <code class="literal">rattan</code> с характеристикой
+	    <code class="literal">lf</code>:</p><pre class="programlisting">rattan|line|diablo|lp|Diablo 630 Line Printer:\
+        :sh:sd=/var/spool/lpd/rattan:\
+        :lp=/dev/lpt0:\
+        :if=/usr/local/libexec/if-simple:\
+        :lf=/var/log/rattan.log</pre><p>Затем попытайтесь напечатать снова. Поищите в журнальном файле
+	    (в нашем примере - <code class="filename">/var/log/rattan.log</code>)
+	    возможные сообщения об ошибках. На основе полученных сообщений
+	    попытайтесь решить проблему.</p><p>Если вы не зададите характеристику <code class="literal">lf</code>,
+	    система <span class="application">LPD</span> использует по умолчанию
+	    <code class="filename">/dev/console</code>.</p></dd></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="printing-lpd-alternatives.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="printing.html">Наверх</a></td><td width="40%" align="right"> <a accesskey="n" href="linuxemu.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">10.6. Альтернативы стандартному спулеру </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 11. Двоичная совместимость с Linux</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

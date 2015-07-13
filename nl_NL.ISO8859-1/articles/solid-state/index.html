@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>FreeBSD en Solid State Apparaten</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Dit artikel behandelt het gebruik van solid state disk-apparaten in FreeBSD voor het maken van embedded systemen. Embedded systemen hebben het voordeel van verhoogde stabiliteit wegens het ontbreken van bewegende delen (harde schijven). Er moet echter rekening worden gehouden met de over het algemeen weinig beschikbare schijfruimte in het systeem en de duurzaamheid van het opslagmedium. Specifieke onderwerpen die aan bod komen omvatten de typen en attributen van solid state-media die geschikt zijn om in FreeBSD als schijf te gebruiken, kernelopties die interessant zijn in zo'n omgeving, de mechanismen van rc.initdiskless die de initialisatie van zulke systemen automatiseren en de noodzaak voor alleen-lezen bestandssystemen, en het van voor af aan bouwen van bestandssystemen. Het artikel zal afsluiten met wat algemene strategiën voor kleine en alleen-lezen FreeBSD-omgevingen. Vertaald door René Ladan." /><link rel="home" href="index.html" title="FreeBSD en Solid State Apparaten" /><link rel="next" href="kernel.html" title="2. Kernelopties" /><link rel="copyright" href="trademarks.html" title="Juridische kennisgeving" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">FreeBSD en Solid State Apparaten</th></tr><tr><td width="20%" align="left"> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="kernel.html">Volgende</a></td></tr></table><hr /></div><div xml:lang="nl" class="article" lang="nl"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp62539728"></a>FreeBSD en Solid State Apparaten</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">John</span> <span class="surname">Kozubik</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:john@kozubik.com">john@kozubik.com</a>&gt;</code></p></div></div></div></div></div><div>Herziening: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Copyright © 2001, 2009 The FreeBSD Documentation Project</p></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="trademarks.html">Juridische kennisgeving</a></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="legalnotice.html">Copyright</a></div><div>   door .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Samenvatting</div><p>Dit artikel behandelt het gebruik van solid state
+	disk-apparaten in FreeBSD voor het maken van embedded
+	systemen.</p><p>Embedded systemen hebben het voordeel van verhoogde
+	stabiliteit wegens het ontbreken van bewegende delen (harde
+	schijven).  Er moet echter rekening worden gehouden met de over
+	het algemeen weinig beschikbare schijfruimte in het systeem en
+	de duurzaamheid van het opslagmedium.</p><p>Specifieke onderwerpen die aan bod komen omvatten de typen
+	en attributen van solid state-media die geschikt zijn om in FreeBSD
+	als schijf te gebruiken, kernelopties die interessant zijn in
+	zo'n omgeving, de mechanismen van
+	<code class="filename">rc.initdiskless</code> die de initialisatie van zulke
+	systemen automatiseren en de noodzaak voor alleen-lezen
+	bestandssystemen, en het van voor af aan bouwen van
+	bestandssystemen.  Het artikel zal afsluiten met wat algemene
+	strategiën voor kleine en alleen-lezen
+	FreeBSD-omgevingen.</p><p><span class="emphasis"><em>Vertaald door René Ladan</em></span>.</p></div></div></div><div class="docformatnavi">
+      [
+      
+	  Opgedeeld HTML bestand
+	
+      /
+      <a href="article.html">Enkel HTML bestand</a>
+      ]
+    </div><hr /></div><div class="toc"><div class="toc-title">Inhoudsopgave</div><dl class="toc"><dt><span class="sect1"><a href="index.html#intro">1. Solid State Disk-apparaten</a></span></dt><dt><span class="sect1"><a href="kernel.html">2. Kernelopties</a></span></dt><dt><span class="sect1"><a href="ro-fs.html">3. Het <code class="literal">rc</code>-deelsysteem en alleen-lezen
+      bestandssystemen</a></span></dt><dt><span class="sect1"><a href="ar01s04.html">4. Een bestandssysteem uit het niets opbouwen</a></span></dt><dt><span class="sect1"><a href="strategies.html">5. Systeemstragiën voor kleine en alleen-lezen
+      omgevingen.</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="intro"></a>1. Solid State Disk-apparaten</h2></div></div></div><p>Het bereik van dit artikel zal beperkt zijn tot solid state
+      disk-apparaten die gemaakt zijn met flash-geheugen.
+      Flash-geheugen is een solid state-geheugen (geen bewegende
+      onderdelen) dat niet-vluchtig is (het geheugen blijft gegevens
+      behouden zelf nadat alle stroombronnen zijn ontkoppeld).
+      Flash-geheugen kan enorme fysieke schokken weerstaan en is
+      redelijk snel (de oplossingen met flash-geheugens die in dit
+      artikel worden behandeld zijn iets langzamer dan een EIDE-harde
+      schijf voor schrijfbewerkingen, en veel sneller voor
+      leesbewerkingen).  Een heel belangrijk aspect van flash-geheugen,
+      waarvan de ramnificaties later in dit artikel besproken zullen
+      worden, is dat elke sector een beperkte herschrijfcapaciteit heeft.
+      Een sector flash-geheugen kan maar een bepaald aantal keren
+      beschreven, gewist, en herschreven worden voordat de sector
+      permanent onbruikbaar wordt.  Hoewel veel flash-geheugenproducten
+      automatisch slechte blokken in kaart brengen, en hoewel sommigen
+      zelfs schrijfoperaties gelijkmatig over de eenheid distribueren,
+      blijft het een feit dat er een limiet bestaat aan de hoeveelheid
+      waarmee het apparaat kan worden beschreven.  Concurrerende
+      apparaten hebben tussen de 1.000.000 en 10.000.000
+      schrijfbewerkingen per sector in hun specificaties staan.  Dit
+      getal varieert vanwege de omgevingstemperatuur.</p><p>In het bijzonder worden ATA-compatibele compact-flash-eenheden
+      besproken, welke vrij populair zijn als opslagmedium voor digitale
+      camera's.  Bijzonder interessant is het feit dat de pinnen ervan
+      precies met die van de IDE-bus overeenkomen en dat ze compatibel
+      zijn met de ATA-commandoverzameling.  Daarom kunnen deze apparaten
+      direct aan een IDE-bus in een computer gekoppeld worden met een
+      zeer eenvoudige en goedkope adapter.  Eenmaal op deze wijze
+      geïmplementeerd zien besturingssystemen zoals FreeBSD het
+      apparaat als een normale harde schijf (doch klein).</p><p>Er bestaan nog andere solid state disk-oplossingen, maar hun
+      kosten, zeldzaamheid, en relatieve gebruiksongemak plaatst ze
+      buiten het bereik van dit artikel.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="kernel.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"> </td><td width="40%" align="right" valign="top"> 2. Kernelopties</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

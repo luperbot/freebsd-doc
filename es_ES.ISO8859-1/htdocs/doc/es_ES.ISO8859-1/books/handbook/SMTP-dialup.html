@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>27.9. Utilización del correo con una conexión mediante módem analógico (dial-up)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manual de FreeBSD" /><link rel="up" href="mail.html" title="Capítulo 27. Correo Electrónico" /><link rel="prev" href="outgoing-only.html" title="27.8. Configuración para sólamente enviar correo" /><link rel="next" href="SMTP-Auth.html" title="27.10. Autentificación utilizando SMTP" /><link rel="copyright" href="legalnotice.html" title="Aviso Legal" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">27.9. Utilización del correo con una conexión mediante módem analógico (dial-up)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="outgoing-only.html">Anterior</a> </td><th width="60%" align="center">Capítulo 27. Correo Electrónico</th><td width="20%" align="right"> <a accesskey="n" href="SMTP-Auth.html">Siguiente</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="SMTP-dialup"></a>27.9. Utilización del correo con una conexión mediante módem analógico (dial-up)</h2></div></div></div><p>Si se dispone de una dirección IP privada no es necesario
+      realizar ningún ajuste a partir de la configuración por
+      defecto.  Basta con asignar como nombre de nuestra máquina el
+      nombre que tenemos registrado en el DNS y <span class="application">
+      sendmail</span> se encargará del resto.</p><p>Por otra parte si utilizamos una conexión temporal a internet
+      mediante PPP y se nos asigna una dirección IP
+      de forma dinámica, lo más normal es tener nuestras
+      carpetas de correo alojadas en el servidor de correo de
+      nuestro proveedor de servicios.  Supongamos que el dominio de nuestro
+      ISP es <code class="systemitem">ejemplo.net</code> y que nuestro nombre de usuario
+      es <code class="systemitem">usuario</code>; además hemos llamado a nuestra
+      <code class="systemitem">user</code>, además, hemos llamado a nuestra
+      máquina <code class="systemitem">bsd.home</code>, y nuestro ISP nos ha comunicado que
+      debemos utilizar como pasarela la máquina <code class="systemitem">relay.ejemplo.net</code>.</p><p>Para recuperar correo de nuestra carpeta de correo se debe instalar
+      un agente de recuperación automática de correo.
+      <span class="application">fetchmail</span> es una buena elección puesto
+      que permite utilizar varios protocolos.  Este programa está
+      disponible como un paquete y también desde la colección de
+      ports  (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/fetchmail/pkg-descr">mail/fetchmail</a>).  Normalmente nuestro
+      <acronym class="acronym">ISP</acronym> proporciona <acronym class="acronym">POP</acronym>
+      <acronym class="acronym">POP</acronym>.  Si utilizamos <acronym class="acronym">ppp</acronym> a nivel de
+      usuario se puede recuperar automáticamente el correo cuando se
+      establece la conexión <acronym class="acronym">ppp</acronym> utilizando
+      el fichero <code class="filename">/etc/ppp/ppp.linkup</code>:</p><pre class="programlisting">MYADDR:
+!bg su user -c fetchmail</pre><p>Si utilizamos <span class="application">sendmail</span> (como se muestra
+      más adelante) para entregar correo a cuentas remotas
+      probablemente queramos que <span class="application">sendmail</span>
+      procese nuestras colas de correo tan pronto como nuestra conexión
+      de internet se establezca.  Para ello escriba el siguiente comando tras
+      el comando de <code class="command">fetchmail</code> que hemos escrito antes en
+      el fichero  <code class="filename">/etc/ppp/ppp.linkup</code>:</p><pre class="programlisting">  !bg su user -c "sendmail -q"</pre><p>Asumiendo que tenemos una cuenta para el usuario
+      <code class="systemitem">usuario</code> en <code class="systemitem">bsd.home</code>.  En el directorio <span class="quote">&#8220;<span class="quote">home</span>&#8221;</span>
+       del usuario <code class="systemitem">usuario</code> en la máquina
+      <code class="systemitem">bsd.home</code> debemos crear un fichero
+      <code class="filename">.fetchmailrc</code> con el siguiente contenido:</p><pre class="programlisting">poll ejemplo.net protocol pop3 fetchall pass Secr3To</pre><p>Este fichero debe tener permisos de lectura sólo para el
+      propio dueño  ya que contiene la contraseña de acceso
+      a nuestra cuenta de POP en nuestro ISP (<code class="literal">
+      Secr3To</code>).</p><p>Para poder enviar correo con la cabecera <code class="literal">from:</code>
+      correcta, debemos decir a
+      <span class="application">sendmail</span> que utilice
+      <code class="literal">usuario@ejemplo.net</code> en vez de
+      <code class="literal">usuario@bsd.home</code>.  Siguiendo con nuestro ejemplo
+      es necesario decirle a <span class="application">sendmail</span> que
+      envíe todo el correo a través de la pasarela
+      <code class="systemitem">relay.ejemplo.net</code>.</p><p>El siguiente fichero de configuración
+      <code class="filename">.mc</code> debe ser suficiente para cumplir
+      con las anteriores tareas:</p><pre class="programlisting">VERSIONID(`bsd.home.mc version 1.0')
+OSTYPE(bsd4.4)dnl
+FEATURE(nouucp)dnl
+MAILER(local)dnl
+MAILER(smtp)dnl
+Cwlocalhost
+Cwbsd.home
+MASQUERADE_AS(`ejemplo.net')dnl
+FEATURE(allmasquerade)dnl
+FEATURE(masquerade_envelope)dnl
+FEATURE(nocanonify)dnl
+FEATURE(nodns)dnl
+define(`SMART_HOST', `relay.ejemplo.net')
+Dmbsd.home
+define(`confDOMAIN_NAME',`bsd.home')dnl
+define(`confDELIVERY_MODE',`deferred')dnl</pre><p>En la sección anterior se explica cómo convertir este
+      fichero <code class="filename">.mc</code>  en un fichero de
+      configuración para <span class="application">sendmail</span>,
+      <code class="filename">sendmail.cf</code>. No debemos olvidar
+      reiniciar <span class="application">sendmail</span>
+      después de mofidificar el fichero <code class="filename">
+      sendmail.cf</code>.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="outgoing-only.html">Anterior</a> </td><td width="20%" align="center"><a accesskey="u" href="mail.html">Subir</a></td><td width="40%" align="right"> <a accesskey="n" href="SMTP-Auth.html">Siguiente</a></td></tr><tr><td width="40%" align="left" valign="top">27.8. Configuración para sólamente enviar correo </td><td width="20%" align="center"><a accesskey="h" href="index.html">Inicio</a></td><td width="40%" align="right" valign="top"> 27.10. Autentificación utilizando SMTP</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Puede descargar éste y muchos otros documentos desde
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Si tiene dudas sobre FreeBSD consulte la
+    <a href="http://www.FreeBSD.org/docs.html">documentación</a> antes de escribir a la lista
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Envíe sus preguntas sobre la documentación a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

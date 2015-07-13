@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>4. FreeBSD 作業系統的安裝</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="遠端安裝 FreeBSD 作業系統而不必接 Remote Console" /><link rel="up" href="index.html" title="遠端安裝 FreeBSD 作業系統而不必接 Remote Console" /><link rel="prev" href="preparation.html" title="3. 準備 - mfsBSD" /><link rel="next" href="zfs.html" title="5. ZFS" /><link rel="copyright" href="trademarks.html" title="法律聲明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4. FreeBSD 作業系統的安裝</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="preparation.html">前一頁</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="zfs.html">下一頁</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="installation"></a>4. FreeBSD 作業系統的安裝</h2></div></div></div><p>現在 <span class="application">mfsBSD</span> 已順利啟動，並且應該可以透過
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a> 方式來連。  本節將介紹如何建立 slice 分割、設定
+      <span class="application">gmirror</span> 以作 RAID-1、如何以
+      <span class="application">sysinstall</span> 來安裝 FreeBSD
+      作業系統的最小化安裝。</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63537104"></a>4.1. 準備硬碟</h3></div></div></div><p>首先要作的是配置硬碟空間給 FreeBSD，像是建立 slice 跟分割區。
+	很明顯地，目前在跑的作業系統是載入到系統記憶體內執行，
+	因此要對硬碟配置並無任何問題。  這些工作可以用
+	<span class="application">sysinstall</span> 或者以 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fdisk&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fdisk</span>(8)</span></a> 搭配
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a> 來完成。</p><p>首先先把各硬碟都先清空。  請對各硬碟作下列指令：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/zero of=/dev/ad0 count=2</code></strong></pre><p>接著，以您慣用的工具來建立 slice 以及設定 label。  通常會建議以
+	的 <span class="application">sysinstall</span> 工具來作會比較輕鬆，
+	或者是強而又不太會出槌的文字介面 <span class="trademark">UNIX</span>® 標準工具(像是 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fdisk&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fdisk</span>(8)</span></a>,
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a>)，這部分稍後也會一併介紹。  前者部分在 FreeBSD Handbook
+	的 <a class="link" href="../../../../doc/zh_TW.UTF-8/books/handbook/install-steps.html" target="_top">安裝
+	FreeBSD</a> 章節有相當詳盡的介紹，所以這邊主要要介紹的是如何建立
+	RAID-1 系統以及 <span class="application">ZFS</span>。
+	這邊會介紹建立以 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a> 做成的小型 mirrored 檔案系統：
+	<code class="filename">/</code> (根目錄), <code class="filename">/usr</code> 以及 <code class="filename">/var</code>，而硬碟的其餘剩餘空間則通通以
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=zpool&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">zpool</span>(8)</span></a> 做成 <span class="application">ZFS</span> 的 mirrored 檔案系統
+	。  請注意：必須要先把 FreeBSD 作業系統裝好並開完機後，才能進行設定
+	<span class="application">ZFS</span> 檔案系統。</p><p>下面的例子會介紹如何建立 slice 以及 label、在每個分割區上啟用
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a>、如何在每個 mirrored 分割區上建立
+	<span class="application">UFS2</span> 檔案系統：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fdisk -BI /dev/ad0</code></strong> <a id="fdisk"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>fdisk -BI /dev/ad1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/ad0s1</code></strong> <a id="bsdlabel-writing"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -wB /dev/ad1s1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>bsdlabel -e /dev/ad0s1</code></strong> <a id="bsdlabel-editing"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>bsdlabel /dev/ad0s1 &gt; /tmp/bsdlabel.txt &amp;&amp; bsdlabel -R /dev/ad1s1 /tmp/bsdlabel.txt</code></strong> <a id="bsdlabel-restore"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror label root /dev/ad[01]s1a</code></strong> <a id="gmirror1"></a><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror label var /dev/ad[01]s1d</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror label usr /dev/ad[01]s1e</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>gmirror label -F swap /dev/ad[01]s1b</code></strong> <a id="gmirror2"></a><span><img src="./imagelib/callouts/6.png" alt="6" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/mirror/root</code></strong> <a id="newfs"></a><span><img src="./imagelib/callouts/7.png" alt="7" border="0" /></span>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/mirror/var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/mirror/usr</code></strong></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#fdisk"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>對該硬碟建立 slice 並且在第零軌處將開機表作初始。
+	    請對該機器所有硬碟都作此一動作。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#bsdlabel-writing"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>對各硬碟寫入 label 以及 bootstrap 碼。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#bsdlabel-editing"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>現在手動修改該硬碟的 label，至於如何建立分割區(partitions)
+	    請參閱 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">bsdlabel</span>(8)</span></a> 說明。
+	    分割區分別建立：<code class="literal">a</code> 是給 <code class="filename">/</code> (根目錄)，
+	    <code class="literal">b</code> 給 swap，
+	    <code class="literal">d</code> 給 <code class="filename">/var</code>，
+	    <code class="literal">e</code> 給 <code class="filename">/usr</code>，
+	    最後，會在稍後步驟把 <code class="literal">f</code> 給
+	    <span class="application">ZFS</span> 使用。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#bsdlabel-restore"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>把剛剛的 label 設定先匯出，再匯入到第二顆硬碟上，
+		如此一來兩邊的硬碟 label 設定就會同樣。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#gmirror1"><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></a> </p></td><td valign="top" align="left"><p>在各分割區上啟用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a></p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#gmirror2"><span><img src="./imagelib/callouts/6.png" alt="6" border="0" /></span></a> </p></td><td valign="top" align="left"><p>請注意：<code class="option">-F</code> 選項是用在 swap 上。
+	    這參數會讓 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a> 認為該硬體是處於可靠狀態，
+	    即使發生電源故障或系統當掉，也不會去同步。</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#newfs"><span><img src="./imagelib/callouts/7.png" alt="7" border="0" /></span></a> </p></td><td valign="top" align="left"><p>在各個有做 mirror 的分割區上建立 <span class="application">UFS2</span>
+	    檔案系統</p></td></tr></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63670096"></a>4.2. 系統安裝</h3></div></div></div><p>這裡是最重要的一環，
+	本節介紹實際上如何在先前一節所做好的硬碟安裝最小化的 FreeBSD，
+	為了完成此一目標，所有檔案系統都必須掛載妥當，才能讓
+	<span class="application">sysinstall</span> 可以把 FreeBSD 裝到硬碟內：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/mirror/root /mnt</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir /mnt/var /mnt/usr</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/mirror/var /mnt/var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/mirror/usr /mnt/usr</code></strong></pre><p>做完上述動作之後，請執行 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a>。  請從主選單中選擇
+	<span class="guimenuitem">Custom</span> 安裝，選
+	<span class="guimenuitem">Options</span> 按 <span class="keycap"><strong>Enter</strong></span>。
+	然後以方向鍵移動到 <code class="literal">Install Root</code> 處，按
+	<span class="keycap"><strong>Space</strong></span> 鍵然後改為 <code class="filename">/mnt</code>，再按 <span class="keycap"><strong>Enter</strong></span>
+	鍵以將修改值存起來，然後按 <span class="keycap"><strong>q</strong></span> 鍵即可離開這個
+	<span class="guimenuitem">Options</span> 畫面。</p><div xmlns="" class="warning"><h3 class="admontitle">警告: </h3><p xmlns="http://www.w3.org/1999/xhtml">請注意：本步驟極為重要，若忽略的話那麼
+	  <span class="application">sysinstall</span> 就沒辦法安裝 FreeBSD。</p></div><p>接著選 <span class="guimenuitem">Distributions</span>，然後移動游標到
+	<code class="option">Minimal</code> 處，按 <span class="keycap"><strong>Space</strong></span> 鍵。
+	本文之所以介紹最小化安裝是為了要節省網路流量，因為系統安裝是透過
+	<span class="application">ftp</span> 方式來進行。  要離開本畫面，請選
+	<code class="option">Exit</code> 即可。</p><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">至於 <span class="guimenuitem">Partition</span> 及
+	  <span class="guimenuitem">Label</span> 步驟則可略過，
+	  因為這些目前已經都設定完畢了。</p></div><p>在 <span class="guimenuitem">Media</span> 選單中請選
+	<code class="option">FTP</code>。  請選最近的 mirror 站，並且讓
+	<span class="application">sysinstall</span> 假設網路已經設妥。
+	接下來就會回到 <span class="guimenuitem">Custom</span> 選單。</p><p>最後，按下 <span class="guimenuitem">Commit</span> 即可開始進行安裝。
+	完成安裝後，即可離開 <span class="application">sysinstall</span>。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63724624"></a>4.3. 後續安裝步驟</h3></div></div></div><p>此時 FreeBSD 作業系統應該已經裝完，然而還有些後續流程要做。
+	必須要做一些後續設定，才能讓 FreeBSD 可以開機跟登入。</p><p>現在必須要用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a> 以切到剛剛新裝好的系統內。
+	指令如下：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chroot /mnt</code></strong></pre><p>然後再打下列指令以繼續完成：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>把 <code class="literal">GENERIC</code> kernel 複製到
+	    <code class="filename">/boot/kernel</code>
+	    目錄：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cp -Rp /boot/GENERIC/* /boot/kernel</code></strong></pre></li><li class="listitem"><p>建立 <code class="filename">/etc/rc.conf</code>,
+	    <code class="filename">/etc/resolv.conf</code> 及
+	    <code class="filename">/etc/fstab</code> 檔案。  別忘了，要記得在
+	    <code class="filename">/etc/rc.conf</code> 檔設相關網路設定，以及把
+	    <span class="application">sshd</span> 啟用。  此外，
+	    <code class="filename">/etc/fstab</code> 檔應該會長像下面這樣：</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/mirror/swap        none            swap    sw              0       0
+/dev/mirror/root        /               ufs     rw              1       1
+/dev/mirror/usr         /usr            ufs     rw              2       2
+/dev/mirror/var         /var            ufs     rw              2       2
+/dev/cd0                /cdrom          cd9660  ro,noauto       0       0</pre></li><li class="listitem"><p>新增 <code class="filename">/boot/loader.conf</code> 檔，
+	    並且內容填入下列：</p><pre class="programlisting">geom_mirror_load="YES"
+zfs_load="YES"</pre></li><li class="listitem"><p>執行下列指令，以在下次開機時啟用 <span class="application">ZFS</span>
+	    ：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'zfs_enable="YES"' &gt;&gt; /etc/rc.conf </code></strong></pre></li><li class="listitem"><p>使用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=adduser&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">adduser</span>(8)</span></a> 工具來新增其他使用者帳號。  別忘了，
+	    至少要有一個帳號得加入 <code class="systemitem">wheel</code> 群組，
+	    才能在重開機後以該帳號切換為 root。</p></li><li class="listitem"><p>再次檢查上述相關的設定，是否有遺漏或打錯。</p></li></ul></div><p>現在該系統終於可以重開機了，請用 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=reboot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">reboot</span>(8)</span></a>
+	指令以重開機。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="preparation.html">前一頁</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="zfs.html">下一頁</a></td></tr><tr><td width="40%" align="left" valign="top">3. 準備 - <span class="application">mfsBSD</span> </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始頁</a></td><td width="40%" align="right" valign="top"> 5. ZFS</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文及其他文件，可由此下載：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>。</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>若有 FreeBSD 方面疑問，請先閱讀
+    <a href="http://www.FreeBSD.org/docs.html">FreeBSD 相關文件</a>，如不能解決的話，再洽詢
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;。<br></br>
+    關於本文件的問題，請洽詢
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;。</small></p></body></html>

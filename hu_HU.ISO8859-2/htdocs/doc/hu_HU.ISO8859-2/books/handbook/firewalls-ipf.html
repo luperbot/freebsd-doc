@@ -1,0 +1,1352 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>30.5. Az IPFILTER (IPF) tűzfal</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="firewalls.html" title="30. fejezet - Tűzfalak" /><link rel="prev" href="firewalls-pf.html" title="30.4. Az OpenBSD csomagszűrője (PF) és az ALTQ" /><link rel="next" href="firewalls-ipfw.html" title="30.6. IPFW" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">30.5. Az IPFILTER (IPF) tűzfal</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="firewalls-pf.html">Vissza</a> </td><th width="60%" align="center">30. fejezet - Tűzfalak</th><td width="20%" align="right"> <a accesskey="n" href="firewalls-ipfw.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls-ipf"></a>30.5. Az IPFILTER (IPF) tűzfal</h2></div></div></div><a id="idp98820048" class="indexterm"></a><p>Az IPFILTER szerzője Darren Reed.  Az IPFILTER nem
+      kötődik egyik rendszerhez sem: ez egy olyan nyílt
+      forráskódú alkalmazás, amelyet
+      átírtak FreeBSD, NetBSD, OpenBSD, <span class="trademark">SunOS</span>TM, HP/UX
+      és <span class="trademark">Solaris</span>TM operációs rendszerekre.  Az
+      IPFILTER karbantartása és támogatása
+      pillanatnyilag is aktív, folyamatosan jelennek meg
+      újabb változatai.</p><p>Az IPFILTER egy rendszermag oldalán
+      működő tűzfalazási és egy
+      címfordítási mechanizmusra alapszik, amelyet
+      felhasználói programokkal tudunk felügyelni
+      és vezérelni.  A tűzfal szabályai az
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> segédprogrammal
+      állíthatóak be vagy
+      törölhetőek.  A hálózati
+      címfordításra vonatkozó
+      szabályokat az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ipnat</span>(1)</span></a> segédprogrammal
+      állíthatjuk be vagy törölhetjük.  Az
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> segédprogram képes futás
+      közben statisztikákat készíteni az
+      IPFILTER rendszermagban elhelyezkedő részeinek
+      viselkedéséről.  Az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipmon&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipmon</span>(8)</span></a> program pedig
+      az IPFILTER cselekvéseit képes a
+      rendszernaplókba feljegyezni.</p><p>Az IPF eredetileg olyan szabályfeldolgozási
+      módszer szerint készült, amelyben <span class="quote">"<span class="quote">az
+      utolsó egyező szabály nyer</span>"</span> és
+      csak állapotnélküli szabályokat ismert.
+      Az idő múlásával az IPF
+      részévé vált a <span class="quote">"<span class="quote">quick</span>"</span>
+      opció és a <span class="quote">"<span class="quote">keep state</span>"</span> opción
+      keresztül az állapottartás is, melyek
+      drámai mértékben
+      korszerűsítették a szabályok
+      feldolgozásának elvét.  Az IPF hivatalos
+      dokumentációja csak a régi szabályok
+      létrehozását és azok
+      feldolgozásának leírását
+      tartalmazza.  A korszerűsített funkciók csak
+      kiegészítésképpen jelennek meg,
+      és az általuk felkínált
+      előnyök megértése egy sokkal magasabb
+      szintű és biztonságosabb tűzfal
+      megépítését teszik
+      lehetővé.</p><p>A szakaszban szereplő utasításokban olyan
+      szabályok szerepelnek, amelyek kihasználják a
+      <span class="quote">"<span class="quote">quick</span>"</span> és <span class="quote">"<span class="quote">keep state</span>"</span>
+      opciókat.  Ezek az inkluzív
+      tűzfalszabályok létrehozásának
+      alapjai.</p><p>A régi típusú szabályokról
+      a <code class="uri"><a class="uri" href="http://www.obfuscation.org/ipf/ipf-howto.html#TOC_1" target="_top">http://www.obfuscation.org/ipf/ipf-howto.html#TOC_1</a></code>
+      és <code class="uri"><a class="uri" href="http://coombs.anu.edu.au/~avalon/ip-filter.html" target="_top">http://coombs.anu.edu.au/~avalon/ip-filter.html</a></code>
+      címeken olvashatunk (angolul).</p><p>Az IPF gyakran ismételt kérdései a <code class="uri"><a class="uri" href="http://www.phildev.net/ipf/index.html" target="_top">http://www.phildev.net/ipf/index.html</a></code> címen
+      érhetőek el (angolul).</p><p>A nyílt forrású IPFILTER
+      levelezési lista kereshető archívumait a <code class="uri"><a class="uri" href="http://marc.theaimsgroup.com/?l=ipfilter" target="_top">http://marc.theaimsgroup.com/?l=ipfilter</a></code>
+      címen találjuk (angolul).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98844112"></a>30.5.1. Az IPF engedélyezése</h3></div></div></div><a id="idp98844752" class="indexterm"></a><p>Az IPF megtalálható a FreeBSD
+	alaptelepítésében mint menet közben
+	külön betölthető modul.  Ha az
+	<code class="filename">rc.conf</code> állományba
+	beírjuk a <code class="literal">ipfilter_enable="YES"</code> sort,
+	akkor ez a modul dinamikusan betöltődik.  A
+	betölthető modul alapból naplóz
+	és a <code class="literal">default pass all</code>
+	beállítást tartalmazza.  Ha helyette a
+	<code class="literal">block all</code> szabályt akarjuk
+	használni, akkor emiatt még nem kell
+	feltétlenül újrafordítanunk a FreeBSD
+	rendszermagját, elég ha egyszerűen csak a
+	szabályrendszerünk végére
+	beszúrjuk.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98852176"></a>30.5.2. A rendszermag beállításai</h3></div></div></div><a id="idp98852816" class="indexterm"></a><a id="idp98853968" class="indexterm"></a><a id="idp98855120" class="indexterm"></a><a id="idp98856272" class="indexterm"></a><p>Az IPF használatához nem kötelező a
+	következő beállításokkal
+	újrafordítani a FreeBSD rendszermagját, itt
+	csupán
+	háttérinformációként
+	szerepel.  Amikor az IPF a rendszermagba kerül, a
+	betölhető modulra nem lesz szükség.</p><p>Az IPF a rendszermag forrásai között
+	található
+	<code class="filename">/usr/src/sys/conf/NOTES</code>
+	állományban megadott
+	beállításai a következő
+	módon foglalhatóak össze:</p><pre class="programlisting">options IPFILTER
+options IPFILTER_LOG
+options IPFILTER_DEFAULT_BLOCK</pre><p>Az <code class="literal">options IPFILTER</code> engedélyezi az
+	<span class="quote">"<span class="quote">IPFILTER</span>"</span> tűzfal
+	támogatását.</p><p>Az <code class="literal">options IPFILTER_LOG</code>
+	hatására az IPF az <code class="filename">ipl</code>
+	csomagnaplózó pszeudo eszközre jegyzi fel a
+	forgalmat - minden olyan szabály esetén,
+	ahol megjelenik a <code class="literal">log</code> kulcsszó.</p><p>Az <code class="literal">options IPFILTER_DEFAULT_BLOCK</code>
+	megváltoztatja az alapértelmezett
+	viselkedést, tehát minden olyan csomag, amely nem
+	illeszkedik a tűzfal valamelyik <code class="literal">pass</code>
+	típusú (átengedő)
+	szabályára, blokkolásra kerül.</p><p>Ezek a beállítások csak azt
+	követően érvényesülnek, ha
+	fordítottunk és telepítettünk
+	velük egy új rendszermagot.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98863568"></a>30.5.3. Az <code class="filename">rc.conf</code> állomány
+	beállításai</h3></div></div></div><p>Az <code class="filename">/etc/rc.conf</code>
+	állományban a következő
+	utasításokra lesz szükségünk az
+	IPF működésbe hozására a rendszer
+	indítása során:</p><pre class="programlisting">ipfilter_enable="YES"             # az ipf tűzfal indítása
+ipfilter_rules="/etc/ipf.rules"   # betölti a szabályokat tartalmazó szöveges állományt
+ipmon_enable="YES"                # elindítja az IP monitor naplózását
+ipmon_flags="-Ds"                 # D = indítás démonként
+                                  # s = naplózás a syslog használatával
+                                  # v = a tcp ablak, ack, seq csomagok naplózása
+                                  # n = az IP-címek és portok feloldása</pre><p>Ha olyan helyi hálózat áll meg a
+	tűzfal mögött, amely egy fenntartott
+	privát IP-címtartományt használ,
+	akkor még a következő
+	utasításokra is szükségünk lesz a
+	címfordítás
+	bekapcsolásához:</p><pre class="programlisting">gateway_enable="YES"              # a helyi hálózat átjárója
+ipnat_enable="YES"                # az ipnat funkció elindítása
+ipnat_rules="/etc/ipnat.rules"    # az ipnat működéséhez szükséges definíciók</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98866768"></a>30.5.4. IPF</h3></div></div></div><a id="idp98867408" class="indexterm"></a><p>Az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> parancs használható a
+	szabályokat tartalmazó állomány
+	betöltésére.  Általában egy
+	állományba írjuk össze a tűzfal
+	szabályait és ezzel a paranccsal
+	cseréljük le egyszerre a tűzfalban levő
+	jelenlegi szabályokat:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipf -Fa -f /etc/ipf.rules</code></strong></pre><p>Az <code class="option">-Fa</code> az összes belső
+	szabály törlését jelenti.</p><p>Az <code class="option">-f</code> jelzi, hogy egy
+	állományból kell beolvasni a
+	betöltendő szabályokat.</p><p>Ezzel mintegy lehetőségünk van
+	változtatni a korábban
+	összeállított szabályainkon, futtatni
+	a fenti IPF parancsot és ezen keresztül úgy
+	frissíteni a szabályok friss
+	másolatával a már működő
+	tűzfalat, hogy nem is kell újraindítanunk a
+	rendszert.  Ez a módszer igen kényelmes az
+	új szabályok
+	kipróbálásához, mivel
+	bármikor tetszőlegesen
+	végrehajtható.</p><p>Az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> man oldala tartalmazza a parancsnak
+	megadható további
+	beállításokat.</p><p>Az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> parancs a szabályokat
+	tároló állományt egy
+	szabványos szöveges állománynak
+	tekinti, semmilyen szimbolikus helyettesítést
+	alkalmazó szkriptet nem fogad el.</p><p>Lehetőségünk van azonban olyan IPF
+	szabályokat készíteni, amelyek
+	kiaknázzák a szkriptek szimbolikus
+	helyettesítésének lehetőségeit.
+	Erről bővebben lásd <a class="xref" href="firewalls-ipf.html#firewalls-ipf-rules-script" title="30.5.9. A szabályok felírása szimbolikus helyettesítéssel">30.5.9. szakasz - A szabályok felírása szimbolikus
+	helyettesítéssel</a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98879440"></a>30.5.5. Az IPFSTAT</h3></div></div></div><a id="idp98880080" class="indexterm"></a><a id="idp98880720" class="indexterm"></a><p>Az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> alapértelmezés szerint a
+	arra használatos, hogy le tudjuk kérdezni
+	és megjeleníteni a tűzfalhoz tartozó
+	számlálók értékeit, amelyek a
+	legutóbbi indítás vagy az <code class="command">ipf
+	-Z</code> parancs által kiadott
+	lenullázásuk óta a bejövő vagy
+	kimenő forgalomból a megadott szabályoknak
+	megfelelő csomagok alapján gyűjtenek össze
+	statisztikákat.</p><p>A parancs működésének
+	részleteit az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> man oldalon
+	olvashatjuk.</p><p>Az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> meghívása alapból
+	így néz ki:</p><pre class="screen">input packets: blocked 99286 passed 1255609 nomatch 14686 counted 0
+ output packets: blocked 4200 passed 1284345 nomatch 14687 counted 0
+ input packets logged: blocked 99286 passed 0
+ output packets logged: blocked 0 passed 0
+ packets logged: input 0 output 0
+ log failures: input 3898 output 0
+ fragment state(in): kept 0 lost 0
+ fragment state(out): kept 0 lost 0
+ packet state(in): kept 169364 lost 0
+ packet state(out): kept 431395 lost 0
+ ICMP replies: 0 <acronym class="acronym">TCP</acronym> RSTs sent: 0
+ Result cache hits(in): 1215208 (out): 1098963
+ IN Pullups succeeded: 2 failed: 0
+ OUT Pullups succeeded: 0 failed: 0
+ Fastroute successes: 0 failures: 0
+ <acronym class="acronym">TCP</acronym> cksum fails(in): 0 (out): 0
+ Packet log flags set: (0)</pre><p>Az <code class="option">-i</code> mint bejövő (inbound), vagy
+	az <code class="option">-o</code> mint kimenő (outbound) forgalomra
+	vonatkozó paraméterek megadásával a
+	rendszermagban az adott oldalon jelenleg telepített
+	és alkalmazott szabályokat kérhetjük
+	le és jeleníthetjük meg.</p><p>Az <code class="command">ipfstat -in</code> parancs így a
+	bejövő forgalomra vonatkozó belső
+	szabályokat mutatja a szabályok
+	számával.</p><p>Az <code class="command">ipfstat -on</code> parancs a kimenő
+	forgalmat érintő belső szabályokat
+	mutatja a szabályok számával.</p><p>Az eredmény körülbelül ilyen
+	lesz:</p><pre class="screen">@1 pass out on xl0 from any to any
+@2 block out on dc0 from any to any
+@3 pass out quick on dc0 proto tcp/udp from any to any keep state</pre><p>Az <code class="command">ipfstat -ih</code> a bejövő
+	forgalomhoz tartozó belső szabályokat mutatja
+	és mindegyik elé odaírja, hogy eddig mennyi
+	csomag illeszkedett rájuk.</p><p>Az <code class="command">ipfstat -oh</code> ugyanígy a
+	kimentő forgalom esetén mutatja a belső
+	szabályokat és mindegyik előtt
+	feltünteti, hogy az adott pillanatig mennyi csomag
+	illeszkedett rájuk.</p><p>A kimenete nagyjából ilyen lesz:</p><pre class="screen">2451423 pass out on xl0 from any to any
+354727 block out on dc0 from any to any
+430918 pass out quick on dc0 proto tcp/udp from any to any keep state</pre><p>Az <code class="command">ipfstat</code> parancs talán egyik
+	legfontosabb funkciója a <code class="option">-t</code>
+	kapcsolóval csalható elő, melynek
+	hatására a rendszerben aktív
+	állapotok táblázatát mutatja meg
+	ugyanúgy, ahogy a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=top&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">top</span>(1)</span></a> a FreeBSD rendszerben
+	futó programokat.  Amikor a tűzfalunk
+	támadás alatt áll, ezzel a
+	funkcióval tudjuk a problémát
+	beazonosítani, leásni a mélyébe
+	és látni a támadótól
+	érkező csomagokat.  A
+	kiegészítésképpen megadható
+	alkapcsolók megadásával
+	kiválaszthatjuk azt a cél vagy forrás
+	IP-címet, portot vagy protokollt, amelyet valós
+	időben meg akarunk figyelni.  Ennek részleteit az
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfstat&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfstat</span>(8)</span></a> man oldalán láthatjuk.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98899792"></a>30.5.6. Az IPMON</h3></div></div></div><a id="idp98900432" class="indexterm"></a><a id="idp98901072" class="indexterm"></a><p>Az <code class="command">ipmon</code> megfelelő
+	működéséhez be kell kapcsolnunk a
+	rendszermag <code class="literal">IPFILTER_LOG</code>
+	beállítását.  Ez a parancs
+	két különböző módban
+	használható.  Ha parancsot a <code class="option">-D</code>
+	opció nélkül gépeljük be, akkor
+	ezek közül alapból a natív módot
+	kapjuk meg.</p><p>A démon mód abban az esetben hasznos, ha
+	folyamatosan naplózni akarjuk a rendszerben zajló
+	eseményeket, majd később ezeket
+	átnézni.  Így képes egymással
+	együttműködni a FreeBSD és az IPFILTER.  A
+	FreeBSD beépítve tartalmaz olyan
+	lehetőséget, aminek révén
+	magától cseréli a rendszernaplókat.
+	Ezért ha átküldjük a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	démonnak a naplózandó üzeneteket,
+	akkor sokkal jobban járunk, mintha egyszerűen csak
+	mezei állományba naplóznánk.  Az
+	<code class="filename">rc.conf</code> alapértelmezései
+	között az <code class="literal">ipmon_flags</code>
+	beállítás a <code class="option">-Ds</code>
+	kapcsolókat rögzíti:</p><pre class="programlisting">ipmon_flags="-Ds" # D = indítás démonként
+                  # s = naplózás a syslog használatával
+                  # v = a tcp ablak, ack, seq csomagok naplózása
+                  # n = az IP-címek és portok nevének feloldása</pre><p>Ennek a viselkedésnek az előnyei minden
+	bizonnyal egyértelműek.
+	Segítségével képesek vagyunk az
+	esetek megtörténte után
+	átnézni, hogyan milyen csomagokat dobott el a
+	rendszer, azok milyen címekről érkeztek
+	és hova szánták.  Ez egy komoly fegyver a
+	támadók lenyomozásában.</p><p>Hiába engedélyezzük a
+	naplózást, az IPF
+	önszántából semmilyen
+	naplózási szabályt nem fog gyártani.
+	A tűzfal gazdájának kell eldöntenie,
+	hogy a szabályokat közül melyiket akarja
+	naplózni, és így neki kell megadnia a
+	<code class="literal">log</code> kulcsszót ezekben az esetekben.
+	Normális esetben csak a <code class="literal">deny</code>
+	szabályokat naplózzák.</p><p>Egyáltalán nem ritka, hogy a
+	szabályrendszer végén egy
+	alapértelmezés szerint mindent eldobó
+	szabály áll, amely naplóz.  Ezzel
+	lehetőségünk nyílik
+	rögzíteni azokat a csomagokat, amelyek egyetlen
+	szabályra sem illeszkedtek.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98945616"></a>30.5.7. Naplózás az IPMON
+	használatával</h3></div></div></div><p>A <span class="application">syslogd</span> egy saját
+	módszert alkalmaz a naplózott adatok
+	elkülönítésére.  Egy
+	<span class="quote">"<span class="quote">funkciók</span>"</span> (facility) és
+	<span class="quote">"<span class="quote">szintek</span>"</span> (level) segítségével
+	kialakított speciális csoportosítást
+	alkalmaz.  Az IPMON <code class="option">-Ds</code> módja
+	alapértelmezés szerint a <code class="literal">local0</code>
+	<span class="quote">"<span class="quote">funkciót</span>"</span> használja.  Ezen
+	túl a következő szinteken
+	különíthetjük el igényeinknek
+	megfelelően a naplózott adatokat:</p><pre class="screen">LOG_INFO - az átengedés vagy blokkolás helyett a "log" kulcsszóval ellátott csomagok
+LOG_NOTICE - az át is engedett csomagok
+LOG_WARNING - a blokkolt csomagok
+LOG_ERR - a naplózott csomagok közül azok, amelyek túlságosan kicsik (hibás a fejlécük)</pre><p>Az IPFILTER csak akkor tud naplózni a
+	<code class="filename">/var/log/ipfilter.log</code>
+	állományba, ha előtte létrehozzuk.  Az
+	alábbi parancs erre tökéletesen
+	megfelelő:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/ipfilter.log</code></strong></pre><p>A <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> működését az
+	<code class="filename">/etc/syslog.conf</code> állományban
+	szereplő definíciók vezérlik.  A
+	<code class="filename">syslog.conf</code> állomány
+	számottevő mértékben képes
+	meghatározni azt, ahogy a
+	<span class="application">syslog</span> az IPF és a
+	hozzá hasonló alkalmazásoktól kapott
+	rendszerszintű üzeneteket kezeli.</p><p>Az <code class="filename">/etc/syslog.conf</code>
+	állományba az alábbi sor kell
+	felvennünk:</p><pre class="programlisting">local0.* /var/log/ipfilter.log</pre><p>A <code class="literal">local0.*</code> megadásával az
+	összes ilyen típusú üzenet egy
+	előre rögzített helyre kerül.</p><p>Az <code class="filename">/etc/syslog.conf</code>
+	állományban elvégzett
+	módosításokat úgy
+	léptethetjük érvénybe, ha
+	újraindítjuk a
+	számítógépet vagy az
+	<code class="command">/etc/rc.d/syslogd reload</code> paranccsal
+	megkérjük a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> démont, hogy
+	olvassa újra az <code class="filename">/etc/syslog.conf</code>
+	állományt.</p><p>Az imént létrehozott naplót ne
+	felejtsük el megadni az
+	<code class="filename">/etc/newsyslog.conf</code>
+	állományban sem, és akkor ezzel a
+	cseréjét is megoldjuk.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98962768"></a>30.5.8. A naplózott üzenetek formátuma</h3></div></div></div><p>Az <code class="command">ipmon</code> által létrehozott
+	üzenetek whitespace karakterekkel elválasztott
+	adatmezőkből állnak.  A következő
+	mezők az összes üzenet esetében
+	megjelennek:</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>A csomag megérkezésének
+	    dátuma</p></li><li class="listitem"><p>A csomag megérkezésének
+	    időpontja.  ÓÓ:PP:MM.E alakban jelennek
+	    meg az órák, percek, másodpercek
+	    és ezredmásodpercek (ez több
+	    számjegy hosszú is lehet) szerint</p></li><li class="listitem"><p>Azon interfész a neve, ahol a csomag
+	    feldolgozásra került, például
+	    <code class="filename">dc0</code></p></li><li class="listitem"><p>A szabályhoz tartozó csoport és
+	    sorszám, például
+	    <code class="literal">@0:17</code></p></li></ol></div><p>Ezek az <code class="command">ipfstat -in</code> paranccsal
+	nézhetőek meg.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Cselekvés: a p mint átment (passed), b
+	    mint blokkolt (blocked), S mint rövid csomag (short
+	    packet), n mint egyik szabályra sem illeszkedett (not
+	    match), L mint naplózás (log).  A
+	    módosítók
+	    megjelenítésének sorrendje: S, p, b, n,
+	    L.  A nagybetűs P és B azt jelzi, hogy a
+	    csomagot egy felsőbb szintű
+	    beállítás miatt
+	    naplózták, nem egy szabály
+	    hatására.</p></li><li class="listitem"><p>Címek: ez tulajdonképpen három
+	    mezőt takar: a forrás címet és
+	    portot (melyet egy vessző választ el), a -&gt;
+	    jelet és cél címet és portot.
+	    Például: <code class="literal">209.53.17.22,80 -&gt;
+	    198.73.220.17,1722</code>.</p></li><li class="listitem"><p>A <code class="literal">PR</code> után a protokoll neve
+	    vagy száma olvasható, például
+	    <code class="literal">PR tcp</code>.</p></li><li class="listitem"><p>A <code class="literal">len</code> csomaghoz tartozó
+	    fejléc és törzsének teljes
+	    hosszát jelöli, például
+	    <code class="literal">len 20 40</code>.</p></li></ol></div><p>Amennyiben a csomag <acronym class="acronym">TCP</acronym>, egy
+	kötőjellel kezdődően további
+	mezők is megjelenhetnek a beállított
+	opcióknak megfelelő betűk
+	képében.  A betűket és
+	beállításaikat az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">ipf</span>(5)</span></a> man
+	oldalán olvashatjuk.</p><p>Amennyiben a csomag ICMP, a sort két mező
+	zárja, melyek közül az első tartalma
+	mindig <span class="quote">"<span class="quote">ICMP</span>"</span>, és ezt egy perjellel
+	elválasztva az ICMP üzenet típusa és
+	altípusa követi.  Tehát például
+	az ICMP 3/3 a <span class="quote">"<span class="quote">nem elérhető port</span>"</span>
+	üzenetet hordozza.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipf-rules-script"></a>30.5.9. A szabályok felírása szimbolikus
+	helyettesítéssel</h3></div></div></div><p>Az IPF használatában gyakorlott
+	felhasználók közül
+	néhányan képesek olyan
+	stílusú szabályrendszert
+	készíteni, ahol szimbolikus
+	helyettesítést használnak.  Ennek az egyik
+	legnagyobb előnye az, hogy ilyenkor elég csak a
+	szimbolikus névhez tartozó értéket
+	megváltoztatni és amikor a szkript lefut, akkor az
+	összes rá hivatkozó szabályba ez
+	kerül be.  Szkript lévén a szimbolikus
+	helyettesítéssel ki tudjuk emelni a gyakran
+	használt értékeket és
+	behelyettesíteni ezeket több helyre.  Ezt a most
+	következő példában
+	láthatjuk.</p><p>Az itt alkalmazott felírás kompatibilis az
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> és <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcsh</span>(1)</span></a>
+	parancsértelmezőkkel.</p><p>A szimbolikus helyettesítést egy
+	dollárjellel fejezzük ki:
+	<code class="literal">$</code>.</p><p>A szimbolikus mezőkben nem szerepel a $
+	jelölés.</p><p>A szimbolikus mező tartalmát kettős
+	idézőjelbe (<code class="literal">"</code>)
+	tesszük.</p><p>Kezdjük így el a szabályok
+	írását:</p><pre class="programlisting">######### Az IPF szabályait tartalmazó szkript eleje ###########
+
+oif="dc0"            # a kimenő interfész neve
+odns="192.0.2.11"    # az internet szolgáltató névszerverének IP-címe
+myip="192.0.2.7"     # a szolgáltatótól kapott statikus IP-címünk
+ks="keep state"
+fks="flags S keep state"
+
+# Választhatunk, hogy az /etc/ipf.rules állományt ebből a szkriptből
+# hozzuk létre vagy futtathatjuk "magát" a szkriptet.
+#
+# Egyszerre csak az egyik sort használjuk.
+#
+# 1) Ezzel gyárhatjuk le az /etc/ipf.rules állományt:
+#cat &gt; /etc/ipf.rules &lt;&lt; EOF
+#
+# 2) Ezzel futtathajuk "magát" a szkriptet:
+/sbin/ipf -Fa -f - &lt;&lt; EOF
+
+# Engedélyezzük a szolgáltató névszerverének elérését.
+pass out quick on $oif proto tcp from any to $odns port = 53 $fks
+pass out quick on $oif proto udp from any to $odns port = 53 $ks
+
+# Engedélyezzük kifelé a titkosítatlan www funkciót.
+pass out quick on $oif proto tcp from $myip to any port = 80 $fks
+
+# Engedélyezzük kifelé a TLS SSL felett üzemelő titkosított www funkciót.
+pass out quick on $oif proto tcp from $myip to any port = 443 $fks
+EOF
+################## Itt az IPF szkript vége ########################</pre><p>Ennyi lenne.  A példában szereplő
+	szabályok most nem annyira lényegesek, a
+	hangsúly most igazából a szimbolikus
+	helyettesítésen és annak
+	használatán van.  Ha a fenti példát
+	az <code class="filename">/etc/ipf.rules.script</code>
+	állományba mentjük, akkor ezeket a
+	szabályokat a következő paranccsal újra
+	tudjuk tölteni:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /etc/ipf.rules.script</code></strong></pre><p>Egyetlen aprócska gond van a beágyazott
+	szimbólumokat tartalmazó
+	állományokkal: az IPF maga nem képes
+	megérteni a helyettesítéseket, azért
+	közvetlenül nem olvassa a szkriptet.</p><p>Ez a szkript két módon
+	hasznosítható:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Vegyük ki megjegyzésből a
+	    <code class="literal">cat</code> paranccsal kezdődő sort,
+	    és tegyük megjegyzésbe az
+	    <code class="literal">/sbin/ipf</code> kezdetűt.  A megszokottak
+	    szerint tegyük az
+	    <code class="literal">ipfilter_enable="YES"</code> sort az
+	    <code class="filename">/etc/rc.conf</code> állományba,
+	    majd minden egyes módosítása
+	    után futtassuk le a szkriptet az
+	    <code class="filename">/etc/ipf.rules</code> állomány
+	    létrehozásához vagy
+	    frissítéséhez.</p></li><li class="listitem"><p>Tiltsuk le az IPFILTER aktiválását
+	    a rendszerindításkor, tehát
+	    írjuk bele az <code class="literal">ipfilter_enable="NO"</code>
+	    sort (ami mellesleg az alapértelmezett
+	    értéke) az <code class="filename">/etc/rc.conf</code>
+	    állományba.</p><p>Tegyünk egy, az alábbi szkripthez
+	    hasonlót az <code class="filename">/usr/local/etc/rc.d/</code>
+	    könyvtárba.  A szkriptnek adjuk valamilyen
+	    értelmes nevet, például
+	    <code class="filename">ipf.loadrules.sh</code>.  Az
+	    <code class="filename">.sh</code> kiterjesztés
+	    használata kötelező.</p><pre class="programlisting">#!/bin/sh
+sh /etc/ipf.rules.script</pre><p>A szkript engedélyeit állítsuk be
+	    úgy, hogy a <code class="systemitem">root</code>
+	    tulajdonában legyen és képes legyen
+	    olvasni, írni valamint végrehajtani.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chmod 700 /usr/local/etc/rc.d/ipf.loadrules.sh</code></strong></pre></li></ul></div><p>Most miután a rendszer elindult, az IPF
+	szabályai be fognak töltődni.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99008080"></a>30.5.10. Szabályrendszerek az IPF-ben</h3></div></div></div><p>Az IPF esetében a szabályrendszer olyan
+	szabályokból áll, amelyek a
+	csomagokról tartalmuk alapján eldöntik, hogy
+	át kell engedni vagy vissza kell tartani.  A gépek
+	közt két irányban áramló
+	csomagok egy munkamenet alapú társalgást
+	képeznek.  A tűzfalhoz tartozó
+	szabályrendszer egyaránt feldolgozza a
+	internetről a hálózatunk felé
+	igyekvő csomagokat, illetve a hálózatunk
+	ezekre adott válaszait.  Az egyes
+	<acronym class="acronym">TCP/IP</acronym> szolgáltatásokat (mint
+	például telnet, www, levelezés stb.) a
+	hozzájuk tartozó protokol és
+	szabványos (fogadó) portszám írja
+	le.  Ezekre a forrásról általában
+	valamilyen nem szabványos (magasabb
+	értékű) portról érkeznek
+	csomagok.  Ekkor a kommunikáció összes
+	paramétere (vagyis a portok és címek)
+	bármelyike alapján definiálhatunk
+	blokkolást vagy továbbengedést
+	leíró szabályokat.</p><a id="idp99009616" class="indexterm"></a><p>Az IPF eredetileg úgy íródott, hogy a
+	szabályokat <span class="quote">"<span class="quote">az utolsó illeszkedő
+	szabály nyer</span>"</span> stílusban dolgozza fel
+	és csak állapot nélküli
+	szabályokat ismert.  Az idők folyamán az IPF
+	szabályai kiegészültek a <span class="quote">"<span class="quote">quick</span>"</span>
+	és az állapottartásra vonatkozó
+	<span class="quote">"<span class="quote">keep state</span>"</span> opciókkal, amelynek
+	köszönhetően óriási
+	mértékben korszerűsödött a
+	szabályok feldolgozása.</p><p>A szakaszban szereplő utasítások olyan
+	szabályokat alkalmaznak, amelyekben egyaránt
+	szerepel a <span class="quote">"<span class="quote">quick</span>"</span> és az
+	állapottartásért felelős <span class="quote">"<span class="quote">keep
+	state</span>"</span> beállítás.  Ez az
+	inkluzív tűzfalak
+	létrehozásának egyik
+	alapeszköze.</p><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">A tűzfal szabályainak
+	  összeállítása során
+	  <span class="emphasis"><em>nagyon óvatosnak</em></span> kell
+	  lennünk!  Bizonyos beállítások
+	  hatására akár <span class="emphasis"><em>ki is
+	  zárhatjuk magunkat</em></span> a
+	  szerverünkről.  Az ebből fakadó
+	  esetleges kellemetlenségek elkerülése
+	  érdekében javasoljuk, hogy a tűzfal
+	  alapjait először helyi konzolról
+	  építsük fel, ne pedig
+	  távolról, például
+	  <span class="application">ssh</span>
+	  segítségével.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99015504"></a>30.5.11. A szabályok felépítése</h3></div></div></div><a id="idp99016144" class="indexterm"></a><p>A szabályok felépítésének
+	bemutatását itt most leszűkítjük
+	a modern állapottartó szabályokra és
+	az <span class="quote">"<span class="quote">első illeszkedő szabály nyer</span>"</span>
+	típusú feldolgozásra.  A szabályok
+	felírásának régebbi módjai az
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipf&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipf</span>(8)</span></a> man oldalon találhatóak.</p><p>A <code class="literal">#</code> karakterrel egy megjegyzés
+	kezdetét jelezzük, és általában
+	a sor végén vagy egy külön sorban bukkan
+	fel.  Az üres sorokat a rendszer nem veszi
+	figyelembe.</p><p>A szabályok kulcsszavakat tartalmaznak.  Ezeknek a
+	kulcsszavaknak balról jobbra haladva adott sorrendben
+	kell szerepelniük.  A kulcsszavakat kiemeltük.  Egyes
+	kulcsszavakhoz további beállítások
+	is tartozhatnak, amelyek maguk is kulcsszavak lehetnek,
+	és még további opciókkal
+	rendelkezhetnek.  Az alábbi nyelvtan mindegyik
+	elemét kiemeltük és az alábbiakban
+	egyenként kifejtjük a részleteiket.</p><p><em class="replaceable"><code>CSELEKVÉS BE-KI OPCIÓK
+	SZűRÉS ÁLLAPOTTARTÓ PROTOKOLL
+	FORRÁS_CÍM,CÉL_CÍM OBJEKTUM
+	PORTSZÁM TCP_BEÁLLÍTÁS
+	ÁLLAPOTTARTÓ</code></em></p><p><em class="replaceable"><code>CSELEKVÉS</code></em> = block |
+	pass</p><p><em class="replaceable"><code>BE-KI</code></em> = in | out</p><p><em class="replaceable"><code>OPCIÓK</code></em> = log | quick | on
+	<em class="replaceable"><code>interfész</code></em></p><p><em class="replaceable"><code>SZűRÉS</code></em> = proto
+	<em class="replaceable"><code>érték</code></em> |
+	<em class="replaceable"><code>forrás/cél IP</code></em> | port =
+	<em class="replaceable"><code>szám</code></em> | flags
+	<em class="replaceable"><code>beállítás</code></em></p><p><em class="replaceable"><code>PROTOKOLL</code></em> = tcp/udp | udp | tcp |
+	icmp</p><p><em class="replaceable"><code>FORRÁS_CÍM,CÉL_CÍM</code></em>
+	= all | from <em class="replaceable"><code>objektum</code></em> to
+	<em class="replaceable"><code>objektum</code></em></p><p><em class="replaceable"><code>OBJEKTUM</code></em> =
+	<em class="replaceable"><code>IP-cím</code></em> | any</p><p><em class="replaceable"><code>PORTSZÁM</code></em> =
+	<em class="replaceable"><code>portszám</code></em></p><p><em class="replaceable"><code>TCP_BEÁLLÍTÁS</code></em>
+	= S</p><p><em class="replaceable"><code>ÁLLAPOTTARTÓ</code></em> = keep
+	state</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99038288"></a>30.5.11.1. CSELEKVÉS</h4></div></div></div><p>A cselekvés határozza meg, hogy mit kell
+	  tenni azokkal a csomagokkal, amelyek illeszkednek a
+	  szabály többi részére.  Minden
+	  szabályhoz tartoznia <span class="emphasis"><em>kell</em></span> egy
+	  cselekvésnek.  A következő cselekvések
+	  közül választhatunk:</p><p>A <code class="literal">block</code> megadásával a
+	  szabályban szereplő szűrési
+	  feltételre illeszkedő csomagot eldobjuk.</p><p>A <code class="literal">pass</code> megadásával a
+	  szabályban szereplő szűrési
+	  feltételre illeszkedő csomagot
+	  átengedjük a tűzfalon.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99041360"></a>30.5.11.2. BE-KI</h4></div></div></div><p>Az összes szűrési szabály
+	  esetében kötelező egyértelműen
+	  nyilatkozunk arról, hogy a bemenő vagy a
+	  kimenő forgalomra vonatkozik.  Ezért a
+	  következő kulcsszó vagy az
+	  <code class="literal">in</code> vagy pedig az <code class="literal">out</code>, de
+	  közülük egyszerre csak az egyiket szabad
+	  használni, máskülönben a
+	  szabály hibásnak minősül.</p><p>Az <code class="literal">in</code> jelenti, hogy a szabályt
+	  az internet felől az adott interfészen
+	  beérkező csomagokra kell alkalmazni.</p><p>Az <code class="literal">out</code> jelenti, hogy a szabályt
+	  az internet felé az adott interfészen
+	  kiküldött csomagokra kell alkalmazni.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99044944"></a>30.5.11.3. OPCIÓK</h4></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ezek az opciók csak a lentebb bemutatott
+	    sorrendben használhatók.</p></div><p>A <code class="literal">log</code> jelzi, hogy illeszkedés
+	  esetén a csomag fejlécét az
+	  <code class="filename">ipl</code> eszközön keresztül
+	  naplózni kell (lásd a
+	  naplózásról szóló
+	  szakaszt).</p><p>A <code class="literal">quick</code>jelzi, hogy illeszkedés
+	  esetén ez lesz a legutolsónak
+	  ellenőrzött szabály és így egy
+	  olyan <span class="quote">"<span class="quote">rövidzárat</span>"</span> tudunk
+	  képezni a feldolgozásban, amellyel
+	  elkerüljük a csomagra egyébként
+	  vonatkozó többi szabály
+	  illesztését.  Ez az opció a
+	  korszerűsített szabályfeldolgozás
+	  kihasználásához elengedhetetlen.</p><p>Az <code class="literal">on</code> használatával a
+	  szűrés feltételei közé
+	  bevonhatjuk a csomaghoz tartozó hálózati
+	  interfészt.  Itt az interfészek az
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> által megjelenített
+	  formában adhatóak meg.  Az opció
+	  megadásával csak az adott interfészen az
+	  adott irányba (befelé/kifelé)
+	  közlekedő csomagokra fog illeszkedni a
+	  szabály.  Ez az opció a
+	  korszerűsített szabályfeldolgozás
+	  kihasználásához
+	  nélkülözhetetlen.</p><p>Amikor naplózunk egy csomagot, akkor a
+	  hozzá tartozó fejléc az
+	  <acronym class="acronym">IPL</acronym> csomagnaplózó pszeudo
+	  eszközhöz kerül.  A <code class="literal">log</code>
+	  kulcsszó után közvetlenül a
+	  következő minősítők szerepelhetnek
+	  (a következő sorrendben):</p><p>A <code class="literal">body</code> jelzi, hogy a csomag
+	  tartalmának első 128 byte-ját még
+	  jegyezzük fel a fejléc mellé.</p><p>A <code class="literal">first</code> minősítőt
+	  akkor érdemes használnunk, amikor a
+	  <code class="literal">log</code> kulcsszót a <code class="literal">keep
+	  state</code> opcióval együtt alkalmazzuk, mivel
+	  ilyenkor csak a szabályt kialakító csomag
+	  kerül naplózásra és nem minden
+	  olyan, ami illeszkedik az állapottartási
+	  feltételekre.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99054160"></a>30.5.11.4. SZűRÉS</h4></div></div></div><p>Ebben a szakaszban olyan kulcsszavak jelenhetnek meg,
+	  amelyekkel a csomagok különféle
+	  tulajdonságai alapján
+	  ítélkezhetünk azok
+	  illeszkedéséről.  Itt adott egy
+	  kiinduló kulcsszó, amelyhez további
+	  kulcsszavak is tartoznak, és amelyek közül
+	  csak egyet választhatunk.  Az alábbi
+	  általános tulajdonságok alapján
+	  tudjuk szűrni a csomagokat, ebben a sorrendben:</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99055312"></a>30.5.11.5. PROTOKOLL</h4></div></div></div><p>A <code class="literal">proto</code> egy olyan kulcsszó,
+	  amelyhez hozzá kell rendelnünk még
+	  valamelyik opcióját is.  Ez az opció
+	  segít az adott protokolloknak megfelelően
+	  válogatni a csomagok között.  A
+	  korszerűsített szabályfeldolgozás
+	  lehetőségeinek
+	  kihasználásához
+	  nélkülözhetetlen.</p><p>Opcióként a <code class="literal">tcp/udp | udp | tcp |
+	  icmp</code>, vagy bármelyik, az
+	  <code class="filename">/etc/protocols</code> állományban
+	  megtalálható kulcsszó
+	  felhasználható.  A <code class="literal">tcp/udp</code>
+	  ebből a szempontból speciálisnak
+	  tekinthető, mivel hatására egyszerre
+	  illeszthetőek a szabályra a <acronym class="acronym">TCP</acronym>
+	  és <acronym class="acronym">UDP</acronym> csomagok, és
+	  így a protokolltól eltekintve azonos
+	  szabályok felesleges
+	  többszörözését
+	  kerülhetjük el.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99063376"></a>30.5.11.6. FORRÁS_CÍM/CÉL_CÍM</h4></div></div></div><p>Az <code class="literal">all</code> kulcsszó gyakorlatilag a
+	  <span class="quote">"<span class="quote">from any to any</span>"</span> (<span class="quote">"<span class="quote">bárhonnan
+	  bárhova</span>"</span>) szinonímája és
+	  nem tartozik hozzá paraméter.</p><p>A <code class="literal">from forrás
+	  to cél</code>
+	  felépítése: a <code class="literal">from</code>
+	  és <code class="literal">to</code> kulcsszavak az IP-címek
+	  illesztésére használhatóak.
+	  Ilyenkor a szabályokban a forrás
+	  <span class="emphasis"><em>és</em></span> a cél
+	  paramétereknek is szerepelniük kell.  Az
+	  <code class="literal">any</code> egy olyan speciális
+	  kulcsszó, amely tetszőleges IP-címre
+	  illeszkedik.  Néhány példa az
+	  alkalmazására: <code class="literal">from any to
+	  any</code> vagy <code class="literal">from 0.0.0.0/0 to any</code>,
+	  <code class="literal">from any to 0.0.0.0/0</code>, <code class="literal">from
+	  0.0.0.0/0 to any</code> vagy <code class="literal">from any to
+	  0.0.0.0</code>.</p><p>Az IP-címek megadhatóak pontozott numerikus
+	  formában a hálózati maszk bitekben
+	  mért hosszával együtt, vagy akár
+	  egyetlen pontozott numerikus IP-címként.</p><p>Nincs lehetőség olyan
+	  IP-címtartományok illesztésére,
+	  amelyek nem adhatóak meg kényelmesen ponttal
+	  elválasztott számok és maszk
+	  hosszával.  A <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/ipcalc/pkg-descr">net-mgmt/ipcalc</a> port az ilyen
+	  számításokat könnyíti meg.  A
+	  hálózati maszkok hosszának
+	  megállapításban segíthet az
+	  említett segédprogram (angol nyelvű)
+	  honlapja: <code class="uri"><a class="uri" href="http://jodies.de/ipcalc" target="_top">http://jodies.de/ipcalc</a></code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99075920"></a>30.5.11.7. PORT</h4></div></div></div><p>Amikor portra vonatkozó illeszkedést
+	  írunk elő, megadhatjuk a forrásra és
+	  célra, amit aztán vagy csak
+	  <acronym class="acronym">TCP</acronym> vagy pedig csak <acronym class="acronym">UDP</acronym>
+	  csomagokra alkalmazunk.  A portok feltételeinek
+	  megfogalmazásánál használhatjuk a
+	  portok számát vagy az
+	  <code class="filename">/etc/services</code> állományban
+	  szereplő nevüket.  Amikor a port egy
+	  <code class="literal">from</code> típusú objektum
+	  leírásában jelenik meg, akkor
+	  automatikusan a forrásportot jelenti, míg a
+	  <code class="literal">to</code> objektum leírásában
+	  pedig a célportot.  A <code class="literal">to</code>
+	  objektumoknál a port megadása elengedhetetlen a
+	  korszerűsített szabályfeldolgozás
+	  előnyeinek kihasználásához.
+	  Példa: <code class="literal">from any to any port =
+	  80</code>.</p><p>Az egyes portokat különböző
+	  műveletek segítségével, numerikusan
+	  hasonlíthatjuk össze, ahol akár
+	  porttartományt is megadhatunk.</p><p>port "=" | "!=" | "&lt;" | "&gt;" | "&lt;=" | "&gt;=" |
+	  "eq" | "ne" | "lt" | "gt" | "le" | "ge".</p><p>A porttartományok megadásához
+	  használjuk a <code class="literal">port</code> "&lt;&gt;" |
+	  "&gt;&lt;" felírási módot.</p><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">A forrásra és célra
+	    vonatkozó paraméterek után
+	    szereplő másik két paraméter
+	    nélkülözhetetlen a
+	    korszerűsített szabályfeldolgozás
+	    működéséhez.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99082192"></a>30.5.11.8. <acronym class="acronym">TCP</acronym>_BEÁLLÍTÁS</h4></div></div></div><p>A beállítások csak a
+	  <acronym class="acronym">TCP</acronym> forgalom
+	  szűrésénél
+	  érvényesülnek.  A betűk jelölik
+	  azokat a lehetséges beállításokat,
+	  amelyek a <acronym class="acronym">TCP</acronym> csomagok
+	  fejlécében
+	  megvizsgálhatóak.</p><p>A korszerűsített
+	  szabályfeldolgozás a <code class="literal">flags S</code>
+	  paraméter segítségével ismeri fel
+	  a <acronym class="acronym">TCP</acronym> munkameneteket
+	  kezdeményező kéréseket.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99085648"></a>30.5.11.9. ÁLLAPOTTARTÓ</h4></div></div></div><p>A <code class="literal">keep state</code> jelzi, hogy a
+	  szabály paramétereinek megfelelő
+	  bármely csomag aktiválja az
+	  állapottartó szűrés
+	  használatát.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ez a beállítás
+	    feltétlenül szükséges a
+	    korszerűsített szabályfeldolgozás
+	    megfelelő kihasználásához.</p></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99088080"></a>30.5.12. Állapottartó csomagszűrés</h3></div></div></div><a id="idp99088720" class="indexterm"></a><p>Az állapottartó szűrés a csomagok
+	kétirányú áramlását
+	egy létrejött kapcsolatba sorolja be.  Amikor
+	aktiválódik, az állapottartó
+	szabály előre dinamikusan létrehozza a
+	kétirányú kommunikációban
+	megforduló csomagokhoz a megfelelő belső
+	szabályokat.  Olyan vizsgálatokat végez,
+	amelyek segítségével ki tudja
+	deríteni, hogy a csomag küldője és
+	címzettje között fennálló
+	kétirányú kapcsolat érvényes
+	szabályok szerint zajlik-e.  Minden olyan csomagot, amely
+	nem illeszkedik megfelelően a kapcsolatra vonatkozó
+	sémára, csalásnak tekintjük és
+	automatikusan eldobjuk.</p><p>Az állapottartás révén
+	lehetőségünk van a <acronym class="acronym">TCP</acronym> vagy
+	<acronym class="acronym">UDP</acronym> kapcsolatokhoz tartozó
+	<acronym class="acronym">ICMP</acronym> csomagokat is átengedni a
+	tűzfalon.  Tehát ha kapunk egy 3-as
+	típusú, 4-es kódú
+	<acronym class="acronym">ICMP</acronym> választ valamilyen
+	böngészésre használt
+	állapottartó szabályon keresztül
+	kiküldött kérésre, akkor az
+	automatikusan bejöhet.  Amelyik csomagot az IPF
+	egyértelműen képes besorolni az aktív
+	kapcsolatba, még ha az eltérő protokollt is
+	használ, beengedi.</p><p>Ami ilyenkor történik:</p><p>Az internethez csatlakozó interfészen
+	keresztül kifelé haladó csomagokat
+	először egy dinamikus állapottábla
+	alapján illesztjük, és ha a csomag
+	illeszkedik az aktív kapcsolatban
+	következőként várt csomagra, akkor
+	átmegy a tűzfalon és a dinamikus
+	állapottáblában frissül a kapcsolat
+	állapota.  Az aktív munkameneten kívül
+	csomagok pedig egyszerűen a kimenő
+	szabályrendszer szerint kerülnek
+	ellenőrzésre.</p><p>Hasonlóan az előzőhöz, az internethez
+	csatlakozó interfészen keresztül
+	befelé haladó csomagokat először egy
+	dinamikus állapottábla alapján
+	illesztjük, és ha a csomag illeszkedik az
+	aktív kapcsolatban következőként
+	várt csomagra, akkor átmegy a tűzfalon
+	és a dinamikus állapottáblában
+	frissül a kapcsolat állapota.  Az aktív
+	munkamenethez nem tartozó csomagok pedig egyszerűen
+	a bejövő szabályrendszer szerint kerülnek
+	ellenőrzésre.</p><p>Amikor egy kapcsolat befejeződik, automatikusan
+	törlődik a dinamikus
+	állapottáblából.</p><p>Az állapottartó csomagszűrés
+	használatával az újonnan keletkező
+	kapcsolatok elutasítására vagy
+	engedélyezésére tudunk koncentrálni.
+	Ha engedélyeztük egy új kapcsolat
+	létrejöttét, akkor a
+	rákövetkező összes többi csomag
+	automatikusan átmegy a tűzfalon és minden
+	más hamis csomag eldobódik.  Ha tiltjuk az
+	új kapcsolatot, akkor egyetlen
+	rákövetkező csomag sem juthat át.  Az
+	állapottartó szűrés által
+	felkínált fejlett elemzési
+	lehetőségek képesek védelmet
+	nyújtani a behatolók részéről
+	alkalmazott megannyi különböző
+	támadási módszer ellen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99094352"></a>30.5.13. Példa inkluzív
+	szabályrendszerre</h3></div></div></div><p>A most következő szabályrendszer arra mutat
+	példát, hogyan programozzunk le egy nagyon
+	biztonságos inkluzív tűzfalat.  Az
+	inkluzív tűzfalak csak a szabályainak
+	megfelelő szolgáltatásokat engedik
+	keresztül, és alapértelmezés szerint
+	minden mást blokkolnak.  Egy hálózat
+	gépeit védő tűzfalnak, amelyet gyakran
+	<span class="quote">"<span class="quote">hálózati tűzfalnak</span>"</span> (network
+	firewall) is neveznek, legalább két
+	hálózati interfésszel kell rendelkeznie.
+	Ezeket az interfészeket általában
+	úgy állítják be, hogy
+	tökéletesen megbíznak az egyik oldalban (a
+	helyi hálózatban), a másikban (az
+	internetben) pedig egyáltalán nem.  A
+	tűzfalat egyébként úgy is
+	beállíthatjuk, hogy csak a tűzfalat
+	működtető gépet védje - ezt
+	<span class="quote">"<span class="quote">egyrendszeres tűzfalnak</span>"</span> (host based
+	firewall) nevezik.  Az ilyen típusú
+	megoldásokat nem biztonságos
+	hálózaton keresztül kommunikáló
+	szervereknél alkalmaznak.</p><p>Mindegyik <span class="trademark">UNIX</span>(R)-típusú rendszert,
+	köztük a FreeBSD-t is úgy
+	alakították ki, hogy az operációs
+	rendszeren belüli kommunikáció az
+	<code class="filename">lo0</code> interfészen és a
+	<code class="systemitem">127.0.0.1</code> IP-címen
+	keresztül történik.  A tűzfal
+	szabályai között feltétlenül
+	szerepelniük kell olyanoknak, amelyek lehetővé
+	teszik ezen a speciális intefészen a csomagok
+	zavartalan mozgását.</p><p>Az internetre csatlakozó interfészhez kell
+	rendelni a kifelé és befelé haladó
+	forgalom hitelesítését é a
+	hozzáférésének
+	vezérlését.  Ez lehet a
+	felhasználói PPP által létrehozott
+	<code class="filename">tun0</code> interfész vagy a DSL-,
+	illetve kábelmodemhez csatlakozó
+	hálózati kártya.</p><p>Ahol egy vagy több hálózati kártya
+	is csatlakozik több különböző helyi
+	hálózathoz, úgy kell
+	beállítani a hozzájuk tartozó
+	interfészeket, hogy egymás felé és
+	az internet felé képesek legyenek küldeni
+	és fogadni.</p><p>A szabályokat először három nagy
+	csoportba kell szerveznünk: először jönnek a
+	megbízható interfészek, ezeket követik
+	az internet felé mutató interfészek,
+	végül internet felől jövő, nem
+	megbízható interfészeke.</p><p>Az egyes csoportokban szereplő szabályokat
+	úgy kell megadni, hogy közülük előre
+	kerüljenek a leggyakrabban alkalmazottak, és a
+	csoport utolsó szabálya blokkoljon és
+	naplózzon minden csomagot az adott interfészen
+	és irányban.</p><p>A kimenő forgalomat vezérlő
+	szabályrendszer csak <code class="literal">pass</code>
+	(tehát átengedő) szabályokat
+	tartalmazhat, amelyek bentről az interneten
+	elérhető szolgáltatásokat
+	azonosítják egyértelműen.  Az
+	összes ilyen szabályban meg kell jelenni a
+	<code class="literal">quick</code>, <code class="literal">on</code>,
+	<code class="literal">proto</code>, <code class="literal">port</code> és
+	<code class="literal">keep state</code>
+	beállításoknak.  A <code class="literal">proto
+	tcp</code> szabályok esetében meg kell adni a
+	<code class="literal">flag</code> opciót is, amivel fel tudjuk
+	ismertetni a kapcsolatok keletkezését és
+	ezen keresztül aktiválni az
+	állapottartást.</p><p>A bejövő forgalmat vezérlő
+	szabályrendszerben először az eldobni
+	kívánt csomagokat kell megadni, aminek két
+	eltérő oka van.  Először is
+	előfordulhat, hogy a veszélyes csomagok
+	részleges illeszkedés miatt szabályosnak
+	tűnnek.  Az ilyen csomagokat értelemszerűen nem
+	lenne szabad beengedni a szabályok részleges
+	megfelelése alapján.  A másodszor az eleve
+	ismerten problémás és értelmetlen
+	csomagokat csendben el kellene vetni, mielőtt a szakaszhoz
+	tartozó utolsó szabály fogná meg
+	és naplózná.  Ez az utolsó
+	szabály egyébként szükség
+	esetén felhasználható a
+	támadók elleni bizonyítékok
+	begyűjtésére.</p><p>A másik, amire még oda kell figyelnünk,
+	hogy a blokkolt csomagok esetében semmilyen válasz
+	nem keletkezzen, egyszerűen csak tűnjenek el.
+	Így a támadó nem fogja tudni, hogy a
+	csomagjai vajon elérték-e a rendszerünket.
+	Minél kevesebb információt tudnak
+	összegyűjteni a rendszerünkről a
+	támadók, annál több időt kell
+	szánniuk csínytevéseik
+	kieszelésére.  A <code class="literal">log first</code>
+	opciót tartalmazó szabályok csak az
+	illeszkedésnél fogják naplózni a
+	hozzájuk tartozó eseményt.  Erre
+	láthatunk példát az <code class="literal">nmap OS
+	fingerprint</code> szabálynál.  Az <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/security/nmap/pkg-descr">security/nmap</a> segédprogramot
+	a támadók gyakran alkalmazzák a
+	megtámadni kívánt szerver
+	operációs rendszerének
+	felderítésére.</p><p>Minden <code class="literal">log first</code> opcióval megadott
+	szabály illeszkedésénél a
+	<code class="command">ipfstat -hio</code> parancs
+	meghatározódik az eddigi illeszkedések
+	aktuális száma.  Nagyobb értékek
+	esetében következtethetünk arra, hogy a
+	rendszerünket megtámadták (vagyis csomagokkal
+	árasztják éppen el).</p><p>Az ismeretlen portszámok
+	felderítésére az
+	<code class="filename">/etc/services</code> állomány,
+	esetleg a <code class="uri"><a class="uri" href="http://www.securitystats.com/tools/portsearch.php" target="_top">http://www.securitystats.com/tools/portsearch.php</a></code>
+	(angol nyelvű) honlap használható.</p><p>Érdemes továbbá megnézni a
+	trójai programok által használt portokat a
+	<code class="uri"><a class="uri" href="http://www.simovits.com/trojans/trojans.html" target="_top">http://www.simovits.com/trojans/trojans.html</a></code>
+	címen (angolul).</p><p>A következő szabályrendszer egy olyan
+	biztonságos <span class="quote">"<span class="quote">inkluzív</span>"</span>
+	típusú tűzfal, amelyet éles rendszeren
+	is használnak.  Ezt a rendszerünkön nem
+	használt szolgáltatásokra vonatkozó
+	<code class="literal">pass</code> szabályok
+	törlésével könnyedén a
+	saját igényeink szerint
+	alakíthatjuk.</p><p>Ha nem akarunk látni bizonyos üzeneteket, akkor
+	vegyünk fel hozzájuk egy <code class="literal">block</code>
+	típusú szabályt a befelé
+	irányuló forgalomhoz tartozó
+	szabályok közé.</p><p>A szabályokban írjuk át a
+	<code class="filename">dc0</code> interfész nevét annak
+	a hálózati kártyának az
+	interfészére, amelyen keresztül csatlakozunk
+	az internethez.  A felhasználói PPP
+	esetében ez a <code class="filename">tun0</code> lesz.</p><p>Tehát a következőket kell beírni az
+	<code class="filename">/etc/ipf.rules</code>
+	állományba:</p><pre class="programlisting">#################################################################
+# A helyi hálózatunkon zajló forgalmat ne korlátozzuk.
+# Csak akkor kell, ha helyi hálózathoz is csatlakozunk.
+#################################################################
+
+#pass out quick on xl0 all
+#pass in quick on xl0 all
+
+#################################################################
+# A belső interfészen szintén ne korlátozzunk semmit.
+#################################################################
+pass in quick on lo0 all
+pass out quick on lo0 all
+
+#################################################################
+# Az internet felé forgalmazó interfész (kimenő kapcsolatok)
+# A saját hálózatunkról belülről vagy erről az átjáróról
+# kezdeményezett kapcsolatokat vizsgáljuk az internet felé.
+#################################################################
+
+# Engedélyezzük az internet szolgáltatók névszerverének elérését,
+# az "xxx" helyett a névszervet IP-címét kell megadni.
+# Másoljuk le ezeket a sorokat, ha a szolgáltatónknak több
+# névszerverét is beakarjuk állítani. A címeiket az /etc/resolv.conf
+# állományban találjuk.
+pass out quick on dc0 proto tcp from any to xxx port = 53 flags S keep state
+pass out quick on dc0 proto udp from any to xxx port = 53 keep state
+
+# DSL vagy kábeles hálózatoknál engedélyezzük a
+# szolgáltatónk DHCP szerverének elérését.
+# Ez a szabály nem kell, ha "felhasználói PPP"-vel
+# kapcsolódunk az internethez, ilyenkor tehát az egész
+# csoport törölhető.
+# Használjuk az alábbi szabályt és keressük meg a naplóban az
+# IP-címet. Ha megtaláltuk, akkor tegyük bele a megjegyzésben
+# szereplő szabályba és töröljük az első szabályt.
+pass out log quick on dc0 proto udp from any to any port = 67 keep state
+#pass out quick on dc0 proto udp from any to z.z.z.z port = 67 keep state
+
+# Kifelé engedélyezzük a szabványos nem biztonságos WWW funkciókat.
+pass out quick on dc0 proto tcp from any to any port = 80 flags S keep state
+
+# Kifelé engedélyezzük a biztonságos WWW funkciókat TLS SSL
+# protokollal.
+pass out quick on dc0 proto tcp from any to any port = 443 flags S keep state
+
+# Kifelé engedélyezzük az e-mailek küldését és fogadását.
+pass out quick on dc0 proto tcp from any to any port = 110 flags S keep state
+pass out quick on dc0 proto tcp from any to any port = 25 flags S keep state
+
+# Kifelé engedélyezzük az idő szolgáltatást.
+pass out quick on dc0 proto tcp from any to any port = 37 flags S keep state
+
+# Kifelé engedélyezzük az nntp híreket.
+pass out quick on dc0 proto tcp from any to any port = 119 flags S keep state
+
+# Kifelé engedélyezzük az átjáróról és a helyi hálózatról a nem
+# biztonságos FTP használatát (passzív és akív módokban is). Ez a
+# funkció a működéséhez a nat szabályokat tartalmazó állományban
+# hivatkozott FTP proxyt használja. Amennyiben a pkg_add paranccsal
+# csomagokat akarunk telepíteni az átjáróra, erre a szabályra
+# mindenképpen szükségünk lesz.
+pass out quick on dc0 proto tcp from any to any port = 21 flags S keep state
+
+# Kifelé engedélyezzük az ssh/sftp/scp # (biztonságos telnet/rlogin/FTP)
+# szolgáltatások # elérését az SSH (secure shell) használatával.
+pass out quick on dc0 proto tcp from any to any port = 22 flags S keep state
+
+# Kifelé engedélyezzük a nem biztonságos telnet elérését.
+pass out quick on dc0 proto tcp from any to any port = 23 flags S keep state
+
+# Kifelé engedélyezzük FreeBSD CVSUp funkcióját.
+pass out quick on dc0 proto tcp from any to any port = 5999 flags S keep state
+
+# Kifelé engedélyezzük a pinget.
+pass out quick on dc0 proto icmp from any to any icmp-type 8 keep state
+
+# Kifelé engedélyezzük a helyi hálózatról érkező whois kéréseket.
+pass out quick on dc0 proto tcp from any to any port = 43 flags S keep state
+
+# Minden mást eldobunk és naplózzuk az első előfordulásukat.
+# Ez a szabály blokkol alapértelmezés szerint mindent.
+block out log first quick on dc0 all
+
+#################################################################
+# Az internet felőli interfész (bejövő kapcsolatok)
+# A saját hálózatunk felé vagy erre az átjáróra
+# nyitott kapcsolatokat vizsgáljuk az internet felől.
+#################################################################
+
+# Eldobjuk az összes olyan bejövő forgalmat, amit hivatalosan nem
+# lehetne továbbítani vagy fenntartott címterülethez tartozik.
+block in quick on dc0 from 192.168.0.0/16 to any    #RFC 1918: privát IP
+block in quick on dc0 from 172.16.0.0/12 to any     #RFC 1918: privát IP
+block in quick on dc0 from 10.0.0.0/8 to any        #RFC 1918: privát IP
+block in quick on dc0 from 127.0.0.0/8 to any       #helyi
+block in quick on dc0 from 0.0.0.0/8 to any         #helyi
+block in quick on dc0 from 169.254.0.0/16 to any    #DHCP
+block in quick on dc0 from 192.0.2.0/24 to any      #dokumentációs célokra fenntartva
+block in quick on dc0 from 204.152.64.0/23 to any   #Sun klaszterek összekötésére használt
+block in quick on dc0 from 224.0.0.0/3 to any       #D és E osztályú multicast
+
+##### Itt eldobunk egy rakás csúf dolgot ############
+# Ezeket nem akarjuk a naplóban látni:
+
+# Eldobjuk a töredékcsomagokat.
+block in quick on dc0 all with frags
+
+# Eldobjuk a túlságosan rövid TCP csomagokat.
+block in quick on dc0 proto tcp all with short
+
+# Eldobjuk a forrás által közvetített (source routed) csomagokat.
+block in quick on dc0 all with opt lsrr
+block in quick on dc0 all with opt ssrr
+
+# Elutasítjuk az "OS fingerprint" kéréseket.
+# Naplózzuk az első előfordulást, így nálunk lesz a kíváncsiskodó
+# egyén IP-címe.
+block in log first quick on dc0 proto tcp from any to any flags FUP
+
+# Eldobunk mindent, aminek speciális beállításai vannak.
+block in quick on dc0 all with ipopts
+
+# Elutasítjuk a publikus pinget.
+block in quick on dc0 proto icmp all icmp-type 8
+
+# Elutasítjuk az ident kéréseket.
+block in quick on dc0 proto tcp from any to any port = 113
+
+# Blokkoljuk az összes Netbios szolgáltatást: 137=név, 138=datagram,
+# 139=session. A Netbios az MS Windows megosztását implementálja.
+# Blokkoljuk az MS Windows hosts2 névszerver kéréseit is a 81-es
+# porton.
+block in log first quick on dc0 proto tcp/udp from any to any port = 137
+block in log first quick on dc0 proto tcp/udp from any to any port = 138
+block in log first quick on dc0 proto tcp/udp from any to any port = 139
+block in log first quick on dc0 proto tcp/udp from any to any port = 81
+
+# Engedélyezzük a szolgáltatónk DHCP szerverétől érkező forgalmat.
+# Ebben a szabályban meg kell adnunk a szolgáltató DHCP szerverének
+# IP-címét, mivel itt csak a hiteles forrásból fogadunk el csomagokat.
+# Erre csak DSL- és kábelmodemes kapcsolat esetében van szükség, a
+# "felhasználói PPP" alkalmazása során szükségtelen. Ez az IP-cím
+# megegyezik a kimenő kapcsolatoknál megadott címmel.
+pass in quick on dc0 proto udp from z.z.z.z to any port = 68 keep state
+
+# Befelé engedélyezzük a szabványos WWW funkciót, mivel webszerverünk
+# van.
+pass in quick on dc0 proto tcp from any to any port = 80 flags S keep state
+
+# Befelé engedélyezzük az internetről érkező nem biztonságos telnet
+# kapcsolatokat. Azért nem biztonságos, mert az azonosítókat és
+# jelszavakat titkosítatlan formában közli az interneten keresztül.
+# Töröljük ezt a szabályt, ha nem használunk telnet szervert.
+#pass in quick on dc0 proto tcp from any to any port = 23 flags S keep state
+
+# Befelé engedélyezzük az internetről # érkező ssh/sftp/scp (biztonságos
+# telnet/rlogin/FTP) # kapcsolatokat az SSH (secure shell) használatával.
+pass in quick on dc0 proto tcp from any to any port = 22 flags S keep state
+
+# Minden mást dobjuk el és naplózzuk az első előfordulásukat.
+# Az első alkalom naplózásával elejét tudjuk venni a "Denial of
+# Service" típusú támadásoknak, amivel egyébként lehetséges lenne a
+# napló elárasztása.
+# Ez a szabály blokkol alapértelmezés szerint mindent.
+block in log first quick on dc0 all
+################### Itt van a szabályok vége ##############################</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99117264"></a>30.5.14. <acronym class="acronym">NAT</acronym></h3></div></div></div><a id="idp99118032" class="indexterm"></a><a id="idp99118544" class="indexterm"></a><a id="idp99136208" class="indexterm"></a><p>A <acronym class="acronym">NAT</acronym> jelentése <span class="emphasis"><em>Network
+	Address Translation</em></span>, vagyis hálózati
+	címfordítás.  A <span class="trademark">Linux</span>(R) esetében ezt
+	<span class="quote">"<span class="quote">IP masqueradingnak</span>"</span>, vagyis IP maszkolásnak
+	hívják.  A hálózati
+	címfordítás és az IP
+	maszkolás lényegben ugyanazt takarja.  Az IPF
+	címfordításért felelős
+	funkciójának köszönhetően
+	képesek vagyunk a tűzfal mögött
+	elhelyezkedő helyi hálózat
+	számára megosztani az
+	internet-szolgáltatól kapott publikus
+	IP-címet.</p><p>Sokakban felmerülhet a kérdés, hogy erre
+	vajon mi szükségünk lehet.  Az
+	internet-szolgáltatók a
+	magánszemélyeknek általában
+	dinamikus IP-címeket osztanak ki.  A dinamikus itt arra
+	utal, hogy a címünk minden alkalommal
+	változik, amikor betárcsázunk a
+	szolgáltatóhoz vagy amikor ki- és
+	bekapcsoljuk a modemünket.  Ez a dinamikus IP-cím
+	fog azonosítani minket az interneten.</p><p>Most tegyük fel, hogy öt gépünk van
+	otthon, viszont csak egyetlen előfizetéssel
+	rendelkezünk.  Ebben az esetben öt telefonvonalat
+	kellene használnunk és mindegyik géphez
+	előfizetni az internetre.</p><p>A hálózati címfordítás
+	alkalmazásával azonban mindössze egyetlen
+	előfizetés kell.  A gépek közül
+	négyet hozzákötünk egy switch-hez
+	és a switch-et pedig a fennmaradó géphez,
+	amelyen FreeBSD fut.  Ez utóbbi lesz az így
+	kialakított helyi hálózatunk
+	átjárója.  A tűzfalban
+	működő címfordítás
+	segítségével a helyi
+	hálózaton található gépek
+	IP-címeit észrevétlenül át
+	tudjuk fordítani a hálózatunk publikus
+	IP-címére, ahogy a csomagok elhagyják az
+	átjárót.  A beérkező csomagok
+	esetében mindez visszafelé történik
+	meg.</p><p>Az IP-címek közül adott egy
+	tartomány, amit a címfordítást
+	használó helyi hálózatok
+	részére tartanak fenn.  Az RFC 1918 szerint
+	az alábbi IP-címtartományok
+	használhatók a helyi hálózatban,
+	mivel ezeken keresztül közvetlenül sosem lehet
+	kijutni az internetre:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /><col /></colgroup><tbody><tr><td>Kezdő IP: <code class="systemitem">10.0.0.0</code></td><td>-</td><td>Záró IP: <code class="systemitem">10.255.255.255</code></td></tr><tr><td>Kezdő IP: <code class="systemitem">172.16.0.0</code></td><td>-</td><td>Záró IP: <code class="systemitem">172.31.255.255</code></td></tr><tr><td>Kezdő IP: <code class="systemitem">192.168.0.0</code></td><td>-</td><td>Záró IP: <code class="systemitem">192.168.255.255</code></td></tr></tbody></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99154896"></a>30.5.15. IP<acronym class="acronym">NAT</acronym></h3></div></div></div><a id="idp99155792" class="indexterm"></a><a id="idp99157072" class="indexterm"></a><p>A címfordításra vonatkozó
+	szabályokat az <code class="command">ipnat</code> paranccsal tudjuk
+	betölteni.  Az ilyen típusú
+	szabályokat általában az
+	<code class="filename">/etc/ipnat.rules</code> állományban
+	találjuk.  A részleteket lásd az
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ipnat</span>(1)</span></a> man oldalán.</p><p>Amikor a címfordítás üzembe
+	helyezése után meg akarjuk változtatni a
+	címfordítás szabályait,
+	először a címfordítás
+	szabályait tartalmazó állományt
+	módosítsuk, majd a belső
+	címfordítási szabályok és a
+	címfordítási táblázatban
+	szereplő aktív bejegyzések
+	törléséhez futassuk le az
+	<code class="command">ipnat</code> parancsot a <code class="option">-CF</code>
+	beállítással.</p><p>A címfordítási szabályok
+	újratöltését egy ehhez hasonló
+	paranccsal tudjuk elvégezni:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -CF -f /etc/ipnat.szabályok</code></strong></pre><p>A címfordításhoz tartozó
+	statisztikákat ezzel a paranccsal tudjuk
+	lekérdezni:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -s</code></strong></pre><p>A címfordítási
+	táblázatban pillanatnyilag szereplő
+	összerendeléseket a következő paranccsal
+	tudjuk listázni:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -l</code></strong></pre><p>A szabályok feldolgozásával és
+	az aktív szabályokkal/bejegyzésekkel
+	kapcsolatos információk
+	részletezését így
+	engedélyezhetjük:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipnat -v</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99170256"></a>30.5.16. A címfordítási
+	szabályok</h3></div></div></div><p>A címfordítási szabályok nagyon
+	rugalmasak és rengeteg olyan funkciót meg tudunk
+	velük valósítani, ami az üzleti
+	és otthoni felhasználók
+	számára egyaránt hasznos.</p><p>Itt most a szabályok
+	felépítését csak
+	egyszerűsítve mutatjuk be, leginkább a nem
+	üzleti környezetek tekintetében.  A
+	szabályok komplett formai leírását
+	az <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipnat&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">ipnat</span>(5)</span></a> man oldalán találjuk.</p><p>Egy címfordítási szabály
+	tehát valahogy így néz ki:</p><pre class="programlisting">map <em class="replaceable"><code>INTERFÉSZ</code></em> <em class="replaceable"><code>HELYI_IP_TARTOMÁNY</code></em> -&gt; <em class="replaceable"><code>PUBLIKUS_CÍM</code></em></pre><p>A szabályt a <code class="literal">map</code> kulcsszó
+	kezdi.</p><p>A <em class="replaceable"><code>INTERFÉSZ</code></em> helyére
+	az internet felé mutató külső
+	interfész nevét írjuk be.</p><p>A <em class="replaceable"><code>HELYI_IP_TARTOMÁNY</code></em> lesz
+	az, amelyben a kliensek címeznek.  Ez
+	például a <code class="systemitem">192.168.1.0/24</code>.</p><p>A <em class="replaceable"><code>PUBLIKUS_CÍM</code></em> lehet egy
+	külső IP-cím vagy a <code class="literal">0/32</code>
+	speciális kulcsszó, amellyel a
+	<em class="replaceable"><code>FELÜLET</code></em>-hez rendelt
+	IP-címre hivatkozunk.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99179088"></a>30.5.17. Hogyan működik a hálózati
+	címfordítás</h3></div></div></div><p>A publikus cél felé haladó csomag
+	megérkezik a helyi hálózatról.
+	Miután a kimenő kapcsolatokra vonatkozó
+	szabályok átengedik, a
+	címfordítás kapja meg a szerepet és
+	fentről lefelé haladva nekilát alkalmazni a
+	saját szabályait, ahol az első egyező
+	szerint cselekszik.  A címfordítás a
+	szabályokat a csomaghoz tartozó interfészre
+	és a forrás IP-címére illeszti.
+	Amikor a csomag interfészének neve illeszkedik egy
+	címfordítási szabályra, akkor
+	ezután a csomag forrás (vagyis a helyi
+	hálózaton belüli)
+	IP-címéről igyekszik eldönteni, hogy a
+	szabály nyilának bal oldalán szereplő
+	tartományba esik-e.  Ha erre is illeszkedik, akkor a
+	forrás IP-címét átírjuk a
+	<code class="literal">0/32</code> kulcsszó alapján
+	felderített publikus IP-címre.  A
+	címfordító rutin ezt feljegyzi a
+	saját belső táblázatába,
+	így amikor a csomag visszatér az internetről,
+	akkor képes lesz visszafordítani az eredeti
+	belső IP-címére és
+	feldolgozásra átadni a tűzfal
+	szabályainak.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99180624"></a>30.5.18. A címfordítás
+	engedélyezése</h3></div></div></div><p>A címfordítás életre
+	keltéséhez a következőket kell
+	beállítanunk az <code class="filename">/etc/rc.conf</code>
+	állományban.</p><p>Először engedélyezzük a
+	gépünknek, hogy közvetítsen forgalmat az
+	interfészek között:</p><pre class="programlisting">gateway_enable="YES"</pre><p>Minden alkalommal indítsuk el a
+	címfordításért felelős IPNAT
+	programot:</p><pre class="programlisting">ipnat_enable="YES"</pre><p>Adjuk meg az IPNAT számára a
+	betöltendő szabályokat:</p><pre class="programlisting">ipnat_rules="/etc/ipnat.rules"</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99184592"></a>30.5.19. Hálózati címfordítás
+	nagyon nagy helyi hálózatok
+	esetében</h3></div></div></div><p>Az olyan helyi hálózatokban, ahol rengeteg PC
+	található vagy több alhálózatot
+	is tartalmaz, az összes privát IP-cím
+	egyetlen publikus IP-címbe
+	tömörítése igen komoly
+	problémává tud dagadni és az azonos
+	portok gyakori használata a helyi hálózatra
+	kötött számítógépek
+	között ütközéseket okoz.  Két
+	módon tudunk megoldást nyújtani erre a
+	problémára.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99193936"></a>30.5.19.1. A használható portok
+	  kiosztása</h4></div></div></div><p>Egy normális címfordítási
+	  szabály valahogy így nézne ki:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 0/32</pre><p>A fenti szabályban a csomag
+	  forrásportját az IP<acronym class="acronym">NAT</acronym>
+	  változatlanul a feldolgozás után hagyja.
+	  Ha ehhez még hozzátesszük a
+	  <code class="literal">portmap</code> kulcsszót, akkor ezzel
+	  utasítani tudjuk az IP<acronym class="acronym">NAT</acronym>-ot, hogy
+	  csak az adott tartományban képezze le a
+	  forrásportokat.  Például a
+	  következő szabály hatására az
+	  IP<acronym class="acronym">NAT</acronym> a forrásportokat egy adott
+	  tartományon belül fogja
+	  módosítani:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 0/32 portmap tcp/udp 20000:60000</pre><p>Ha viszont még inkább meg akarjuk
+	  könnyíteni a dolgunkat, akkor itt egyszerűen
+	  csak adjuk meg az <code class="literal">auto</code> kulcsszót,
+	  amellyel az IP<acronym class="acronym">NAT</acronym>
+	  önmagától megállapítja, hogy
+	  milyen portokat tud használni:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 0/32 portmap tcp/udp auto</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99199312"></a>30.5.19.2. Több publikus cím használata</h4></div></div></div><p>Minden nagyobb helyi hálózat esetében
+	  elérkezünk ahhoz a ponthoz, ahol már
+	  egyetlen publikus cím nem elég.  Ha több
+	  publikus IP-címmel is rendelkezünk, akkor
+	  ezekből a címekből egy <span class="quote">"<span class="quote">közös
+	  készletet</span>"</span> hozhatunk létre, amiből
+	  majd az IPNAT válogathat miközben a csomagok
+	  címeit átírja kifelé
+	  menetben.</p><p>Például ahelyett, hogy a csomagokat egyetlen
+	  publikus IP-címre képeznénk le, ahogy itt
+	  tesszük:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 204.134.75.1</pre><p>A hálózati maszk
+	  segítségével meg tudjuk adni
+	  IP-címek egy tartományát is:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 204.134.75.0/255.255.255.0</pre><p>CIDR-jelöléssel:</p><pre class="programlisting">map dc0 192.168.1.0/24 -&gt; 204.134.75.0/24</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99203408"></a>30.5.20. A portok átirányítása</h3></div></div></div><p>Gyakran előfordul, hogy van webszerverünk,
+	levelező szerverünk, adatbázis szerverünk
+	és névszerverünk, melyek a helyi
+	hálózat különböző
+	gépein futnak.  Ebben az esetben a szerverekhez
+	tartozó forgalmat is fordítanunk kell, illetve
+	valamilyen módon a bejövő forgalmat is
+	át kell irányítanunk a helyi
+	hálózat megfelelő gépeihez.  Az
+	IP<acronym class="acronym">NAT</acronym> ezt a gondot a hálózati
+	címfordítás
+	átirányítást támogató
+	funkcióival szünteti meg.  Tegyük fel, hogy a
+	<code class="systemitem">10.0.10.25</code> belső
+	címen van egy webszerverünk, amelyhez a <code class="systemitem">20.20.20.5</code> publikus IP tartozik.
+	Ilyenkor a következő szabályt adjuk meg:</p><pre class="programlisting">rdr dc0 20.20.20.5/32 port 80 -&gt; 10.0.10.25 port 80</pre><p>vagy:</p><pre class="programlisting">rdr dc0 0.0.0.0/0 port 80 -&gt; 10.0.10.25 port 80</pre><p>Így tudjuk beállítani a <code class="systemitem">10.0.10.33</code> címmel
+	  rendelkező névszervert a kintről
+	  érkező névfeloldási
+	  kérések fogadására:</p><pre class="programlisting">rdr dc0 20.20.20.5/32 port 53 -&gt; 10.0.10.33 port 53 udp</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99208400"></a>30.5.21. Az FTP és a címfordítás</h3></div></div></div><p>Az FTP egy olyan őskövület, amely még
+	az internet egy régi korszakából maradt fenn,
+	amikor az egyetemek között még bérelt
+	vonal létezett és az FTP szolgált a
+	kutatók közt az állományok
+	megosztására.  Ez még abban az időben
+	történt, amikor a biztonság
+	egyáltalán nem volt lényeges szempont.  Az
+	évek előrehaladtával az FTP protokoll
+	beleivódott a feltörekvő internet
+	gerincébe és a titkosítatlanul
+	küldött azonosítóival és
+	jelszavaival továbbra is ugyanolyan védtelen
+	maradt.  Az FTP két változatban, aktív
+	és passzív módban képes
+	működni.  Az eltérés kettejük
+	között az adatcsatorna
+	megállapításában van.  A
+	passzív mód sokkal biztonságosabb, mivel
+	ilyenkor az adatcsatornát az FTP kapcsolatot
+	kezdeményező állítja be.  Az FTP
+	különböző módjainak
+	magyarázatát és a köztük
+	levő különbséget a <code class="uri"><a class="uri" href="http://www.slacksite.com/other/ftp.html" target="_top">http://www.slacksite.com/other/ftp.html</a></code>
+	címen ismerhetjük meg részleteiben
+	(angolul).</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99210064"></a>30.5.21.1. Az IPNAT szabályai</h4></div></div></div><p>Az IPNAT egy speciális beépített FTP
+	  proxyval rendelkezik, amelyre a hálózati
+	  címfordítás leképezései
+	  között hivatkozhatunk.  Képes figyelni az
+	  összes aktív vagy passzív FTP kapcsolathoz
+	  tartozó kimenő kérést és
+	  ezekhez dinamikusan létrehozni olyan ideiglenes
+	  szűrési szabályokat, amelyek valóban
+	  csak az adatcsatornához felhasznált portokat
+	  tartalmazzák.  Ezzel ki tudjuk
+	  küszöbölni az FTP azon káros
+	  hatását a tűzfalra nézve, hogy
+	  egyszerre túlságosan sok magasabb
+	  tartománybeli port legyen nyitva.</p><p>Ez a szabály a belső hálózat
+	  összes FTP forgalmát lekezeli:</p><pre class="programlisting">map dc0 10.0.10.0/29 -&gt; 0/32 proxy port 21 ftp/tcp</pre><p>Ez a szabály pedig az
+	  átjáróról érkező FTP
+	  forgalommal bírkózik meg:</p><pre class="programlisting">map dc0 0.0.0.0/0 -&gt; 0/32 proxy port 21 ftp/tcp</pre><p>Ez a szabály kezeli a belső
+	  hálózatról érkező összes
+	  nem FTP típusú forgalmat:</p><pre class="programlisting">map dc0 10.0.10.0/29 -&gt; 0/32</pre><p>Az FTP leképzésére vonatkozó
+	  szabály a szokásos leképzési
+	  szabály elé kerül.  Az összes csomag
+	  fentről haladva az első illeszkedő
+	  szabály alapján kerül feldolgozásra.
+	  Először az interfész nevét
+	  vizsgáljuk, majd a belső hálózatbeli
+	  forrás IP-t, végül azt, hogy a csomag egy
+	  FTP kapcsolat része.  Ha minden
+	  paraméterében megfelel, akkor az FTP proxy
+	  készít egy ideiglenes szűrési
+	  szabályt hozzá, amellyel az FTP kapcsolathoz
+	  tartozó csomagok mind a két irányba
+	  képesek lesznek vándorolni, természetesen
+	  a címfordítással együtt.  Az
+	  összes többi bentről érkező csomag
+	  átlép ezen a szabályon és
+	  megáll a harmadiknál, ahol az
+	  interfésznek és forrás IP-nek
+	  megfelelően átfordítjuk a
+	  címét.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99213904"></a>30.5.21.2. Az IPNAT szűrési szabályai
+	  FTP-re</h4></div></div></div><p>Az FTP esetében csak egyetlen szűrési
+	  szabályra van szükségünk a
+	  hálózati címfordításba
+	  épített FTP proxy
+	  használatához.</p><p>FTP proxy nélkül az alábbi három
+	  szabály kellene:</p><pre class="programlisting"># Kifelé engedélyezzük a belső gépek FTP elérést az internet irányába,
+# aktív és passzív módokban.
+pass out quick on rl0 proto tcp from any to any port = 21 flags S keep state
+
+# Kifelé engedélyezzük a passzív módhoz tartozó magasabb tartománybeli
+# adatcsatornákat.
+pass out quick on rl0 proto tcp from any to any port &gt; 1024 flags S keep state
+
+# Aktív módban beengedjük az FTP szervertől érkező adatcsatornát.
+pass in quick on rl0 proto tcp from any to any port = 20 flags S keep state</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="firewalls-pf.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="firewalls.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="firewalls-ipfw.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">30.4. Az OpenBSD csomagszűrője (PF) és az
+      <acronym class="acronym">ALTQ</acronym> </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 30.6. IPFW</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

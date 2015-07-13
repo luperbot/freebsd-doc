@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>16.4. Les périphériques caractères</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Livre de chevet du développeur FreeBSD" /><link rel="up" href="driverbasics.html" title="Chapitre 16. Ecrire des pilotes de périphériques pour FreeBSD" /><link rel="prev" href="ch16s03.html" title="16.3. Accéder au pilote d'un périphérique" /><link rel="next" href="ch16s05.html" title="16.5. Pilotes Réseau" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">16.4. Les périphériques caractères</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch16s03.html">Précédent</a> </td><th width="60%" align="center">Chapitre 16. Ecrire des pilotes de périphériques pour FreeBSD</th><td width="20%" align="right"> <a accesskey="n" href="ch16s05.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp67945040"></a>16.4. Les périphériques caractères</h2></div></div></div><p>Un pilote de périphérique caractère est un pilote qui transfère les données
+      directement au processus utilisateur ou vers celui-ci. Il s'agit du plus commun
+      des types de pilote de périphérique et il y en a plein d'exemples simples dans
+      l'arbre des sources.</p><p>Cet exemple simple de pseudo-périphérique enregistre toutes les valeurs
+      que vous lui avez écrites et peut vous les renvoyer quand vous les lui
+      demandez.</p><pre class="programlisting">/*
+ * un simple pseudo-périphérique `echo' KLD
+ *
+ * Murray Stokely
+ */
+
+#define MIN(a,b) (((a) &lt; (b)) ? (a) : (b))
+
+#include &lt;sys/types.h&gt;
+#include &lt;sys/module.h&gt;
+#include &lt;sys/systm.h&gt; /* uprintf */
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/param.h&gt;  /* defines utilises dans kernel.h */
+#include &lt;sys/kernel.h&gt; /* types utilises dans me module d'initialisation */
+#include &lt;sys/conf.h&gt;   /* cdevsw struct */
+#include &lt;sys/uio.h&gt;    /* uio struct */
+#include &lt;sys/malloc.h&gt;
+
+#define BUFFERSIZE 256
+
+/* Prototypes des fonctions */
+d_open_t      echo_open;
+d_close_t     echo_close;
+d_read_t      echo_read;
+d_write_t     echo_write;
+
+/* Points d'entrée du périphérique Caractère */
+static struct cdevsw echo_cdevsw = {
+  echo_open,
+  echo_close,
+  echo_read,
+  echo_write,
+  noioctl,
+  nopoll,
+  nommap,
+  nostrategy,
+  "echo",
+  33,                   /* reserve pour lkms - /usr/src/sys/conf/majors */
+  nodump,
+  nopsize,
+  D_TTY,
+  -1
+};
+
+typedef struct s_echo {
+  char msg[BUFFERSIZE];
+  int len;
+} t_echo;
+
+/* variables */
+static dev_t sdev;
+static int len;
+static int count;
+static t_echo *echomsg;
+
+MALLOC_DECLARE(M_ECHOBUF);
+MALLOC_DEFINE(M_ECHOBUF, "echobuffer", "cache pour le module echo");
+
+/*
+ * Cette fonction est appelee par les appels systeme kld[un]load(2) pour
+ * determiner quelles actions doivent etre faites quand le
+ * module est charge ou decharge
+ */
+
+static int
+echo_loader(struct module *m, int what, void *arg)
+{
+  int err = 0;
+
+  switch (what) {
+  case MOD_LOAD:                /* kldload */
+    sdev = make_dev(<code class="literal">&amp;</code>echo_cdevsw,
+		    0,
+		    UID_ROOT,
+		    GID_WHEEL,
+		    0600,
+		    "echo");
+    /* aloocation de mémoire noyau pour l'utilisation de ce module */
+    /*    malloc(256,M_ECHOBUF,M_WAITOK); */
+    MALLOC(echomsg, t_echo *, sizeof(t_echo), M_ECHOBUF, M_WAITOK);
+    printf("Peripherique Echo charge.\n");
+    break;
+  case MOD_UNLOAD:
+    destroy_dev(sdev);
+    FREE(echomsg,M_ECHOBUF);
+    printf("Peripherique Echo decharge.\n");
+    break;
+  default:
+    err = EINVAL;
+    break;
+  }
+  return(err);
+}
+
+int
+echo_open(dev_t dev, int oflags, int devtype, struct proc *p)
+{
+  int err = 0;
+
+  uprintf("Peripherique \"echo\" ouvert avec succes.\n");
+  return(err);
+}
+
+int
+echo_close(dev_t dev, int fflag, int devtype, struct proc *p)
+{
+  uprintf("Fermeture du peripherique \"echo.\"\n");
+  return(0);
+}
+
+/*
+ * La fonction read prend juste comme parametre
+ * le cache qui a ete sauve par l'appel à echo_write()
+ * et le retourne a l'utilisateur pour acces.
+ * uio(9)
+ */
+
+int
+echo_read(dev_t dev, struct uio *uio, int ioflag)
+{
+  int err = 0;
+  int amt;
+
+  /* De quelle taille est cette operation read ?  Aussi grande que l'utilisateur le veut,
+     ou aussi grande que les donnees restantes */
+  amt = MIN(uio-&gt;uio_resid, (echomsg-&gt;len - uio-&gt;uio_offset &gt; 0) ? echomsg-&gt;len - uio-&gt;uio_offset : 0);
+  if ((err = uiomove(echomsg-&gt;msg + uio-&gt;uio_offset,amt,uio)) != 0) {
+    uprintf("uiomove echoue!\n");
+  }
+
+  return err;
+}
+
+/*
+ * echo_write prend un caractere en entree et le sauve
+ * dans le cache pour une utilisation ulterieure.
+ */
+
+int
+echo_write(dev_t dev, struct uio *uio, int ioflag)
+{
+  int err = 0;
+
+  /* Copie la chaine d'entree de la memoire de l'utilisateur a la memoire du noyau*/
+  err = copyin(uio-&gt;uio_iov-&gt;iov_base, echomsg-&gt;msg, MIN(uio-&gt;uio_iov-&gt;iov_len,BUFFERSIZE));
+
+  /* Maintenant nous avons besoin de terminer la chaine par NULL */
+  *(echomsg-&gt;msg + MIN(uio-&gt;uio_iov-&gt;iov_len,BUFFERSIZE)) = 0;
+  /* Enregistre la taille */
+  echomsg-&gt;len = MIN(uio-&gt;uio_iov-&gt;iov_len,BUFFERSIZE);
+
+  if (err != 0) {
+    uprintf("Ecriture echouee: mauvaise adresse!\n");
+  }
+
+  count++;
+  return(err);
+}
+
+DEV_MODULE(echo,echo_loader,NULL);</pre><p>Pour installer ce pilote, vous devrez d'abord créer un fichier spécial dans
+      votre système de fichiers avec une commande comme : </p><pre class="screen">
+	<code class="prompt">#</code> mknod /dev/echo c 33 0
+</pre><p>Avec ce pilote chargé, vous devriez maintenant être capable de taper
+      quelque chose comme :</p><pre class="screen">
+        <code class="prompt">#</code> echo -n "Test Donnees" &gt; /dev/echo
+        <code class="prompt">#</code> cat /dev/echo
+	Test Donnees
+</pre><p>Périphériques réels dans le chapitre suivant.</p><p>Informations additionnelles
+    </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><a class="link" href="http://www.daemonnews.org/200010/blueprints.html" target="_top">Dynamic
+	Kernel Linker (KLD) Facility Programming Tutorial</a> -
+	<a class="link" href="http://www.daemonnews.org" target="_top">Daemonnews</a> October 2000</li><li class="listitem"><a class="link" href="http://www.daemonnews.org/200007/newbus-intro.html" target="_top">How
+	to Write Kernel Drivers with NEWBUS</a> - <a class="link" href="http://www.daemonnews.org" target="_top">Daemonnews</a> July
+	2000</li></ul></div><p>
+    </p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch16s03.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="driverbasics.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch16s05.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">16.3. Accéder au pilote d'un périphérique </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 16.5. Pilotes Réseau</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

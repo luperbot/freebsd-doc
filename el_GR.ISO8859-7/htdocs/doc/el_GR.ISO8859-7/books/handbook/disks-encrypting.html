@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>19.14. Encrypting Disk Partitions</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Εγχειρίδιο του FreeBSD" /><link rel="up" href="disks.html" title="Κεφάλαιο 19. Αποθηκευτικά Μέσα" /><link rel="prev" href="quotas.html" title="19.13. File System Quotas" /><link rel="next" href="swap-encrypting.html" title="19.15. Encrypting Swap Space" /><link rel="copyright" href="legalnotice.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">19.14. Encrypting Disk Partitions</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="quotas.html">Προηγ</a> </td><th width="60%" align="center">Κεφάλαιο 19. Αποθηκευτικά Μέσα</th><td width="20%" align="right"> <a accesskey="n" href="swap-encrypting.html">Επόμενο</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="disks-encrypting"></a>19.14. Encrypting Disk Partitions</h2></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Lucky</span> <span class="surname">Green</span></span>. </span></div></div></div><a id="idp91005776" class="indexterm"></a><p>FreeBSD offers excellent online protections against
+      unauthorized data access.  File permissions and
+      <a class="link" href="mac.html" title="Κεφάλαιο 17. Υποχρεωτικός Έλεγχος Πρόσβασης">Mandatory Access Control</a> (MAC) help
+      prevent unauthorized users from accessing data while the
+      operating system is active and the computer is powered up.
+      However, the permissions enforced by the operating system are
+      irrelevant if an attacker has physical access to a computer and
+      can move the computer's hard drive to another system to copy and
+      analyze the data.</p><p>Regardless of how an attacker may have come into possession
+      of a hard drive or powered-down computer, both the GEOM Based
+      Disk Encryption (<code class="command">gbde</code>) and
+      <code class="command">geli</code> cryptographic subsystems in FreeBSD are
+      able to protect the data on the computer's file systems against
+      even highly-motivated attackers with significant resources.
+      Unlike cumbersome encryption methods that encrypt only
+      individual files, <code class="command">gbde</code> and
+      <code class="command">geli</code> transparently encrypt entire file
+      systems.  No cleartext ever touches the hard drive's
+      platter.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91009872"></a>19.14.1. Disk Encryption with
+	<span class="application">gbde</span></h3></div></div></div><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Configuring <span class="application">gbde</span> requires
+	    superuser privileges.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>su -</code></strong>
+Password:</pre></li><li class="step"><p>If using a custom kernel configuration file, ensure it
+	    contains this line:</p><p><code class="literal">options GEOM_BDE</code></p><p>If the kernel already contains this support, use
+	    <code class="command">kldload</code> to load <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>kldload geom_bde</code></strong></pre></li></ol></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91017168"></a>19.14.1.1. Preparing the Encrypted Hard Drive</h4></div></div></div><p>The following example demonstrates adding a new hard
+	  drive to a system that will hold a single encrypted
+	  partition.  This partition will be mounted as
+	  <code class="filename">/private</code>.
+	  <span class="application">gbde</span> can also be used to encrypt
+	  <code class="filename">/home</code> and
+	  <code class="filename">/var/mail</code>, but this
+	  requires more complex instructions which exceed the scope of
+	  this introduction.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Add the New Hard Drive</strong></p><p>Install the new drive to the system as explained in
+	      <a class="xref" href="disks-adding.html" title="19.3. Adding Disks">Τμήμα 19.3, «Adding Disks»</a>.  For the purposes
+	      of this example, a new hard drive partition has been
+	      added as <code class="filename">/dev/ad4s1c</code> and
+	      <code class="filename">/dev/ad0s1*</code>
+	      represents the existing standard FreeBSD partitions.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4</pre></li><li class="step"><p class="title"><strong>Create a Directory to Hold <code class="command">gbde</code>
+	      Lock Files</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/gbde</code></strong></pre><p>The <span class="application">gbde</span> lock file
+	      contains information that
+	      <span class="application">gbde</span> requires to access
+	      encrypted partitions.  Without access to the lock file,
+	      <span class="application">gbde</span> will not be able to
+	      decrypt the data contained in the encrypted partition
+	      without significant manual intervention which is not
+	      supported by the software.  Each encrypted partition
+	      uses a separate lock file.</p></li><li class="step"><p class="title"><strong>Initialize the <code class="command">gbde</code>
+	      Partition</strong></p><p>A <span class="application">gbde</span> partition must be
+	      initialized before it can be used.  This initialization
+	      needs to be performed only once:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde init /dev/ad4s1c -i -L /etc/gbde/ad4s1c.lock</code></strong></pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> will open the default editor, in order
+	      to set various configuration options in a template.  For
+	      use with UFS1 or UFS2, set the sector_size to
+	      2048:</p><pre class="programlisting"># $FreeBSD: src/sbin/gbde/template.txt,v 1.1.36.1 2009/08/03 08:13:06 kensmith Exp $
+#
+# Sector size is the smallest unit of data which can be read or written.
+# Making it too small decreases performance and decreases available space.
+# Making it too large may prevent filesystems from working.  512 is the
+# minimum and always safe.  For UFS, use the fragment size
+#
+sector_size	=	2048
+[...]</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> will ask the user twice to type the
+	      passphrase used to secure the data.  The passphrase must
+	      be the same both times.  The ability of
+	      <span class="application">gbde</span> to protect data depends
+	      entirely on the quality of the passphrase.  For tips on
+	      how to select a secure passphrase that is easy to
+	      remember, see the <a class="link" href="http://world.std.com/~reinhold/diceware.html" target="_top">Diceware
+		Passphrase</a> website.</p><p><code class="command">gbde init</code>creates a lock file for
+	      the <span class="application">gbde</span> partition.  In this
+	      example, it is stored as
+	      <code class="filename">/etc/gbde/ad4s1c.lock</code>.
+	      <span class="application">gbde</span> lock files must end in
+	      <span class="quote">«<span class="quote">.lock</span>»</span> in order to be correctly detected
+	      by the <code class="filename">/etc/rc.d/gbde</code> start up
+	      script.</p><div xmlns="" class="caution"><h3 class="admontitle">Προσοχή: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="application">gbde</span> lock files
+		<span class="emphasis"><em>must</em></span> be backed up together with
+		the contents of any encrypted partitions.  While
+		deleting a lock file alone cannot prevent a determined
+		attacker from decrypting a
+		<span class="application">gbde</span> partition, without the
+		lock file, the legitimate owner will be unable to
+		access the data on the encrypted partition without a
+		significant amount of work that is totally unsupported
+		by <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a>.</p></div></li><li class="step"><p class="title"><strong>Attach the Encrypted Partition to the
+	      Kernel</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c.lock</code></strong></pre><p>This command will prompt to input the passphrase
+	      that was selected during the initialization of the
+	      encrypted partition.  The new encrypted device will
+	      appear in
+	      <code class="filename">/dev</code> as
+	      <code class="filename">/dev/device_name.bde</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/ad*</code></strong>
+/dev/ad0        /dev/ad0s1b     /dev/ad0s1e     /dev/ad4s1
+/dev/ad0s1      /dev/ad0s1c     /dev/ad0s1f     /dev/ad4s1c
+/dev/ad0s1a     /dev/ad0s1d     /dev/ad4        /dev/ad4s1c.bde</pre></li><li class="step"><p class="title"><strong>Create a File System on the Encrypted
+	      Device</strong></p><p>Once the encrypted device has been attached to the
+	      kernel, a file system can be created on the device using
+	      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a>.  This example creates a UFS2 file
+	      system with soft updates enabled.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -U /dev/ad4s1c.bde</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml"><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">newfs</span>(8)</span></a> must be performed on an attached
+		<span class="application">gbde</span> partition which is
+		identified by a
+		<code class="filename">*.bde</code>
+		extension to the device name.</p></div></li><li class="step"><p class="title"><strong>Mount the Encrypted Partition</strong></p><p>Create a mount point for the encrypted file
+	      system:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /private</code></strong></pre><p>Mount the encrypted file system:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre></li><li class="step"><p class="title"><strong>Verify That the Encrypted File System is
+	      Available</strong></p><p>The encrypted file system should now be visible to
+	      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> and be available for use.</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem        Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a      1037M    72M   883M     8%    /
+/devfs            1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f       8.1G    55K   7.5G     0%    /home
+/dev/ad0s1e      1037M   1.1M   953M     0%    /tmp
+/dev/ad0s1d       6.1G   1.9G   3.7G    35%    /usr
+/dev/ad4s1c.bde   150G   4.1K   138G     0%    /private</pre></li></ol></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91074768"></a>19.14.1.2. Mounting Existing Encrypted File Systems</h4></div></div></div><p>After each boot, any encrypted file systems must be
+	  re-attached to the kernel, checked for errors, and mounted,
+	  before the file systems can be used.  The required commands
+	  must be executed as
+	  <code class="systemitem">root</code>.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Attach the <code class="command">gbde</code> Partition to the
+	      Kernel</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde attach /dev/ad4s1c -l /etc/gbde/ad4s1c.lock</code></strong></pre><p>This command will prompt for the passphrase that was
+	      selected during initialization of the encrypted
+	      <span class="application">gbde</span> partition.</p></li><li class="step"><p class="title"><strong>Check the File System for Errors</strong></p><p>Since encrypted file systems cannot yet be listed in
+	      <code class="filename">/etc/fstab</code> for automatic mounting,
+	      the file systems must be checked for errors by running
+	      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=fsck&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">fsck</span>(8)</span></a> manually before mounting:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>fsck -p -t ffs /dev/ad4s1c.bde</code></strong></pre></li><li class="step"><p class="title"><strong>Mount the Encrypted File System</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /dev/ad4s1c.bde /private</code></strong></pre><p>The encrypted file system is now available for
+	      use.</p></li></ol></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91089232"></a>19.14.1.2.1. Automatically Mounting Encrypted Partitions</h5></div></div></div><p>It is possible to create a script to automatically
+	    attach, check, and mount an encrypted partition, but for
+	    security reasons the script should not contain the
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> password.  Instead, it is recommended that
+	    such scripts be run manually while providing the password
+	    via the console or <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ssh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ssh</span>(1)</span></a>.</p><p>As an alternative, an <code class="filename">rc.d</code> script
+	    is provided.  Arguments for this script can be passed via
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a>:</p><pre class="programlisting">gbde_autoattach_all="YES"
+gbde_devices="ad4s1c"
+gbde_lockdir="/etc/gbde"</pre><p>This requires that the
+	    <span class="application">gbde</span> passphrase be entered at
+	    boot time.  After typing the correct passphrase, the
+	    <span class="application">gbde</span> encrypted partition will
+	    be mounted automatically.  This can be useful when using
+	    <span class="application">gbde</span> on laptops.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91099728"></a>19.14.1.3. Cryptographic Protections Employed by
+	  <code class="command">gbde</code></h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gbde</span>(8)</span></a> encrypts the sector payload using 128-bit
+	  AES in CBC mode.  Each sector on the disk is encrypted with
+	  a different AES key.  For more information on the
+	  cryptographic design, including how the sector keys are
+	  derived from the user-supplied passphrase, refer to
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gbde&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">gbde</span>(4)</span></a>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91102544"></a>19.14.1.4. Compatibility Issues</h4></div></div></div><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> is incompatible with
+	  <span class="application">gbde</span>-encrypted devices.  All
+	  <code class="filename">*.bde</code>
+	  devices must be detached from the kernel before starting
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysinstall</span>(8)</span></a> or it will crash during its initial
+	  probing for devices.  To detach the encrypted device used in
+	  the example, use the following command:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gbde detach /dev/ad4s1c</code></strong></pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91106896"></a>19.14.2. Disk Encryption with <code class="command">geli</code></h3></div><div><span class="authorgroup">Contributed by <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Daniel</span> <span class="surname">Gerzo</span></span>. </span></div></div></div><p>An alternative cryptographic GEOM class is available
+	through <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.  <code class="command">geli</code> differs from
+	<code class="command">gbde</code>; offers different features, and uses
+	a different scheme for doing cryptographic work.</p><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> provides the following features:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Utilizes the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=crypto&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">crypto</span>(9)</span></a> framework and, when
+	    cryptographic hardware is available,
+	    <code class="command">geli</code> uses it automatically.</p></li><li class="listitem"><p>Supports multiple cryptographic algorithms such as
+	    AES, Blowfish, and 3DES.</p></li><li class="listitem"><p>Allows the root partition to be encrypted.  The
+	    passphrase used to access the encrypted root partition
+	    will be requested during system boot.</p></li><li class="listitem"><p>Allows the use of two independent keys such as a
+	    <span class="quote">«<span class="quote">key</span>»</span> and a
+	    <span class="quote">«<span class="quote">company key</span>»</span>.</p></li><li class="listitem"><p><code class="command">geli</code> is fast as it performs simple
+	    sector-to-sector encryption.</p></li><li class="listitem"><p>Allows backup and restore of master keys.  If a user
+	    destroys their keys, it is still possible to get access
+	    to the data by restoring keys from the backup.</p></li><li class="listitem"><p>Allows a disk to attach with a random, one-time key
+	    which is useful for swap partitions and temporary file
+	    systems.</p></li></ul></div><p>More <code class="command">geli</code> features can be found in
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a>.</p><p>This section describes how to enable support for
+	<code class="command">geli</code> in the FreeBSD kernel and explains how
+	to create and use a <code class="command">geli</code> encryption
+	provider.</p><p>Superuser privileges are required since modifications
+	to the kernel are necessary.</p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p class="title"><strong>Adding <code class="command">geli</code> Support to the
+	    Kernel</strong></p><p>For a custom kernel, ensure the kernel configuration
+	    file contains these lines:</p><pre class="programlisting">options GEOM_ELI
+device crypto</pre><p>Alternatively, the <code class="command">geli</code> module can
+	    be loaded at boot time by adding the following line to
+	    <code class="filename">/boot/loader.conf</code>:</p><pre class="programlisting">geom_eli_load="YES"</pre><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> should now be supported by the
+	    kernel.</p></li><li class="step"><p class="title"><strong>Generating the Master Key</strong></p><p>The following example describes how to generate a
+	    key file which will be used as part of the master key for
+	    the encrypted provider mounted under
+	    <code class="filename">/private</code>.  The key
+	    file will provide some random data used to encrypt the
+	    master key.  The master key will also be protected by a
+	    passphrase.  The provider's sector size will be 4kB.
+	    The example will describe how to attach to the
+	    <code class="command">geli</code> provider, create a file system on
+	    it, mount it, work with it, and finally, how to detach
+	    it.</p><p>It is recommended to use a bigger sector size, such as
+	    4kB, for better performance.</p><p>The master key will be protected with a passphrase and
+	    the data source for the key file will be
+	    <code class="filename">/dev/random</code>.  The sector size of
+	    the provider <code class="filename">/dev/da2.eli</code> will be
+	    4kB.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/root/da2.key bs=64 count=1</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli init -s 4096 -K /root/da2.key /dev/da2</code></strong>
+Enter new passphrase:
+Reenter new passphrase:</pre><p>It is not mandatory to use both a passphrase and a key
+	    file as either method of securing the master key can be
+	    used in isolation.</p><p>If the key file is given as <span class="quote">«<span class="quote">-</span>»</span>, standard
+	    input will be used.  This example shows how more than one
+	    key file can be used:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cat keyfile1 keyfile2 keyfile3 | geli init -K - /dev/da2</code></strong></pre></li><li class="step"><p class="title"><strong>Attaching the Provider with the Generated Key</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>geli attach -k /root/da2.key /dev/da2</code></strong>
+Enter passphrase:</pre><p>The new plaintext device will be named
+	    <code class="filename">/dev/da2.eli</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ls /dev/da2*</code></strong>
+/dev/da2  /dev/da2.eli</pre></li><li class="step"><p class="title"><strong>Creating the New File System</strong></p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>dd if=/dev/random of=/dev/da2.eli bs=1m</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>newfs /dev/da2.eli</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount /dev/da2.eli /private</code></strong></pre><p>The encrypted file system should now be visible to
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=df&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">df</span>(1)</span></a> and be available for use:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>df -H</code></strong>
+Filesystem     Size   Used  Avail Capacity  Mounted on
+/dev/ad0s1a    248M    89M   139M    38%    /
+/devfs         1.0K   1.0K     0B   100%    /dev
+/dev/ad0s1f    7.7G   2.3G   4.9G    32%    /usr
+/dev/ad0s1d    989M   1.5M   909M     0%    /tmp
+/dev/ad0s1e    3.9G   1.3G   2.3G    35%    /var
+/dev/da2.eli   150G   4.1K   138G     0%    /private</pre></li><li class="step"><p class="title"><strong>Unmounting and Detaching the Provider</strong></p><p>Once the work on the encrypted partition is done, and
+	    the <code class="filename">/private</code>
+	    partition is no longer needed, it is prudent to consider
+	    unmounting and detaching the <code class="command">geli</code>
+	    encrypted partition from the kernel:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /private</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>geli detach da2.eli</code></strong></pre></li></ol></div><p>More information about the use of <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=geli&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">geli</span>(8)</span></a> can be
+	found in its manual page.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp91167568"></a>19.14.2.1. Using the <code class="filename">geli</code>
+	  <code class="filename">rc.d</code> Script</h4></div></div></div><p><code class="command">geli</code> comes with a
+	  <code class="filename">rc.d</code> script which can be used to
+	  simplify the usage of <code class="command">geli</code>.  An example
+	  of configuring <code class="command">geli</code> through
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> follows:</p><pre class="programlisting">geli_devices="da2"
+geli_da2_flags="-p -k /root/da2.key"</pre><p>This configures <code class="filename">/dev/da2</code> as a
+	  <code class="command">geli</code> provider of which the master key
+	  file is located in <code class="filename">/root/da2.key</code>.
+	  <code class="command">geli</code> will not use a passphrase when
+	  attaching to the provider if
+	  <code class="option">-P</code> was given during the
+	  <code class="literal">geli init</code> phase.  The system will detach
+	  the <code class="command">geli</code> provider from the kernel before
+	  the system shuts down.</p><p>More information about configuring
+	  <code class="filename">rc.d</code> is provided in the
+	  <a class="link" href="configtuning-rcd.html" title="12.7. Χρησιμοποιώντας Το Σύστημα rc Στο FreeBSD">rc.d</a> section of the
+	  Handbook.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="quotas.html">Προηγ</a> </td><td width="20%" align="center"><a accesskey="u" href="disks.html">Πάνω</a></td><td width="40%" align="right"> <a accesskey="n" href="swap-encrypting.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top">19.13. File System Quotas </td><td width="20%" align="center"><a accesskey="h" href="index.html">Αρχή</a></td><td width="40%" align="right" valign="top"> 19.15. Encrypting Swap Space</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

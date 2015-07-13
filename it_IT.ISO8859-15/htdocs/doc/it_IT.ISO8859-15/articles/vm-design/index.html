@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Elementi di progettazione del sistema di VM di FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Il titolo è in realtà solo un modo complicato per dire che cercherò di descrivere l'intera enchilada della memoria virtuale (VM), sperando di farlo in una maniera che chiunque possa seguire. Nell'ultimo anno mi sono concentrato su un certo numero di sottosistemi principali del kernel in FreeBSD, trovando quelli della VM (la memoria virtuale) e dello Swap i più interessanti, e considerando quello di NFS un lavoretto necessario. Ho riscritto solo piccole porzioni di quel codice. Nell'arena della VM la sola grossa riscrittura che ho affrontato è stata quella del sottosistema di swap. La maggior parte del mio lavoro è stato di pulizia e mantenimento, con solo alcune moderate riscritture di codice e nessuna correzione rilevante a livello algoritmico nel sottosistema della VM. Il nocciolo della base teorica del sottosistema rimane immutato ed un bel po' del merito per gli sforzi di modernizzazione negli ultimi anni appartiene a John Dyson e David Greenman. Poiché non sono uno storico come Kirk non tenterò di marcare tutte le varie caratteristiche con i nomi delle relative persone, perché sbaglierei invariabilmente. Traduzione a cura di Gabriele Renzi surrender_it@yahoo.it." /><link rel="home" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="next" href="vm-objects.html" title="2. Oggetti VM" /><link rel="copyright" href="trademarks.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Elementi di progettazione del sistema di VM di FreeBSD</th></tr><tr><td width="20%" align="left"> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="vm-objects.html">Avanti</a></td></tr></table><hr /></div><div xml:lang="it" class="article" lang="it"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71628624"></a>Elementi di progettazione del sistema di VM di FreeBSD</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></h3><div class="affiliation"><div class="address"><p><br />
+            <code class="email">&lt;<a xmlns="" class="email" href="mailto:dillon@apollo.backplane.com">dillon@apollo.backplane.com</a>&gt;</code><br />
+          </p></div></div></div></div></div><div>Revisione: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="trademarks.html">Nota Legale</a></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="legalnotice.html">Nota Legale</a></div><div>   di .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">Sommario</div><p>Il titolo è in realtà solo un modo complicato per dire
+        che cercherò di descrivere l'intera enchilada della memoria
+        virtuale (VM), sperando di farlo in una maniera che chiunque possa
+        seguire.
+        Nell'ultimo anno mi sono concentrato su un certo numero di sottosistemi
+        principali del kernel in FreeBSD, trovando quelli della VM (la memoria
+        virtuale) e dello Swap i più interessanti, e considerando quello
+        di NFS <span class="quote">«<span class="quote">un lavoretto necessario</span>»</span>.
+        Ho riscritto solo piccole porzioni di quel codice.  Nell'arena
+        della VM la sola grossa riscrittura che ho affrontato è stata
+        quella del sottosistema di swap.
+        La maggior parte del mio lavoro è stato di pulizia e
+        mantenimento, con solo alcune moderate riscritture di codice e
+        nessuna correzione rilevante a livello algoritmico nel sottosistema
+        della VM.  Il nocciolo della base teorica del sottosistema
+        rimane immutato ed un bel po' del merito per gli sforzi di
+        modernizzazione negli ultimi anni appartiene a John Dyson e David
+        Greenman.  Poiché non sono uno storico come Kirk non
+        tenterò di marcare tutte le varie caratteristiche con i nomi
+        delle relative persone, perché sbaglierei
+        invariabilmente.</p><p><span class="emphasis"><em>Traduzione a cura di Gabriele Renzi <code class="email">&lt;<a xmlns="" class="email" href="mailto:surrender_it@yahoo.it">surrender_it@yahoo.it</a>&gt;</code>.</em></span></p></div></div></div><div class="docformatnavi">
+      [
+      
+	  HTML Multiplo
+	
+      /
+      <a href="article.html">HTML Singolo</a>
+      ]
+    </div><hr /></div><div class="toc"><div class="toc-title">Indice</div><dl class="toc"><dt><span class="sect1"><a href="index.html#introduction">1. Introduzione</a></span></dt><dt><span class="sect1"><a href="vm-objects.html">2. Oggetti VM</a></span></dt><dt><span class="sect1"><a href="swap-layers.html">3. Livelli di SWAP</a></span></dt><dt><span class="sect1"><a href="freeing-pages.html">4. Quando liberare una pagina</a></span></dt><dt><span class="sect1"><a href="prefault-optimizations.html">5. Pre-Faulting e Ottimizzazioni di Azzeramento</a></span></dt><dt><span class="sect1"><a href="page-table-optimizations.html">6. Ottimizzazioni della Tabella delle Pagine </a></span></dt><dt><span class="sect1"><a href="page-coloring-optimizations.html">7. Colorazione delle Pagine</a></span></dt><dt><span class="sect1"><a href="conclusion.html">8. Conclusione</a></span></dt><dt><span class="sect1"><a href="allen-briggs-qa.html">9. Sessione Bonus di Domande e Risposte di Allen Briggs
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="introduction"></a>1. Introduzione</h2></div></div></div><p>Prima di andare avanti con la descrizione del progetto effettivo
+      della VM spendiamo un po' di tempo sulla necessità di mantenere
+      e modernizzare una qualunque base di codice longeva.
+      Nel mondo della programmazione, gli algoritmi tendono ad essere più
+      importanti del codice ed è dovuto alle radici accademiche
+      di BSD che si è prestata grande attenzione alla progettazione
+      algoritmica sin dal principio.
+      Una maggiore attenzione al design in genere conduce ad una base di codice
+      flessibile e pulita che può essere modificata abbastanza
+      semplicemente, estesa, o rimpiazzata nel tempo.
+      Mentre BSD viene considerato un sistema operativo <span class="quote">«<span class="quote">vecchio</span>»</span>
+      da alcune persone, quelli di noi che lavorano su di esso tendono
+      a considerarlo come una base di codice <span class="quote">«<span class="quote">matura</span>»</span>
+      che ha vari componenti modificati, estesi, o rimpiazzati con codice
+      moderno.  Questa si è evoluta, e FreeBSD è all'avanguardia,
+      non importa quanto possa essere vecchio qualche pezzo di codice.
+      Questa è una distinzione importante da fare ed una di quelle che
+      sfortunatamente sfuggono alla maggior parte delle persone.  Il più
+      grande errore che un programmatore possa fare è non imparare
+      dalla storia, e questo è precisamente l'errore che molti sistemi
+      operativi moderni hanno commesso.  <span class="trademark">Windows NT</span>® è il miglior esempio
+      di questo, e le conseguenze sono state disastrose.  Anche Linux commette
+      questo errore a un certo livello-abbastanza perché noi
+      appassionati di BSD possiamo scherzarci su ogni tanto, comunque.
+      Il problema di Linux è semplicemente la mancanza di esperienza e
+      di una storia con la quale confrontare le idee, un problema che sta
+      venendo affrontato rapidamente dalla comunità Linux nello stesso
+      modo in cui è stato affrontato da quella BSD-con il continuo
+      sviluppo di codice.  La gente di <span class="trademark">Windows NT</span>®, d'altro canto, fa
+      ripetutamente gli stessi errori risolti da <span class="trademark">UNIX</span>® decadi fa e poi impiega
+      anni nel risolverli.  E poi li rifanno, ancora, e ancora.
+      Soffrono di un preoccupante caso di <span class="quote">«<span class="quote">non è stato progettato
+        qui</span>»</span> e di <span class="quote">«<span class="quote">abbiamo sempre ragione perché il nostro
+        dipartimento marketing dice così</span>»</span>.  Io ho pochissima
+      tolleranza per chiunque non impari dalla storia.</p><p>La maggior parte dell'apparente complessità di progettazione di
+      FreeBSD, specialmente nel sottosistema VM/Swap, è una conseguenza
+      diretta dell'aver dovuto risolvere importanti problemi di prestazioni
+      legati a varie condizioni.  Questi problemi non sono dovuti a cattivi
+      progetti algoritmici ma sorgono invece da fattori ambientali.
+      In ogni paragone diretto tra piattaforme, questi problemi
+      diventano più evidenti quando le risorse di sistema cominciano ad
+      essere stressate.
+      Mentre descrivo il sottosistema VM/Swap di FreeBSD il lettore
+      dovrebbe sempre tenere a mente almeno due punti.  Primo, l'aspetto
+      più importante nel design prestazionale è ciò che
+      è noto come <span class="quote">«<span class="quote">Ottimizzazione del Percorso Critico</span>»</span>.
+      Accade spesso che le ottimizzazioni prestazionali aggiungano
+      un po di impurità al codice per far migliorare il percorso critico.
+      Secondo, un progetto solido e generalizzato, funziona meglio di
+      un progetto pesantemente ottimizzato, alla lunga.  Mentre un progetto
+      generale può alla fin fine essere più lento di un sistema
+      pesantemente ottimizzato quando vengono implementati inizialmente, il
+      progetto generalizzato tende ad essere più semplice da adattare
+      alle condizioni variabili mentre quello pesantemente ottimizzato finisce
+      per dover essere gettato via.  Ogni base di codice che dovrà
+      sopravvivere ed essere mantenibile per anni deve dunque essere progettata
+      con attenzione fin dall'inizio anche se questo può portare a
+      piccoli peggioramenti nelle prestazioni.
+      Vent'anni fa c'era ancora gente che sosteneva che programmare in assembly
+      era meglio che programmare in linguaggi di alto livello, perché
+      si poteva produrre codice che era dieci volte più veloce.  Oggi,
+      la fallacia di tale argomento è ovvia-così come i
+      paralleli con il design algoritmico e la generalizzazione del
+      codice.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="vm-objects.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"> </td><td width="40%" align="right" valign="top"> 2. Oggetti VM</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

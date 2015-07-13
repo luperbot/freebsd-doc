@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>29.6. Névfeloldás (DNS)</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="network-servers.html" title="29. fejezet - Hálózati szerverek" /><link rel="prev" href="network-dhcp.html" title="29.5. A hálózat automatikus beállítása (DHCP)" /><link rel="next" href="network-apache.html" title="29.7. Az Apache webszerver" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">29.6. Névfeloldás (<acronym class="acronym">DNS</acronym>)</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-dhcp.html">Vissza</a> </td><th width="60%" align="center">29. fejezet - Hálózati szerverek</th><td width="20%" align="right"> <a accesskey="n" href="network-apache.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-dns"></a>29.6. Névfeloldás (<acronym class="acronym">DNS</acronym>)</h2></div><div><span class="authorgroup">Készítette: <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Lee</span>, <span class="firstname">Chern</span></span>, <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Rhodes</span>, <span class="firstname">Tom</span></span> és <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Gerzo</span>, <span class="firstname">Daniel</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97875280"></a>29.6.1. Áttekintés</h3></div></div></div><a id="idp97875920" class="indexterm"></a><p>A FreeBSD alapértelmezés szerint a BIND (Berkeley
+	Internet Name Domain) egyik verzióját tartalmazza,
+	amely a névfeloldási (Domain Name System,
+	<acronym class="acronym">DNS</acronym>) protokoll egyik elterjedt
+	implementációja.  A <acronym class="acronym">DNS</acronym>
+	protokollon keresztül tudunk az
+	<acronym class="acronym">IP</acronym>-címekhez neveket rendelni és
+	fordítva.  Például a <code class="systemitem">www.FreeBSD.org</code> névre a FreeBSD Projekt
+	webszerverének <acronym class="acronym">IP</acronym>-címét
+	kapjuk meg, miközben a <code class="systemitem">ftp.FreeBSD.org</code> pedig a
+	hozzá tartozó <acronym class="acronym">FTP</acronym> szerver
+	<acronym class="acronym">IP</acronym>-címét fogja visszaadni.
+	Ehhez hasonlóan a fordítottja is
+	megtörténhet, vagyis egy
+	<acronym class="acronym">IP</acronym>-címhez is kérhetjük a
+	hálózati név feloldását.  A
+	névfeloldási kérések
+	kiszolgálásához nem feltétlenül
+	szükséges névszervert futtatni a
+	rendszerünkön.</p><p>A FreeBSD jelen pillanatban alapból a
+	<acronym class="acronym">BIND</acronym>9 névszervert tartalmazza.  A
+	benne szereplő változata több biztonsági
+	javítást, új
+	állományrendszeri kiosztást és
+	automatizált <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>
+	beállítást is magában foglal.</p><a id="idp97886416" class="indexterm"></a><p>Az interneten keresztüli névfeloldást
+	legfelső szintű tartományoknak (Top Level
+	Domain, <acronym class="acronym">TLD</acronym>) nevezett hitelesített
+	tövek némileg bonyolult rendszerén alapszik,
+	valamint más egyéb olyan névszervereken,
+	amelyek további egyéni információkat
+	tárolnak és táraznak.</p><p>A BIND fejlesztését jelenleg az Internet
+	Systems Consortium (<code class="uri"><a class="uri" href="http://www.isc.org/" target="_top">http://www.isc.org/</a></code>)
+	felügyeli.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97888720"></a>29.6.2. Alapfogalmak</h3></div></div></div><p>A leírás megértéséhez be
+	kell mutatnunk néhány névfeloldással
+	kapcsolatos fogalmat.</p><a id="idp97889744" class="indexterm"></a><a id="idp97890256" class="indexterm"></a><a id="idp97890896" class="indexterm"></a><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Fogalom</th><th>Meghatározás</th></tr></thead><tbody><tr><td>Közvetlen névfeloldás (forward
+		<acronym class="acronym">DNS</acronym>)</td><td>A hálózati nevek
+		leképezése IP-címekre.</td></tr><tr><td>ős (origin)</td><td>Egy adott zóna állományban
+		szereplő tartományra vonatkozik.</td></tr><tr><td><span class="application">named</span>, BIND</td><td>A FreeBSD-n belüli BIND névszerver
+		különböző
+		megnevezései.</td></tr><tr><td>Névfeloldó (resolver)</td><td>Az a program a rendszerben, amelyhez a
+		hálózaton levő gépek a
+		zónák adatainak
+		elérésével kapcsolatban
+		fordulnak.</td></tr><tr><td>Inverz névfeloldás (reverse
+		<acronym class="acronym">DNS</acronym>)</td><td>Az <acronym class="acronym">IP</acronym>-címek
+		leképzése hálózati
+		nevekre.</td></tr><tr><td>Gyökérzóna (root zone)</td><td>Az interneten található
+		zónák hierarchiájának
+		töve.  Minden zóna ebbe a
+		gyökérzónába esik, ahhoz
+		hasonlóan, ahogy egy
+		állományrendszerben az
+		állományok a
+		gyökérkönyvtárba.</td></tr><tr><td>Zóna (zone)</td><td>Egy különálló
+		tartomány, altartomány vagy a
+		névfeloldás azon része, amelyet
+		egyazon fennhatóság alatt tartanak
+		karban.</td></tr></tbody></table></div><a id="idp97913040" class="indexterm"></a><p>Példák zónákra:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>A gyökérzónára a
+	    leírásokban általában
+	    <code class="systemitem">.</code> néven szoktak hivatkozni.</p></li><li class="listitem"><p>A <code class="systemitem">org.</code> egy legfelső szintű
+	    tartomány (<acronym class="acronym">TLD</acronym>) a
+	    gyökérzónán belül.</p></li><li class="listitem"><p>A <code class="systemitem">minta.org.</code> a
+	    <code class="systemitem">org.</code> <acronym class="acronym">TLD</acronym>
+	    tartomány alatti zóna.</p></li><li class="listitem"><p>A <code class="systemitem">1.168.192.in-addr.arpa</code> egy olyan
+	    zóna, amelyek a <code class="systemitem">192.168.1.*</code>
+	    <acronym class="acronym">IP</acronym>-címtartományban
+	    szereplő összes címet jelöli.</p></li></ul></div><p>Mint láthatjuk, a hálózati nevek
+	balról kiegészülve pontosodnak.  Tehát
+	például a <code class="systemitem">minta.org.</code> sokkal pontosabb
+	meghatározás, mint a <code class="systemitem">org.</code>, ahogy
+	az <code class="systemitem">org.</code> magánál a
+	gyökérzónánál jelent
+	többet.  A hálózati nevek felosztása
+	leginkább egy állományrendszerhez
+	hasonlítható, például a <code class="filename">/dev</code> könyvtár a
+	gyökéren belül található,
+	és így tovább.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97928528"></a>29.6.3. Miért érdemes névszervert
+	futtatni</h3></div></div></div><p>A névszerverek általában két
+	alakban jelennek meg.  Egyikük a hitelesített
+	névszerver, a másikuk a
+	gyorsítótárazó
+	névszerver.</p><p>Egy hitelesített névszerverre akkor van
+	szükségünk, ha:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>a világ többi része felé
+	    akarunk hiteles névfeloldási
+	    információkat szolgáltatni;</p></li><li class="listitem"><p>regisztráltunk egy tartományt
+	    (például <code class="systemitem">minta.org</code>) és az alatta
+	    levő hálózati nevekhez is
+	    szeretnénk <acronym class="acronym">IP</acronym>-címeket
+	    rendeltetni;</p></li><li class="listitem"><p>a <acronym class="acronym">IP</acronym>-címtartományunkban
+	    szükség van inverz névfeloldási
+	    bejegyzésekre (amely
+	    <acronym class="acronym">IP</acronym>-címből ad meg
+	    hálózati nevet) is;</p></li><li class="listitem"><p>a kérések
+	    teljesítéséhez egy tartalék
+	    avagy második, alárendelt (slave)
+	    névszerver kell.</p></li></ul></div><p>A gyorsítótárazó
+	névszerverre akkor van szükségünk,
+	ha:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>egy helyi névfeloldó szerver
+	    felhasználásával fel akarjuk
+	    gyorsítani az egyébként a
+	    külső névszerver felé
+	    irányuló kérések
+	    kiszolgálását.</p></li></ul></div><p>Amikor valaki lekérdezi a <code class="systemitem">www.FreeBSD.org</code> címét, akkor
+	a névfeloldó először
+	általában a kapcsolatot rendelkezésre
+	bocsátó internet-szolgáltató
+	névszerverét kérdezi meg és onnan
+	kapja meg a választ.  Egy helyi,
+	gyorsítótárazó névszerver
+	használata esetén azonban egy ilyen
+	kérést csak egyszer kell kiadni a külső
+	névszervernek.  Ezután már minden
+	további ilyen kérés el sem hagyja a
+	belső hálózatunkat, mivel a válasz
+	szerepel a gyorsítótárban.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97937872"></a>29.6.4. Ahogyan működik</h3></div></div></div><p>FreeBSD alatt a BIND démon nyilvánvaló
+	okokból <span class="application">named</span> néven
+	érhető el.</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Állomány</th><th>Leírás</th></tr></thead><tbody><tr><td><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a></td><td>A BIND démon.</td></tr><tr><td><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rndc</span>(8)</span></a></td><td>A névszervert vezérlő
+		segédprogram.</td></tr><tr><td><code class="filename">/etc/namedb</code></td><td>A BIND által kezelt zónák
+		adatait tároló
+		könyvtár.</td></tr><tr><td><code class="filename">/etc/namedb/named.conf</code></td><td>A démon konfigurációs
+		állománya.</td></tr></tbody></table></div><p>Attól függően, hogy miként
+	állítjuk be az adott zónát a
+	szerveren, a hozzá tartozó állományok
+	a <code class="filename">/etc/namedb</code>
+	könyvtáron belül a <code class="filename">master</code>, <code class="filename">slave</code> vagy <code class="filename">dynamic</code> alkönyvtárban
+	foglalnak helyet.  Az itt tárolt
+	állományokban levő névfeloldási
+	információk alapján válaszol a
+	névszerver a felé intézett
+	kérésekre.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97950544"></a>29.6.5. A BIND elindítása</h3></div></div></div><a id="idp97951184" class="indexterm"></a><p>Mivel a BIND alapból elérhető a
+	rendszerben, viszonylag könnyen be tudjuk
+	állítani.</p><p>A <span class="application">named</span> alapértelmezett
+	beállítása szerint egy <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a>
+	környezetben futó egyszerű
+	névfeloldást végző szerver, amely a
+	helyi IPv4 interfészen (127.0.0.1) fogadja a
+	kéréseket.  Ezzel a
+	beállítással a következő
+	parancson keresztül tudjuk elindítani:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/named onestart</code></strong></pre><p>Ha engedélyezni akarjuk a
+	<span class="application">named</span> démont minden egyes
+	rendszerindításkor, tegyük a
+	következő sort az <code class="filename">/etc/rc.conf</code>
+	állományba:</p><pre class="programlisting">named_enable="YES"</pre><p>Értelemszerűen az
+	<code class="filename">/etc/namedb/named.conf</code> tele van olyan
+	beállítási lehetőségekkel,
+	amelyek meghaladják ennek a leírásnak a
+	kereteit.  Ha viszont kíváncsiak vagyunk a
+	FreeBSD-ben a <span class="application">named</span>
+	indításához használt
+	beállításokra, akkor az
+	<code class="filename">/etc/defaults/rc.conf</code>
+	állományban nézzük meg
+	<code class="literal">named_*</code>
+	változókat és olvassuk át az
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> man oldalt.  Emellett még a <a class="xref" href="configtuning-rcd.html" title="11.7. Az rc használata FreeBSD alatt">11.7. szakasz - Az rc használata FreeBSD alatt</a>t is hasznos lehet elolvasni.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97964240"></a>29.6.6. A konfigurációs
+	állományok</h3></div></div></div><a id="idp97969104" class="indexterm"></a><p>A <span class="application">named</span>
+	beállításait tartalmazó
+	állományok pillanatnyilag az <code class="filename">/etc/namedb</code> könyvtárban
+	találhatóak és hacsak nem egy egyszerű
+	névfeloldóra tartunk igényt, akkor a
+	használata előtt módosítanunk is kell.
+	Itt ejtjük meg a beállítások nagy
+	részét.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp97971536"></a>29.6.6.1. <code class="filename">/etc/namedb/named.conf</code></h4></div></div></div><pre class="programlisting">// $FreeBSD$
+//
+// Részletesebb leírást a named.conf(5) és named(8) man oldalakon, valamint
+// a /usr/share/doc/bind9 könyvtárban találhatunk.
+//
+// Ha egy hitelesített szervert akarunk beállítani, akkor igyekezzünk
+// a névfeloldás összes finom részletével pontosan tisztában lenni.
+// Ugyanis még a legkisebb hibákkal is egyrészt elvághatunk gépeket az
+// internet-lérésétől, vagy másrészt felesleges forgalmat tudunk
+// generálni
+//
+
+options {
+	// A chroot könyvtárhoz relatív elérési út, amennyiben létezik
+	directory	"/etc/namedb";
+	pid-file	"/var/run/named/pid";
+	dump-file	"/var/dump/named_dump.db";
+	statistics-file	"/var/stats/named.stats";
+
+// Ha a named démont csak helyi névfeloldóként használjuk, akkor ez
+// egy biztonságos alapbeállítás. Ha viszont a named démon az egész
+// hálózatunkat is kiszolgálja, akkor ezt a beállítást tegyük
+// megjegyzésbe, vagy adjunk meg egy rendes IP-címet, esetleg
+// töröljük ki.
+	listen-on	{ 127.0.0.1; };
+
+// Ha rendszerünkön engedélyezett az IPv6 használata, akkor a helyi
+// névfeloldó használatához ezt a sort vegyük ki a megjegyzésből.
+// A hálózatunk többi részéről pedig úgy lehet elérni, ha itt megadunk
+// egy IPv6 címet, vagy az "any" kulcsszót.
+//	listen-on-v6	{ ::1; };
+
+// Az alábbi zónákat már a lentebb található üres zónák eleve lefedik.
+// Ha tehát a lenti üres zónákat kivesszük a konfigurációból, akkor
+// ezeket a sorokat is tegyük megjegyzésbe.
+	disable-empty-zone "255.255.255.255.IN-ADDR.ARPA";
+	disable-empty-zone "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.IP6.ARPA";
+	disable-empty-zone "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.IP6.ARPA";
+
+// Ha a szolgáltatónk névszervert is elérhetővé tett számunkra, akkor
+// itt adjuk meg annak az IP-címét és engedélyezzük az alábbi sort.
+// Ezzel egyben kihasználjuk a gyorsítótárat is, így mérsékeljük az
+// internet felé mozgó névfeloldásokat.
+/*
+	forwarders {
+		127.0.0.1;
+	};
+*
+
+// Ha a 'forwarders' rész nem üres, akkor alapértelmezés szerint a
+// 'forward first' értékkel rendelkezik.  Ekkor a kérést a helyi szerver
+// kapja abban az esetben, amikor a 'forwarders' részben megadott
+// szerverek nem tudják megválaszolni.  Emellett a névszerverben a
+// következő sor hozzáadásával letilthatjuk, hogy önmagától ne
+// kezdeményezzen kéréseket:
+//     forward only;
+
+// Ha a kérések továbbítását az /etc/resolv.conf állományban megadott
+// bejegyzések mentén szeretnénk automatikusan konfigurálni, akkor vegyük
+// ki a megjegyzésből az alábbi sort és adjuk hozzá az /etc/rc.conf
+// állományhoz a name_auto_forward=yes sort.  Emellett használható még a
+// named_auto_forward_only beállítás is (amely fentebb leírt funkciót
+// valósítja meg).
+//     include "/etc/namedb/auto_forward.conf";</pre><p>Ahogy arról a megjegyzésekben is szó
+	  esik, úgy tudjuk aktiválni a
+	  gyorsítótárat, ha megadjuk a
+	  <code class="literal">forwarders</code> beállítást.
+	  Normális körülmények között
+	  a névszerver az interneten az egyes
+	  névszervereket rekurzívan fogja keresni
+	  egészen addig, amíg meg nem találja a
+	  keresett választ.  Az iménti
+	  beállítás
+	  engedélyezésével azonban
+	  először a szolgáltató
+	  névszerverét (vagy az általa
+	  kijelölt névszervert) fogjuk megkérdezni, a
+	  saját
+	  gyorsítótárából.  Ha a
+	  szolgáltató kérdéses
+	  névszervere egy gyakran használt, gyors
+	  névszerver, akkor ezt érdemes
+	  bekapcsolnunk.</p><div xmlns="" class="warning"><h3 class="admontitle">Figyelem: </h3><p xmlns="http://www.w3.org/1999/xhtml">Itt a <code class="systemitem">127.0.0.1</code>
+	    megadása <span class="emphasis"><em>nem</em></span> működik.
+	    Mindenképpen írjuk át a
+	    szolgáltatónk névszerverének
+	    <acronym class="acronym">IP</acronym>-címére.</p></div><pre class="programlisting">	/*
+	   A BIND legújabb változataiban alapértelmezés szerint minden egyes
+	   kimenő kérésnél más, véletlenszerűen választott UDP portot
+	   használnak, ezáltal jelentős mértékben csökkenthető a gyorsítótár
+	   meghamisíthatóságának (cache poisoning) esélye.  Javasoljuk
+	   mindenkinek, hogy használják ki ezt a lehetőséget és eszerint
+	   állítsák be a tűzfalakat.
+
+	   Ha nem sikerül a tűzfalat hozzáigazítani ehhez a
+	   viselkedéshez AKKOR ÉS CSAK IS AKKOR engedélyezzük a lenti
+	   beállítást.  Alkalmazásával sokkal kevésbé lesz ellenálló a
+	   névszerver a különböző hamisítási kísérletekkel szemben,
+	   ezért lehetőség szerint kerüljük el.
+
+	   Az NNNNN helyére egy 49160 és 65530 közti számot kell
+	   beírnunk.
+	 */
+	 // query-source address * port NNNNN;
+};
+
+// Ha engedélyezzük a helyi névszervert, akkor az /etc/resolv.conf
+// állományban első helyen megadni a 127.0.0.1 címet. Sőt, az
+// /etc/rc.conf állományból se felejtsük ki.
+
+// A hagyományos "root-hints" megoldás.  Használjuk ezt VAGY a lentebb
+// megadott alárendelt zónákat.
+zone "." { type hint; file "named.root"; };
+
+/*	Több szempontból is előnyös, ha a következő zónákat alárendeljük a
+	gyökér névfeloldó szervereknek:
+	1. A helyi felhasználók kéréseit gyorsabban tudjuk feloldalni.
+	2. A gyökérszerverek felé nem megy semmilyen hamis forgalom.
+	3. A gyökérszerverek meghibásodása vagy elosztott DoS támadás
+	   esetén rugalmasabban tudunk reagálni.
+
+	Másfelöl azonban ez a módszer a "hints" állomány alkalmazásával
+	szemben több felügyeletet igényel, mivel figyelnünk kell, nehogy
+	egy váratlan meghibásodás működésképtelenné tegye a
+	szerverünket.  Ez a megoldás leginkább a sok klienst kiszolgáló
+	névszerverek esetén bizonyulhat jövedelmezőbbnek.  Óvatosan
+	bánjunk vele!
+
+	A módszer alkalmazásához vegyük ki a megjegyzésből a következő
+	bejegyzéseket és tegyük megjegyzésbe a fenti hint zónát.
+*/
+
+zone "." {
+	type slave;
+	file "slave/root.slave";
+	masters {
+		192.5.5.241;	// F.ROOT-SERVERS.NET.
+	};
+	notify no;
+};
+
+zone "arpa" {
+	type slave;
+	file "slave/arpa.slave";
+	masters {
+		192.5.5.241;	// F.ROOT-SERVERS.NET.
+	};
+	notify no;
+}
+
+zone "in-addr.arpa" {
+	type slave;
+	file "slave/in-addr.arpa.slave";
+	masters {
+		192.5.5.241;	// F.ROOT-SERVERS.NET.
+	};
+	notify no;
+};
+*/
+
+/*	Az alábbi zónák helyi kiszolgálásával meg tudjuk akadályozni, hogy
+	a belőlük indított kérések elhagyják a hálózatunkat és a elérjük
+	a gyökér névfeloldó szervereket.  Ez a megközelítés két komoly
+	előnnyel rendelkezik:
+	1. A helyi felhasználók kéréseit gyorsabban tudjuk
+	   megválaszolni.
+	2. A gyökérszerverek felé nem továbbítódik semmilyen hamis
+	   forgalom.
+*/
+// RFC 1912
+zone "localhost"	{ type master; file "master/localhost-forward.db"; };
+zone "127.in-addr.arpa"	{ type master; file "master/localhost-reverse.db"; };
+zone "255.in-addr.arpa"	{ type master; file "master/empty.db"; };
+
+// A helyi IPv6 címek részére létrehozott RFC 1912-szerű zóna
+zone "0.ip6.arpa"	{ type master; file "master/localhost-reverse.db"; };
+
+// "Ez" a hálózat (RFC 1912 és 3330)
+zone "0.in-addr.arpa"		{ type master; file "master/empty.db"; };
+
+// Magáncélú hálózatok (RFC 1918)
+zone "10.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "16.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "17.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "18.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "19.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "20.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "21.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "22.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "23.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "24.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "25.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "26.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "27.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "28.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "29.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "30.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "31.172.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "168.192.in-addr.arpa"	{ type master; file "master/empty.db"; };
+
+// Helyi link/APIPA (RFC 3330 és 3927)
+zone "254.169.in-addr.arpa"	{ type master; file "master/empty.db"; };
+
+// Dokumentációs próbahálózat (RFC 3330)
+zone "2.0.192.in-addr.arpa"	{ type master; file "master/empty.db"; };
+
+// Útválasztási teljesítmény tesztelésére (RFC 3330)
+zone "18.198.in-addr.arpa"	{ type master; file "master/empty.db"; };
+zone "19.198.in-addr.arpa"	{ type master; file "master/empty.db"; };
+
+// Az IANA részére fentartott - a régi E osztályú címtér
+zone "240.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "241.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "242.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "243.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "244.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "245.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "246.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "247.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "248.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "249.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "250.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "251.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "252.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "253.in-addr.arpa"		{ type master; file "master/empty.db"; };
+zone "254.in-addr.arpa"		{ type master; file "master/empty.db"; };
+
+// Hozzárendelés nélküli IPv6-címek (RFC 4291)
+zone "1.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "3.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "4.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "5.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "6.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "7.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "8.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "9.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "a.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "b.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "c.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "d.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "e.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "0.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "1.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "2.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "3.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "4.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "5.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "6.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "7.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "8.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "9.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "a.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "b.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "0.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "1.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "2.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "3.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "4.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "5.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "6.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "7.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+
+// IPv6 ULA (RFC 4193)
+zone "c.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "d.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+
+// IPv6 helyi link (RFC 4291)
+zone "8.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "9.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "a.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "b.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+
+// Elavult IPv6 helyi címek (RFC 3879)
+zone "c.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "d.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "e.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+zone "f.e.f.ip6.arpa"		{ type master; file "master/empty.db"; };
+
+// Az IP6.INT már elavult (RFC 4159)
+zone "ip6.int"			{ type master; file "master/empty.db"; };
+
+// FONTOS: Ne használjuk ezeket az IP-címeket, mert nem valódiak,
+// csupán illusztrációs és dokumentációs célokból adtuk meg!
+//
+// Az alárendelt zónák beállításaira vonatkozó bejegyzések. Érdemes
+// ilyet beállítani legalább ahhoz a zónához, amelyhez a tartományunk is
+// tartozik. Az elsődleges névszerverhez tartozó IP-címet érdeklődjük meg
+// az illetékes hálózati rendszergazdától.
+//
+// Soha ne felejtsünk el megadni zónát az inverz kereséshez!  A neve az IP-cím
+// tagjainak fordított sorrendjéből // származik, amelyhez hozzátoldunk még egy
+// ".IN-ADDR.ARPA" (illetve IPv6 esetén ".IP6.ARPA") részt.
+//
+// Mielőtt nekilátnánk egy elsődleges zóna beállításának, gondoljuk
+// végig, hogy tényleg a megfelelő szinten ismerjük a névfeloldás és
+// a BIND működését. Gyakran ugyanis egyáltalán nem nyilvánvaló
+// csapdákba tudunk esni.  Egy alárendelt zóna beállítása általában sokkal egyszerűbb feladat.
+//
+// FONTOS: Ne kövessük vakon a most következő példát :-) Helyette inkább
+// valódi neveket és címeket adjunk meg.
+
+/* Példa dinamikus zónára
+key "mintaorgkulcs" {
+	algorithm hmac-md5;
+	secret "sf87HJqjkqh8ac87a02lla==";
+};
+zone "minta.org" {
+	type master;
+	allow-update {
+		key "mintaorgkulcs";
+	};
+	file "dynamic/minta.org";
+};
+*/
+
+/* Példa inverz alárendelt zónákra
+zone "1.168.192.in-addr.arpa" {
+	type slave;
+	file "slave/1.168.192.in-addr.arpa";
+	masters {
+		192.168.1.1;
+	};
+};
+*/</pre><p>A <code class="filename">named.conf</code>
+	  állományban tehát így adhatunk meg
+	  közvetlen és inverz alárendelt
+	  zónákat.</p><p>Minden egyes újabb kiszolgált
+	  zónához az egy új bejegyzést kell
+	  felvenni a <code class="filename">named.conf</code>
+	  állományban.</p><p>Például a <code class="systemitem">minta.org</code> címhez
+	  tartozó legegyszerűbb ilyen bejegyzés
+	  így néz ki:</p><pre class="programlisting">zone "minta.org" {
+	type master;
+	file "master/minta.org";
+};</pre><p>Ez egy központi zóna, ahogy arról a
+	  <code class="option">type</code> mező, vagyis a típusa is
+	  árulkodik.  Továbbá a
+	  <code class="option">file</code> mezőben láthatjuk, hogy a
+	  hozzá tartozó információkat az
+	  <code class="filename">/etc/namedb/master/minta.org</code>
+	  állományban tárolja.</p><pre class="programlisting">zone "minta.org" {
+	type slave;
+	file "slave/minta.org";
+};</pre><p>Az alárendelt esetben a zónához
+	  tartozó információkat a zóna
+	  központi szerverétől kapjuk meg és
+	  megadott állományban mentjük el.  Ha
+	  valamiért a központi szerver leáll vagy nem
+	  érhető el, akkor az alárendelt szerver az
+	  átküldött zóna
+	  információk alapján képes helyette
+	  kiszolgálni a kéréseket.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98010064"></a>29.6.6.2. A zóna állományok</h4></div></div></div><a id="idp98010704" class="indexterm"></a><p>A <code class="systemitem">minta.org</code>
+	  címhez tartozó példa központi
+	  zóna állomány (amely az
+	  <code class="filename">/etc/namedb/master/néven.org</code>
+	  érhető el) tartalma az alábbi:</p><pre class="programlisting">$TTL 3600        ; alapértelmezés szerint 1 óra
+minta.org.      IN      SOA      ns1.minta.org. admin.minta.org. (
+                                2006051501      ; sorozatszám
+                                10800           ; frissítés
+                                3600            ; ismétlés
+                                604800          ; lejárat
+                                300             ; TTL negatív válasz
+                        )
+
+; névszerverek
+                IN      NS      ns1.minta.org.
+                IN      NS      ns2.minta.org.
+
+; MX rekordok
+                IN      MX 10   mx.minta.org.
+                IN      MX 20   levelezes.minta.org.
+
+                IN      A       192.168.1.1
+
+; a gépek nevei
+localhost       IN      A       127.0.0.1
+ns1             IN      A       192.168.1.2
+ns2             IN      A       192.168.1.3
+mx              IN      A       192.168.1.4
+levelezes       IN      A       192.168.1.5
+
+; álnevek
+www             IN      CNAME   minta.org.</pre><p>A <span class="quote">"<span class="quote">.</span>"</span>-ra végződő
+	  hálózati nevek abszolút nevek, míg
+	  minden más <span class="quote">"<span class="quote">.</span>"</span> nélküli
+	  név az ősére vezehető vissza
+	  (tehát relatív).  Például az
+	  <code class="literal">ns1</code> névből az
+	  <code class="literal">ns1.minta.org</code>
+	  keletkezik.</p><p>A zóna állományok
+	  felépítése a következő:</p><pre class="programlisting">rekordnév      IN rekordtípus   érték</pre><a id="idp98016336" class="indexterm"></a><p>A névfeloldásban leggyakrabban alkalmazott
+	  rekordok típusai:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">SOA</span></dt><dd><p>a zóna fennhatóságának
+		kezdete</p></dd><dt><span class="term">NS</span></dt><dd><p>egy hitelesített névszerver</p></dd><dt><span class="term">A</span></dt><dd><p>egy gép címe</p></dd><dt><span class="term">CNAME</span></dt><dd><p>egy álnév kanonikus neve</p></dd><dt><span class="term">MX</span></dt><dd><p>levélváltó</p></dd><dt><span class="term">PTR</span></dt><dd><p>mutató a tartománynévre (az
+		inverz feloldás használja)</p></dd></dl></div><pre class="programlisting">
+minta.org. IN SOA ns1.minta.org. admin.minta.org. (
+                        2006051501      ; sorozatszám
+                        10800           ; 3 óránként frissítsünk
+                        3600            ; 1 óra után próbálkozzunk újra
+                        604800          ; 1 hét után jár le
+                        300 )           ; TTL negatív válasz</pre><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="systemitem">minta.org.</code></span></dt><dd><p>a tartomány neve, amely egyben a zóna
+		őse</p></dd><dt><span class="term"><code class="systemitem">ns1.minta.org.</code></span></dt><dd><p>a zóna elsődleges/hitelesített
+		névszervere</p></dd><dt><span class="term"><code class="literal">admin.minta.org.</code></span></dt><dd><p>a zónáért felelős
+		személy neve, akinek az e-mail
+		címét a <span class="quote">"<span class="quote">@</span>"</span>
+		behelyettesítésével kapjuk meg.
+		(Tehát a <code class="email">&lt;<a xmlns="" class="email" href="mailto:admin@example.org">admin@example.org</a>&gt;</code>
+		címből <code class="literal">admin.example.org</code>
+		lesz.)</p></dd><dt><span class="term"><code class="literal">2006051501</code></span></dt><dd><p>az állomány sorozatszáma.  Ezt
+		a zóna állomány
+		módosításakor mindig
+		növelnünk kell.  Manapság a
+		rendszergazdák a sorozatszámot
+		<code class="literal">ééééhhnnvv</code>
+		alakban adják meg.  A
+		<code class="literal">2006051501</code> tehát azt jelenti,
+		hogy az állományt 2006.  május
+		15-én módosították
+		utoljára, és a <code class="literal">01</code> pedig
+		arra utal, hogy aznap először.  A
+		sorozatszám megadása fontos az
+		alárendelt névszerverek
+		számára, mivel így tudják
+		megállapítani, hogy a zóna mikor
+		változott utoljára.</p></dd></dl></div><pre class="programlisting">
+                IN NS           ns1.minta.org.</pre><p>Ez egy NS bejegyzés.  A zónához
+	  tartozó minden hitelesített névszervernek
+	  lennie kell legalább egy ilyen
+	  bejegyzésének.</p><pre class="programlisting">localhost       IN      A       127.0.0.1
+ns1             IN      A       192.168.1.2
+ns2             IN      A       192.168.1.3
+mx              IN      A       192.168.1.4
+levelezes       IN      A       192.168.1.5</pre><p>Az A rekord egy gép nevét adja meg.  Ahogy a
+	  fenti példából is kiderül, az
+	  <code class="systemitem">ns1.minta.org</code> név a
+	  <code class="systemitem">192.168.1.2</code> címre
+	  képződik le.</p><pre class="programlisting">                IN      A       192.168.1.1</pre><p>Ez a sor <code class="systemitem">192.168.1.1</code>
+	  címet rendeli az aktuális őshöz, amely
+	  jelen esetünkben az <code class="systemitem">example.org</code>.</p><pre class="programlisting">www             IN CNAME        @</pre><p>A kanonikus neveket tároló rekordokat
+	  általában egy gép álneveihez
+	  használjuk.  Ebben a példában a
+	  <code class="systemitem">www</code> a <span class="quote">"<span class="quote">főgép</span>"</span> egyik
+	  álneve, amely itt éppenséggel a <code class="systemitem">minta.org</code> (<code class="systemitem">192.168.1.1</code>) tartományneve.  A
+	  CNAME rekordok mellé más típusú
+	  rekordokat ugyanarra a hálózati névre
+	  soha ne adjunk meg.</p><a id="idp98053072" class="indexterm"></a><pre class="programlisting">                IN MX   10      levelezes.minta.org.</pre><p>Az MX rekord adja meg, hogy milyen levelező szerverek
+	  felelősek a zónába érkező
+	  levelek fogadásáért.  A <code class="systemitem">levelezes.minta.org</code> a levelező
+	  szerver hálózati neve, ahol a 10 az adott
+	  levelező szerver prioritása.</p><p>Több levelező szerver is megadható 10-es,
+	  20-as stb.  prioritásokkal.  A <code class="systemitem">minta.org</code> tartományon
+	  belül először mindig a legnagyobb MX
+	  prioritással rendelkező levelező szervernek
+	  próbáljuk meg továbbítani a
+	  leveleket (a legkisebb prioritási
+	  értékkel rendelkező rekord), majd
+	  ezután a második legnagyobbnak stb.
+	  egészen addig, amíg a levelet tovább nem
+	  küldtük.</p><p>Az in-addr.arpa zóna állományok
+	  (inverz DNS) esetén ugyanez a
+	  felépítés, kivéve, hogy a PTR
+	  típusú bejegyzések szerepelnek az A
+	  és CNAME helyett.</p><pre class="programlisting">$TTL 3600
+
+1.168.192.in-addr.arpa. IN SOA ns1.minta.org. admin.minta.org. (
+                        2006051501      ; sorozatszám
+                        10800           ; frissítés
+                        3600            ; ismétlés
+                        604800          ; lejárat
+                        300 )           ; TTL negatív válasz
+
+        IN      NS      ns1.minta.org.
+        IN      NS      ns2.minta.org.
+
+1       IN      PTR     minta.org.
+2       IN      PTR     ns1.minta.org.
+3       IN      PTR     ns2.minta.org.
+4       IN      PTR     mx.minta.org.
+5       IN      PTR     levelezes.minta.org.</pre><p>Ez az állomány írja le tehát a
+	  kitalált tartományunkon belül az
+	  IP-címek és hálózati nevek
+	  összerendelését.</p><p>Érdemes megemlíteni, hogy a PTR rekordok
+	  jobb oldalán álló nevek
+	  mindegyikének teljes hálózati
+	  névnek kell lennie (vagyis <span class="quote">"<span class="quote">.</span>"</span> karakterrel
+	  kell végződnie).</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98058064"></a>29.6.7. A gyorsítótárazó
+	névszerver</h3></div></div></div><a id="idp98058704" class="indexterm"></a><p>A gyorsítótárazó
+	névszerver az a névszerver, amely elsődleges
+	feladata a rekurzív kérések
+	kiszolgálása.  Egyszerűen
+	továbbítja a beérkező
+	kéréseket, majd megjegyzi azokat, így
+	később közvetlenül tud
+	válaszolni.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98060368"></a>29.6.8. Biztonság</h3></div></div></div><p>Habár a névfeloldás
+	szempontjából a BIND a legelterjedtebb, a
+	biztonságosságával azért akadnak
+	gondok.  Gyakran találnak benne potenciális
+	és kihasználható biztonsági
+	réseket.</p><p>A FreeBSD azonban a <span class="application">named</span>
+	démont automatikusan egy <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=chroot&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">chroot</span>(8)</span></a> környezetbe
+	helyezi.  Emellett még léteznek további
+	más védelmi mechanizmusok is, amelyek
+	segítségével el tudjuk kerülni a
+	névfeloldást célzó esetleges
+	támadásokat.</p><p>Sosem árt olvasgatni a <a class="link" href="http://www.cert.org/" target="_top">CERT</a> által kiadott
+	biztonsági figyelmeztetéseket és
+	feliratkozni a <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-security-notifications" target="_top">FreeBSD security notifications levelezési lista</a> címére,
+	hogy folyamatosan értesüljünk az interneten
+	és a FreeBSD-ben talált különböző
+	biztonsági hibákról.</p><div xmlns="" class="tip"><h3 class="admontitle">Tipp: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ha valamilyen gondunk támadna, akkor esetleg
+	  próbálkozzunk meg a forrásaink
+	  frissítésével és a
+	  <span class="application">named</span>
+	  újrafordításával.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp98069840"></a>29.6.9. Egyéb olvasnivalók</h3></div></div></div><p>A BIND/<span class="application">named</span> man oldalai:
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rndc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rndc</span>(8)</span></a> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">named</span>(8)</span></a> <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=named.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">named.conf</span>(5)</span></a></p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><a class="link" href="http://www.isc.org/software/bind" target="_top">Az ISC
+	    BIND hivatalos honlapja (angolul)</a></p></li><li class="listitem"><p><a class="link" href="http://www.isc.org/software/guild" target="_top">Az ISC BIND
+	    hivatalos fóruma (angolul)</a></p></li><li class="listitem"><p><a class="link" href="http://www.oreilly.com/catalog/dns5/" target="_top">O'Reilly DNS and
+	    BIND 5th Edition</a></p></li><li class="listitem"><p><a class="link" href="http://www.rfc-editor.org/rfc/rfc1034.txt" target="_top">RFC1034 -
+	    Domain Names - Concepts and Facilities</a></p></li><li class="listitem"><p><a class="link" href="http://www.rfc-editor.org/rfc/rfc1035.txt" target="_top">RFC1035 -
+	    Domain Names - Implementation and
+	    Specification</a></p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-dhcp.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="network-servers.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="network-apache.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">29.5. A hálózat automatikus
+      beállítása (DHCP) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 29.7. Az Apache webszerver</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

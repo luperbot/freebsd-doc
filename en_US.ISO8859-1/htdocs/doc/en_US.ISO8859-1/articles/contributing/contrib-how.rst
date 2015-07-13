@@ -1,0 +1,499 @@
+====================
+2.?How to Contribute
+====================
+
+.. raw:: html
+
+   <div class="navheader">
+
+2.?How to Contribute
+`Prev <index.html>`__?
+?
+?\ `Next <ports-contributing.html>`__
+
+--------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect1">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.?How to Contribute
+--------------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Contributions to the system generally fall into one or more of the
+following 5 categories:
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.1.?Bug Reports and General Commentary
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+An idea or suggestion of *general* technical interest should be mailed
+to the `FreeBSD technical discussions mailing
+list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-hackers>`__.
+Likewise, people with an interest in such things (and a tolerance for a
+*high* volume of mail!) may subscribe to the `FreeBSD technical
+discussions mailing
+list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-hackers>`__. See
+`The FreeBSD
+Handbook <../../../../doc/en_US.ISO8859-1/books/handbook/eresources.html#ERESOURCES-MAIL>`__
+for more information about this and other mailing lists.
+
+If you find a bug or are submitting a specific change, please report it
+using the `bug submission form <https://bugs.FreeBSD.org/submit/>`__.
+Try to fill-in each field of the bug report. Unless they exceed 65KB,
+include any patches directly in the report. If the patch is suitable to
+be applied to the source tree put ``[PATCH]`` in the synopsis of the
+report. When including patches, *do not* use cut-and-paste because
+cut-and-paste turns tabs into spaces and makes them unusable. When
+patches are a lot larger than 20KB, consider compressing them (eg. with
+`gzip(1) <http://www.FreeBSD.org/cgi/man.cgi?query=gzip&sektion=1>`__ or
+`bzip2(1) <http://www.FreeBSD.org/cgi/man.cgi?query=bzip2&sektion=1>`__)
+prior to uploading them.
+
+After filing a report, you should receive confirmation along with a
+tracking number. Keep this tracking number so that you can update us
+with details about the problem.
+
+See also `this
+article <../../../../doc/en_US.ISO8859-1/articles/problem-reports/article.html>`__
+on how to write good problem reports.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.2.?Changes to the Documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Changes to the documentation are overseen by the `FreeBSD documentation
+project mailing
+list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-doc>`__. Please
+look at the `FreeBSD Documentation Project
+Primer <../../../../doc/en_US.ISO8859-1/books/fdp-primer/index.html>`__
+for complete instructions. Send submissions and changes (even small ones
+are welcome!) using the same method any other bug report.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.3.?Changes to Existing Source Code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+An addition or change to the existing source code is a somewhat trickier
+affair and depends a lot on how far out of date you are with the current
+state of FreeBSD development. There is a special on-going release of
+FreeBSD known as “FreeBSD-CURRENT” which is made available in a variety
+of ways for the convenience of developers working actively on the
+system. See `The FreeBSD
+Handbook <../../../../doc/en_US.ISO8859-1/books/handbook/current-stable.html>`__
+for more information about getting and using FreeBSD-CURRENT.
+
+Working from older sources unfortunately means that your changes may
+sometimes be too obsolete or too divergent for easy re-integration into
+FreeBSD. Chances of this can be minimized somewhat by subscribing to the
+`FreeBSD announcements mailing
+list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-announce>`__ and
+the `FreeBSD-CURRENT mailing
+list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-current>`__
+lists, where discussions on the current state of the system take place.
+
+Assuming that you can manage to secure fairly up-to-date sources to base
+your changes on, the next step is to produce a set of diffs to send to
+the FreeBSD maintainers. This is done with the
+`diff(1) <http://www.FreeBSD.org/cgi/man.cgi?query=diff&sektion=1>`__
+command.
+
+The preferred
+`diff(1) <http://www.FreeBSD.org/cgi/man.cgi?query=diff&sektion=1>`__
+format for submitting patches is the unified output format generated by
+``diff -u``.
+
+.. code:: screen
+
+    % diff -u oldfile newfile
+
+or
+
+.. code:: screen
+
+    % diff -u -r -N olddir newdir
+
+would generate a set of unified diffs for the given source file or
+directory hierarchy.
+
+See
+`diff(1) <http://www.FreeBSD.org/cgi/man.cgi?query=diff&sektion=1>`__
+for more information.
+
+Once you have a set of diffs (which you may test with the
+`patch(1) <http://www.FreeBSD.org/cgi/man.cgi?query=patch&sektion=1>`__
+command), you should submit them for inclusion with FreeBSD as a bug
+report. *Do not* just send the diffs to the `FreeBSD technical
+discussions mailing
+list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-hackers>`__ or
+they will get lost! We greatly appreciate your submission (this is a
+volunteer project!); because we are busy, we may not be able to address
+it immediately, but it will remain in the PR database until we do.
+Indicate your submission by including ``[PATCH]`` in the synopsis of the
+report.
+
+If you feel it appropriate (e.g. you have added, deleted, or renamed
+files), bundle your changes into a ``tar`` file. Archives created with
+`shar(1) <http://www.FreeBSD.org/cgi/man.cgi?query=shar&sektion=1>`__
+are also welcome.
+
+If your change is of a potentially sensitive nature, such as if you are
+unsure of copyright issues governing its further distribution then you
+should send it to Core Team ``<core@FreeBSD.org>`` directly rather than
+submitting as a bug report. The Core Team ``<core@FreeBSD.org>`` reaches
+a much smaller group of people who do much of the day-to-day work on
+FreeBSD. Note that this group is also *very busy* and so you should only
+send mail to them where it is truly necessary.
+
+Please refer to
+`intro(9) <http://www.FreeBSD.org/cgi/man.cgi?query=intro&sektion=9>`__
+and
+`style(9) <http://www.FreeBSD.org/cgi/man.cgi?query=style&sektion=9>`__
+for some information on coding style. We would appreciate it if you were
+at least aware of this information before submitting code.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.4.?New Code or Major Value-Added Packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+In the case of a significant contribution of a large body work, or the
+addition of an important new feature to FreeBSD, it becomes almost
+always necessary to either send changes as tar files or upload them to a
+web or FTP site for other people to access. If you do not have access to
+a web or FTP site, ask on an appropriate FreeBSD mailing list for
+someone to host the changes for you.
+
+When working with large amounts of code, the touchy subject of
+copyrights also invariably comes up. FreeBSD prefers free software
+licenses such as BSD or ISC. Copyleft licenses such as GPLv2 are
+sometimes permitted. The complete listing can be found on the `core team
+licensing policy <../../../../internal/software-license.html>`__ page.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect2">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.5.?Money or Hardware
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+We are always very happy to accept donations to further the cause of the
+FreeBSD Project and, in a volunteer effort like ours, a little can go a
+long way! Donations of hardware are also very important to expanding our
+list of supported peripherals since we generally lack the funds to buy
+such items ourselves.
+
+.. raw:: html
+
+   <div class="sect3">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.5.1.?Donating Funds
+^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+The FreeBSD Foundation is a non-profit, tax-exempt foundation
+established to further the goals of the FreeBSD Project. As a 501(c)3
+entity, the Foundation is generally exempt from US federal income tax as
+well as Colorado State income tax. Donations to a tax-exempt entity are
+often deductible from taxable federal income.
+
+Donations may be sent in check form to:
+
+.. raw:: html
+
+   <div class="address">
+
+| 
+|  ????The?FreeBSD?Foundation
+|  ????P.O.?Box?20247,
+|  ????Boulder,
+|  ????CO?80308
+|  ????USA
+|  ??
+
+.. raw:: html
+
+   </div>
+
+The FreeBSD Foundation is now able to accept donations through the web
+with PayPal. To place a donation, please visit the Foundation `web
+site <http://www.freebsdfoundation.org>`__.
+
+More information about the FreeBSD Foundation can be found in `The
+FreeBSD Foundation -- an
+Introduction <http://people.FreeBSD.org/~jdp/foundation/announcement.html>`__.
+To contact the Foundation by email, write to
+``<bod@FreeBSDFoundation.org>``.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect3">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+2.5.2.?Donating Hardware
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+The FreeBSD Project happily accepts donations of hardware that it can
+find good use for. If you are interested in donating hardware, please
+contact the `Donations Liaison Office <../../../../donations/>`__.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="navfooter">
+
+--------------
+
++----------------------------+-------------------------+-----------------------------------------+
+| `Prev <index.html>`__?     | ?                       | ?\ `Next <ports-contributing.html>`__   |
++----------------------------+-------------------------+-----------------------------------------+
+| Contributing to FreeBSD?   | `Home <index.html>`__   | ?3.?Contributing to ports               |
++----------------------------+-------------------------+-----------------------------------------+
+
+.. raw:: html
+
+   </div>
+
+All FreeBSD documents are available for download at
+http://ftp.FreeBSD.org/pub/FreeBSD/doc/
+
+| Questions that are not answered by the
+  `documentation <http://www.FreeBSD.org/docs.html>`__ may be sent to
+  <freebsd-questions@FreeBSD.org\ >.
+|  Send questions about this document to <freebsd-doc@FreeBSD.org\ >.

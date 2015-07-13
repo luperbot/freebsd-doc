@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>第 2 章 内核中的锁</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="kernel.html" title="部分 I. 内核" /><link rel="prev" href="boot-kernel.html" title="1.7. 内核初始化" /><link rel="next" href="locking-sx.html" title="2.2. 共享互斥锁" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">第 2 章 内核中的锁</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="boot-kernel.html">上一页</a> </td><th width="60%" align="center">部分 I. 内核</th><td width="20%" align="right"> <a accesskey="n" href="locking-sx.html">下一页</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="locking"></a>第 2 章 内核中的锁</h2></div><div><span class="authorgroup">翻译：<span xmlns="http://www.w3.org/1999/xhtml" class="author"></span>. </span></div></div></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="locking.html#locking-mutexes">2.1. Mutex</a></span></dt><dt><span class="sect1"><a href="locking-sx.html">2.2. 共享互斥锁</a></span></dt><dt><span class="sect1"><a href="locking-atomic.html">2.3. 原子保护变量</a></span></dt></dl></div><a id="idp64142672" class="indexterm"></a><p><span class="emphasis"><em>这一章由 FreeBSD SMP Next Generation Project 维护。
+    请将评论和建议发送给<a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-smp" target="_top">FreeBSD 对称多处理 (SMP) 邮件列表</a>.</em></span></p><a id="idp64146128" class="indexterm"></a><a id="idp64147024" class="indexterm"></a><a id="idp64148048" class="indexterm"></a><a id="idp64149328" class="indexterm"></a><a id="idp64150480" class="indexterm"></a><p>这篇文档提纲挈领的讲述了在FreeBSD内核中的锁，这些锁使得有效的多处理成为可能。
+   锁可以用几种方式获得。数据结构可以用mutex或<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lockmgr&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">lockmgr</span>(9)</span></a>保护。
+   对于为数不多的若干个变量，假如总是使用原子操作访问它们，这些变量就可以得到保护。
+   </p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">仅读本章内容，还不足以找出<span class="quote">“<span class="quote">mutex</span>”</span>
+   和<span class="quote">“<span class="quote">共享互斥锁</span>”</span>的区别。似乎它们的功能有重叠之处，
+   前者比后者的功能选项更多。它们似乎都是<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lockmgr&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">lockmgr</span>(9)</span></a>的子集。</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="locking-mutexes"></a>2.1. Mutex</h2></div></div></div><p>Mutex就是一种用来解决共享/排它矛盾的锁。
+     一个mutex在一个时刻只可以被一个实体拥有。如果另一个实体要获得已经被拥有的mutex，
+     就会进入等待，直到这个mutex被释放。在FreeBSD内核中，mutex被进程所拥有。</p><p>Mutex可以被递归的索要，但是mutex一般只被一个实体拥有较短的一段时间，
+     因此一个实体不能在持有mutex时睡眠。如果你需要在持有mutex时睡眠，
+     可使用一个 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=lockmgr&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">lockmgr</span>(9)</span></a> 的锁。</p><p>每个mutex有几个令人感兴趣的属性:</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">变量名</span></dt><dd><p>在内核源代码中<span class="type">struct mtx</span>变量的名字</p></dd><dt><span class="term">逻辑名</span></dt><dd><p>由函数<code class="function">mtx_init</code>指派的mutex的名字。
+            这个名字显示在KTR跟踪消息和witness出错与警告信息里。
+            这个名字还用于区分标识在witness代码中的各个mutex</p></dd><dt><span class="term">类型</span></dt><dd><p>Mutex的类型，用标志<code class="constant">MTX_*</code>表示。
+            每个标志的意义在<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mutex&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">mutex</span>(9)</span></a>有所描述。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="constant">MTX_DEF</code></span></dt><dd><p>一个睡眠mutex</p></dd><dt><span class="term"><code class="constant">MTX_SPIN</code></span></dt><dd><p>一个循环mutex</p></dd><dt><span class="term"><code class="constant">MTX_RECURSE</code></span></dt><dd><p>这个mutex允许递归</p></dd></dl></div></dd><dt><span class="term">保护对象</span></dt><dd><p>这个入口所要保护的数据结构列表或数据结构成员列表。
+	    对于数据结构成员，将按照
+	    <code class="varname">结构名</code>.<code class="varname">成员名</code>的形式命名。</p></dd><dt><span class="term">依赖函数</span></dt><dd><p>仅当mutex被持有时才可以被调用的函数</p></dd></dl></div><div class="table"><a id="idp64236240"></a><div class="table-title">表 2.1. Mutex列表</div><div class="table-contents"><a id="idp64238800" class="indexterm"></a><a id="idp64240976" class="indexterm"></a><a id="idp64243408" class="indexterm"></a><a id="idp64245328" class="indexterm"></a><table summary="Mutex列表" width="100%" border="1"><colgroup><col /><col /><col /><col /><col /></colgroup><thead><tr><th>变量名</th><th>逻辑名</th><th>类型</th><th>保护对象</th><th>依赖函数</th></tr></thead><tbody><tr><td>sched_lock</td><td><span class="quote">“<span class="quote">sched lock</span>”</span>(调度器锁)</td><td>
+	      <code class="constant">MTX_SPIN</code> |
+	      <code class="constant">MTX_RECURSE</code>
+	    </td><td>
+	      <code class="varname">_gmonparam</code>,
+	      <code class="varname">cnt.v_swtch</code>,
+	      <code class="varname">cp_time</code>,
+	      <code class="varname">curpriority</code>,
+	      <code class="varname">mtx</code>.<code class="varname">mtx_blocked</code>,
+	      <code class="varname">mtx</code>.<code class="varname">mtx_contested</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_procq</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_slpq</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_sflag</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_stat</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_estcpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_cpticks</code>
+	      <code class="varname">proc</code>.<code class="varname">p_pctcpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_wchan</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_wmesg</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_swtime</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_slptime</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_runtime</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_uu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_su</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_iu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_uticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_sticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_iticks</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_oncpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_lastcpu</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_rqindex</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_heldmtx</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_blocked</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_mtxname</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_contested</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_priority</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_usrpri</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_nativepri</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_nice</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_rtprio</code>,
+	      <code class="varname">pscnt</code>,
+	      <code class="varname">slpque</code>,
+	      <code class="varname">itqueuebits</code>,
+	      <code class="varname">itqueues</code>,
+	      <code class="varname">rtqueuebits</code>,
+	      <code class="varname">rtqueues</code>,
+	      <code class="varname">queuebits</code>,
+	      <code class="varname">queues</code>,
+	      <code class="varname">idqueuebits</code>,
+	      <code class="varname">idqueues</code>,
+	      <code class="varname">switchtime</code>,
+	      <code class="varname">switchticks</code>
+	    </td><td>
+	      <code class="function">setrunqueue</code>,
+	      <code class="function">remrunqueue</code>,
+	      <code class="function">mi_switch</code>,
+	      <code class="function">chooseproc</code>,
+	      <code class="function">schedclock</code>,
+	      <code class="function">resetpriority</code>,
+	      <code class="function">updatepri</code>,
+	      <code class="function">maybe_resched</code>,
+	      <code class="function">cpu_switch</code>,
+	      <code class="function">cpu_throw</code>,
+	      <code class="function">need_resched</code>,
+	      <code class="function">resched_wanted</code>,
+	      <code class="function">clear_resched</code>,
+	      <code class="function">aston</code>,
+	      <code class="function">astoff</code>,
+	      <code class="function">astpending</code>,
+	      <code class="function">calcru</code>,
+	      <code class="function">proc_compare</code>
+	    </td></tr><tr><td>vm86pcb_lock</td><td><span class="quote">“<span class="quote">vm86pcb lock</span>”</span>(虚拟8086模式进程控制块锁)</td><td>
+	      <code class="constant">MTX_DEF</code>
+	    </td><td>
+	      <code class="varname">vm86pcb</code>
+	    </td><td>
+	      <code class="function">vm86_bioscall</code>
+	    </td></tr><tr><td>Giant</td><td><span class="quote">“<span class="quote">Giant</span>”</span>(巨锁)</td><td>
+	      <code class="constant">MTX_DEF</code> |
+	      <code class="constant">MTX_RECURSE</code>
+	    </td><td>几乎可以是任何东西</td><td>许多</td></tr><tr><td>callout_lock</td><td><span class="quote">“<span class="quote">callout lock</span>”</span>(延时调用锁)</td><td>
+	      <code class="constant">MTX_SPIN</code> |
+	      <code class="constant">MTX_RECURSE</code>
+	    </td><td>
+	      <code class="varname">callfree</code>,
+	      <code class="varname">callwheel</code>,
+	      <code class="varname">nextsoftcheck</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_itcallout</code>,
+	      <code class="varname">proc</code>.<code class="varname">p_slpcallout</code>,
+	      <code class="varname">softticks</code>,
+	      <code class="varname">ticks</code>
+	    </td><td>
+	    </td></tr></tbody></table></div></div><br class="table-break" /></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="boot-kernel.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="kernel.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="locking-sx.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">1.7. 内核初始化 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 2.2. 共享互斥锁</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

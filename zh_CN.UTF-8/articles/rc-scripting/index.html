@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>BSD rc.d脚本编程实战</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="初学者可能会发现，难以通过正式的文档， 基于 BSD 的 rc.d 框架，编写一些实际任务的 rc.d 脚本。 本文中，我们采用了一些复杂性不断增加的典型案例， 来展示适合每个案例的 rc.d 特性， 并探讨其中的工作原理。 这样的实验为大家进一步研究设计有效的 rc.d 应用程序提供了一些参考点。" /><link rel="home" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="next" href="rcng-task.html" title="2. 任务描述" /><link rel="copyright" href="trademarks.html" title="法律通告" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">BSD rc.d脚本编程实战</th></tr><tr><td width="20%" align="left"> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="rcng-task.html">下一页</a></td></tr></table><hr /></div><div xml:lang="zh_cn" class="article" lang="zh_cn"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63030864"></a>BSD rc.d脚本编程实战</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="author"><h3 class="author"><span class="firstname">Yar</span> <span class="surname">Tikhiy</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:yar@FreeBSD.org">yar@FreeBSD.org</a>&gt;</code></p></div></div></div></div><div>修订: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">版权 © 2005-2006, 2012 The FreeBSD Project</p></div><div><a xmlns="http://www.w3.org/1999/xhtml" href="trademarks.html">法律通告</a></div><div>   由 .</div><div><div xmlns="http://www.w3.org/1999/xhtml" class="abstract"><div class="abstract-title">摘要</div><p>初学者可能会发现，难以通过正式的文档，
+        基于 BSD 的 <code class="filename">rc.d</code>
+        框架，编写一些实际任务的 <code class="filename">rc.d</code> 脚本。
+        本文中，我们采用了一些复杂性不断增加的典型案例，
+        来展示适合每个案例的 <code class="filename">rc.d</code> 特性，
+        并探讨其中的工作原理。
+        这样的实验为大家进一步研究设计有效的
+        <code class="filename">rc.d</code> 应用程序提供了一些参考点。</p></div></div></div><div class="docformatnavi">
+      [
+      
+	  章节模式
+	
+      /
+      <a href="article.html">完整模式</a>
+      ]
+    </div><hr /></div><div class="toc"><div class="toc-title">目录</div><dl class="toc"><dt><span class="sect1"><a href="index.html#rcng-intro">1. 简介</a></span></dt><dt><span class="sect1"><a href="rcng-task.html">2. 任务描述</a></span></dt><dt><span class="sect1"><a href="rcng-dummy.html">3. 虚拟的脚本</a></span></dt><dt><span class="sect1"><a href="rcng-confdummy.html">4. 可配置的虚拟脚本</a></span></dt><dt><span class="sect1"><a href="rcng-daemon.html">5. 启动并停止简单守护进程</a></span></dt><dt><span class="sect1"><a href="rcng-daemon-adv.html">6. 启动并停止高级守护进程</a></span></dt><dt><span class="sect1"><a href="rcng-hookup.html">7. 链接脚本到 rc.d 框架</a></span></dt><dt><span class="sect1"><a href="rcng-args.html">8. 给予 rc.d 脚本更多的灵活性</a></span></dt><dt><span class="sect1"><a href="rcng-furthur.html">9. 进一步阅读</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rcng-intro"></a>1. 简介</h2></div></div></div><p>历史上 BSD 曾有过一个单一的启动脚本，
+      <code class="filename">/etc/rc</code>。 该脚本在系统启动的时候被
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=init&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">init</span>(8)</span></a> 程序所引导，并执行所有多用户操作所需求的用户级任务：
+      检查并挂载文件系统，设置网络，启动守护进程，等等。
+      在每个系统中实际的任务清单也并不相同；
+      管理员需要根据需求自定义这样的任务清单。在一些特殊的情况中，
+      还不得不去修改 <code class="filename">/etc/rc</code> 文件，
+      一些真正的黑客乐此不疲。</p><p>单一脚本启动方法的真正问题是它没有提供对从
+      <code class="filename">/etc/rc</code> 启动的单个组件的控制。
+      拿一个例子来说吧，<code class="filename">/etc/rc</code>
+      不能够重新启动某个单独的守护进程。
+      系统管理员不得不手动找出守护进程，并杀掉它，
+      等待它真正退出后，再通过浏览 <code class="filename">/etc/rc</code>
+      得到该守护进程的标识，最终输入全部命令来再次启动守护进程。
+      如果重新启动的服务包括不止一个守护进程或需要更多动作的话，
+      该任务将变得更加困难以及容易出错。简而言之，
+      单一脚本在实现我们这样的目的上是不成功的：
+      让系统管理员的生活更轻松。</p><p>再后来，为了将最重要的一些子系统独立出来，
+      便尝试将部分的内容从 <code class="filename">/etc/rc</code> 分离出来了。
+      最广为人知的例子就是用来启动联网的 <code class="filename">/etc/netstart</code>
+      文件。它容许从单用户模式访问网络，
+      但由于它的部分代码需要和一些与联网完全无关的动作交互，
+      所以它并没有完美地结合到自启动的进程中。那便是为何
+      <code class="filename">/etc/netstart</code> 被演变成
+      <code class="filename">/etc/rc.network</code> 的原因了。
+      后者不再是一个普通的脚本；它包括了庞大的，由
+      <code class="filename">/etc/rc</code> 在不同的系统启动级别中调用的凌乱的
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 函数。然而，当启动任务变得多样化以及久经更改，
+      <span class="quote">“<span class="quote">类模块化</span>”</span> 方法变得比曾经的整体
+      <code class="filename">/etc/rc</code> 更缓慢费事。</p><p>由于没有一个干净和易于设计的框架，
+      启动脚本不得不全力更改以满足飞速开发中基于 BSD 的操作系统的需求。
+      它逐渐变得明朗并经过许多必要的步骤最终变成一个具有细密性和扩展性的
+      <code class="filename">rc</code> 系统。BSD <code class="filename">rc.d</code>
+      就这样诞生了。Luke Mewburn 和 NetBSD 社区是公认的
+      <code class="filename">rc.d</code> 之父。再之后它被引入到了 FreeBSD 中。
+      它的名字引用为系统单独的服务脚本的位置，也就是
+      <code class="filename">/etc/rc.d</code>下面的那些脚本。
+      之后我们将学习到更多的 <code class="filename">rc.d</code>
+      系统的组件并看看单个脚本是如何被调用的。</p><p>BSD <code class="filename">rc.d</code>
+      背后的基本理念是 <span class="emphasis"><em>良好</em></span> 的模块化和代码重用性。
+      <span class="emphasis"><em>良好</em></span> 的模块化意味着每个基本
+      <span class="quote">“<span class="quote">服务</span>”</span> 就象系统守护进程或原始启动任务那样，
+      通过属于它们的可启动该服务的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 脚本，来停止服务，
+      重载服务，检查服务的状态。具体动作由脚本的命令行参数所决定。
+      <code class="filename">/etc/rc</code> 脚本仍然掌管着系统的启动，
+      但现在它仅仅是使用 <code class="option">start</code> 参数来一个个调用那些小的脚本。
+      这便于用 <code class="option">stop</code> 来对运行中的同样的脚本很好地执行停止任务，
+      这是被 <code class="filename">/etc/rc.shutdown</code>
+      脚本所完成的。看，这是多么好地体现了 Unix 的哲学：
+      拥有一组小的专用的工具，每个工具尽可能好地完成自己的任务。
+      <span class="emphasis"><em>代码重用</em></span> 意味着所有的通用操作由
+      <code class="filename">/etc/rc.subr</code> 中的一些 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 函数所实现。
+      现在一个典型的脚本只需要寥寥几行的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 代码。最终，
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rcorder&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rcorder</span>(8)</span></a> 成为了 <code class="filename">rc.d</code> 框架中重要的一部分，
+      它用来帮助 <code class="filename">/etc/rc</code>
+      处理小脚本之间的依赖关系并有次序地运行它们。它同样帮助
+      <code class="filename">/etc/rc.shutdown</code> 做类似的事情，
+      因为正确的关闭次序是相对于启动的次序的。</p><p>BSD <code class="filename">rc.d</code> 的设计在
+      <a class="link" href="rcng-furthur.html#lukem"> Luke Mewburn 的原文 </a> 中有记录，
+      以及 <code class="filename">rc.d</code> 组件也被充分详细地记录在各自的
+      <a class="link" href="rcng-furthur.html#manpages">联机手册</a> 中。然而，
+      它可能没能清晰展现给一个 <code class="filename">rc.d</code>
+      新手，如何将无数的块和片进行关联来为具体的任务创建一个好风格的脚本。
+      因此本文将试着以不同的方式来讲述 <code class="filename">rc.d</code>。
+      它将展示在某些典型情况中应该使用哪些特性，并阐述了为何如此。
+      注意这并不是一篇 how-to 文档，我们的目的不是给出现成的配方，
+      而是在展示一些简单的进入 <code class="filename">rc.d</code> 的范围的门路。
+      本文也不是相关联机手册的替代品。
+      阅读本文时记得同时参考联机手册以获取更完整正规的文档。</p><p>理解本文需要一些先决条件。首先，你需要熟悉
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 脚本编程语言以掌握 <code class="filename">rc.d</code>，
+      还有，你需要知道系统是如何执行用户级的启动和停止任务，这些在
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc</span>(8)</span></a> 中都有说明。</p><p>本文关注的是 <code class="filename">rc.d</code> 的 FreeBSD 分支。
+      不过，它可能对 NetBSD 的开发者也同样有用，因为 BSD
+      <code class="filename">rc.d</code> 的两个分支不只是共享了同样的设计，
+      还保留了对脚本编写者都可见的类似观点。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="rcng-task.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"> </td><td width="40%" align="right" valign="top"> 2. 任务描述</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

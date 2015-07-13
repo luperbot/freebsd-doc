@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>12.16. Utiliser et déboguer l'ACPI sous FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="config-tuning.html" title="Chapitre 12. Configuration et optimisation" /><link rel="prev" href="acpi-overview.html" title="12.15. Gestion de l'énergie et des ressources" /><link rel="next" href="boot.html" title="Chapitre 13. Processus de démarrage de FreeBSD" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">12.16. Utiliser et déboguer l'<acronym class="acronym">ACPI</acronym>
+      sous FreeBSD</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="acpi-overview.html">Précédent</a> </td><th width="60%" align="center">Chapitre 12. Configuration et optimisation</th><td width="20%" align="right"> <a accesskey="n" href="boot.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="ACPI-debug"></a>12.16. Utiliser et déboguer l'<acronym class="acronym">ACPI</acronym>
+      sous FreeBSD</h2></div><div><span class="authorgroup">Ecrit par <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Nate</span> <span class="surname">Lawson</span></span>. </span></div><div><span class="authorgroup">Avec la collaboration de <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Peter</span> <span class="surname">Schultz</span></span> et <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp77324624" class="indexterm"></a><p>L'<acronym class="acronym">ACPI</acronym> est une nouvelle méthode de
+      recherche des périphériques, de gestion de
+      l'énergie, et fourni un accès standardisé
+      à différents matériels gérés
+      auparavant par le <acronym class="acronym">BIOS</acronym>.  Des progrès ont
+      été fait vers un fonctionnement de
+      l'<acronym class="acronym">ACPI</acronym> sur tous les systèmes, mais des
+      bogues dans le <span class="quote">« <span class="quote">bytecode</span> »</span> du <em class="firstterm">langage machine
+      <acronym class="acronym">ACPI</acronym></em>
+      (<em class="firstterm"><acronym class="acronym">ACPI</acronym> Machine
+      Language</em>&#8212;<acronym class="acronym">AML</acronym>), des
+      imperfections dans les sous-systèmes du noyau FreeBSD, et des
+      bogues dans l'interpréteur <acronym class="acronym">ACPI-CA</acronym>
+      d'<span class="trademark">Intel</span>® continuent d'apparaître.</p><p>Ce document est destiné à vous permettre d'aider
+      les développeurs du système <acronym class="acronym">ACPI</acronym>
+      sous FreeBSD à identifier la cause originelle des
+      problèmes que vous observez et à déboguer et
+      développer une solution.  Merci de lire ce document et nous
+      espérons pouvoir résoudre les problèmes de
+      votre système.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-submitdebug"></a>12.16.1. Soumettre des informations de débogage</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Note: </h3><p xmlns="http://www.w3.org/1999/xhtml">Avant de soumettre un problème, assurez-vous
+	  d'utiliser la dernière version de votre
+	  <acronym class="acronym">BIOS</acronym>, et si elle est disponible, la
+	  dernière version du firmware du contrôleur
+	  utilisé.</p></div><p>Pour ceux désirant soumettre directement un
+	problème, veuillez faire parvenir les informations
+	suivantes à la liste <a class="link" href="mailto:freebsd-acpi@FreeBSD.org" target="_top">freebsd-acpi@FreeBSD.org</a>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Description du comportement défectueux, en
+	    ajoutant le type et le modèle du système et tout
+	    ce qui peut causer l'apparition du bogue.  Notez
+	    également le plus précisément possible
+	    quand le bogue a commencé à se manifester s'il
+	    est nouveau.</p></li><li class="listitem"><p>La sortie de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dmesg&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dmesg</span>(8)</span></a> après un <code class="command">boot
+	    -v</code>, y compris tout message
+	    généré lors de la manifestation du
+	    bogue.</p></li><li class="listitem"><p>La sortie de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dmesg&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dmesg</span>(8)</span></a> après un <code class="command">boot
+	    -v</code> avec
+	    l'<acronym class="acronym">ACPI</acronym> désactivé, si cette
+	    désactivation corrige le problème.</p></li><li class="listitem"><p>La sortie de <code class="command">sysctl hw.acpi</code>.  C'est
+	    également un bon moyen de déterminer quelles
+	    fonctionnalités sont offertes par votre
+	    système.</p></li><li class="listitem"><p>Une <acronym class="acronym">URL</acronym> où peut être
+	    trouvé votre <em class="firstterm">code source
+	    <acronym class="acronym">ACPI</acronym></em> (<acronym class="acronym">ACPI</acronym>
+	    Source Language&#8212;<acronym class="acronym">ASL</acronym>).  N'envoyez pas
+	    directement l'<acronym class="acronym">ASL</acronym> sur la liste de
+	    diffusion, ce fichier peut être très gros.  Vous
+	    pouvez générer une copie de votre
+	    <acronym class="acronym">ASL</acronym> en exécutant la commande
+	    suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>acpidump -dt &gt; name-system.asl</code></strong></pre><p>(Remplacez <em class="replaceable"><code>name</code></em> par votre
+	    nom d'utilisateur et <em class="replaceable"><code>system</code></em> par
+	    celui du constructeur/modèle.  Par exemple:
+	    <code class="filename">njl-FooCo6000.asl</code>)</p></li></ul></div><p>La plupart des développeurs lisent la liste
+	<a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current" target="_top">liste de diffusion à propos de la branche FreeBSD-CURRENT</a> mais soumettez également les problèmes
+	rencontrés à la liste <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">freebsd-acpi</a> afin
+	d'être sûr qu'ils seront vus.  Soyez patient, nous
+	avons tous un travail à plein temps qui nous attend
+	ailleurs.  Si votre bogue n'est pas immédiatement apparent,
+	nous vous demanderons probablement de soumettre un
+	<acronym class="acronym">PR</acronym> par l'intermédiaire de
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=send-pr&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">send-pr</span>(1)</span></a>.  Quand vous remplirez un <acronym class="acronym">PR</acronym>,
+	veillez à inclure les mêmes informations que celles
+	précisées précédemment.  Cela nous aidera
+	à cerner et à résoudre le problème.
+	N'envoyez pas de <acronym class="acronym">PR</acronym> sans avoir contacté
+	auparavant la liste <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">freebsd-acpi</a> étant donné que
+	nous utilisons les <acronym class="acronym">PR</acronym>s comme pense-bêtes
+	de problèmes existants, et non pas comme mécanisme
+	de rapport.  Il se peut que votre problème puisse avoir
+	déjà été signalé par quelqu'un
+	d'autre.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-background"></a>12.16.2. Information de fond</h3></div></div></div><a id="idp77360208" class="indexterm"></a><p>L'<acronym class="acronym">ACPI</acronym> est présent sur tous les
+	ordinateurs modernes compatibles avec l'une des architectures ia32
+	(x86), ia64 (Itanium), et amd64 (AMD).  La norme complète
+	définit des fonctionnalités comme la gestion des
+	performances du <acronym class="acronym">CPU</acronym>, des contrôles des
+	niveaux d'énergie, des zones de températures, divers
+	systèmes d'utilisation des batteries, des contrôleurs
+	intégrés, et l'énumération du bus.  La
+	plupart des systèmes n'implémentent pas
+	l'intégralité des fonctionnalités de la
+	norme.  Par exemple, un ordinateur de bureau n'implémentera
+	généralement que la partie énumération
+	de bus alors qu'un ordinateur portable aura également le
+	support de la gestion du refroidissement et de la batterie.  Les
+	ordinateurs portables disposent également des modes de mise
+	en veille et de réveil, avec toute la complexité qui
+	en découle.</p><p>Un système compatible <acronym class="acronym">ACPI</acronym> dispose
+	de divers composants.  Les fabricants de <acronym class="acronym">BIOS</acronym>
+	et de circuits fournissent des tables de description
+	(<acronym class="acronym">FADT</acronym>) fixes en mémoire qui
+	définissent des choses comme la table
+	<acronym class="acronym">APIC</acronym> (utilisée par les systèmes
+	<acronym class="acronym">SMP</acronym>), les registres de configuration, et des
+	valeurs de configuration simples.  De plus, est fournie une table
+	de <span class="quote">« <span class="quote">bytecode</span> »</span> (la <em class="firstterm">table
+	différenciée de description du
+	système</em>&#8212;<em class="firstterm">Differentiated System
+	Description Table</em> <acronym class="acronym">DSDT</acronym>) qui
+	spécifie sous forme d'une arborescence l'espace des noms
+	des périphériques et des méthodes.</p><p>Le pilote <acronym class="acronym">ACPI</acronym> doit analyser les
+	tables, implémenter un interpréteur pour le
+	<span class="quote">« <span class="quote">bytecode</span> »</span>, et modifier les pilotes de
+	périphériques et le noyau pour qu'ils
+	acceptent des informations en provenance du
+	sous-système <acronym class="acronym">ACPI</acronym>.  Pour FreeBSD, <span class="trademark">Intel</span>®
+	fourni un interpréteur (<acronym class="acronym">ACPI-CA</acronym>) qui
+	est partagé avec Linux et NetBSD.  L'emplacement du code
+	source de l'interpréteur <acronym class="acronym">ACPI-CA</acronym> est
+	<code class="filename">src/sys/contrib/dev/acpica</code>.  Le code
+	<span class="quote">« <span class="quote">glu</span> »</span> permettant à
+	<acronym class="acronym">ACPI-CA</acronym> de fonctionner sous FreeBSD se trouve
+	dans <code class="filename">src/sys/dev/acpica/Osd</code>.  Et enfin, les
+	pilotes qui gèrent les différents
+	périphériques <acronym class="acronym">ACPI</acronym> se trouvent
+	dans <code class="filename">src/sys/dev/acpica</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-comprob"></a>12.16.3. Problèmes courants</h3></div></div></div><a id="idp77372240" class="indexterm"></a><p>Pour un fonctionnement correct de
+	l'<acronym class="acronym">ACPI</acronym>, il faut que toutes les parties
+	fonctionnent correctement.  Voici quelques problèmes
+	courants, par ordre de fréquence d'apparition, et
+	quelques contournements ou corrections possibles.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77378384"></a>12.16.3.1. Problèmes avec la souris</h4></div></div></div><p>Dans certains cas le réveil après une mise
+	  en veille sera à l'origine d'un dysfonctionnement de
+	  la souris.  Une solution connue est d'ajouter la ligne
+	  <code class="literal">hint.psm.0.flags="0x3000"</code> au fichier
+	  <code class="filename">/boot/loader.conf</code>.  Si cela ne
+	  fonctionne pas, pensez à envoyer un rapport de bogue
+	  comme décrit plus haut.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77380304"></a>12.16.3.2. Mise en veille/réveil</h4></div></div></div><p>L'<acronym class="acronym">ACPI</acronym> dispose de trois modes
+	  de mise en veille en <acronym class="acronym">RAM</acronym>
+	  (<acronym class="acronym">STR</acronym>&#8212;Suspend To RAM),
+	  <code class="literal">S1</code> à <code class="literal">S3</code>, et un
+	  mode de mise en veille vers le disque dur
+	  (<code class="literal">STD</code>&#8212;Suspend To Disk), appelé
+	  <code class="literal">S4</code>.  Le mode <code class="literal">S5</code> est un
+	  arrêt <span class="quote">« <span class="quote">soft</span> »</span> et est le mode dans lequel se
+	  trouve votre système quand il est branché mais
+	  pas allumé.  Le mode <code class="literal">S4</code> peut
+	  être implémenté de deux manières
+	  différentes.  Le mode
+	  <code class="literal">S4</code><acronym class="acronym">BIOS</acronym> est une mise en
+	  veille vers le disque assistée par le
+	  <acronym class="acronym">BIOS</acronym>.  Le mode
+	  <code class="literal">S4</code><acronym class="acronym">OS</acronym> est
+	  implémenté intégralement par le
+	  système d'exploitation.</p><p>Commencez par examiner la sortie de
+	  <code class="command">sysctl hw.acpi</code> à la recherche
+	  d'éléments concernant les modes de mise en
+	  veille.  Voici les résultats pour un Thinkpad:</p><pre class="screen">hw.acpi.supported_sleep_state: S3 S4 S5
+hw.acpi.s4bios: 0</pre><p>Cela signifie que nous pouvons utiliser
+	  <code class="command">acpiconf -s</code> pour tester les modes
+	  <code class="literal">S3</code>,
+	  <code class="literal">S4</code><acronym class="acronym">OS</acronym>, et
+	  <code class="literal">S5</code>.  Si <code class="option">s4bios</code>
+	  était égal à <code class="literal">1</code>, nous
+	  disposerions d'un support
+	  <code class="literal">S4</code><acronym class="acronym">BIOS</acronym> à la place
+	  de <code class="literal">S4</code><acronym class="acronym">OS</acronym>.</p><p>Quand vous testez la mise en veille et le réveil,
+	  commencez avec le mode <code class="literal">S1</code>, pour voir s'il
+	  est supporté.  Ce mode doit fonctionner dans la plupart
+	  des cas puisqu'il nécessite peu de support.  Le mode
+	  <code class="literal">S2</code> n'est pas implémenté, mais
+	  si vous en disposez, il est similaire au mode
+	  <code class="literal">S1</code>.  La chose suivante à essayer est
+	  le mode <code class="literal">S3</code>.  C'est le mode
+	  <acronym class="acronym">STR</acronym> le plus avancé et il
+	  nécessite un support du pilote important pour
+	  réinitialiser correctement votre matériel.  Si
+	  vous avez des problèmes au réveil de la machine,
+	  n'hésitez pas à contacter la liste <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">freebsd-acpi</a>
+	  mais ne vous attendez pas à ce que le problème
+	  soit résolu puisqu'il y a de nombreux
+	  pilotes/matériels qui nécessitent plus de tests
+	  et de développement.</p><p>Pour isoler le problème, retirez du noyau tous les
+	  pilotes de périphériques possibles.  Si cela
+	  fonctionne, vous pouvez alors identifier le pilote fautif en
+	  chargeant les pilotes un à un jusqu'à
+	  l'apparition du problème.  Généralement
+	  les pilotes binaires comme <code class="filename">nvidia.ko</code>, les
+	  pilotes d'affichage X11, ou les pilotes USB seront victimes de
+	  la plupart des problèmes tandis que ceux concernant les
+	  interfaces Ethernet fonctionneront normalement.  Si vous
+	  pouvez charger/décharger les pilotes de
+	  périphériques correctement, vous pouvez
+	  automatiser cela en ajoutant les commandes appropriées
+	  dans les fichiers <code class="filename">/etc/rc.suspend</code> et
+	  <code class="filename">/etc/rc.resume</code>.  Il y a un exemple en
+	  commentaire pour décharger ou charger un pilote.
+	  Essayez de fixer <code class="option">hw.acpi.reset_video</code> à
+	  zéro (<code class="literal">0</code>) si votre affichage est
+	  corrompu après un réveil de la machine.  Essayez
+	  des valeurs plus grandes ou plus faibles pour
+	  <code class="option">hw.acpi.sleep_delay</code> pour voir si cela
+	  aide.</p><p>Une autre méthode est d'essayer de charger une
+	  distribution Linux récente avec le support
+	  <acronym class="acronym">ACPI</acronym> et tester la mise en veille et le
+	  réveil sur le même matériel.  Si cela
+	  fonctionne sous Linux, c'est probablement donc un
+	  problème de pilotes FreeBSD et déterminer quel
+	  pilote est responsable des dysfonctionnements nous aidera
+	  à corriger le problème.  Notez que les personnes
+	  qui maintiennent l'<acronym class="acronym">ACPI</acronym> sous FreeBSD ne
+	  s'occupe pas généralement des autres pilotes de
+	  périphériques (comme le son, le système
+	  <acronym class="acronym">ATA</acronym>, etc.), aussi tout rapport concernant
+	  un problème de pilote devrait probablement en fin de
+	  compte être posté sur la liste <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-current" target="_top">freebsd-current</a>
+	  et communiqué au responsable du pilote.  Si vous vous
+	  sentez une âme d'aventurier, commencez à ajouter
+	  des <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=printf&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">printf</span>(3)</span></a>s de débogage dans un pilote
+	  problématique pour déterminer à quel
+	  moment dans sa fonction de réveil il se bloque.</p><p>Enfin, essayez de désactiver
+	  l'<acronym class="acronym">ACPI</acronym> et d'activer l'<acronym class="acronym">APM</acronym>
+	  à la place, pour voir si la mise en veille et le
+	  réveil fonctionnent avec l'<acronym class="acronym">APM</acronym>, tout
+	  particulièrement dans le cas de matériel ancien
+	  (antérieur à 2000).  Cela prend du temps aux
+	  constructeurs de mettre en place le support
+	  <acronym class="acronym">ACPI</acronym> et le matériel ancien aura
+	  sûrement des problèmes de <acronym class="acronym">BIOS</acronym>
+	  avec l'<acronym class="acronym">ACPI</acronym>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77420368"></a>12.16.3.3. Blocages du système (temporaires ou permanents)</h4></div></div></div><p>La plupart des blocages système sont le
+	  résultat d'une perte d'interruptions ou d'une
+	  tempête d'interruptions.  Les circuits ont beaucoup de
+	  problèmes en fonction de la manière dont le
+	  <acronym class="acronym">BIOS</acronym> configure les interruptions avant le
+	  démarrage, l'exactitude de la table
+	  <acronym class="acronym">APIC</acronym> (<acronym class="acronym">MADT</acronym>), et le routage
+	  du <em class="firstterm">System Control Interrupt</em>
+	  (<acronym class="acronym">SCI</acronym>).</p><a id="idp77423312" class="indexterm"></a><p>Les tempêtes d'interruptions peuvent être
+	  distinguées des pertes d'interruptions en
+	  contrôlant la sortie de la commande <code class="command">vmstat
+	  -i</code> en examinant la ligne mentionnant
+	  <code class="literal">acpi0</code>.  Si le compteur s'incrémente
+	  plusieurs fois par seconde, vous êtes victime d'une
+	  tempête d'interruptions.  Si le système semble
+	  bloqué, essayez de basculer sous <acronym class="acronym">DDB</acronym>
+	  (<span class="keycap"><strong>CTRL</strong></span>+<span class="keycap"><strong>ALT</strong></span>+<span class="keycap"><strong>ESC</strong></span> sous la
+	  console) et tapez <code class="literal">show interrupts</code>.</p><a id="idp77427408" class="indexterm"></a><p>Votre plus grand espoir quand vous faites face à
+	  des problèmes d'interruptions est d'essayer de
+	  désactiver le support <acronym class="acronym">APIC</acronym> avec la
+	  ligne <code class="literal">hint.apic.0.disabled="1"</code> dans le
+	  fichier <code class="filename">loader.conf</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77430224"></a>12.16.3.4. Paniques</h4></div></div></div><p>Les paniques sont relativement rares dans le cas de
+	  l'<acronym class="acronym">ACPI</acronym> et sont au sommet des
+	  priorités en matière de problèmes
+	  à corriger.  Le premier point est d'isoler les
+	  étapes nécessaires à la reproduction de
+	  la panique (si possible) et d'obtenir une trace de
+	  débogage.  Suivez l'aide sur l'activation de
+	  <code class="literal">options DDB</code> et la configuration d'une
+	  console série (lire la <a class="xref" href="serialconsole-setup.html#serialconsole-ddb" title="26.6.1.1. Entering the DDB Debugger from the Serial Line">Section 26.6.1.1, « Entering the DDB Debugger from the Serial Line »</a>) ou la configuration d'une
+	  partition <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">dump</span>(8)</span></a>.  Vous pouvez obtenir une trace de
+	  débogage sous <acronym class="acronym">DDB</acronym> avec la commande
+	  <code class="literal">tr</code>.  Si vous devez recopier à la
+	  main la trace de débogage, assurez-vous de relever les
+	  cinq dernières lignes et les cinq premières
+	  ligne de la trace.</p><p>Ensuite essayez d'isoler le problème en
+	  démarrant avec l'<acronym class="acronym">ACPI</acronym>
+	  désactivé.  Si cela fonctionne, vous pouvez isoler
+	  le sous-système <acronym class="acronym">ACPI</acronym> en utilisant
+	  différentes valeurs pour l'option
+	  <code class="option">debug.acpi.disable</code>.  Consultez la page de
+	  manuel <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi</span>(4)</span></a> pour des exemples.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77448912"></a>12.16.3.5. Le système redémarre après une mise
+	  en veille ou un arrêt</h4></div></div></div><p>Tout d'abord, essayez de fixer
+	  <code class="literal">hw.acpi.disable_on_poweroff="0"</code> dans
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">loader.conf</span>(5)</span></a>.  Cela empêche
+	  l'<acronym class="acronym">ACPI</acronym> de désactiver divers
+	  événements lors du processus d'arrêt.
+	  Certains systèmes ont besoin d'avoir cette valeur
+	  fixée à <code class="literal">1</code> (valeur par
+	  défaut) pour la même raison.  Cela corrige
+	  généralement le problème d'un
+	  système démarrant spontanément
+	  après une mise en veille ou un arrêt.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77451984"></a>12.16.3.6. Autres problèmes</h4></div></div></div><p>Si vous rencontrez d'autres problèmes avec
+	  l'<acronym class="acronym">ACPI</acronym> (impossible de travailler avec une
+	  station d'amarrage, périphériques non
+	  détectés, etc.), veuillez envoyer un courrier
+	  descriptif à la liste de diffusion; cependant, certains
+	  de ces problèmes peuvent être relatifs à
+	  des partie incomplètes du sous-système
+	  <acronym class="acronym">ACPI</acronym> et qui pourront prendre du temps
+	  à être implémentées.  Soyez patient
+	  et prêt à tester les correctifs que nous pourront
+	  éventuellement vous envoyer.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-aslanddump"></a>12.16.4. <acronym class="acronym">ASL</acronym>, <code class="command">acpidump</code>, et
+        <acronym class="acronym">IASL</acronym></h3></div></div></div><a id="idp77455696" class="indexterm"></a><p>Le problème le plus courant est le fait que les
+	constructeurs fournissent des <span class="quote">« <span class="quote">bytecodes</span> »</span>
+	erronés (ou plus simplement bogués!).  Cela se
+	manifeste généralement sur la console par des
+	messages du noyau du type:</p><pre class="screen">ACPI-1287: *** Error: Method execution failed [\\_SB_.PCI0.LPC0.FIGD._STA] \\
+(Node 0xc3f6d160), AE_NOT_FOUND</pre><p>La plupart du temps vous pouvez corriger ces problèmes en
+	mettant à jour votre <acronym class="acronym">BIOS</acronym> avec la
+	dernière version disponible.  La majorité des
+	messages sur la console sont inoffensifs mais si vous avez
+	d'autres problèmes comme l'état de la batterie qui
+	ne fonctionne pas, ce sont de bonnes raisons pour commencer
+	à jeter un oeil à ces problèmes dans
+	l'<acronym class="acronym">AML</acronym>.  Le <span class="quote">« <span class="quote">bytecode</span> »</span>, connu
+	sous le nom d'<acronym class="acronym">AML</acronym>, est compilé
+	à partir d'un langage source appelé
+	<acronym class="acronym">ASL</acronym>.  L'<acronym class="acronym">AML</acronym> se trouve dans
+	une table appelée <acronym class="acronym">DSDT</acronym>.  Pour obtenir
+	une copie de votre <acronym class="acronym">ASL</acronym>, utilisez
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpidump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">acpidump</span>(8)</span></a>.  Vous devriez utiliser de paire les options
+	<code class="option">-t</code> (qui affiche le contenu des tables fixes) et
+	<code class="option">-d</code> (qui désassemble
+	l'<acronym class="acronym">AML</acronym> en <acronym class="acronym">ASL</acronym>).  Consultez
+	la section <a class="link" href="ACPI-debug.html#ACPI-submitdebug" title="12.16.1. Soumettre des informations de débogage">Soumettre des
+	informations de déboguage</a> pour un exemple de
+	syntaxe.</p><p>Le tout premier test que vous pouvez effectuer est
+	de recompiler votre <acronym class="acronym">ASL</acronym> à la recherche
+	d'erreurs.  Les avertissements peuvent être
+	généralement ignorés mais les erreurs sont
+	des bogues qui normalement empêchent
+	l'<acronym class="acronym">ACPI</acronym> de fonctionner correctement.  Pour
+	recompiler votre <acronym class="acronym">ASL</acronym>, utilisez la commande
+	suivante:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>iasl your.asl</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-fixasl"></a>12.16.5. Correction de votre <acronym class="acronym">ASL</acronym></h3></div></div></div><a id="idp77476304" class="indexterm"></a><p>A long terme, notre objectif est que tout le monde puisse
+	avoir un système <acronym class="acronym">ACPI</acronym> fonctionnant
+	sans aucune intervention de l'utilisateur.  Actuellement, nous
+	sommes toujours en train de développer des solutions pour
+	contourner les erreurs courantes faites par les fabricants de
+	<acronym class="acronym">BIOS</acronym>.  L'interpréteur de <span class="trademark">Microsoft</span>®
+	(<code class="filename">acpi.sys</code> et
+	<code class="filename">acpiec.sys</code>) ne contrôle pas de
+	façon stricte la conformité avec la norme, et par
+	conséquent de nombreux fabricants de
+	<acronym class="acronym">BIOS</acronym> qui testent l'<acronym class="acronym">ACPI</acronym>
+	uniquement sous <span class="trademark">Windows</span>® ne corrigent donc jamais leur
+	<acronym class="acronym">ASL</acronym>.  Nous espérons poursuivre
+	à identifier et documenter avec exactitude les
+	comportements non-standards autorisés par
+	l'interpréteur de <span class="trademark">Microsoft</span>® et les reproduire de
+	manière à permettre à FreeBSD de fonctionner
+	sans obliger les utilisateurs à corriger leur
+	<acronym class="acronym">ASL</acronym>.  Comme solution et pour nous aider
+	à identifier ces comportements, vous pouvez corriger
+	manuellement votre <acronym class="acronym">ASL</acronym>.  Si cela fonctionne
+	pour vous, veuillez nous envoyer un <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=diff&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">diff</span>(1)</span></a> de l'ancien et
+	du nouveau <acronym class="acronym">ASL</acronym> de façon à ce
+	que nous puissions corriger le comportement incorrect dans
+	<acronym class="acronym">ACPI-CA</acronym> et rendre donc inutile à
+	l'avenir votre correctif.</p><a id="idp77484496" class="indexterm"></a><p>Voici une liste des messages d'erreur courants, leur cause,
+	et comment les corriger:</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77486032"></a>12.16.5.1. Dépendances _OS</h4></div></div></div><p>Certains <acronym class="acronym">AML</acronym>s supposent que le monde
+	  n'est fait de que différentes versions de <span class="trademark">Windows</span>®.
+	  Vous pouvez demander à FreeBSD de s'annoncer comme
+	  étant n'importe quel système d'exploitation pour
+	  voir si cela corrige les problèmes que vous pouvez
+	  rencontrer.  Une manière simple de faire cela est de
+	  fixer la variable <code class="literal">hw.acpi.osname="Windows
+	  2001"</code> dans <code class="filename">/boot/loader.conf</code> ou
+	  avec une autre chaîne de caractères que vous
+	  trouvez dans l'<acronym class="acronym">ASL</acronym>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77493456"></a>12.16.5.2. <span class="errorname">Missing Return statements</span></h4></div></div></div><p>Certaines méthodes ne renvoient pas explicitement
+	  une valeur comme la norme le demande.  Bien
+	  qu'<acronym class="acronym">ACPI-CA</acronym> ne gère pas cela, FreeBSD
+	  contourne ce problème en renvoyant implicitement la
+	  valeur.  Vous pouvez également ajouter des <span class="quote">« <span class="quote">Return
+	  statements</span> »</span> explicites où cela est
+	  nécessaire si vous connaissez la valeur à
+	  renvoyer.  Pour forcer <code class="command">iasl</code> à compiler
+	  l'<acronym class="acronym">ASL</acronym>, utilisez l'option
+	  <code class="option">-f</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77496656"></a>12.16.5.3. Remplacer l'<acronym class="acronym">AML</acronym> par
+	  défaut</h4></div></div></div><p>Après avoir personnalisé
+	  <code class="filename">votre.asl</code>, vous voudrez le compiler, pour
+	  cela exécutez:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>iasl your.asl</code></strong></pre><p>Vous pouvez ajouter l'option <code class="option">-f</code> pour
+	  forcer la création de l'<acronym class="acronym">AML</acronym>,
+	  même s'il y a des erreurs lors de la compilation.
+	  Rappelez-vous que certaines erreurs (e.g., <span class="errorname">missing
+	  Return statements</span>) sont automatiquement
+	  contournées par l'interpréteur.</p><p><code class="filename">DSDT.aml</code> est le fichier de sortie par
+	  défaut pour <code class="command">iasl</code>.  Vous pouvez le
+	  charger à la place de la version boguée de votre
+	  <acronym class="acronym">BIOS</acronym> (qui est toujours présent dans la
+	  mémoire flash) en éditant le fichier
+	  <code class="filename">/boot/loader.conf</code> comme suit:</p><pre class="programlisting">acpi_dsdt_load="YES"
+acpi_dsdt_name="/boot/DSDT.aml"</pre><p>Assurez-vous de bien copier votre fichier
+	  <code class="filename">DSDT.aml</code> dans le répertoire
+	  <code class="filename">/boot</code>.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-debugoutput"></a>12.16.6. Obtenir d'<acronym class="acronym">ACPI</acronym> une sortie de
+	débogage</h3></div></div></div><a id="idp77505872" class="indexterm"></a><a id="idp77507024" class="indexterm"></a><p>Le pilote <acronym class="acronym">ACPI</acronym> dispose d'une fonction
+	de débogage très flexible.  Elle vous permet de
+	spécifier un ensemble de sous-systèmes ainsi que
+	le niveau de verbosité.  Les sous-systèmes que
+	vous désirez déboguer sont indiqués sous la
+	forme de <span class="quote">« <span class="quote">couches</span> »</span> et sont divisés en
+	composants <acronym class="acronym">ACPI-CA</acronym> (ACPI_ALL_COMPONENTS) et
+	en supports matériel <acronym class="acronym">ACPI</acronym>
+	(ACPI_ALL_DRIVERS).  La verbosité de la sortie de
+	débogage est spécifiée par un
+	<span class="quote">« <span class="quote">niveau</span> »</span> et des intervalles de ACPI_LV_ERROR
+	(rapporte juste les erreurs) à ACPI_LV_VERBOSE (tout).
+	Le <span class="quote">« <span class="quote">niveau</span> »</span> est un masque de bits
+	séparés par des espaces, aussi de nombreuses
+	options peuvent être fixées à la fois.  Dans
+	la pratique, vous voudrez utiliser un console série pour
+	afficher la sortie si les informations de débogage sont
+	si importantes qu'elles dépassent le tampon des messages
+	de la console.  Une liste complète des couches
+	individuelles et des niveaux peut être trouvée dans
+	la page de manuel <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi</span>(4)</span></a>.</p><p>L'affichage des informations de débogage n'est pas
+	activé par défaut.  Pour l'activer, ajoutez la ligne
+	<code class="literal">options ACPI_DEBUG</code> à votre fichier de
+	configuration du noyau si l'<acronym class="acronym">ACPI</acronym> est
+	compilé dans le noyau.  Vous pouvez ajouter la ligne
+	<code class="literal">ACPI_DEBUG=1</code> à votre fichier
+	<code class="filename">/etc/make.conf</code> pour l'activer de façon
+	globale.  Si l'<acronym class="acronym">ACPI</acronym> est sous forme de module,
+	vous pouvez recompiler votre module <code class="filename">acpi.ko</code>
+	comme suit:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /sys/modules/acpi/acpi
+&amp;&amp; make clean &amp;&amp;
+make ACPI_DEBUG=1</code></strong></pre><p>Installez <code class="filename">acpi.ko</code> dans le
+	répertoire <code class="filename">/boot/kernel</code> et indiquez le niveau et
+	la couche désirée dans
+	<code class="filename">loader.conf</code>.  L'exemple suivant active les
+	messages de débogage pour tous les composants
+	<acronym class="acronym">ACPI-CA</acronym> et tous les pilotes de matériel
+	<acronym class="acronym">ACPI</acronym> (<acronym class="acronym">CPU</acronym>,
+	<acronym class="acronym">LID</acronym>, etc.).  Il n'affichera que les messages
+	d'erreur, c'est le niveau le moins verbeux.</p><pre class="programlisting">debug.acpi.layer="ACPI_ALL_COMPONENTS ACPI_ALL_DRIVERS"
+debug.acpi.level="ACPI_LV_ERROR"</pre><p>Si l'information que vous voulez est
+	déclenchée par un événement particulier
+	(disons par exemple une mise en veille suivi d'un réveil),
+	vous pouvez abandonner les modifications dans
+	<code class="filename">loader.conf</code> et utiliser à la place
+	<code class="command">sysctl</code> pour indiquer la couche et le niveau
+	après le démarrage et préparer votre
+	système pour cet événement particulier.  Les
+	variables <code class="command">sysctl</code> sont appelées de la
+	même manière que dans le fichier
+	<code class="filename">loader.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="ACPI-References"></a>12.16.7. Références</h3></div></div></div><p>Plus d'information au sujet de l'<acronym class="acronym">ACPI</acronym>
+	peut être trouvé aux emplacements suivants:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>La liste de diffusion <a class="link" href="http://lists.FreeBSD.org/mailman/listinfo/freebsd-acpi" target="_top">liste de diffusion concernant ACPI sous FreeBSD</a></p></li><li class="listitem"><p>Les archives de la liste de diffusion
+	    <acronym class="acronym">ACPI</acronym> <code class="uri"><a class="uri" href="http://lists.freebsd.org/pipermail/freebsd-acpi/" target="_top">http://lists.freebsd.org/pipermail/freebsd-acpi/</a></code></p></li><li class="listitem"><p>Les archives de l'ancienne liste de diffusion
+	  <acronym class="acronym">ACPI</acronym> <code class="uri"><a class="uri" href="http://home.jp.FreeBSD.org/mail-list/acpi-jp/" target="_top">http://home.jp.FreeBSD.org/mail-list/acpi-jp/</a></code></p></li><li class="listitem"><p>La spécification <acronym class="acronym">ACPI</acronym> 2.0
+	    <code class="uri"><a class="uri" href="http://acpi.info/spec.htm" target="_top">http://acpi.info/spec.htm</a></code></p></li><li class="listitem"><p>Les pages de manuel: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi</span>(4)</span></a>,
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpi_thermal&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">acpi_thermal</span>(4)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpidump&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">acpidump</span>(8)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=iasl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">iasl</span>(8)</span></a>,
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=acpidb&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">acpidb</span>(8)</span></a></p></li><li class="listitem"><p><a class="link" href="http://www.cpqlinux.com/acpi-howto.html#fix_broken_dsdt" target="_top">
+	    Ressource sur le débogage de la
+	    <acronym class="acronym">DSDT</acronym></a>.  (Utilise un exemple
+	    basé sur du matériel Compaq mais qui est en
+	    général intéressant.)</p></li></ul></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="acpi-overview.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="config-tuning.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="boot.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">12.15. Gestion de l'énergie et des ressources </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> Chapitre 13. Processus de démarrage de FreeBSD</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

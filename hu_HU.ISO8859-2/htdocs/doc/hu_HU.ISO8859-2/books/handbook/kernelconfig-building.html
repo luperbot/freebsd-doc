@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>8.5. Saját rendszermag készítése és telepítése</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="kernelconfig.html" title="8. fejezet - A FreeBSD rendszermag testreszabása" /><link rel="prev" href="kernelconfig-modules.html" title="8.4. Meghajtók, alrendszerek és modulok" /><link rel="next" href="kernelconfig-config.html" title="8.6. A konfigurációs állomány" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8.5. Saját rendszermag készítése
+      és telepítése</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="kernelconfig-modules.html">Vissza</a> </td><th width="60%" align="center">8. fejezet - A FreeBSD rendszermag testreszabása</th><td width="20%" align="right"> <a accesskey="n" href="kernelconfig-config.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="kernelconfig-building"></a>8.5. Saját rendszermag készítése
+      és telepítése</h2></div></div></div><a id="idp81037392" class="indexterm"></a><p>Először is tegyünk egy rövidke
+      sétát a rendszermag könyvtárában.
+      A továbbiakban említendő összes
+      könyvtár a <code class="filename">/usr/src/sys</code>
+      könyvtáron belül található, amely
+      <code class="filename">/sys</code> néven is elérhető.
+      Itt rengeteg alkönyvtár található,
+      mindegyikük a rendszermag különböző
+      részeit testesíti meg.  Ezek közül most
+      számunkra a legfontosabb az
+      <code class="filename">architektúra/conf</code>
+      lesz, ahol majd létrehozzuk a saját rendszermagunk
+      konfigurációs állományát,
+      valamint a <code class="filename">compile</code>, ahol majd a
+      rendszermagunk fordítása történik.  Itt
+      az <em class="replaceable"><code>architektúra</code></em> lehet
+      <code class="filename">i386</code>, <code class="filename">alpha</code>,
+      <code class="filename">amd64</code>, <code class="filename">ia64</code>,
+      <code class="filename">powerpc</code>, <code class="filename">sparc64</code> vagy
+      <code class="filename">pc98</code> (a PC-k egyik, leginkább
+      Japánban elterjedt változata).  Az adott
+      architektúra könyvtárában
+      található összes állomány csak
+      arra az architektúrára vonatkozik, a kód
+      többi része pedig gépfüggetlen és
+      közös az összes többi létező
+      és leendő FreeBSD platformon.  Érdemes megfigyelni
+      a könyvtárak logikai elrendezését:
+      minden egyes ismert eszköz, állományrendszer
+      és bővítmény saját
+      alkönyvtárral rendelkezik.</p><p>A példák során ez a fejezet
+      feltételezi, hogy az i386 architektúrát
+      használjuk.  Ha ez a mi esetünkben nem így
+      lenne, ne felejtsük el átírni bennük az
+      elérési útvonalakat a rendszerünk
+      architektúrájának megfelelően.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Ha <span class="emphasis"><em>nem lenne</em></span>
+	<code class="filename">/usr/src/sys</code> könyvtár a
+	rendszerünkben, valószínűleg még
+	nem telepítettük a rendszermag
+	forráskódját.  Ezt a legkönnyebben
+	úgy tudjuk megtenni, ha <code class="systemitem">root</code>
+	felhasználóként elindítjuk a
+	<code class="command">sysinstall</code> programot és ott
+	kiválasztjuk a <span class="guimenuitem">Configure</span>
+	(Beállítások), azon belül
+	<span class="guimenuitem">Distributions</span> (Terjesztések)
+	menüpontot, amiben válasszuk ki a
+	<span class="guimenuitem">src</span>, <span class="guimenuitem">base</span>
+	és <span class="guimenuitem">sys</span> terjesztéseket.
+	Ha nem szeretnénk erre a célra a
+	<span class="application">sysinstall</span> programot
+	használni, de rendelkezésünkre áll a
+	<span class="quote">"<span class="quote">hivatalos</span>"</span> FreeBSD CD, akkor a forrásokat
+	akár parancssorból is
+	telepíthetjük:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount /cdrom</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir -p /usr/src/sys</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /usr/src/sys /sys</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat /cdrom/src/ssys.[a-d]* | tar -xzvf -</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cat /cdrom/src/sbase.[a-d]* | tar -xzvf -</code></strong></pre></div><p>Ezután lépjünk be az
+      <code class="filename">i386/conf</code>
+      könyvtárba és másoljuk le a
+      <code class="filename">GENERIC</code> konfigurációs
+      állományt a kedvünk szerinti nevűre.
+      Például:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/sys/i386/conf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp GENERIC SAJÁT</code></strong></pre><p>Általában a nevet végig nagybetűkkel
+      írjuk, és ha több FreeBSD-s gépet is
+      üzemeltetünk különböző hardverekkel,
+      hasznosnak bizonyulhat megemlíteni benne az adott
+      gép rendszerének nevét is.  Ebben a
+      példában ez most a
+      <code class="filename">SAJÁT</code>
+      lesz.</p><div xmlns="" class="tip"><h3 class="admontitle">Tipp: </h3><p xmlns="http://www.w3.org/1999/xhtml">A rendszermagunk konfigurációs
+	állományát nem éppen a legjobb
+	ötlet a <code class="filename">/usr/src</code>
+	könyvtárban tárolni.  Ugyanis könnyen
+	előfordulhat, hogy egy rosszul sikerült
+	fordítás után egyszerűen csak
+	letöröljük az egész
+	<code class="filename">/usr/src</code> könyvtárat és
+	onnan kezdjük újra.  Azonban csak ezután
+	juthat eszünkbe, hogy vele együtt bizony
+	letöröltük a saját rendszermagunk
+	konfigurációs állományát is!
+	Ehhez hasonlóan, közvetlenül a
+	<code class="filename">GENERIC</code> konfigurációs
+	állomány szerkesztése sem ajánlott,
+	mivel a források egy esetleges <a class="link" href="updating-upgrading.html" title="24. fejezet - A FreeBSD frissítése és frissen tartása">frissítésénél</a>
+	könnyen felülíródhat és ezzel
+	együtt elvesznek a módosításaink
+	is.</p><p xmlns="http://www.w3.org/1999/xhtml">Tehát érdemes inkább valahol
+	máshol tárolnunk a rendszermagunk
+	konfigurációs állományát,
+	majd létrehozni rá egy szimbolikus linket a
+	<code class="filename">i386</code>
+	könyvtárban.</p><p xmlns="http://www.w3.org/1999/xhtml">Valahogy így:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src/sys/i386/conf</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mkdir /root/kernel</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>cp GENERIC /root/kernel/SAJÁT</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s /root/kernel/SAJÁT</code></strong></pre></div><p>Most pedig a kedvenc szövegszerkesztőnkkel
+      lássunk neki a
+      <code class="filename">SAJÁT</code>
+      átírásának!  Ha nemrég
+      telepítettük csak a rendszerünket, az egyetlen
+      elérhető szövegszerkesztőnk minden bizonnyal
+      a <span class="application">vi</span> lesz.  Róla most
+      túlságosan is bonyolult lenne leírást
+      adnunk, de az <a class="link" href="bibliography.html" title="B. függelék - Irodalomjegyzék">Irodalomjegyzék</a>ben
+      található könyvek közül sokban
+      elég jól bemutatják.  Ezen kívül
+      a FreeBSD ajánl egy könnyebben megtanulható
+      szövegszerkesztőt is az <span class="application">ee</span>
+      személyében, amely a kezdők
+      számára az ideális választás.
+      Nyugodtan átírhatjuk az elöl
+      található megjegyzéseket a saját
+      konfigurációnknak megfelelően, vagy akár
+      azt is rögzíthetjük, hogy miben
+      tértünk el a <code class="filename">GENERIC</code>
+      beállításaitól.</p><a id="idp81078608" class="indexterm"></a><p>Ha fordítottunk már rendszermagot <span class="trademark">SunOS</span>TM vagy
+      más BSD operációs rendszer alatt, ez az
+      állomány ismerősnek tűnhet.  Ha viszont
+      más operációs rendszerek, mint
+      például a DOS felől érkezünk, a
+      <code class="filename">GENERIC</code> konfigurációs
+      állomány egy kissé terebélyesnek
+      tűnhet számunkra, ezért <a class="link" href="kernelconfig-config.html" title="8.6. A konfigurációs állomány">A konfigurációs
+      állomány</a> című részt
+      figyelmesen és lassan olvassuk át.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">Amennyiben a forrásfánkat a FreeBSD projekt
+	legfrissebb forrásaival <a class="link" href="updating-upgrading.html" title="24. fejezet - A FreeBSD frissítése és frissen tartása">szinkronizáljuk</a>, mindig
+	olvassuk el a <code class="filename">/usr/src/UPDATING</code>
+	állományt, mielőtt bármilyen
+	frissítéshez is kezdenénk.  Itt
+	megtalálhatóak azok a fontos érintett
+	kérdések és területek, amely
+	külön figyelmet igényelnek a frissített
+	forráskód esetén.  A
+	<code class="filename">/usr/src/UPDATING</code> mindig a FreeBSD
+	forrásának legfrissebb változatához
+	igazodik, és ezért sokkal naprakészebb
+	információkat tartalmaz, mint ez a
+	kézikönyv.</p></div><p>Most pedig le kell lefordítanunk a rendszermag
+      forráskódját.</p><div class="procedure"><a id="idp81083344"></a><div class="procedure-title">Eljárás 8.1. A rendszermag lefordítása</div><ol class="procedure" type="1"><li class="step"><p>Lépjünk be a <code class="filename">/usr/src</code>
+	  könyvtárba:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>cd /usr/src</code></strong></pre></li><li class="step"><p>Fordítsuk le a rendszermagot:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make buildkernel KERNCONF=SAJÁT</code></strong></pre></li><li class="step"><p>Telepítsük az új rendszermagot:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>make installkernel KERNCONF=SAJÁT</code></strong></pre></li></ol></div><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A FreeBSD teljes forrásfájára
+	szükség van a rendszermag
+	lefordításához.</p></div><div xmlns="" class="tip"><h3 class="admontitle">Tipp: </h3><p xmlns="http://www.w3.org/1999/xhtml">Amikor egy saját rendszermagot
+	alapértelmezés szerint fordítunk, vele
+	együtt az <span class="emphasis"><em>összes</em></span> modul is
+	lefordításra kerül.  Ha viszont időt
+	szeretnénk megtakarítani a rendszermag
+	frissítése során, vagy csak a saját
+	moduljainkat akarjuk lefordítani, érdemes
+	átírnunk az <code class="filename">/etc/make.conf</code>
+	állományt a rendszermag
+	fordításának megkezdése
+	előtt:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">MODULES_OVERRIDE = linux acpi sound/sound sound/driver/ds1 ntfs</pre><p xmlns="http://www.w3.org/1999/xhtml">Ez a változó megadja a ténylegesen
+	lefordítandó modulok
+	listáját.</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">WITHOUT_MODULES = linux acpi sound ntfs</pre><p xmlns="http://www.w3.org/1999/xhtml">Ez a változó a
+	fordításból kihagyandó felső
+	szintű modulokat sorolja fel.  A rendszermag
+	fordításának folyamatában
+	egyéb hasznosnak tekinthető
+	változókról a <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=make.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">make.conf</span>(5)</span></a> man
+	oldalán olvashatunk.</p></div><a id="idp81106640" class="indexterm"></a><p>Ezután az új rendszermag a <code class="filename">/boot/kernel</code> könyvtárba
+      kerül <code class="filename">/boot/kernel/kernel</code> néven,
+      a korábbi rendszermag pedig
+      <code class="filename">/boot/kernel.old/kernel</code> néven
+      őrződik meg.  Most állítsuk le a rendszert
+      és indítsuk újra az új rendszermag
+      aktiválásához.  Ha közben valamilyen
+      hiba történt volna, nézzük meg a fejezet
+      végén található, <a class="link" href="kernelconfig-trouble.html" title="8.7. Ha valamilyen hiba történne">hibakeresés</a>re
+      vonatkozó utasításokat.  Mindenképpen
+      olvassuk el azt a részt, amely leírja, hogyan
+      állítsuk helyre a rendszerünket abban az
+      esetben, ha az új rendszermaggal <a class="link" href="kernelconfig-trouble.html#kernelconfig-noboot">nem indul</a>.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A rendszerindítási folyamathoz tartozó
+	további állományok, mint
+	például a rendszerbetöltő
+	(<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>) és annak konfigurációs
+	állománya, a <code class="filename">/boot</code>
+	könyvtárban találhatóak.  A
+	külső és saját modulok a <code class="filename">/boot/kernel</code> a
+	könyvtárba kerülhetnek, azonban a
+	felhasználóknak nagyon ügyelniük kell
+	rá, hogy az itt található modulok
+	szinkronban legyenek a lefordított rendszermaggal.
+	Ellenkező esetben a rendszerben
+	megbízhatatlanságot, hibákat
+	észlelhetünk.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="kernelconfig-modules.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="kernelconfig.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="kernelconfig-config.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">8.4. Meghajtók, alrendszerek és modulok </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 8.6. A konfigurációs állomány</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

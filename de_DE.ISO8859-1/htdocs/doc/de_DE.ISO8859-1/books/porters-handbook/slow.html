@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Kapitel 4. Einen Port in aller Ruhe erstellen</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD Porter-Handbuch" /><link rel="up" href="index.html" title="Das FreeBSD Porter-Handbuch" /><link rel="prev" href="porting-submitting.html" title="3.6. Den neuen Port einreichen" /><link rel="next" href="slow-sources.html" title="4.2. Den originalen Quelltext besorgen" /><link rel="copyright" href="trademarks.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Kapitel 4. Einen Port in aller Ruhe erstellen</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-submitting.html">Zurück</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="slow-sources.html">Weiter</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slow"></a>Kapitel 4. Einen Port in aller Ruhe erstellen</h1></div></div></div><div class="toc"><div class="toc-title">Inhaltsverzeichnis</div><dl class="toc"><dt><span class="sect1"><a href="slow.html#slow-work">4.1. Die Funktionsweise</a></span></dt><dt><span class="sect1"><a href="slow-sources.html">4.2. Den originalen Quelltext besorgen</a></span></dt><dt><span class="sect1"><a href="slow-modifying.html">4.3. Den Port bearbeiten</a></span></dt><dt><span class="sect1"><a href="slow-patch.html">4.4. Fehlerbehebung (Patches)</a></span></dt><dt><span class="sect1"><a href="slow-configure.html">4.5. Konfigurieren</a></span></dt><dt><span class="sect1"><a href="slow-user-input.html">4.6. Handhabung von Benutzereingaben</a></span></dt></dl></div><p>Ok, das war nicht ganz einfach und der Port hat einige
+      Veränderungen erfordert, um funktionieren zu können.
+      In diesem Abschnitt werden wir Schritt für Schritt
+      erklären, wie man den funktionierenden Port den Vorgaben
+      der Ports entsprechend anpasst.</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slow-work"></a>4.1. Die Funktionsweise</h2></div></div></div><p>Beginnen wir mit der Abfolge der Ereignisse, die
+	eintreten, wenn der Nutzer das erste <code class="command">make</code>
+	in Ihrem Portsverzeichnis ausführt. Sie empfinden es
+	für das Verständnis vielleicht hilfreich
+	<code class="filename">bsd.port.mk</code> in einem anderen Fenster
+	offen zu haben, während Sie diesen Abschnitt
+	lesen.</p><p>Aber machen Sie sich keine Sorgen, falls Sie nicht
+	wirklich verstehen, was <code class="filename">bsd.port.mk</code>
+	macht, die Wenigsten begreifen dies... 
+	<span class="emphasis"><em>:&gt;</em></span></p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Das Target <code class="buildtarget">fetch</code> wird
+	    aufgerufen. Es ist dafür verantwortlich
+	    sicherzustellen, dass der Tarball lokal im
+	    <code class="varname">DISTDIR</code> verfügbar ist. Falls
+	    <code class="buildtarget">fetch</code> die benötigten Dateien
+	    in <code class="varname">DISTDIR</code> nicht finden kann,
+	    durchsucht es die URL <code class="varname">MASTER_SITES</code>,
+	    welche im Makefile gesetzt ist, ebenso wie unsere
+	    Haupt-FTP-Seite unter <a class="link" href="ftp://ftp.FreeBSD.org/pub/FreeBSD/ports/distfiles" target="_top">
+            ftp://ftp.freebsd.org/pub/FreeBSD/ports/distfiles/
+	    </a>, wo wir genehmigte Distfiles als Backup
+	    aufbewahren. Danach wird versucht, so eine direkte
+	    Internetverbindung besteht, dass genannte Distfile mit
+	    <code class="varname">FETCH</code> herunterzuladen. Falls dies
+	    gelingt, wird die Datei in <code class="varname">DISTDIR</code>
+	    für weitere Nutzung abgelegt und fährt
+	    fort.</p></li><li class="step"><p>Das Target <code class="buildtarget">extract</code> wird
+	    aufgerufen. Es sucht nach den Distfiles Ihres Ports
+	    (normalerweise ein gzip-komprimierter Tarball) in
+	    <code class="varname">DISTDIR</code> und entpackt diese in ein
+	    temporäres Unterverzeichnis, welches von <code class="varname">
+	    WRKDIR</code> festgelegt wird (standardmäßig
+	    <code class="filename">work</code>).</p></li><li class="step"><p>Das Target <code class="buildtarget">patch</code> wird
+	    aufgerufen. Zuerst werden alle in
+	    <code class="varname">PATCHFILES</code> festgelegten Patches
+	    eingespielt. Anschließend werden, falls Patches der
+	    Form
+	    <code class="filename">patch-*</code> in
+	    <code class="varname">PATCHDIR</code> (standardmäßig das
+	    <code class="filename">files</code>-Unterverzeichnis) gefunden
+	    werden, diese in alphabetischer Reihenfolge
+	    eingespielt.</p></li><li class="step"><p>Das Target <code class="buildtarget">configure</code> wird
+	    aufgerufen. Dieses kann viele verschiedene Dinge
+	    machen.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Existiert <code class="filename">scripts/configure</code>,
+		so wird es aufgerufen.</p></li><li class="listitem"><p>Falls <code class="varname">HAS_CONFIGURE</code> oder
+		<code class="varname">GNU_CONFIGURE</code> gesetzt sind, wird
+		<code class="filename">WRKSRC/configure
+		</code>ausgeführt.</p></li><li class="listitem"><p>Falls <code class="varname">USE_IMAKE</code> gesetzt ist,
+		wird <code class="varname">XMKMF</code>
+		(standardmäßig <code class="command">xmkmf -a</code>)
+		ausgeführt.</p></li></ol></div></li><li class="step"><p>Das Target <code class="buildtarget">build</code> wird
+	    aufgerufen. Es ist für das Wechseln in das private
+	    Arbeitsverzeichnis (<code class="varname">WRKSRC</code>) und das
+	    Bauen des Ports zuständig. Ist
+	    <code class="varname">USE_GMAKE</code> gesetzt, so wird GNU
+	    <code class="command">make</code> verwendet, sonst das
+	    System-<code class="command">make</code>.</p></li></ol></div><p>Die oben genannten Schritte sind die Standardaktionen.
+	Zusätzlich können Sie <code class="buildtarget">pre-<em class="replaceable"><code>
+	irgendwas</code></em></code> oder
+	<code class="buildtarget">post-<em class="replaceable"><code>irgendwas</code></em>
+	</code> als Targets definieren oder Skripten mit diesen
+	Namen in das <code class="filename">scripts</code>-Unterverzeichnis
+	legen. Sie werden dann vor bzw. nach den Standardaktionen
+	aufgerufen.</p><p>Angenommen Sie haben das Target <code class="buildtarget">post-extract
+	</code> in Ihrem <code class="filename">Makefile</code>
+	definiert und eine Datei <code class="filename">pre-build</code> im
+	<code class="filename">scripts</code> Unterverzeichnis, so wird das
+	Target <code class="buildtarget">post-extract</code> nach dem normalen
+	Entpacken aufgerufen und das Skript
+	<code class="filename">pre-build</code>
+	ausgeführt, bevor die vordefinierten Bau-Regeln
+	abgearbeitet sind. Es wird empfohlen, dass Sie
+	<code class="filename">Makefile</code>-Targets verwenden, falls die
+	Aktionen es erlauben, da es so für jemanden einfacher
+	sein wird herauszufinden, was für eine
+	nicht-standardmäßige Aktion der Port
+	benötigt.</p><p>Die Standardaktionen werden aus den Targets
+	<code class="filename">bsd.port.mk</code>
+	<code class="buildtarget">do-<em class="replaceable"><code>irgendwas</code></em>
+	</code> übernommen. Zum Beispiel sind die Befehle
+	zum Entpacken eines Ports im Target
+	<code class="buildtarget">do-extract</code> zu finden. Falls Sie mit
+	einem vorgegebenen Target nicht zufrieden sind, können
+	Sie es verändern, indem Sie das Target
+	<code class="buildtarget">do-<em class="replaceable"><code>irgendwas</code></em>
+	</code> in Ihrem <code class="filename">Makefile</code> neu
+	definieren.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die <span class="quote">&#8222;<span class="quote">Haupt</span>&#8220;</span>-Targets (z.B.
+	  <code class="buildtarget">extract</code>,
+	  <code class="buildtarget">configure</code> usw.) machen nicht mehr
+	  als sicherzustellen, dass bis hierhin alle Abschnitte
+	  abgeschlossen sind, um danach die eigentlichen Targets oder
+	  Skripte aufzurufen. Und es ist nicht beabsichtigt, dass
+	  diese geändert werden. Falls Sie das Entpacken
+	  verändern wollen, verändern Sie
+	  <code class="buildtarget">do-extract</code>, aber niemals die Art,
+	  wie <code class="buildtarget">extract</code> arbeitet!</p></div><p>Jetzt, da Sie verstehen, was geschieht, wenn der Benutzer
+	<code class="command">make</code> eingibt, lassen Sie uns durch die
+	empfohlenen Schritte gehen, um den perfekten Port zu
+	erstellen.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-submitting.html">Zurück</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="slow-sources.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">3.6. Den neuen Port einreichen </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 4.2. Den originalen Quelltext besorgen</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

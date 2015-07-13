@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>8.4. 特定数据的锁策略</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="smp.html" title="第 8 章 SMPng 设计文档" /><link rel="prev" href="smp-design.html" title="8.3. 架构与设计概览" /><link rel="next" href="smp-implementation-notes.html" title="8.5. 实现说明" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8.4. 特定数据的锁策略</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="smp-design.html">上一页</a> </td><th width="60%" align="center">第 8 章 SMPng 设计文档</th><td width="20%" align="right"> <a accesskey="n" href="smp-implementation-notes.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="smp-lock-strategies"></a>8.4. 特定数据的锁策略</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71065296"></a>8.4.1. 凭据</h3></div></div></div><a id="idp71065936" class="indexterm"></a><p><code class="varname">struct ucred</code> 是内核内部的凭据结构体，
+	它通常作为内核中以进程为导向的访问控制的依据。
+	BSD-派生的系统采用一种 <span class="quote">“<span class="quote">写时复制</span>”</span> 的模型来处理凭据数据：
+	同一凭据结构体可能存在多个引用， 如果需要对其进行修改，
+	则这个结构体将被复制、 修改， 然后替换该引用。
+	由于在打开时用于实现访问控制的凭据快取缓存广泛存在，
+	这种做法会极大地节省内存。 在迁移到细粒度的 SMP 时，
+	这一模型也省去了大量的锁操作， 因为只有未共享的凭据才能实施修改，
+	因而避免了在使用共享凭据时额外的同步操作。</p><p>凭据结构体只有一个引用时， 被认为是可变的；
+	不允许改变共享的凭据结构体， 否则将可能导致发生竞态条件。
+	<code class="varname">cr_mtxp</code> mutex 用于保护
+	<code class="varname">struct ucred</code> 的引用计数，
+	以维护其一致性。 使用凭据结构体时， 必须在使用过程中保持有效的引用，
+	否则它就可能在这个不合理的消费者使用过程中被释放。</p><p><code class="varname">struct ucred</code> mutex 是一种叶
+	mutex， 出于性能考虑， 它通过 mutex 池实现。</p><p>由于多用于访问控制决策， 凭据通常情况下是以只读方式访问的， 此时一般应使用
+	<code class="varname">td_ucred</code>， 因为它不需要上锁。
+	当更新进程凭据时， 检查和更新过程中必须持有 <code class="literal">proc</code>
+	锁。 检查和更新操作必须使用 <code class="varname">p_ucred</code>，
+	以避免检查时和使用时的竞态条件。</p><p>如果所调系统调用将在更新进程凭据之后进行访问控制检查， 则
+	<code class="varname">td_ucred</code> 也必须刷新为当前进程的值。
+	这样做能够避免修改后使用过时的凭据。 内核会自动在进程进入内核时，
+	将线程结构体的 <code class="varname">td_ucred</code> 指针刷新为进程的
+	<code class="varname">p_ucred</code>， 以保证内核访问控制能用到新的凭据。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71086160"></a>8.4.2. 文件描述符和文件描述符表</h3></div></div></div><p>详细内容将在稍后增加。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71099728"></a>8.4.3. Jail 结构体</h3></div></div></div><a id="idp71100368" class="indexterm"></a><p><code class="varname">struct prison</code> 保存了用于维护那些通过
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=jail&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">jail</span>(2)</span></a> API 创建的 jail 所用到的管理信息。 这包括 jail
+	的主机名、 IP 地址， 以及一些相关的设置。 这个结构体包含引用计数，
+	因为指向这一结构体实例的指针会在多种凭据结构之间共享。
+	用了一个 mutex， <code class="varname">pr_mtx</code>
+	来保护对引用计数以及所有 jail 结构体中可变变量的读写访问。
+	有一些变量只会在创建 jail 的时刻发生变化， 只需持有有效的
+	<code class="varname">struct prison</code> 就可以开始读这些值了。
+	关于每个项目具体的上锁操作的文档，
+	可以在 <code class="filename">sys/jail.h</code> 的注释中找到。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71103952"></a>8.4.4. MAC 框架</h3></div></div></div><a id="idp71104592" class="indexterm"></a><p>TrustedBSD MAC 框架会以 <code class="varname">struct
+	label</code> 的形式维护一系列内核对象的数据。
+	一般来说， 内核中的 label (标签) 是由与其对应的内核对象同样的锁保护的。
+	例如， <code class="varname">struct vnode</code> 上的
+	<code class="varname">v_label</code> 标签是由其所在 vnode 上的
+	vnode 锁保护的。</p><p>除了嵌入到标准内核对象中的标签之外， MAC
+	框架也需要维护一组包含已注册的和激活策略的列表。 策略表和忙计数由一个全局
+	mutex (<code class="varname">mac_policy_list_lock</code>) 保护。
+	由于能够同时并行地进行许多访问控制检查， 对策略表的只读访问，
+	在增减忙计数时， 框架的入口处需要首先持有这个 mutex。
+	MAC 入口操作的过程中并不需要长时间持有此 mutex -- 有些操作，
+	例如文件系统对象上的标签操作 -- 是持久的。 要修改策略表，
+	例如在注册和解除注册策略时， 需要持有此 mutex， 而且要求引用计数为零，
+	以避免在用表时对其进行修改。</p><p>对于需要等待表进入闲置状态的线程， 提供了一个条件变量
+	<code class="varname">mac_policy_list_not_busy</code>，
+	但这一条件变量只能在调用者没有持有其它锁时才能使用，
+	否则可能会引发锁逆序问题。 忙计数在整个框架中事实上还扮演了某种形式的
+	共享/排他 锁的作用： 与 sx 锁不同的地方在于，
+	等待列表进入闲置状态的线程可以饿死， 而不是允许忙计数和其它在 MAC
+	框架入口 (或内部) 的锁之间的逆序情况。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71141712"></a>8.4.5. 模块</h3></div></div></div><a id="idp71142352" class="indexterm"></a><p>对于模块子系统， 用于保护共享数据使用了一个单独的锁， 它是一个 共享/排他
+	(SX) 锁， 许多情况需要获得它 (以共享或排他的方式)，
+	因此我们提供了几个方便使用的宏来简化对这个锁的访问，
+	这些宏可以在 <code class="filename">sys/module.h</code> 中找到，
+	其用法都非常简单明了。 这个锁保护的主要是
+	<code class="varname">module_t</code> (当以共享方式上锁)
+	和全局的 <code class="varname">modulelist_t</code> 这两个结构体，
+	以及模块。 要更进一步理解这些锁策略， 需要仔细阅读
+	<code class="filename">kern/kern_module.c</code> 的源代码。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71145168"></a>8.4.6. Newbus 设备树</h3></div></div></div><a id="idp71145808" class="indexterm"></a><p>newbus 系统使用了一个 sx 锁。 读的一方应持有共享 (读)
+	锁 (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sx_slock&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">sx_slock</span>(9)</span></a>) 而写的一方则应持有排他 (写) 锁
+	(<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sx_xlock&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">sx_xlock</span>(9)</span></a>)。 内部函数一般不需要进行上锁，
+	而外部可见的则应根据需要上锁。 有些项目不需上锁，
+	因为这些项目在全程是只读的，
+	(例如 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=device_get_softc&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">device_get_softc</span>(9)</span></a>)， 因而并不会产生竞态条件。
+	针对 newbus 数据结构的修改相对而言非常少， 因此单个的锁已经足够使用，
+	而不致造成性能折损。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71149264"></a>8.4.7. 管道</h3></div></div></div><p>...</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71150416"></a>8.4.8. 进程和线程</h3></div></div></div><p>- 进程层次结构</p><p>- proc 锁及其参考</p><p>- 在系统调用过程中线程私有的 proc 项副本，
+	包括 td_ucred</p><p>- 进程间操作</p><p>- 进程组和会话</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71153104"></a>8.4.9. 调度器</h3></div></div></div><a id="idp71153744" class="indexterm"></a><p>本文在其它地方已经提供了很多关于 <code class="varname">sched_lock</code>
+	的参考和注释。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71155152"></a>8.4.10. Select 和 Poll</h3></div></div></div><p><code class="function">select</code> 和
+	<code class="function">poll</code> 这两个函数允许线程阻塞并等待文件描述符上的事件 --
+	最常见的情况是文件描述符是否可读或可写。</p><p>...</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71157456"></a>8.4.11. SIGIO</h3></div></div></div><p>SIGIO 服务允许进程请求在特定文件描述符的读/写状态发生变化时，
+	将 SIGIO 信号群发给其进程组。 任意给定内核对象上，
+	只允许一进程或进程组注册 SIGIO， 这个进程或进程组称为属主 (owner)。
+	每一支持 SIGIO 注册的对象， 都包含一指针字段， 如果对象未注册则为
+	<code class="constant">NULL</code>，
+	否则是一指向描述这一注册的 <code class="varname">struct sigio</code> 的指针。
+	这一字段由一全局 mutex，
+	<code class="varname">sigio_lock</code> 保护。 调用 SIGIO 维护函数时，
+	必须以 <span class="quote">“<span class="quote">传引用</span>”</span> 方式传递这一字段，
+	以确保本地注册副本的中这个字段不脱离锁的保护。</p><p>每个关联到进程或进程组的注册对象， 都会分配一
+	<code class="varname">struct sigio</code> 结构， 并包括指回该对象的指针、
+	属主、 信号信息、 凭据， 以及关于这一注册的一般信息。
+	每个进程或进程组都包含一个已注册 <code class="varname">struct sigio</code>
+	结构体的列表， 对进程来说是
+	<code class="varname">p_sigiolst</code>， 而对进程组则是
+	<code class="varname">pg_sigiolst</code>。 这些表由相应的进程或进程组锁保护。
+	除了用以将
+	<code class="varname">struct sigio</code> 连接到进程组上的
+	<code class="varname">sio_pgsigio</code> 字段之外， 在 <code class="varname">struct
+	sigio</code> 中的多数字段在注册过程中都是不变量。
+	一般而言， 开发人员在实现新的支持 SIGIO 的内核对象时，
+	会希望避免在调用 SIGIO 支持函数， 例如 <code class="function">fsetown</code>
+	或 <code class="function">funsetown</code> 持有结构体锁，
+	以免去需要在结构体锁和全局 SIGIO 锁之间定义锁序。
+	通常可以通过提高结构体上的引用计数来达到这样的目的，
+	例如， 在进行管道操作时， 使用引用某个管道的文件描述符这样的操作，
+	就可以照此办理。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71169232"></a>8.4.12. Sysctl</h3></div></div></div><p><code class="function">sysctl</code> MIB 服务会从内核内部，
+	以及用户态的应用程序以系统调用的方式触发。
+	这会引发至少两个和锁有关的问题： 其一是对维持命名空间的数据结构的保护，
+	其二是与那些通过 sysctl 接口访问的内核变量和函数之间的交互。
+	由于 sysctl 允许直接导出 (甚至修改) 内核统计数据以及配置参数， sysctl
+	机制必须知道这些变量相应的上锁语义。 目前， sysctl 使用一个全局 sx
+	锁来实现对 <code class="function">sysctl</code> 操作的串行化；
+	然而， 这些是假定用全局锁保护的， 并且没有提供其它保护机制。
+	这一节的其余部分将详细介绍上锁和 sysctl 相关变动的语义。</p><p>- 需要将 sysctl 更新值所进行的操作的顺序， 从原先的读旧值、
+	copyin 和 copyout、 写新值， 改为 copyin、 上锁、 读旧值、 写新值、
+	解锁、 copyout。 一般的 sysctl 只是 copyout 旧值并设置它们 copyin
+	所得到的新值， 仍然可以采用旧式的模型。 然而，
+	对所有 sysctl 处理程序采用第二种模型并避免锁操作方面，
+	第二种方式可能更规矩一些。</p><p>- 对于通常的情况， sysctl 可以内嵌一个 mutex 指针到 SYSCTL_FOO
+	宏和结构体中。 这对多数 sysctl 都是有效的。 对于使用 sx
+	锁、 自旋 mutex， 或其它除单一休眠 mutex 之外的锁策略，
+	可以用 SYSCTL_PROC 节点来完成正确的上锁。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp71171792"></a>8.4.13. 任务队列 (Taskqueue)</h3></div></div></div><p>任务队列 (taskqueue) 的接口包括两个与之关联的用于保护相关数据的锁。
+	<code class="varname">taskqueue_queues_mutex</code> 是用于保护
+	<code class="varname">taskqueue_queues</code> TAILQ 的锁。
+	与这个系统关联的另一个 mutex 锁是位于
+	<code class="varname">struct taskqueue</code> 结构体上。
+	在此处使用同步原语的目的在于保护 <code class="varname">struct
+	taskqueue</code> 中数据的完整性。 应注意的是，
+	并没有单独的、 帮助用户对其自身的工作进行锁的细化用的宏，
+	因为这些锁基本上不会在
+	<code class="filename">kern/subr_taskqueue.c</code> 以外的地方用到。</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="smp-design.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="smp.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="smp-implementation-notes.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">8.3. 架构与设计概览 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 8.5. 实现说明</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

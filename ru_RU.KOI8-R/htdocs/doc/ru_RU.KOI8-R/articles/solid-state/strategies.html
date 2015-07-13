@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>5. Стратегии работы с системой для случаев небольших и доступных только для чтения файловых систем</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD и твердотельные устройства" /><link rel="up" href="index.html" title="FreeBSD и твердотельные устройства" /><link rel="prev" href="ar01s04.html" title="4. Создание файловой системы с нуля" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">5. Стратегии работы с системой для случаев небольших и доступных
+      только для чтения файловых систем</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ar01s04.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> </td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="strategies"></a>5. Стратегии работы с системой для случаев небольших и доступных
+      только для чтения файловых систем</h2></div></div></div><p>В <a class="xref" href="ro-fs.html" title="3. Подсистема rc и файловые системы в режиме только чтения">Раздел 3, <<Подсистема <code class="literal">rc</code> и файловые системы в режиме только
+      чтения>></a> было указано, что файловая система
+      <code class="filename">/var</code>, создаваемая скриптом
+      <code class="filename">/etc/rc.d/var</code>, и наличие корневой файловой
+      системы, доступной только для чтения, приводят к проблемам при работе
+      многих распространенных программных пакетов, используемых во FreeBSD.
+      В этой статье будут даны рекомендации по настройке нормальной работы
+      cron и syslog, установке портов и веб-сервера Apache.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72124240"></a>5.1. cron</h3></div></div></div><p>Во время загрузки содержимое каталогa
+	<code class="filename">/var</code> формируется скриптом
+	<code class="filename">/etc/rc.d/var</code> используя данные из
+	<code class="filename">/etc/mtree/BSD.var.dist</code>, поэтому в нем создается
+	несколько стандартных каталогов, в числе которых -
+	<code class="filename">cron</code>,
+	<code class="filename">cron/tabs</code>,
+	<code class="filename">at</code>.</p><p>Однако это не решает проблему с сохранением cron-таблиц
+	между перезагрузками.  Когда система перезагружается, то файловая
+	система	<code class="filename">/var</code>, которая располагается в памяти,
+	будет уничтожена, вместе со всеми cron-таблицами, которые вы могли там
+	иметь.  Поэтому одним из решений может стать создание cron-таблиц для
+	пользователей, которым они нужны, монтирование вашей файловой системы
+	<code class="filename">/</code> в режиме чтения и записи, и копирование этих
+	cron-таблиц в безопасное место, например,
+	в <code class="filename">/etc/tabs</code>, и последующее добавление строки в
+	конец скрипта <code class="filename">/etc/rc.initdiskless</code> для копирования
+	этих cron-таблиц в каталог <code class="filename">/var/cron/tabs</code> после
+	его создания во время инициализации системы.  Вам может также
+	потребоваться добавить строку, которая изменяет режимы доступа и
+	права на каталоги, которые вы создали, и на файлы, которые вы
+	скопировали в скрипте <code class="filename">/etc/rc.initdiskless</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72153936"></a>5.2. syslog</h3></div></div></div><p>В файле <code class="filename">syslog.conf</code> задано местоположение
+	некоторых файлов протоколов, которые имеются в каталоге
+	<code class="filename">/var/log</code>.  Эти файлы не создаются скриптом
+	<code class="filename">/etc/rc.d/var</code> во время инициализации системы.
+	Поэтому где-нибудь в скрипте <code class="filename">/etc/rc.d/var</code>,
+	после секции, создающей каталоги в <code class="filename">/var</code>, вам нужно
+	добавить нечто вроде следующего:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>touch /var/log/security /var/log/maillog /var/log/cron /var/log/messages</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chmod 0644 /var/log/*</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72165968"></a>5.3. Установка портов</h3></div></div></div><p>Перед тем, как обсудить изменения, которые нужно сделать для
+	успешного использования дерева портов, необходимо напомнить о том,
+	что ваши файловые системы на флэш-носителях доступны только для чтения.
+	Поэтому вам нужно временно монтировать их в режиме чтения и записи,
+	используя параметры командной строки, как это показано в
+	<a class="xref" href="ro-fs.html" title="3. Подсистема rc и файловые системы в режиме только чтения">Раздел 3, <<Подсистема <code class="literal">rc</code> и файловые системы в режиме только
+      чтения>></a>.  Вы всегда должны перемонтировать эти файловые
+	системы в режим только для чтения после окончания работ -
+	излишние записи на флеш носитель могут значительно сократить его
+	срок эксплуатации.</p><p>Чтобы можно было войти в каталог с портами и успешно выполнить
+	команду <code class="command">make</code> <code class="buildtarget">install</code>,
+	необходимо создать каталог для пакаджей в файловой системе, не
+	располагающейся в памяти, где будут храниться пакаджи между
+	перезагрузками.  Так как для установки пакаджа в любом случае требуется
+	монтирование ваших файловых систем для чтения и записи, имеет смысл
+	выделить область флэш-носителя также и для записи информации
+	о пакадже.</p><p>Прежде всего создайте каталог с базой данных о пакаджах.  Обычно
+	это каталог <code class="filename">/var/db/pkg</code>, но мы не можем разместить
+	базу именно здесь, так как она исчезнет после перезагрузки
+	системы.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mkdir /etc/pkg</code></strong></pre><p>Теперь в скрипт <code class="filename">/etc/rc.d/var</code> добавьте
+	строку, которая связывает каталог <code class="filename">/etc/pkg</code> с
+	<code class="filename">/var/db/pkg</code>.  Например:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ln -s /etc/pkg /var/db/pkg</code></strong></pre><p>Теперь каждый раз при монтировании ваших файловых систем для чтения
+	и записи и установки пакаджа, команда <code class="command">make</code>
+	<code class="buildtarget">install</code> будет работать, а информация о пакадже
+	будет успешно записана в каталог <code class="filename">/etc/pkg</code> (так как
+	файловая система будет в это время смонтирована для чтения и записи),
+	который всегда будет доступным операционной системе как
+	<code class="filename">/var/db/pkg</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp72195024"></a>5.4. Веб-сервер Apache</h3></div></div></div><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Шаги, описанные в этой части статьи, необходимо выполнить лишь
+	  в том случае, если Apache настроен сохранять свой pid или лог файл
+	  вне каталога <code class="filename">/var</code>.
+	  С настройками по умолчанию Apache формирует свой pid файл в <code class="filename">/var/run/httpd.pid</code>, а лог файлы -
+	  в <code class="filename">/var/log</code>.</p></div><p>Далее в статье подразумевается,
+	что Apache сохраняет свои лог файлы в каталог <code class="filename"><em class="replaceable"><code>apache_log_dir</code></em></code>
+	вне каталога <code class="filename">/var</code>.  Когда этот
+	каталог расположен на файловой системе, смонтированной в режиме только
+	для чтения, Apache не сможет сохранять лог файлы, что в свою очередь
+	может вызывать проблемы в работе веб-сервера.  В таком случае
+	необходимо добавить новый каталог к списку каталогов из
+	<code class="filename">/etc/rc.d/var</code> для их создания в каталоге
+	<code class="filename">/var</code> и связать
+	<code class="filename"><em class="replaceable"><code>apache_log_dir</code></em></code>
+	с <code class="filename">/var/log/apache</code>.  Нужно также задать права
+	доступа и владельца нового каталога.</p><p>Сначала добавьте каталог <code class="literal">log/apache</code> к списку
+	каталогов, создаваемых скриптом
+	<code class="filename">/etc/rc.d/var</code>.</p><p>Затем добавьте в скрипт <code class="filename">/etc/rc.d/var</code>
+	после секции создания каталогов такие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>chmod 0774 /var/log/apache</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>chown nobody:nobody /var/log/apache</code></strong></pre><p>И наконец, удалите существующий каталог
+	<code class="filename"><em class="replaceable"><code>apache_install</code></em>/logs</code>
+	и замените его ссылкой:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>rm -rf <em class="replaceable"><code>apache_log_dir</code></em></code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ln -s <em class="replaceable"><code>apache_log_dir</code></em></code></strong></pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ar01s04.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> </td></tr><tr><td width="40%" align="left" valign="top">4. Создание файловой системы с нуля </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

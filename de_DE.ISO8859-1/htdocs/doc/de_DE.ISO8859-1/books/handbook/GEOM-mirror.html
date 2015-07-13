@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>20.4. RAID1 - Spiegelung</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="GEOM.html" title="Kapitel 20. GEOM: Modulares Framework zur Plattentransformation" /><link rel="prev" href="GEOM-striping.html" title="20.3. RAID0 - Striping" /><link rel="next" href="geom-ggate.html" title="20.5. GEOM Gate Netzwerkgeräte" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">20.4. RAID1 - Spiegelung</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="GEOM-striping.html">Zurück</a> </td><th width="60%" align="center">Kapitel 20. GEOM: Modulares Framework zur
+    Plattentransformation</th><td width="20%" align="right"> <a accesskey="n" href="geom-ggate.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="GEOM-mirror"></a>20.4. RAID1 - Spiegelung</h2></div></div></div><a id="idp82397904" class="indexterm"></a><a id="idp82398672" class="indexterm"></a><p>Spiegelung (Mirroring) ist eine Technik, welche von vielen
+      Firmen und Heimnutzern eingesetzt wird, um Daten ohne
+      Unterbrechung zu sichern. Wenn ein Spiegel existiert, dann
+      bedeutet dies einfach nur, dass PlatteB die PlatteA
+      dupliziert. Oder PlatteC+D duplizieren PlatteA+A. Der
+      wichtigste Aspekt ist, dass Daten einer Platte oder
+      Partition dupliziert werden, unabhängig von der
+      Konfiguration der Platte. Dadurch kann später diese
+      Information leichter wiederhergestellt, ohne
+      Zugriffsunterbrechung gesichert oder sogar physisch in einem
+      Datentresor gelagert werden.</p><p>Stellen Sie zu Beginn sicher, dass ihr System zwei
+      Platten mit identischer Größe aufweist. In dieser
+      Übung gehen wir davon aus, dass es direkt
+      zugängliche (<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=da&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">da</span>(4)</span></a>) <acronym class="acronym">SCSI</acronym>-Platten
+      sind.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82401488"></a>20.4.1. Die primäre Platte spiegeln</h3></div></div></div><p>Angenommen, FreeBSD wurde auf der ersten Platte
+	<code class="filename">da0</code> installiert, dann sollte
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gmirror&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gmirror</span>(8)</span></a> angewiesen werden, seine primären Daten
+	auf dieser Platte zu speichern.</p><p>Bevor Sie den Spiegel aufbauen, sollten Sie die maximale
+	Protokollierung aktivieren und den Zugang zum Gerät
+	gestatten.  Dazu setzen Sie die <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a>-Option
+	<code class="varname">kern.geom.debugflags</code> auf den folgenden
+	Wert:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sysctl kern.geom.debugflags=17</code></strong></pre><p>Nun können Sie den Spiegel aufbauen.  Beginnen Sie den
+	Prozess, indem Sie die Metadaten-Informationen auf das Gerät
+	der primären Platte speichern.  Konkret erzeugen Sie dabei
+	das Gerät
+	<code class="filename">/dev/mirror/gm</code>, indem Sie
+	den folgenden Befehl ausführen:</p><div xmlns="" class="warning"><h3 class="admontitle">Warnung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Die Spiegelung der Bootplatte kann zu Datenverlust
+	  führen, wenn Sie Daten im letzten Sektor der Platte
+	  gespeichert haben.  Dieses Risiko lässt sich minimieren,
+	  wenn Sie den Spiegel unmittelbar nach der Installation von
+	  FreeBSD aufsetzen.  Die im folgenden beschriebene Vorgehensweise ist
+	  ebenfalls nicht kompatibel mit den
+	  Standard-Installationseinstellungen von
+	  FreeBSD 9.<em class="replaceable"><code>X</code></em>, die das neue
+	  <acronym class="acronym">GPT</acronym>-Partitionsschema verwenden.  GEOM wird
+	  <acronym class="acronym">GPT</acronym>-Metadaten überschreiben, was zu
+	  Datenverlust und einem möglicherweise nicht bootbarem System
+	  führt.</p></div><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror label -vb round-robin gm0 /dev/da0</code></strong></pre><p>Ihr System sollte wie folgt antworten:</p><pre class="screen">Metadata value stored on /dev/da0.
+Done.</pre><p>Initialisieren Sie GEOM.  Dadurch wird das Kernelmodul
+	<code class="filename">/boot/kernel/geom_mirror.ko</code> geladen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror load</code></strong></pre><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Wenn dieser Befehl erfolgreich ausgeführt wurde, wird
+	  die Gerätedatei <code class="filename">gm0</code> im
+	  Verzeichnis <code class="filename">/dev/mirror</code>
+	  erzeugt.</p></div><p>Stellen Sie sicher, dass das Kernelmodul
+	<code class="filename">geom_mirror.ko</code> beim Systemstart automatisch
+	geladen wird:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>echo 'geom_mirror_load="YES"' &gt;&gt; /boot/loader.conf</code></strong></pre><p>Bearbeiten Sie die Datei <code class="filename">/etc/fstab</code>
+	und ersetzen Sie alle Verweise auf die alte Gerätedatei
+	<code class="filename">da0</code> durch die neue Gerätedatei
+	<code class="filename">gm0</code> des Plattenspiegels.  Um die Datei
+	<code class="filename">/etc/fstab</code> bearbeiten zu können,
+	müssen Sie als Benutzer <code class="systemitem">root</code> am
+	System angemeldet sein.</p><div xmlns="" class="note"><h3 class="admontitle">Anmerkung: </h3><p xmlns="http://www.w3.org/1999/xhtml">Sollte <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> ihr bevorzugter Texteditor sein,
+	  kouml;nnen Sie diese Änderungen ganz einfach wie
+	  folgt durchführen:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>vi /etc/fstab</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Bevor Sie die Datei bearbeiten, sollten Sie ein Backup
+	  anlegen.  Haben Sie die Datei mit <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=vi&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">vi</span>(1)</span></a> geöffnet,
+	  können Sie durch die Eingabe von
+	  <strong class="userinput"><code>:w /etc/fstab.bak</code></strong> eine Sicherungskopie
+	  der Datei anlegen.  Danach ersetzen Sie alle alten Referenzen
+	  auf <code class="filename">da0</code> durch
+	  <code class="filename">gm0</code>, indem Sie
+	  <strong class="userinput"><code>:%s/da/mirror\/gm/g</code></strong> eingeben.</p></div><p>Die geänderte <code class="filename">fstab</code> sollte nun
+	ähnlich wie im folgenden Beispiel aussehen.  Es spielt
+	dabei keine Rolle, ob Sie <acronym class="acronym">SCSI</acronym>- oder
+	<acronym class="acronym">ATA</acronym>-Platten verwenden.  Das
+	<acronym class="acronym">RAID</acronym>-Gerät heißt in jedem Fall
+	<code class="filename">gm</code>.</p><pre class="programlisting"># Device                Mountpoint      FStype  Options         Dump    Pass#
+/dev/mirror/gm0s1b     			        none            swap    sw              0       0
+/dev/mirror/gm0s1a              		/               ufs     rw              1       1
+/dev/mirror/gm0s1d				/usr		ufs	rw		0	0
+/dev/mirror/gm0s1f				/home		ufs	rw		2	2
+#/dev/mirror/gm0s2d             		/store          ufs     rw              2       2
+/dev/mirror/gm0s1e              		/var            ufs     rw              2       2
+/dev/acd0               /cdrom          cd9660  ro,noauto       0       0</pre><p>Führen Sie einen Systemneustart durch:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown -r now</code></strong></pre><p>Wenn das System gestartet wird, sollten Sie nun nur noch
+	<code class="filename">gm0</code>-Geräte anstatt der bisherigen
+	<code class="filename">da0</code>-Geräte sehen.  Nachdem das
+	System vollständig initialisiert wurde, können Sie
+	die neue Konfiguration testen, indem Sie den Befehl
+	<code class="command">mount</code> ausführen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount</code></strong>
+Filesystem         1K-blocks    Used    Avail Capacity  Mounted on
+/dev/mirror/gm0s1a   1012974  224604   707334    24%    /
+devfs                      1       1        0   100%    /dev
+/dev/mirror/gm0s1f  45970182   28596 42263972     0%    /home
+/dev/mirror/gm0s1d   6090094 1348356  4254532    24%    /usr
+/dev/mirror/gm0s1e   3045006 2241420   559986    80%    /var
+devfs                      1       1        0   100%    /var/named/dev</pre><p>Hier ist alles in Ordnung.  Alle Werte sehen aus wie
+	erwartet.  Um die Synchronisierung zu beginnen, integrieren
+	Sie nun die Platte <code class="filename">da1</code> in den
+	Spiegel, indem Sie den folgenden Befehl eingeben:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da1</code></strong></pre><p>Während die Platten gespiegelt werden, können
+	Sie den Fortschritt durch die Eingabe des folgenden Befehls
+	überprüfen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror status</code></strong></pre><p>Nachdem die Plattenspiegelung erfolgreich abgeschlossen
+	wurde (und alle Daten synchronisiert wurden), sollte Sie
+	eine Ausgabe ähnlich der folgenden erhalten, wenn Sie
+	den Befehl erneut ausführen:</p><pre class="screen">      Name    Status  Components
+mirror/gm0  COMPLETE  da0
+                      da1</pre><p>Sollten Probleme aufgetreten oder sollte die
+	Synchronisierung noch nicht abgeschlossen sein, wäre
+	der Status <code class="literal">DEGRADED</code> anstatt
+	<code class="literal">COMPLETE</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82443216"></a>20.4.2. Fehlerbehebung</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82443856"></a>20.4.2.1. Das System weigert sich zu starten</h4></div></div></div><p>Falls das System startet und eine Eingabeaufforderung
+          ähnlich der folgenden erscheint:</p><pre class="programlisting">ffs_mountroot: can't find rootvp
+Root mount failed: 6
+mountroot&gt;</pre><p>Starten Sie den Rechner neu mit der Power- oder
+	  Resettaste. Wählen Sie im Startmenü Option sechs
+	  (6). Dadurch erscheint eine Eingabeaufforderung für
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=loader&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">loader</span>(8)</span></a>. Laden Sie nun das Kernelmodul
+	  händisch:</p><pre class="screen">OK? <strong class="userinput"><code>load geom_mirror</code></strong>
+OK? <strong class="userinput"><code>boot</code></strong></pre><p>Falls dies funktioniert, wurde das Modul (aus welchen
+	  Gründen auch immer) nicht richtig geladen.  Prüfen
+	  Sie, ob Ihr Eintrag in der Datei
+	  <code class="filename">/boot/loader.conf</code> korrekt ist.  Sollte
+	  das Problem weiterhin bestehen, nehmen Sie die Zeile</p><pre class="programlisting">options	GEOM_MIRROR</pre><p>in die Konfigurationsdatei des Kernels auf und führen
+	  Sie einen Rebuild und eine erneute Installation durch. Dies
+	  sollte das Problem beseitigen.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp82453456"></a>20.4.3. Wiederherstellung des Systems nach einem
+	Plattenausfall</h3></div></div></div><p>Das Schöne an der Plattenspiegelung ist, dass eine
+	kaputte Platte ersetzt werden kann, ohne dass Sie dabei
+	Daten verlieren.</p><p>Basierend auf der vorhin besprochenen
+	<acronym class="acronym">RAID</acronym>1-Konfiguration, nehmen wir nun an, dass
+	die Platte <code class="filename">da1</code> ausgefallen ist und daher
+	ersetzt werden muss.  Um dies zu tun, müssen Sie
+	feststellen, welche Platte ausgefallen ist und das System
+	herunterfahren.  Nun können Sie die kaputte Platte gegen
+	eine neue Platte austauschen und das System wieder starten.
+	Nachdem der Systemstart abgeschlossen ist, verwenden Sie die
+	folgenden Befehle, um die Plattenspiegelung wieder zu
+	reaktivieren:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror forget gm0</code></strong></pre><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gmirror insert gm0 /dev/da1</code></strong></pre><p>Der Befehl <code class="command">gmirror</code> <code class="option">status</code>
+	erlaubt es Ihnen, den Fortschritt bei der Wiederherstellung der
+	Plattenspiegelung zu beobachten.  Das ist alles, was Sie tun
+	müssen.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="GEOM-striping.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="GEOM.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="geom-ggate.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">20.3. RAID0 - Striping </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 20.5. GEOM Gate Netzwerkgeräte</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

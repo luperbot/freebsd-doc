@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>6. Hibakeresés</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="A CUPS használata FreeBSD rendszereken" /><link rel="up" href="index.html" title="A CUPS használata FreeBSD rendszereken" /><link rel="prev" href="printing-cups-clients.html" title="5. A CUPS kliensek beállítása" /><link rel="next" href="printing-cups-ports-knobs.html" title="7. A CUPS portok finomhangolása" /><link rel="copyright" href="trademarks.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">6. Hibakeresés</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="printing-cups-clients.html">Vissza</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="printing-cups-ports-knobs.html">Előre</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="printing-cups-troubleshooting"></a>6. Hibakeresés</h2></div></div></div><p>A <span class="application">CUPS</span> használata
+	során tapasztalható problémák
+	többségét az engedélyek helytelen
+	beállítása okozza.  Először
+	tehát, ha valami nem működik rendesen, akkor
+	ellenőrizzük újra az előbb
+	felvázolt <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devfs</span>(8)</span></a>
+	beállításokat.  Ezután
+	győződjünk meg arról is, hogy az
+	állományrendszerben ténylegesen
+	keletkező eszközök engedélyei
+	megfelelőek.  Továbbá segíthet
+	megoldani a problémát, ha felvesszük a
+	felhasználónkat a korábban tárgyalt
+	<code class="systemitem">cups</code> csoportba.  Ha a
+	<span class="application">CUPS</span> felhasználói
+	felületének <span class="quote">"<span class="quote">Administration</span>"</span>
+	képernyőjén található
+	beállítások látszólag
+	hatástalanok, akkor érdemes úgy
+	próbálkoznunk, hogy először
+	készítünk egy bizonsági
+	másolatot a
+	<code class="filename">/usr/local/etc/cups/cupsd.conf</code>
+	állományról és kézzel
+	módosítgatva kísérletezünk
+	különféle konfigurációs
+	lehetőségek kombinációival.  Ehhez
+	találhatunk itt egy példát.  Ezzel
+	kapcsolatban azonban megjegyezzük, hogy a bemutatott
+	<code class="filename">cupsd.conf</code> állomány
+	inkább áttekinthető mintsem
+	biztonságos módon tárgyalja a
+	lehetőségeket.  Ezért javasoljuk, hogy
+	miután sikerült elérnünk a
+	<span class="application">CUPS</span> szervert és
+	beállítani a klienseket, nézzük
+	át alaposan a mintául szolgáló
+	opciókat és korlátozzuk le minél
+	jobban a hozzáférést.</p><pre class="programlisting">
+# Általános információk naplózása.  Ha hibát keresünk, írjuk az
+# "info" helyett a "debug" értéket.
+LogLevel info
+
+# A rendszergazdák csoportja.
+SystemGroup wheel
+
+# A 631-es porton várjuk a kliensek kapcsolódását.
+Port 631
+#Listen localhost:631
+Listen /var/run/cups.sock
+
+# A helyi hálózaton megosztott nyomtatók mutatása.
+Browsing On
+BrowseOrder allow,deny
+#BrowseAllow @LOCAL
+BrowseAllow 192.168.1.*   # Adjuk meg a helyi hálózatunkat.
+BrowseAddress 192.168.1.* # Adjuk meg a helyi hálózatunkat.
+
+# Alapértelmezett hitelesítési módszer, amikor szükség van rá.
+DefaultAuthType Basic
+DefaultEncryption Never # Vegyük ki ezt a sort, ha titkosítani akarunk.
+
+# A szervert a helyi hálózaton bármelyik gép elérheti.
+&lt;Location /&gt;
+  Order allow,deny
+  #Allow localhost
+  Allow 192.168.1.* # Adjuk meg a helyi hálózatunkat.
+&lt;/Location&gt;
+
+# A helyi hálózatról el tudjuk érni az adminisztrációs felületet.
+&lt;Location /admin&gt;
+  #Encryption Required
+  Order allow,deny
+  #Allow localhost
+  Allow 192.168.1.* # Adjuk meg a helyi hálózatunkat.
+&lt;/Location&gt;
+
+# A helyi hálózatunkról el tudjuk érni a konfigurációs állományt.
+&lt;Location /admin/conf&gt;
+  AuthType Basic
+  Require user @SYSTEM
+  Order allow,deny
+  #Allow localhost
+  Allow 192.168.1.* # Adjuk meg a helyi hálózatunkat.
+&lt;/Location&gt;
+
+# Az alapértelmezett nyomtatási és feladatkezelési házirendek.
+&lt;Policy default&gt;
+  # A feladatokat kizárólag csak a tulajdonosaik vagy a rendszergazda
+  # képesek elvégezni.
+  &lt;Limit Send-Document Send-URI Hold-Job Release-Job Restart-Job Purge-Jobs \
+Set-Job-Attributes Create-Job-Subscription Renew-Subscription Cancel-Subscription \
+Get-Notifications Reprocess-Job Cancel-Current-Job Suspend-Current-Job Resume-Job \
+CUPS-Move-Job&gt;
+    Require user @OWNER @SYSTEM
+    Order deny,allow
+  &lt;/Limit&gt;
+
+  # A karbantartást csak megfelelő hitelesítés után végezhetünk.
+  &lt;Limit Pause-Printer Resume-Printer Set-Printer-Attributes Enable-Printer \
+Disable-Printer Pause-Printer-After-Current-Job Hold-New-Jobs Release-Held-New-Jobs \
+Deactivate-Printer Activate-Printer Restart-Printer Shutdown-Printer Startup-Printer \
+Promote-Job Schedule-Job-After CUPS-Add-Printer CUPS-Delete-Printer CUPS-Add-Class \
+CUPS-Delete-Class CUPS-Accept-Jobs CUPS-Reject-Jobs CUPS-Set-Default&gt;
+    AuthType Basic
+    Require user @SYSTEM
+    Order deny,allow
+  &lt;/Limit&gt;
+
+  # A feladatokat csak a tulajdonosaik és a rendszergazda tudják törölni.
+  &lt;Limit Cancel-Job CUPS-Authenticate-Job&gt;
+    Require user @OWNER @SYSTEM
+    Order deny,allow
+  &lt;/Limit&gt;
+
+  &lt;Limit All&gt;
+    Order deny,allow
+  &lt;/Limit&gt;
+&lt;/Policy&gt;</pre></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="printing-cups-clients.html">Vissza</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="printing-cups-ports-knobs.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">5. A CUPS kliensek beállítása </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 7. A CUPS portok finomhangolása</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

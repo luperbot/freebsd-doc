@@ -1,0 +1,901 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>30.6. IPFW</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="firewalls.html" title="Hoofdstuk 30. Firewalls" /><link rel="prev" href="firewalls-ipf.html" title="30.5. De IPFILTER (IPF) firewall" /><link rel="next" href="advanced-networking.html" title="Hoofdstuk 31. Geavanceerde netwerken" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">30.6. IPFW</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="firewalls-ipf.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 30. Firewalls</th><td width="20%" align="right"> <a accesskey="n" href="advanced-networking.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls-ipfw"></a>30.6. IPFW</h2></div></div></div><a id="idp88514256" class="indexterm"></a><p>IPFIREWALL (<acronym class="acronym">IPFW</acronym>) is een firewall die binnen FreeBSD
+      wordt ontwikkeld en onderhouden door vrijwillige leden van de
+      staf.  Het maakt gebruik van verouderde staatloze regels en een
+      verouderde techniek om te realiseren wat eenvoudige stateful
+      logica zou kunnen heten.</p><p>De verzameling voorbeeldregels van IPFW (die in
+      <code class="filename">/etc/rc.firewall</code> en
+      <code class="filename">/etc/rc.firewall6</code> staan) uit de standaard
+      FreeBSD-installatie is redelijk eenvoudig en niet voorbereid om
+      zonder wijzigingen gebruikt te worden.  Het voorbeeld maakt geen
+      gebruik van stateful filteren, wat een voordeel is in de meeste
+      situaties.  Daarom worden deze regels niet als basis gebruikt in
+      dit onderdeel.</p><p>De staatloze syntaxis van IPFW is krachtig door de
+      technisch geavanceerde mogelijkheden van de regelsyntaxis die
+      de kennis van de gemiddelde gebruiker van firewalls ver
+      overstijgt.  IPFW is gericht op de professionele gebruiker
+      of de gevorderde thuisgebruiker die hoge eisen stelt aan de
+      wijze waarop er met pakketten wordt omgegaan.  Voordat de
+      kracht van de IPFW regels echt ingezet kan worden, moet de
+      gebruiker veel weten over de verschillende protocollen en
+      de wijze waarop pakketten in elkaar zitten.  Het tot op dat
+      niveau behandelen van stof valt buiten de doelstellingen van
+      dit Handboek.</p><p>IPFW bestaat uit zeven componenten: de verwerkingseenheid
+      voor de firewallregels, verantwoording, loggen, regels met
+      <code class="literal">divert</code> (omleiden) waarmee
+      <acronym class="acronym">NAT</acronym> gebruikt kan worden en de speciale
+      gevorderde mogelijkheden voor bandbreedtebeheer met DUMMYNET, de
+      <code class="literal">fwd rule</code> forward-mogelijkheid, de bridge-mogelijkheden
+      en de ipstealth-mogelijkheden.  IPFW ondersteunt zowel IPv4 als
+      IPv6.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-enable"></a>30.6.1. IPFW inschakelen</h3></div></div></div><a id="idp88520272" class="indexterm"></a><p>IPFW zit bij de basisinstallatie van FreeBSD als een losse
+	tijdens runtime laadbare module.  Het systeem laadt de kernelmodule
+	dynamisch als in <code class="filename">rc.conf</code> de regel
+	<code class="literal">firewall_enable="YES"</code> staat.  IPFW hoeft
+	niet in de FreeBSD kernel gecompileerd te worden.</p><p>Na het rebooten van een systeem met
+	<code class="literal">firewall_enable="YES"</code> in
+	<code class="filename">rc.conf</code> is het volgende bericht op het
+	scherm te zien tijdens het booten:</p><pre class="screen">ipfw2 initialized, divert disabled, rule-based forwarding disabled, default to deny, logging disabled</pre><p>In de laadbare module zit de mogelijkheid om te loggen
+	gecompileerd.  Er is een knop in <code class="filename">/etc/sysctl.conf</code>
+	om loggen aan te zetten en de uitgebreide loglimiet in te stellen.  Door
+	deze regels toe te voegen, staat loggen aan bij toekomstige
+	herstarts:</p><pre class="programlisting">net.inet.ip.fw.verbose=1
+net.inet.ip.fw.verbose_limit=5</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-kernel"></a>30.6.2. Kernelopties</h3></div></div></div><a id="idp88526288" class="indexterm"></a><a id="idp88527440" class="indexterm"></a><a id="idp88528592" class="indexterm"></a><a id="idp88529744" class="indexterm"></a><p>Het is niet verplicht om IPFW in te schakelen door het
+	mee te compileren in de FreeBSD kernel.  Dit wordt alleen beschreven als
+	achtergrondinformatie.</p><pre class="programlisting">options    IPFIREWALL</pre><p>Met <code class="literal">IPFIREWALL</code> wordt IPFW ingeschakeld
+	als deel van de kernel.</p><pre class="programlisting">options    IPFIREWALL_VERBOSE</pre><p>Met <code class="literal">IPFIREWALL_VERBOSE</code> wordt het
+	loggen van pakketten die worden verwerkt met IPFW mogelijk
+	die het sleutelwoord <code class="literal">log</code> in een regel hebben
+	staan.</p><pre class="programlisting">options    IPFIREWALL_VERBOSE_LIMIT=5</pre><p>Limiteert het aantal pakketten dat per regel wordt gelogd
+	via <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>.  Deze optie kan gebruikt worden in
+	vijandige omgevingen waar de activiteit van een firewall gelogd
+	moet worden.  Hierdoor kan een mogelijke ontzegging van dienst
+	aanval door het vol laten lopen van syslog voorkomen worden.</p><a id="idp88539728" class="indexterm"></a><pre class="programlisting">options    IPFIREWALL_DEFAULT_TO_ACCEPT</pre><p>Met <code class="literal">IPFIREWALL_DEFAULT_TO_ACCEPT</code> wordt
+	standaard alles door de firewall doorgelaten.  Dit wordt
+	aangeraden als iemand voor het eerst een firewall
+	opzet.</p><a id="idp88542160" class="indexterm"></a><pre class="programlisting">options    IPDIVERT</pre><p>Met <code class="literal">IPDIVERT</code> wordt de
+	<acronym class="acronym">NAT</acronym> functionaliteit ingeschakeld.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">De firewall zal alle binnenkomende en uitgaande pakketten
+	  blokkeren als de kerneloptie
+	  <code class="literal">IPFIREWALL_DEFAULT_TO_ACCEPT</code> of een regel om deze
+	  verbindingen expliciet toe te staan ontbreekt.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rc"></a>30.6.3. <code class="filename">/etc/rc.conf</code> opties</h3></div></div></div><p>Start de firewall:</p><pre class="programlisting">firewall_enable="YES"</pre><p>Om één van de standaard firewall types die geleverd wordt
+	door FreeBSD te selecteren, lees
+	<code class="filename">/etc/rc.firewall</code>, maak een selectie en
+	plaats het in de volgende regel:</p><pre class="programlisting">firewall_type="open"</pre><p>Beschikbare waardes voor deze instelling zijn:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">open</code> &#8212; laat al het verkeer door.</p></li><li class="listitem"><p><code class="literal">client</code> &#8212; beschermt alleen deze
+	    machine.</p></li><li class="listitem"><p><code class="literal">simple</code> &#8212; beschermt het hele
+	    netwerk.</p></li><li class="listitem"><p><code class="literal">closed</code> &#8212; blokkeert alle IP-verkeer,
+	    behalve voor lokaal verkeer.</p></li><li class="listitem"><p><code class="literal">UNKNOWN</code> &#8212; voorkomt het laden
+	    de firewall-regels.</p></li><li class="listitem"><p><code class="filename">bestandsnaam</code>
+	    &#8212; absoluut pad naar een bestand dat firewall-regels
+	    bevat.</p></li></ul></div><p>Het is mogelijk om twee verschillende manieren te gebruiken
+	voor speciaal gemaakte regels voor de
+	<span class="application">ipfw</span> firewall.  één
+	daarvan is door het zetten van de
+	<code class="literal">firewall_type</code> variabele naar een absoluut
+	pad van een bestand, welke <span class="emphasis"><em>firewall-regels</em></span>
+	bevat, zonder enige specifieke opties voor <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>.  Het volgende
+	is een eenvoudig voorbeeld van een bestand met regelverzamelingen dat
+	al het inkomend en uitgaand verkeer blokkeert:</p><pre class="programlisting">add deny in
+add deny out</pre><p>Aan de andere kant is het mogelijk om de variabele
+	<code class="literal">firewall_script</code> in te stellen op een
+	absoluut pad van een uitvoerbaar script, welke inclusief
+	<code class="command">ipfw</code> commando's uitgevoerd wordt tijdens het
+	opstarten van het systeem.  Een geldig script met regels dat
+	gelijkwaardig is aan het bestand met regels hierboven, zou het
+	volgende zijn:</p><pre class="programlisting">#!/bin/sh
+
+ipfw -q flush
+
+ipfw add deny in
+ipfw add deny out</pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Als <code class="literal">firewall_type</code> is gezet naar
+	  <code class="literal">client</code> of <code class="literal">simple</code> moeten
+	  de standaard regels die gevonden kunnen worden in
+	  <code class="filename">/etc/rc.firewall</code> gecontroleerd worden om
+	  te zien of deze configuratie voldoet voor de machine.  Let
+	  ook op dat alle voorbeelden die gebruikt zijn in dit hoofdstuk
+	  ervan uitgaan dat de <code class="literal">firewall_script</code>
+	  variabele gezet is naar <code class="filename">/etc/ipfw.rules</code>.</p></div><p>Om loggen in te schakelen:</p><pre class="programlisting">firewall_logging="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Waarschuwing: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het enige dat de variabele
+	  <code class="varname">firewall_logging</code> doet is de sysctl
+	  variabele <code class="varname">net.inet.ip.fw.verbose</code> op de
+	  waarde <code class="literal">1</code> zetten (zie <a class="xref" href="firewalls-ipfw.html#firewalls-ipfw-enable" title="30.6.1. IPFW inschakelen">Paragraaf 30.6.1, &#8220;IPFW inschakelen&#8221;</a>).  Er is geen variabele in
+	  <code class="filename">rc.conf</code> om logboeklimieten in te
+	  stellen, maar dat kan ingesteld worden via een sysctl
+	  variabele, handmatig of via
+	  <code class="filename">/etc/sysctl.conf</code>:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">net.inet.ip.fw.verbose_limit=5</pre></div><p>Als de machine in kwestie een gateway is, dus Network
+	Address Translation (NAT) diensten levert via <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>, dan
+	staat in <a class="xref" href="network-natd.html" title="31.10. Network Address Translation">Paragraaf 31.10, &#8220;Network Address Translation&#8221;</a> meer informatie over de
+	benodigde instellingen voor
+	<code class="filename">/etc/rc.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-cmd"></a>30.6.4. Het commando <code class="command">IPFW</code></h3></div></div></div><a id="idp88591696" class="indexterm"></a><p>Gewoonlijk wordt <code class="command">ipfw</code> gebruikt om met de hand
+	enkelvoudige regels toe te voegen of te verwijderen als IPFW actief is.
+	Het probleem met deze methode is dat, als het systeem wordt uitgezet
+	alle regels die gewijzigd of verwijderd zijn
+	verloren gaan.  Door alle regels in een bestand op te nemen
+	dat bij het booten wordt geladen of door het bestand waarin
+	de wijzigingen zijn gemaakt als een machine draait te laden
+	bestaat die probleem niet.</p><p>Met <code class="command">ipfw</code> kunnen de actieve regels van
+	de firewall op het scherm getoond worden.  De
+	verantwoordingsmogelijkeden van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a> maken
+	dynamisch tellers aan voor iedere regel en houden die bij
+	voor alle pakketten die van toepassing zijn op die regel.  Tijdens het
+	testen van een regel is het afbeelden van de regel met zijn teller
+	een van de manieren om te bepalen of de regel werkt.</p><p>Om alle regels in volgorde te tonen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw list</code></strong></pre><p>Om alle regels te tonen met de tijd waarop deze voor het
+	laatst van toepassing was:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -t list</code></strong></pre><p>Het volgende commando kan gebruikt worden om de
+	verantwoordingsinformatie, pakkettellers en de regel zelf te
+	tonen.  De eerste kolom is het regelnummer met daarachter
+	het aantal keren dat de regel van toepassing was voor
+	inkomend verkeer, gevolgd door het aantal keren dat de regel
+	van toepassing was voor uitgaand verkeer.  Als laatste wordt
+	de regel zelf getoond:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -a list</code></strong></pre><p>Ook kunnen onder de statische regels de dynamische regels
+	getoond worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d list</code></strong></pre><p>En de dynamische regels die verlopen zijn:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d -e list</code></strong></pre><p>De tellers op nul gesteld worden:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero</code></strong></pre><p>Alleen de tellers voor regel met nummer
+	<em class="replaceable"><code>NUM</code></em> op nul stellen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero NUM</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules"></a>30.6.5. Sets van IPFW regels</h3></div></div></div><p>Een verzameling regels is een groep IPFW-regels die is
+	gemaakt om pakketten toe te staan of te blokkeren op basis
+	van de inhoud van dat pakket.  De bi-directionele
+	uitwisseling van pakketten tussen hosts bestaat uit een
+	gesprek dat een sessie heet.  De verzameling van firewallregels
+	beoordeelt zowel de pakketten die aankomen van de host
+	op het publieke Internet als de pakketten die op het systeem ontstaan
+	als antwoord daarop.  Iedere <acronym class="acronym">TCP/IP</acronym>-dienst als
+	telnet, www, mail, etc, heeft zijn eigen protocol en bevoorrechte
+	(luister)poort.  Pakketten bestemd voor een specifieke poort verlaten
+	het bronadres via een onbevoorrechte (hogere) poort en doelen op de
+	specifieke dienstpoort op het bestemmingsadres.  Alle bovenstaande
+	parameters (poorten en adressen) kunnen gebruikt worden als
+	selectiecriteria om regels aan te maken die diensten doorlaten of
+	blokkeren.</p><a id="idp88610000" class="indexterm"></a><p>Als een pakket de firewall binnenkomt wordt het
+	vergeleken met de eerste regel in de set regels en zo gaat
+	dat voor iedere regel vanaf boven tot beneden.  Als een
+	regel van toepassing is op een pakket, dan wordt het
+	actieveld van de regel uitgevoerd.  Dit wordt de
+	<span class="quote">&#8220;<span class="quote">de eerst passende regel wint</span>&#8221;</span> zoekmethode
+	genoemd.  Als een pakket bij geen enkele regel past, dan
+	wordt de verplichte standaardregel 65535 van IPFW toegepast, die alle
+	pakketten weigert zonder een antwoord terug te sturen naar de
+	verzender.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het zoeken gaat door na regels met
+	  <code class="literal">count</code>, <code class="literal">skipto</code> en
+	  <code class="literal">tee</code>.</p></div><p>De instructies in dit onderdeel zijn gebaseerd op regels
+	die gebruik maken van de stateful opties <code class="literal">keep
+	  state</code>, <code class="literal">limit</code>,
+	<code class="literal">in</code>, <code class="literal">out</code> en
+	<code class="literal">via</code>.  Dit is het raamwerk waarmee een
+	set van inclusieve firewallregels wordt samengesteld.</p><div xmlns="" class="warning"><h3 class="admontitle">Waarschuwing: </h3><p xmlns="http://www.w3.org/1999/xhtml">Wees voorzichtig tijdens het werken met firewall-regels, het is
+	  gemakkelijk om uzelf uit te sluiten.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-syntax"></a>30.6.5.1. Regelsyntaxis</h4></div></div></div><a id="idp88626000" class="indexterm"></a><p>De regelsyntaxis zoals hier toegelicht is vereenvoudigd
+	  door alleen te tonen wat nodig is om een standaard
+	  inclusieve set met firewallregels te maken.  De complete
+	  beschrijving van alle mogelijkheden staat in
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>.</p><p>Regels bevatten sleutelwoorden die in een bepaalde
+	  volgorde van links naar rechts op een regel horen te staan.
+	  Sleutelwoorden worden vet weergegeven.  Sommige
+	  sleutelwoorden hebben subopties die zelf ook weer
+	  sleutelwoorden hebben die ook weer subopties kunnen
+	  hebben.</p><p>Het karakter <code class="literal">#</code> wordt gebruikt om
+	  het begin van een opmerking te markeren en kan zowel op een
+	  eigen regel als achter een firewallregel staan.  Lege
+	  regels worden genegeerd.</p><p><em class="replaceable"><code>CMD REGEL_NUMMER ACTIE LOGGEN SELECTIE
+	    STATEFUL</code></em></p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88629968"></a>30.6.5.1.1. CMD</h5></div></div></div><p>Iedere regel moet beginnen met
+	    <em class="parameter"><code>add</code></em> om hem toe te voegen aan de
+	    tabel met regels.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88631504"></a>30.6.5.1.2. REGEL_NUMMER</h5></div></div></div><p>Elke regel is geassocieerd met een regel_nummer van 1 tot en
+	    met 65535.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88632656"></a>30.6.5.1.3. ACTIE</h5></div></div></div><p>Bij een regel kunnen één of meer acties
+	    horen die worden uitgevoerd als een regel geldt voor een
+	    pakket.</p><p><em class="parameter"><code>allow | accept | pass |
+	      permit</code></em></p><p>Deze opties betekenen allemaal hetzelfde: als de
+	    regel geldt voor een pakket, laat dat pakket dan door en
+	    stop met het zoeken naar geldende regels.</p><p><em class="parameter"><code>check-state</code></em></p><p>Vergelijkt het pakket met de tabel met dynamische
+	    regels.  Als het erin staat, dan wordt de actie van
+	    de dynamisch door deze regel gemaakte regel uitgevoerd.
+	    Anders wordt er verder gezocht door de regels.  Een regel met
+	    check-state heeft geen selectiecriteria.  Als er geen regel
+	    met check-state in de set met regels staat, dan wordt de
+	    tabel met dynamische regels bij het eerste voorkomen van
+	    keep-state of limit gecontroleerd.</p><p><em class="parameter"><code>deny | drop</code></em></p><p>Deze opties betekenen hetzelfde: als de regel geldt
+	    voor een pakket, blokkeer dat pakket dan en stop met het
+	    zoeken naar geldende regels.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88640720"></a>30.6.5.1.4. Loggen</h5></div></div></div><p><em class="parameter"><code>log</code></em> of
+	    <em class="parameter"><code>logamount</code></em></p><p>Als een regel met het sleutelwoord
+	    <code class="literal">log</code> van toepassing is op een
+	    pakket, dan wordt er een bericht naar <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	    geschreven met de faciliteitsnaam SECURITY.  Er wordt alleen
+	    een bericht geschreven als het aantal voor die regel
+	    gelogde pakketten niet groter is dan de instelling van de parameter
+	    logamount.  Als er geen <code class="literal">logamount</code> is ingesteld,
+	    dan wordt de limiet uit de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> variabele
+	    <code class="literal">net.inet.ip.fw.verbose_limit</code> gehaald.  In beide
+	    gevallen bestaat er in het geval de waarde nul is geen limiet.
+	    Als de limiet is bereikt, dan kan het loggen weer
+	    ingeschakeld worden door de teller voor het loggen weer
+	    op nul te zetten voor die regel met
+	    <code class="command">ipfw reset log</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Er wordt gelogd als een pakket zeker past bij een
+	      regel, maar voordat de actie (bijvoorbeeld
+	      <em class="parameter"><code>accept</code></em> of
+	      <code class="literal">deny</code>) op een pakket wordt
+	      toegepast.  Uiteindelijk bepaalt de gebruiker zelf voor
+	      welke regels loggen wordt ingeschakeld.</p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88651600"></a>30.6.5.1.5. Selectie</h5></div></div></div><p>De sleutelwoorden in deze paragraaf beschrijven de
+	    attributen van een pakket die gecontroleerd worden bij het
+	    bepalen of een regel wel of niet op een pakket van
+	    toepassing is.  De attributen waarop gecontroleerd kan
+	    worden moeten in de beschreven volgorde gebruikt
+	    worden.</p><p><em class="parameter"><code>udp | tcp | icmp</code></em></p><p>Naast de hierboven aangegeven protocollen kunnen alle
+	    in <code class="filename">/etc/protocols</code> beschreven
+	    protocollen gebruikt worden.  De waarde die wordt
+	    opgegeven is het protocol dat van toepassing moet zijn.
+	    Dit attribuut is verpicht.</p><p><em class="parameter"><code>from bron to best</code></em></p><p>De sleutelwoorden <code class="literal">from</code> en
+	    <code class="literal">to</code> worden gebruikt om te bekijken
+	    of een regel van toepassing is op <acronym class="acronym">IP</acronym>-adressen.
+	    Een regel moet <span class="emphasis"><em>zowel</em></span> bron- als
+	    bestemmingsadressen bevatten.  <code class="literal">any</code> is
+	    een bijzonder sleutelwoord dat van toepassing is op alle
+	    <acronym class="acronym">IP</acronym>-adressen.  <code class="literal">me</code> is
+	    een bijzonder sleutelwoord dat van toepassing is op alle
+	    <acronym class="acronym">IP</acronym>-adressen die ingesteld zijn op
+	    interfaces van een FreeBSD systeem om de PC waarop de firewall draait
+	    te vertegenwoordigen (deze machine).  Zo kan dit onderdeel
+	    bijvoorbeeld de volgende vormen aannemen:
+	    <code class="literal">from me to any</code>,
+	    <code class="literal">from any to me</code>,
+	    <code class="literal">from 0.0.0.0/0 to any</code>,
+	    <code class="literal">from any to 0.0.0.0/0</code>,
+	    <code class="literal">from 0.0.0.0 to any</code>,
+	    <code class="literal">from any to 0.0.0.0</code> of
+	    <code class="literal">from me to 0.0.0.0</code>.
+	    <acronym class="acronym">IP</acronym>-adressen mogen ingevoerd worden
+	    in de vorm numeriek, door punten gescheiden
+	    adres/maskerlengte (CIDR-notatie) of als een enkelvoudig
+	    <acronym class="acronym">IP</acronym>-adres in de vorm numeriek, door
+	    punten gescheiden.  De port <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/ipcalc/pkg-descr">net-mgmt/ipcalc</a> kan gebruikt worden om
+	    de berekeningen e vereenvoudigen.  Aanvullende informatie is
+	    beschikbaar op de webpagina van het programma: <code class="uri"><a class="uri" href="http://jodies.de/ipcalc" target="_top">http://jodies.de/ipcalc</a></code>.</p><p><em class="parameter"><code>poortnummer</code></em></p><p>Wordt gebruikt voor protocollen die poortnummers
+	    ondersteunen (als <acronym class="acronym">TCP</acronym> en <acronym class="acronym">UDP</acronym>).
+	    Het gebruik van een poortnummer is verplicht.  Er mogen ook
+	    dienstnamen uit <code class="filename">/etc/services</code>
+	    gebruikt worden in plaats van nummers.</p><p><em class="parameter"><code>in | out</code></em></p><p>Is op respectievelijk inkomende of uitgaande
+	    pakketten van toepassing.  De sleutelwoorden
+	    <code class="literal">in</code> of <code class="literal">out</code>
+	    zijn verplicht in een regel.</p><p><em class="parameter"><code>via IF</code></em></p><p>Deze parameter geeft aan op welke interface de regel
+	    van toepassing is, waarbij <code class="literal">IF</code> de
+	    exacte naam van de bedoelde interface is.</p><p><em class="parameter"><code>setup</code></em></p><p>Dit is een verplicht sleutelwoord waarmee wordt
+	    aangegeven dat er gezocht wordt naar een pakket met het
+	    verzoek tot het opstarten van een <acronym class="acronym">TCP</acronym>
+	    sessie.</p><p><em class="parameter"><code>keep-state</code></em></p><p>Dit is een verplicht sleutelwoord.  Als er een pakket
+	    op een regel met <em class="parameter"><code>keep-state</code></em>
+	    van toepassing is, dan wordt er door de firewall een
+	    dynamische regel gemaakt die bi-directioneel
+	    verkeer zal toestaan tussen bron en bestemming en de
+	    bijbehorende poorten voor hetzelfde protocol.</p><p><em class="parameter"><code>limit {bron-adr | bron-poort |
+	      best-adr | best-poort}</code></em></p><p>De firewall staat maar <em class="replaceable"><code>N</code></em>
+	    verbindingen toe met dezelfde groep parameters uit een
+	    regel.  Er kunnen één of meer van de
+	    parameters bron- of bestemmingsadres en bron- en
+	    bestemmingspoort gebruikt worden.
+	    <em class="parameter"><code>limit</code></em> en
+	    <em class="parameter"><code>keep-state</code></em> kunnen niet in
+	    dezelfde regel gebruikt worden.  De optie
+	    <em class="parameter"><code>limit</code></em> geeft dezelfde mogelijkheden
+	    als <em class="parameter"><code>keep-state</code></em> en voegt daar
+	    zijn eigen mogelijkheden aan toe.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88697680"></a>30.6.5.2. Regeloptie stateful</h4></div></div></div><a id="idp88698320" class="indexterm"></a><p>Bij stateful filteren wordt verkeer bekeken als
+	  bi-directioneel verkeer dat samen een sessie vormt.
+	  Het heeft de mogelijkheid om te bepalen of de sessie
+	  tussen de zender en de ontvanger op de juiste wijze
+	  voortgaat.  Alle pakketten die niet precies in de
+	  verwachting van een sessie passen worden automatisch als
+	  fout geblokkeerd.</p><p>De optie <code class="literal">check-state</code> wordt gebruikt
+	  om aan te geven waar IPFW-regels tegen de mogelijkheden
+	  voor dynamische regels gehouden moeten worden.  Als er
+	  een passende regel bij een pakket wordt gevonden, dan kan
+	  dat pakket de firewall verlaten en wordt een nieuwe regel
+	  gemaakt voor het volgende pakket dat wordt verwacht in de
+	  sessie.  Als er geen regel van toepassing is op het pakket,
+	  dan wordt de volgende regel in de groep regels
+	  getest.</p><p>De mogelijkheden voor dynamische regels zijn kwetsbaar
+	  voor een aanval die SYN-flood heet, waarmee wordt
+	  geprobeerd een zeer groot aantal regels aan te laten maken.
+	  Om deze aanval tegen te gaan, is de optie
+	  <code class="literal">limit</code> beschikbaar.  Met deze
+	  optie kan het maximaal aantal simultane sessies geregeld
+	  worden op basis van bron en bestemmingsvelden.  Als het
+	  aantal sessies gelijk aan het maximale aantal sessies is,
+	  wordt een pakket voor een nieuwe sessie geweigerd.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88701648"></a>30.6.5.3. Firewallberichten loggen</h4></div></div></div><a id="idp88702288" class="indexterm"></a><p>De voordelen van loggen zijn duidelijk.  Het biedt de
+	  mogelijkheid om na het feit informatie na te zien als:
+	  welke pakketten heeft de firewall laten vallen, waar kwamen
+	  ze vandaan en waar gingen ze heen.  Dit zijn allemaal
+	  voordelen als het gaat om uitvinden waar een aanvaller
+	  vandaan komt en wat hij heeft geprobeerd.</p><p>Zelfs als logging is ingeschakeld logt IPFW nog niets
+	  uit zichzelf.  De beheerder van de firewall beslist welke
+	  actieve regels iets weg moeten schrijven door het
+	  sleutelwoord <code class="literal">log</code> aan die regels toe
+	  te voegen.  Gewoonlijk worden alleen
+	  <code class="literal">deny</code>-regels gelogd.  Dit geldt
+	  bijvoorbeeld voor de <code class="literal">deny</code>-regel
+	  voor inkomende <acronym class="acronym">ICMP</acronym> pings.  Het is
+	  gebruikelijk om de standaardregel <span class="quote">&#8220;<span class="quote">ipfw default deny
+	    everything</span>&#8221;</span> te dupliceren, daar <code class="literal">log</code> in op
+	  te nemen, en deze als laatste in de verzameling met regels te
+	  plaatsen.  Zo zijn alle pakketten te zien die niet voldeden
+	  aan ook maar één regel.</p><p>Loggen heeft ook mogelijke nadelen.  Het is mogelijk om
+	  te veel te loggen en dan om te komen in logboekgegevens
+	  die uiteindelijk een schijf kunnen vullen.  Een DoS aanval
+	  om een schijf met logs te vullen is een van de oudst bekende
+	  typen DoS aanvallen.  Logberichten van de firewall worden
+	  niet alleen naar <span class="application">syslogd</span> geschreven, maar
+	  ook op het <code class="systemitem">root</code> console getoond waar ze snel
+	  erg vervelend kunnen worden.</p><p>De kerneloptie
+	  <code class="literal">IPFIREWALL_VERBOSE_LIMIT=5</code> beperkt het
+	  aantal opeenvolgende berichten dat naar <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a>
+	  wordt geschreven voor één specifieke regel.
+	  Als deze optie is ingeschakeld, worden in dit geval
+	  maximaal vijf berichten voor dezelfde regel gemeld.  Als er
+	  meer berichten op dezelfde regel zouden zijn, zou dat als
+	  volgt aan <span class="application">syslogd</span> gemeld worden:</p><pre class="programlisting">last message repeated 45 times</pre><p>Standaard worden alle gelogde pakketten weggeschreven
+	  naar <code class="filename">/var/log/security</code>, wat is
+	  ingesteld in <code class="filename">/etc/syslog.conf</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-script"></a>30.6.5.4. Regelscript bouwen</h4></div></div></div><p>De meeste ervaren gebruikers van IPFW maken een bestand
+	  waarin de regels staan en stellen dat zo op dat het als
+	  script uitgevoerd kan worden.  Het grootste voordeel van
+	  deze methode is dat de firewallregels allemaal vervangen
+	  kunnen worden zonder dat het systeem opnieuw gestart moet worden.
+	  Deze methode is ook erg geschikt voor het testen van regels
+	  omdat de procedure zo vaak als nodig uitgevoerd kan worden.
+	  Omdat het een script is, kan er gebruik gemaakt worden van
+	  substitutie zodat veel gebruikte waarden verduidelijkt
+	  en in meerdere regels toegepast kunnen worden.  In het volgende
+	  voorbeeld wordt hier gebruik van gemaakt.</p><p>De syntaxis die in het script wordt gebruikt is
+	  compatibel met de shells <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcsh</span>(1)</span></a>.
+	  Velden waarvoor substitutie van toepassing is worden vooraf gegaan
+	  door het dollarteken $.  Definities worden niet
+	  vooraf gegaan door het voorvoegsel $.  De waarden
+	  van een substitutie moet omsloten worden door "dubbele
+	  aanhalingstekens".</p><p>Een bestand met regels kan als volgt beginnen:</p><pre class="programlisting">############### begin voorbeeldscript ipfw regels ##############
+#
+ipfw -q -f flush       # Verwijder alle bestaande regels.
+# Stel standaarden in.
+oif="tun0"             # uitgaande interface.
+odns="192.0.2.11"      # IP adres DNS server ISP.
+cmd="ipfw -q add "     # Voorvoegsel voor regel.
+ks="keep-state"        # Te lui om iedere keer in te typen.
+$cmd 00500 check-state
+$cmd 00502 deny all from any to any frag
+$cmd 00501 deny tcp from any to any established
+$cmd 00600 allow tcp from any to any 80 out via $oif setup $ks
+$cmd 00610 allow tcp from any to $odns 53 out via $oif setup $ks
+$cmd 00611 allow udp from any to $odns 53 out via $oif $ks
+################### einde voorbeeldscript ipfw regels ###########</pre><p>Dat is alles.  De feitelijke functie van de regels is
+	  in dit voorbeeld van ondergeschikt belang.  Dit was slechts
+	  een voorbeeld om het gebruik van substitutie te
+	  illustreren.</p><p>Als het bovenstaande voorbeeld de inhoud van
+	  <code class="filename">/etc/ipfw.rules</code> was, dan kon het
+	  herladen worden met het volgende commando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /etc/ipfw.rules</code></strong></pre><p><code class="filename">/etc/ipfw.rules</code> zou overal kunnen
+	  staan met iedere gewenste naam.</p><p>Wat in het bovenstaande voorbeeld met een bestand is
+	  gerealiseerd, kan ook met de hand:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -q -f flush</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00500 check-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00502 deny all from any to any frag</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00501 deny tcp from any to any established</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00600 allow tcp from any to any 80 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00610 allow tcp from any to 192.0.2.11 53 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00611 allow udp from any to 192.0.2.11 53 out via tun0 keep-state</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88737360"></a>30.6.5.5. Verzameling van stateful regels</h4></div></div></div><p>De volgende verzameling van regels, waarin geen gebruik gemaakt
+	  wordt van <acronym class="acronym">NAT</acronym>, is een voorbeeld van hoe
+	  een erg veilige inclusieve firewall kan worden opgezet.
+	  Een inclusieve firewall laat alleen diensten toe waarvoor
+	  <code class="literal">pass</code> regels van toepassing zijn en
+	  blokkeert al het andere verkeer.  Firewalls die ontworpen zijn om
+	  hele netwerksegmenten te beschermen hebben tenminste twee interfaces
+	  waarvoor regels moeten zijn die de firewall in staat stellen zijn
+	  werk te doen.</p><p>Alle <span class="trademark">UNIX</span>® systemen en dus ook FreeBSD zijn zo ontworpen
+	  dat ze voor interne communicatie de interface
+	  <code class="filename">lo0</code> en <acronym class="acronym">IP</acronym> adres
+	  <code class="systemitem">127.0.0.1</code> gebruiken.  De
+	  firewall moet dit interne verkeer gewoon doorgang laten
+	  vinden.</p><p>Voor de interface die is verbonden met het publieke
+	  Internet worden regels gemaakt waarmee sessies naar het
+	  Internet mogelijk gemaakt worden en toegang wordt gegeven
+	  voor pakketten die uit die sessies terug komen.  Dit kan
+	  de gebruikers-<acronym class="acronym">PPP</acronym>-interface
+	  <code class="filename">tun0</code> zijn of de
+	  netwerkkaart die is verbonden met een xDSL of
+	  kabelmodem.</p><p>In gevallen dat er meer dan één
+	  netwerkkaart is aangesloten op het private netwerk achter
+	  de firewall, moeten er op de firewall-regels zijn om het
+	  verkeer tussen die interfaces vrije doorgang te
+	  geven.</p><p>De regels worden opgedeeld in drie onderdelen: alle
+	  interfaces met vrije doorgang, uitgaand op publieke
+	  interfaces en inkomend op publieke interfaces.</p><p>De volgorde van de regels in iedere sectie voor
+	  publieke interfaces moet zo zijn dat de regels die het
+	  meest gebruikt worden vóór de regels staan
+	  die minder vaak gebruikt worden.  De laatste regel van een
+	  onderdeel geeft aan dat al het overige verkeer op die
+	  interface in die richting geblokkeerd en gelogd moet
+	  worden.</p><p>In het onderdeel Uitgaand van de volgende verzameling regels staan
+	  alleen regels met <code class="literal">allow</code> die parameters bevatten om
+	  individuele diensten beschikbaar te maken die publieke toegang
+	  tot Internet mogen hebben   Al die regels moeten gebruik maken van de
+	  opties <code class="literal">proto</code>, <code class="literal">port</code>,
+	  <code class="literal">in/out</code>, <code class="literal">via</code>
+	  en <code class="literal">keep-state</code>.  De regels met
+	  <code class="literal">proto tcp</code> maken ook gebruik van
+	  <code class="literal">setup</code> om te bekijken of het een
+	  pakket betreft voor het opzetten van een sessie om de
+	  stateful functionaliteit aan te sturen.</p><p>In het onderdeel Inkomend staan als eerste alle regels voor het
+	  blokkeren van ongewenste pakketten, om twee redenen.
+	  Als eerste kan het zo zijn dat kwaadaardige pakketten gedeeltelijk
+	  overeenkomen met legitiem verkeer.  Deze regels moeten worden
+	  geblokkeerd in plaats van te worden binnengelaten, gebaseerd op hun
+	  gedeeltelijke overeenkomst met <code class="literal">allow</code>-regels.
+	  De tweede reden is dat nu ongewenste pakketten
+	  die vaak voorkomen en die bij voorkeur niet in de logboeken
+	  voorkomen niet meer van toepassing zijn op de laatste regel
+	  van het onderdeel waarin ze zouden worden gelogd.  Met de
+	  laatste regel van dit onderdeel worden alle overige
+	  pakketten geblokkeerd en gelogd en ze kunnen
+	  bewijsmateriaal zijn in een zaak tegen iemand die heeft
+	  geprobeerd een systeem aan te vallen.</p><p>Iets waarop u ook moet letten is dat voor al het verkeer dat wordt
+	  geweigerd geen antwoord wordt gestuurd.  Die pakketten verdwijnen
+	  gewoon.  Zo weet een aanvaller niet of een pakket het doelsysteem wel
+	  heeft bereikt.  Zo kan een aanvaller geen informatie
+	  verzamelen over een systeem: hoe minder informatie er over
+	  een systeem beschikbaar is, hoe veiliger het is.  Als er
+	  pakketten gelogd worden met een onbekend poortnummer, dan is de
+	  functie van dat poortnummer na te zoeken in
+	  <code class="filename">/etc/services</code> of op <code class="uri"><a class="uri" href="http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers" target="_top">http://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers</a></code>.
+	  Op de volgende link worden poortnummers van Trojans
+	  beschreven: <code class="uri"><a class="uri" href="http://www.sans.org/security-resources/idfaq/oddports.php" target="_top">http://www.sans.org/security-resources/idfaq/oddports.php</a></code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88754128"></a>30.6.5.6. Voorbeeld van een set inclusieve regels</h4></div></div></div><p>Het volgende voorbeeld is een complete inclusieve verzameling van
+	  regels die geen gebruik maakt van <acronym class="acronym">NAT</acronym>.
+	  Deze verzameling van regels is veilig om deze regels op uw eigen
+	  systemen te gebruiken.  Dit kan door commentaar te maken van een
+	  <code class="literal">pass</code>-regel voor een dienst die niet gewenst is.
+	  Logberichten die niet gewenst zijn, zijn uit te sluiten door een
+	  <code class="literal">deny</code>-regel toe te voegen aan het onderdeel
+	  Inkomend.  Voor de onderstaande regels dient de interfacenaam
+	  <code class="filename">dc0</code> in iedere regel vervangen te worden door
+	  de interfacenaam van de netwerkkaart in het systeem die met
+	  het publieke Internet is verbonden.  Voor gebruikers van
+	  <acronym class="acronym">PPP</acronym> zou dat <code class="filename">tun0</code>
+	  zijn.</p><p>Er zit een merkbare structuur in het gebruik van deze
+	  regels:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Alle regels die een verzoek zijn voor het opzetten van een
+	      sessie gebruiken <code class="literal">keep-state</code>.</p></li><li class="listitem"><p>Alle diensten die vanaf Internet bereikbaar zijn gebruiken de
+	      optie <code class="literal">limit</code> om <span class="quote">&#8220;<span class="quote">flooding</span>&#8221;</span> te
+	      voorkomen.</p></li><li class="listitem"><p>Alle regels gebruiken <code class="literal">in</code> of
+	      <code class="literal">out</code> om de richting aan te geven.</p></li><li class="listitem"><p>Alle regels gebruiken <code class="literal">via</code>
+	      <em class="replaceable"><code>interfacenaam</code></em> om aan te geven op welke
+	      interface de regel van toepassing is.</p></li></ul></div><p>De volgende regels zouden in
+	  <code class="filename">/etc/ipfw.rules</code> kunnen staan:</p><pre class="programlisting">################ Begin bestand met IPFW regels ###############################
+# Verwijder eerst de bestaande regels.
+ipfw -q -f flush
+
+# Stel commando voorvoegsel in.
+cmd="ipfw -q add"
+pif="dc0"     # Interfacenaam van NIC die verbinding
+              # met het publieke Internet heeft.
+
+#################################################################
+# Geen beperkingen op de interface aan de LAN kant. Alleen nodig
+# als er een LAN is. Wijzig xl0 naar de gebruikte interfacenaam.
+#################################################################
+#$cmd 00005 allow all from any to any via xl0
+
+#################################################################
+# Geen beperkingen op de loopback interface.
+#################################################################
+$cmd 00010 allow all from any to any via lo0
+
+#################################################################
+# Sta het pakket toe als het aan de tabel met dynamische regels
+# was toegevoegd met een 'allow keep-state' commando.
+#################################################################
+$cmd 00015 check-state
+
+#################################################################
+# Interface aan het publieke Internet (onderdeel Uitgaand).
+# Inspecteer verzoeken om een sessie te starten van achter de
+# firewall op het private netwerk of vanaf de server zelf naar
+# het publieke Internet.
+#################################################################
+
+# Geef toegang tot de DNS server van de ISP.
+# x.x.x.x moet het IP adres van de DNS van de ISP zijn.
+# Dupliceer deze regels als een ISP meerdere DNS servers heeft.
+# Haal het IP adres evt. uit /etc/resolv.conf
+$cmd 00110 allow tcp from any to x.x.x.x 53 out via $pif setup keep-state
+$cmd 00111 allow udp from any to x.x.x.x 53 out via $pif keep-state
+
+# Geef toegang tot de DHCP server van de ISP voor kabel- en
+# xDSL-netwerken. Deze regel is niet nodig als gebruik gemaakt worden
+# van PPP naar het publieke Internet. In dat geval kan de hele groep
+# verwijderd worden. Gebruik de volgende regel en controleer het
+# logboek voor het IP adres. Wijzig dan het IP adres in de regel
+# commentaar hieronder en verwijder de eerste regel.
+$cmd 00120 allow log udp from any to any 67 out via $pif keep-state
+#$cmd 00120 allow udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Sta niet beveiligd www verkeer toe.
+$cmd 00200 allow tcp from any to any 80 out via $pif setup keep-state
+
+# Sta beveiligd www verkeer over TLS SSL toe.
+$cmd 00220 allow tcp from any to any 443 out via $pif setup keep-state
+
+# Sta het verzenden en ontvangen van e-mail toe.
+$cmd 00230 allow tcp from any to any 25 out via $pif setup keep-state
+$cmd 00231 allow tcp from any to any 110 out via $pif setup keep-state
+
+# Sta de FreeBSD CVSUP functie toe voor uid root.
+$cmd 00240 allow tcp from me to any out via $pif setup keep-state uid root
+
+# Sta ping toe.
+$cmd 00250 allow icmp from any to any out via $pif keep-state
+
+# Sta Time toe naar buiten.
+$cmd 00260 allow tcp from any to any 37 out via $pif setup keep-state
+
+# Sta NNTP nieuws toe naar buiten.
+$cmd 00270 allow tcp from any to any 119 out via $pif setup keep-state
+
+# Sta beveiligde FTP, Telnet en SCP toe naar buiten.
+# Deze functie maakt gebruik van SSH (secure shell).
+$cmd 00280 allow tcp from any to any 22 out via $pif setup keep-state
+
+# Sta whois toe naar buiten.
+$cmd 00290 allow tcp from any to any 43 out via $pif setup keep-state
+
+# Blokkeer en log al het andere dat probeert buiten te komen.
+# Deze regel dwingt de 'block all' logica af.
+$cmd 00299 deny log all from any to any out via $pif
+
+#################################################################
+# Interface aan het publieke Internet (onderdeel Inkomend).
+# Inspecteert pakketten die van het publieke Internet komen
+# met als bestemming de host zelf of het private netwerk.
+#################################################################
+
+# Blokkeer al het verkeer voor niet-routeerbare of gereserveerde
+# adresreeksen.
+$cmd 00300 deny all from 192.168.0.0/16 to any in via $pif   #RFC 1918 privaat IP
+$cmd 00301 deny all from 172.16.0.0/12 to any in via $pif     #RFC 1918 privaat IP
+$cmd 00302 deny all from 10.0.0.0/8 to any in via $pif        #RFC 1918 privaat IP
+$cmd 00303 deny all from 127.0.0.0/8 to any in via $pif       #loopback
+$cmd 00304 deny all from 0.0.0.0/8 to any in via $pif         #loopback
+$cmd 00305 deny all from 169.254.0.0/16 to any in via $pif    #DHCP auto-config
+$cmd 00306 deny all from 192.0.2.0/24 to any in via $pif      #gereserveerd voor documentatie
+$cmd 00307 deny all from 204.152.64.0/23 to any in via $pif   #Sun cluster interconnect
+$cmd 00308 deny all from 224.0.0.0/3 to any in via $pif       #Klasse D &amp; E multicast
+
+# Blokkeer publieke pings.
+$cmd 00310 deny icmp from any to any in via $pif
+
+# Blokkeer ident.
+$cmd 00315 deny tcp from any to any 113 in via $pif
+
+# Blokkeer alle Netbios diensten. 137=naam, 138=datagram, 139=sessie.
+# Netbios is de Windows® bestandsdeeldienst.
+# Blokkeer Windows hosts2 name server verzoeken 81.
+$cmd 00320 deny tcp from any to any 137 in via $pif
+$cmd 00321 deny tcp from any to any 138 in via $pif
+$cmd 00322 deny tcp from any to any 139 in via $pif
+$cmd 00323 deny tcp from any to any 81 in via $pif
+
+# Blokkeer gefragmenteerde pakketten.
+$cmd 00330 deny all from any to any frag in via $pif
+
+# Blokkeer ACK pakketten die niet in de tabel met dynamische regels
+# staan.
+$cmd 00332 deny tcp from any to any established in via $pif
+
+# Geef toegang tot de DHCP server van de ISP voor kabel- en
+# xDSL-netwerken. Deze regel is niet nodig als gebruik gemaakt worden
+# van PPP naar het publieke Internet. In dat geval kan de hele groep
+# verwijderd worden. Hier wordt hetzelfde IP adres gebruikt als in de
+# sectie voor Uitgaand verkeer.
+#$cmd 00360 allow udp from any to x.x.x.x 67 in via $pif keep-state
+
+# Sta inkomend webverkeer toe omdat er een Apache server draait.
+$cmd 00400 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Sta beveiligde FTP, telnet en SCP toe vanaf Internet.
+$cmd 00410 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Sta niet beveiligde telnet sessie toe vanaf het publieke Internet.
+# Dit heeft het label ``niet veilig'' omdat gebruikersnaam en
+# wachtwoord als platte tekst over Internet gaan. Als er geen telnet
+# server draait, hoeft deze regel niet actief te zijn.
+$cmd 00420 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Weiger en log alle niet toegestane inkomende verbindingen van buiten.
+$cmd 00499 deny log all from any to any in via $pif
+
+# Al het andere verkeer wordt standaard geblokkeerd. Weiger en log alle
+# pakketten die tot hier zijn gekomen om te bekijken welke het waren.
+$cmd 00999 deny log all from any to any
+################ Einde bestand met IPFW regels ########################</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88769744"></a>30.6.5.7. Voorbeeld <acronym class="acronym">NAT</acronym> en stateful
+	  regels</h4></div></div></div><a id="idp88770768" class="indexterm"></a><p>Om <acronym class="acronym">NAT</acronym> met IPFW te gebruiken moeten
+	  een extra aantal instellingen gemaakt worden.  In het
+	  instellingenbestand voor de kernel moet <code class="literal">option
+	    IPDIVERT</code> toegevoegd worden aan de andere opties van
+	  IPFIREWALL.</p><p>Naast de normale IPFW opties in
+	  <code class="filename">/etc/rc.conf</code> zijn de volgende
+	  nodig:</p><pre class="programlisting">natd_enable="YES"                   # Schakel NATD in
+natd_interface="rl0"                # interfacenaam voor de publieke Internet NIC
+natd_flags="-dynamic -m"            # -m = behoud poortnummers als mogelijk</pre><p>Stateful regels samen met de regel
+	  <code class="literal">divert natd</code> (Network Address Translation) gebruiken
+	  maakt het schrijven van regels veel gecompliceerder.  De plaats
+	  van de regels met <code class="literal">check-state</code>
+	  en <code class="literal">divert natd</code> zijn van kritiek
+	  belang.  De logica bestaat niet langer uit het eenvoudigweg
+	  van boven naar beneden doorwerken van de regels.  Er wordt
+	  dan ook een nieuw type actie gebruik:
+	  <code class="literal">skipto</code>.  Bij het gebruik van
+	  <code class="literal">skipto</code> is het verplicht iedere regel
+	  te nummeren zodat duidelijk is waar een
+	  <code class="literal">skipto</code> precies heen springt.</p><p>Hieronder staat een groep regels zonder commentaar
+	  waarin een manier om pakketten door de groep regels te
+	  leiden wordt aangegeven.</p><p>De verwerking begint met de eerste regel en er wordt
+	  steeds een volgende regel gecontroleerd tot het einde
+	  wordt bereikt of totdat een regel op het gecontroleerde
+	  pakket van toepassing is, en het pakket uit de firewall wordt
+	  vrijgelaten.  In het voorbeeld zijn de regels 100, 101, 450, 500, en
+	  510 van belang.  Die regels regelen de vertaling van inkomende en
+	  uitgaande pakketten zodat er in de tabel met de
+	  dynamische <code class="literal">keep-state</code>-regels
+	  altijd het private <acronym class="acronym">IP</acronym>-adres staat.
+	  Daarnaast is het van belang op te merken dat er in alle
+	  <code class="literal">allow</code>- en <code class="literal">deny</code>-regels de
+	  richting van het pakket wordt gecontroleerd (inkomend of uitgaand) en
+	  over welke interface het pakket gaat.  Merk ook op dat alle
+	  uitgaande verzoeken voor het starten van een sessie met
+	  een <code class="literal">skipto</code> naar regel 500 gaan voor
+	  <acronym class="acronym">NAT</acronym>.</p><p>Stel dat een gebruiker zijn webbrowser gebruikt om een
+	  webpagina op te halen.  Webpagina's worden over poort 80 verzonden.
+	  Er komt een pakket de firewall binnen dat niet past bij regel 100
+	  omdat het naar buiten gaat en niet naar binnen.  Het komt voorbij
+	  regel 101 omdat dit het eerste pakket is en er dus nog niets over in
+	  de dynamische keep-state tabel staat.  Als het pakket bij 125 aankomt
+	  blijkt het te passen bij die regel.  Het gaat naar buiten
+	  door de interface aan het publieke Internet.  Het pakket
+	  heeft dan nog steeds het bron-<acronym class="acronym">IP</acronym>-adres
+	  van het private LAN.  Als blijkt dat deze regel geldt, dan
+	  gebeuren er twee dingen: door
+	  <code class="literal">keep-state</code> wordt er een regel
+	  in de dynamische keep-state tabel gezet en wordt de
+	  aangegeven actie uitgevoerd.  De actie is onderdeel van de
+	  informatie uit de dynamische tabel.  In dit geval is het
+	  <code class="literal">skipto rule 500</code>.  In regel 500 wordt
+	  <acronym class="acronym">NAT</acronym> op het <acronym class="acronym">IP</acronym>-adres
+	  van het pakket toegepast en dan kan het weg.  Dit
+	  is van groot belang.  Dit pakket komt aan op zijn
+	  bestemming en als er een pakket als antwoord terug komt, dan begint de
+	  verwerking van het antwoordpakket weer van voor af aan.  Nu voldoet
+	  het aan regel 100 en dus wordt het bestemmingsadres
+	  vertaald naar het bijbehorende <acronym class="acronym">IP</acronym>-adres
+	  op het LAN.  Daarna past het bij de
+	  <code class="literal">check-state</code>-regel en wordt een
+	  vermelding in de tabel gevonden wat betekent dat er een
+	  bestaande sessie is en wordt het doorgelaten naar het LAN.
+	  Het gaat dan naar de PC op het LAN die als eerste een
+	  pakket heeft verzonden en die verstuurt een nieuw pakket
+	  met de vraag om een volgend segment met gegevens naar de
+	  server.  Nu blijkt bij controle van de
+	  <code class="literal">check-state</code>-regel dat die op
+	  het pakket van toepassing moet zijn en er staat een
+	  vermelding in de tabel voor uitgaand verkeer.  Daarom wordt
+	  de bijbehorende actie <code class="literal">skipto rule 500</code>
+	  uitgevoerd.  Het pakket springt naar regel 500, er wordt
+	  <acronym class="acronym">NAT</acronym> op toegepast en het kan zijn weg
+	  vervolgen.</p><p>Wat betreft binnenkomende pakketten wordt alles dat
+	  onderdeel is van een bestaande sessie automatisch
+	  afgehandeld door de
+	  <code class="literal">check-state</code>-regel en de correct
+	  geplaatste <code class="literal">divert natd</code>-regels.  Nu hoeven
+	  alleen de foute pakketten nog geweigerd te worden en moeten
+	  de inkomende geauthoriseerde diensten doorgelaten worden.  In
+	  dit geval draait er een Apache server op de firewall-machine
+	  die vanaf Internet bereikbaar moet zijn.  Het nieuwe
+	  inkomende pakket past bij regel 100 en het
+	  <acronym class="acronym">IP</acronym>-adres wordt aangepast aan het interne
+	  <acronym class="acronym">IP</acronym>-adres van de firewall-machine.  Dat
+	  pakket wordt dan gecontroleerd op alle ongewenste
+	  eigenschappen en komt uiteindelijk aan bij regel 425 die
+	  van toepassing blijkt te zijn.  In dat geval kunnen er twee
+	  dingen gebeuren: de pakketregel wordt in de dynamische
+	  keep-state tabel gezet, maar nu wordt het aantal nieuwe
+	  sessies dat van het bron <acronym class="acronym">IP</acronym>-adres komt
+	  gelimiteerd tot twee.  Dit is een bescherming tegen DoS-aanvallen
+	  op de dienst die op dat poortnummer wordt aangeboden.  De actie is
+	  <code class="literal">allow</code>, dus het pakket wordt tot het LAN toegelaten.
+	  Voor het pakket dat als antwoord wordt verstuurd herkent de
+	  <code class="literal">check-state</code> regel dat het
+	  pakket bij een bestaande sessie hoort.  Het stuurt het naar regel
+	  500 voor <acronym class="acronym">NAT</acronym> en stuurt het via de
+	  uitgaande interface weg.</p><p>Voorbeeld Set Regels #1:</p><pre class="programlisting">#!/bin/sh
+cmd="ipfw -q add"
+skip="skipto 500"
+pif=rl0
+ks="keep-state"
+good_tcpo="22,25,37,43,53,80,443,110,119"
+
+ipfw -q -f flush
+
+$cmd 002 allow all from any to any via xl0  # exclude LAN traffic
+$cmd 003 allow all from any to any via lo0  # exclude loopback traffic
+
+$cmd 100 divert natd ip from any to any in via $pif
+$cmd 101 check-state
+
+# Toegestaan uitgaand verkeer.
+$cmd 120 $skip udp from any to xx.168.240.2 53 out via $pif $ks
+$cmd 121 $skip udp from any to xx.168.240.5 53 out via $pif $ks
+$cmd 125 $skip tcp from any to any $good_tcpo out via $pif setup $ks
+$cmd 130 $skip icmp from any to any out via $pif $ks
+$cmd 135 $skip udp from any to any 123 out via $pif $ks
+
+# Blokkeer al het verkeer voor niet-routeerbare of gereserveerde
+# adresreeksen.
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 privaat IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 privaat IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 privaat IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #gereserveerd voor documentatie
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Klasse D &amp; E multicast
+
+# Toegestaan inkomend verkeer.
+$cmd 400 allow udp from xx.70.207.54 to any 68 in $ks
+$cmd 420 allow tcp from any to me 80 in via $pif setup limit src-addr 1
+
+$cmd 450 deny log ip from any to any
+
+# Dit is de 'skipto' locatie voor de uitgaande stateful regels.
+$cmd 500 divert natd ip from any to any out via $pif
+$cmd 510 allow ip from any to any
+
+######################## Einde regels  ##################</pre><p>Het volgende voorbeeld doet vrijwel hetzelfde als het
+	  bovenstaande, maar volgt een zelfdocumenterende stijl voor
+	  het opstellen van regels en commentaar waardoor minder
+	  ervaren gebruikers beter kunnen begrijpen wat de regels
+	  doen.</p><p>Voorbeeld Set Regels #2:</p><pre class="programlisting">#!/bin/sh
+################ Begin bestand met IPFW regels ###############################
+# Verwijder eerst de bestaande regels.
+ipfw -q -f flush
+
+# Stel commando voorvoegsel in.
+cmd="ipfw -q add"
+skip="skipto 800"
+pif="rl0"     # Interfacenaam van NIC die verbinding
+              # met het publieke Internet heeft.
+
+#################################################################
+# Geen beperkingen op de interface aan de LAN kant.
+# Wijzig xl0 naar de gebruikte interfacenaam.
+#################################################################
+$cmd 005 allow all from any to any via xl0
+
+#################################################################
+# Geen beperkingen op de loopback interface.
+#################################################################
+$cmd 010 allow all from any to any via lo0
+
+#################################################################
+# Controleer of pakket inkomend is. NAT in dat geval.
+#################################################################
+$cmd 014 divert natd ip from any to any in via $pif
+
+#################################################################
+# Sta het pakket toe als het aan de tabel met dynamische regels
+# was toegevoegd met een 'allow keep-state' commando.
+#################################################################
+$cmd 015 check-state
+
+#################################################################
+# Interface aan het publieke Internet (onderdeel Uitgaand).
+# Inspecteer verzoeken om een sessie te starten van achter de
+# firewall op het private netwerk of vanaf de server zelf naar
+# het publieke Internet.
+#################################################################
+
+# Geef toegang tot de DNS server van de ISP.
+# x.x.x.x moet het IP adres van de DNS van de ISP zijn.
+# Dupliceer deze regels als een ISP meerdere DNS servers heeft.
+# Haal het IP adres evt. uit /etc/resolv.conf
+$cmd 020 $skip tcp from any to x.x.x.x 53 out via $pif setup keep-state
+
+# Geef toegang tot de DHCP server van de ISP voor kabel en xDSL.
+$cmd 030 $skip udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Sta niet beveiligd www verkeer toe.
+$cmd 040 $skip tcp from any to any 80 out via $pif setup keep-state
+
+# Sta beveiligd www verkeer over TLS SSL toe.
+$cmd 050 $skip tcp from any to any 443 out via $pif setup keep-state
+
+# Sta het verzenden en ontvangen van e-mail toe.
+$cmd 060 $skip tcp from any to any 25 out via $pif setup keep-state
+$cmd 061 $skip tcp from any to any 110 out via $pif setup keep-state
+
+# Sta de FreeBSD CVSUP functie toe voor uid root.
+$cmd 070 $skip tcp from me to any out via $pif setup keep-state uid root
+
+# Sta ping toe naar het publieke Internet.
+$cmd 080 $skip icmp from any to any out via $pif keep-state
+
+# Sta Time toe.
+$cmd 090 $skip tcp from any to any 37 out via $pif setup keep-state
+
+# Sta NNTP nieuws toe.
+$cmd 100 $skip tcp from any to any 119 out via $pif setup keep-state
+
+# Sta beveiligde FTP, Telnet en SCP toe.
+# Deze functie maakt gebruik van SSH (secure shell).
+$cmd 110 $skip tcp from any to any 22 out via $pif setup keep-state
+
+# Sta whois toe.
+$cmd 120 $skip tcp from any to any 43 out via $pif setup keep-state
+
+# Sta NPT tijdserver toe.
+$cmd 130 $skip udp from any to any 123 out via $pif keep-state
+
+#################################################################
+# Interface aan het publieke Internet (onderdeel Inkomend).
+# Inspecteert pakketten die van het publieke Internet komen met
+# als bestemming deze gateway-server zelf of het private netwerk.
+#################################################################
+
+# Blokkeer al het verkeer voor niet-routeerbare of gereserveerde
+# adresreeksen.
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 privaat IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 privaat IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 privaat IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #gereserveerd voor documentatie
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Klasse D &amp; E multicast
+
+# Blokkeer ident.
+$cmd 315 deny tcp from any to any 113 in via $pif
+
+# Blokkeer alle Netbios diensten. 137=naam, 138=datagram, 139=sessie.
+# Netbios is de Windows® bestandsdeeldienst.
+# Blokkeer Windows hosts2 name server verzoeken 81.
+$cmd 320 deny tcp from any to any 137 in via $pif
+$cmd 321 deny tcp from any to any 138 in via $pif
+$cmd 322 deny tcp from any to any 139 in via $pif
+$cmd 323 deny tcp from any to any 81  in via $pif
+
+# Blokkeer gefragmenteerde pakketten.
+$cmd 330 deny all from any to any frag in via $pif
+
+# Blokkeer ACK pakketten die niet in de tabel met dynamische regels
+# staan.
+$cmd 332 deny tcp from any to any established in via $pif
+
+# Geef toegang tot de DHCP server van de ISP voor kabel- en
+# xDSL-netwerken. Deze regel is niet nodig als gebruik gemaakt worden
+# van PPP naar het publieke Internet. In dat geval kan de hele groep
+# verwijderd worden. Hier wordt hetzelfde IP adres gebruikt als in de
+# sectie voor Uitgaand verkeer.
+$cmd 360 allow udp from x.x.x.x to any 68 in via $pif keep-state
+
+# Sta inkomend webverkeer toe omdat er een Apache server draait.
+$cmd 370 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Sta beveiligde FTP, telnet en SCP toe vanaf Internet.
+$cmd 380 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Sta niet beveiligde telnet sessie toe vanaf het publieke Internet.
+# Dit heeft het label ``niet veilig'' omdat gebruikersnaam en
+# wachtwoord als platte tekst over Internet gaan. Als er geen telnet
+# server draait, hoeft deze regel niet actief te zijn.
+#$cmd 390 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Weiger en log alle niet toegestane inkomende verbindingen vanaf het
+# publieke Internet.
+$cmd 400 deny log all from any to any in via $pif
+
+# Weiger en log alle niet toegestane uitgaande verbindingen naar
+# Internet.
+$cmd 450 deny log all from any to any out via $pif
+
+# Dit is de 'skipto' locatie voor de uitgaande stateful regels
+$cmd 800 divert natd ip from any to any out via $pif
+$cmd 801 allow ip from any to any
+
+# Al het andere verkeer wordt standaard geblokkeerd. Weiger en log alle
+# pakketten die tot hier zijn gekomen om te bekijken welke het waren.
+$cmd 999 deny log all from any to any
+################ Einde bestand met IPFW regels ########################</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="firewalls-ipf.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="firewalls.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="advanced-networking.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">30.5. De IPFILTER (IPF) firewall </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> Hoofdstuk 31. Geavanceerde netwerken</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

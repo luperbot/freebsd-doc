@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>2.6. Writing and Debugging a Makefile</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="PMake &#8212; A Tutorial" /><link rel="up" href="basics.html" title="Chapter 2. The Basics of PMake" /><link rel="prev" href="parellelism.html" title="2.5. Parallelism" /><link rel="next" href="invoking.html" title="2.7. Invoking PMake" /><link rel="copyright" href="legalnotice.html" title="Legal Notice" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">2.6. Writing and Debugging a Makefile</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="parellelism.html">Prev</a> </td><th width="60%" align="center">Chapter 2. The Basics of PMake</th><td width="20%" align="right"> <a accesskey="n" href="invoking.html">Next</a></td></tr></table><hr /></div><div class="section"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="writeanddebug"></a>2.6. Writing and Debugging a Makefile</h2></div></div></div><p>Now you know most of what is in a
+      <code class="filename">Makefile</code>, what do you do next?  There are
+      two choices: use one of the uncommonly-available makefile
+      generators or write your own makefile (I leave out the third
+      choice of ignoring <span class="application">PMake</span> and doing
+      everything by hand as being beyond the bounds of common
+      sense).</p><p>When faced with the writing of a makefile, it is usually
+      best to start from first principles: just what are you trying to
+      do?  What do you want the makefile finally to produce?  To begin
+      with a somewhat traditional example, let's say you need to write
+      a makefile to create a program, <code class="command">expr</code>, that
+      takes standard infix expressions and converts them to prefix
+      form (for no readily apparent reason).  You have got three
+      source files, in C, that make up the program:
+      <code class="filename">main.c</code>, <code class="filename">parse.c</code>, and
+      <code class="filename">output.c</code>.  Harking back to my pithy advice
+      about dependency lines, you write the first line of the
+      file:</p><pre class="programlisting">expr            : main.o parse.o output.o</pre><p>because you remember <code class="filename">expr</code> is made from
+      <code class="filename">.o</code> files, not <code class="filename">.c</code>
+      files.  Similarly for the <code class="filename">.o</code> files you
+      produce the lines:</p><pre class="programlisting">main.o          : main.c
+
+parse.o         : parse.c
+
+output.o        : output.c
+
+main.o parse.o output.o : defs.h</pre><p>Great.  You have now got the dependencies specified.  What
+      you need now is commands.  These commands, remember, must
+      produce the target on the dependency line, usually by using the
+      sources you have listed.  You remember about local variables?
+      Good, so it should come to you as no surprise when you
+      write:</p><pre class="programlisting">expr            : main.o parse.o output.o
+	cc -o $(.TARGET) $(.ALLSRC)</pre><p>Why use the variables?  If your program grows to produce
+      postfix expressions too (which, of course, requires a name
+      change or two), it is one fewer place you have to change the
+      file. You cannot do this for the object files, however, because
+      they depend on their corresponding source files and
+      <code class="filename">defs.h</code>, thus if you said:</p><pre class="programlisting">cc -c $(.ALLSRC)</pre><p>you will get (for <code class="filename">main.o</code>):</p><pre class="programlisting">cc -c main.c defs.h</pre><p>which is wrong.  So you round out the makefile with these
+      lines:</p><pre class="programlisting">main.o          : main.c
+	cc -c main.c
+
+parse.o         : parse.c
+	cc -c parse.c
+
+output.o        : output.c
+	cc -c output.c</pre><p>The makefile is now complete and will, in fact, create the
+      program you want it to without unnecessary compilations or
+      excessive typing on your part.  There are two things wrong with
+      it, however (aside from it being altogether too long, something
+      I will address in <a class="xref" href="shortcuts.html" title="Chapter 3. Short-cuts and Other Nice Things">Chapter 3, <em>Short-cuts and Other Nice Things</em></a>):</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>The string <code class="literal">main.o parse.o output.o</code> is
+	  repeated twice, necessitating two changes when you add
+	  postfix (you were planning on that, were not you?).  This is
+	  in direct violation of de Boor's First Rule of writing
+	  makefiles:</p><p>Anything that needs to be written more than once should
+	  be placed in a variable.  I cannot emphasize this enough as
+	  being very important to the maintenance of a makefile and
+	  its program.</p></li><li class="listitem"><p>There is no way to alter the way compilations are
+	  performed short of editing the makefile and making the
+	  change in all places.  This is evil and violates de Boor's
+	  Second Rule, which follows directly from the first:</p><p>Any flags or programs used inside a makefile should be
+	  placed in a variable so they may be changed, temporarily or
+	  permanently, with the greatest ease.</p></li></ol></div><p>The makefile should more properly read:</p><pre class="programlisting">OBJS            = main.o parse.o output.o
+
+expr            : $(OBJS)
+	$(CC) $(CFLAGS) -o $(.TARGET) $(.ALLSRC)
+
+main.o          : main.c
+	$(CC) $(CFLAGS) -c main.c
+
+parse.o         : parse.c
+	$(CC) $(CFLAGS) -c parse.c
+
+output.o        : output.c
+	$(CC) $(CFLAGS) -c output.c
+
+$(OBJS)         : defs.h</pre><p>Alternatively, if you like the idea of dynamic sources
+      mentioned in <a class="xref" href="variables.html#localvariables" title="2.3.1. Local Variables">Section 2.3.1, &#8220;Local Variables&#8221;</a>, you could write it
+      like this:</p><pre class="programlisting">OBJS            = main.o parse.o output.o
+
+expr            : $(OBJS)
+	$(CC) $(CFLAGS) -o $(.TARGET) $(.ALLSRC)
+
+$(OBJS)         : $(.PREFIX).c defs.h
+	$(CC) $(CFLAGS) -c $(.PREFIX).c</pre><p>These two rules and examples lead to de Boor's First
+      Corollary:
+      <span class="emphasis"><em>Variables are your friends</em></span>.</p><p>Once you have written the makefile comes the
+      sometimes-difficult task of making sure the darn thing works.
+      Your most helpful tool to make sure the makefile is at least
+      syntactically correct is the <code class="option">-n</code> flag, which
+      allows you to see if <span class="application">PMake</span> will choke
+      on the makefile.  The second thing the <code class="option">-n</code> flag
+      lets you do is see what <span class="application">PMake</span> would
+      do without it actually doing it, thus you can make sure the
+      right commands would be executed were you to give
+      <span class="application">PMake</span> its head.</p><p>When you find your makefile is not behaving as you hoped,
+      the first question that comes to mind (after <span class="quote">&#8220;<span class="quote">What time is
+      it, anyway?</span>&#8221;</span>) is <span class="quote">&#8220;<span class="quote">Why not?</span>&#8221;</span> In answering
+      this, two flags will serve you well: <code class="literal">-d m</code> and
+      <span class="quote">&#8220;<span class="quote">-p 2</span>&#8221;</span>.
+      The first causes <span class="application">PMake</span> to tell you as
+      it examines each target in the makefile and indicate why it is
+      deciding whatever it is deciding.  You can then use the
+      information printed for other targets to see where you went
+      wrong.  The <span class="quote">&#8220;<span class="quote">-p 2</span>&#8221;</span> flag makes
+      <span class="application">PMake</span> print out its internal state
+      when it is done, allowing you to see that you forgot to make
+      that one chapter depend on that file of macros you just got a
+      new version of.  The output from <span class="quote">&#8220;<span class="quote">-p 2</span>&#8221;</span> is intended
+      to resemble closely a real makefile, but with additional
+      information provided and with variables expanded in those
+      commands <span class="application">PMake</span> actually printed or
+      executed.</p><p>Something to be especially careful about is circular
+      dependencies.  For example:</p><pre class="programlisting">a         : b
+
+b         : c d
+
+d         : a</pre><p>In this case,
+      because of how <span class="application">PMake</span> works,
+      <code class="buildtarget">c</code> is the only thing
+      <span class="application">PMake</span> will examine, because
+      <code class="buildtarget">d</code> and <code class="buildtarget">a</code> will
+      effectively fall off the edge of the universe, making it
+      impossible to examine <code class="buildtarget">b</code> (or them, for
+      that matter).  <span class="application">PMake</span> will tell you
+      (if run in its normal mode) all the targets involved in any
+      cycle it looked at (i.e. if you have two cycles in the
+      graph (naughty, naughty), but only try to make a target in one
+      of them, <span class="application">PMake</span> will only tell you
+      about that one.  You will have to try to make the other to find
+      the second cycle).  When run as <span class="application">Make</span>,
+      it will only print the first target in the cycle.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="parellelism.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="basics.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="invoking.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">2.5. Parallelism </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> 2.7. Invoking PMake</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

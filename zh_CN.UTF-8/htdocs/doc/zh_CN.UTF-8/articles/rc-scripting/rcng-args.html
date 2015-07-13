@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>8. 给予 rc.d 脚本更多的灵活性</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="up" href="index.html" title="BSD rc.d脚本编程实战" /><link rel="prev" href="rcng-hookup.html" title="7. 链接脚本到 rc.d 框架" /><link rel="next" href="rcng-furthur.html" title="9. 进一步阅读" /><link rel="copyright" href="trademarks.html" title="法律通告" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">8. 给予 rc.d 脚本更多的灵活性</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="rcng-hookup.html">上一页</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="rcng-furthur.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="rcng-args"></a>8. 给予 rc.d 脚本更多的灵活性</h2></div></div></div><p>当进行启动或停止的调用时，<code class="filename">rc.d</code>
+      脚本应该作用于其所负责的整个子系统。例如，
+      <code class="filename">/etc/rc.d/netif</code> 应该启动或停止
+      <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 中所描述的全部网络接口。每个任务都唯一地听从一个如
+      <code class="option">start</code> 或 <code class="option">stop</code>
+      这样的单独命令参数的指示。在启动和停止之间的时间，
+      <code class="filename">rc.d</code> 脚本帮助管理员控制运行中的系统，
+      并其在需要的时候它将产生更多的灵活性和精确性。举个例子，
+      管理员可能想在 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> 中添加一个新网络接口的配置信息，
+      然后在不妨碍其它已存在接口的情况下将其启动。
+      在下次管理员可能需要关闭一个单独的网络接口。在魔幻的命令行中，
+      对应的 <code class="filename">rc.d</code> 脚本调用一个额外的参数，
+      网络接口名即可。</p><p>幸运的是，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 允许传递任意多（取决于系统限制）的参数给脚本的方法。
+      由于这个原因，脚本自身的改变可以说是微乎其微。</p><p><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 如何访问到附加的命令行参数呢？直接获取么？
+      并非是无所不用其极的。首先，<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>
+      函数没有访问到调用者的定位参数，而 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a>
+      只是这些函数的容器。其次，<code class="filename">rc.d</code>
+      指令的一个好的风格是由主函数来决定将哪些参数传递给它的方法。</p><p>所以 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.subr&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">rc.subr</span>(8)</span></a> 提供了如下的方法：
+      <code class="function">run_rc_command</code>
+      传递其所有参数但将第一个参数逐字传递到各自的方法。首先，
+      发出以方法自身为名字的参数：<code class="option">start</code>，
+      <code class="option">stop</code>，等等。这会被
+      <code class="function">run_rc_command</code> 移出，
+      这样命令行中原本 <code class="envar">$2</code> 的内容将作为
+      <code class="envar">$1</code> 来提供给方法，等等。</p><p>为了说明这点，我们来修改原来的虚拟脚本，
+      这样它的信息将取决于所提供的附加参数。从这里出发：</p><div class="informalexample"><pre class="programlisting">#!/bin/sh
+
+. /etc/rc.subr
+
+name="dummy"
+start_cmd="${name}_start"
+stop_cmd=":"
+kiss_cmd="${name}_kiss"
+extra_commands="kiss"
+
+dummy_start()
+{
+        if [ $# -gt 0 ]; then<a id="rcng-args-start"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+                echo "Greeting message: $*"
+        else
+                echo "Nothing started."
+        fi
+}
+
+dummy_kiss()
+{
+        echo -n "A ghost gives you a kiss"
+        if [ $# -gt 0 ]; then<a id="rcng-args-kiss"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+                echo -n " and whispers: $*"
+        fi
+        case "$*" in
+        *[.!?])
+                echo
+                ;;
+        *)
+                echo .
+                ;;
+        esac
+}
+
+load_rc_config $name
+run_rc_command "$@"<a id="rcng-args-all"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></pre></div><p>能注意到脚本里发生了那些实质性改变么？</p><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-args-start"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>你输入的所有在 <code class="option">start</code>
+          之后的参数可以被当作各自方法的定位参数一样被终结。
+          我们可以根据我们的任务、技巧和想法来以任何方式使用他们。
+          在当前的例子中，我们只是以下行中字符串的形式传递参数给
+          <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=echo&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">echo</span>(1)</span></a> 程序 ── 注意 <code class="envar">$*</code>
+          是有双引号的。这里是脚本如何被调用的：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/dummy start</code></strong>
+Nothing started.
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/dummy start Hello world!</code></strong>
+Greeting message: Hello world!</pre></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-args-kiss"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>同样用于我们脚本提供的任何方法，并不仅限于标准的方法。
+          我们已经添加了一个自定义的叫做 <code class="option">kiss</code> 的方法，
+          并且它给附加参数带来的戏耍决不亚于 <code class="option">start</code>。
+          例如：</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/dummy kiss</code></strong>
+A ghost gives you a kiss.
+<code class="prompt">#</code> <strong class="userinput"><code>/etc/rc.d/dummy kiss Once I was Etaoin Shrdlu...</code></strong>
+A ghost gives you a kiss and whispers: Once I was Etaoin Shrdlu...</pre></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#rcng-args-all"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>如果我们只是传递所有附加参数给任意的方法，
+          我们只需要在脚本的最后一行我们调用
+          <code class="function">run_rc_command</code> 的地方，
+          用 <code class="literal">"$@</code> 代替 <code class="literal">"$1"</code> 即可。</p><div xmlns="" class="important"><h3 class="admontitle">重要: </h3><p xmlns="http://www.w3.org/1999/xhtml">一个 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a> 程序员应该是可以理解
+            <code class="envar">$*</code> 和 <code class="envar">$@</code>
+            的微妙区别只是指定全部定位参数的不同方法。
+            关于此更深入的探讨，可以参考这个很好的 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>
+            脚本编程手册。在你完全理解这些表达式的意义之前请不要使用它们，
+            因为误用它们将给脚本引入缺陷和不安全的弊端。</p></div><div xmlns="" class="note"><h3 class="admontitle">注意: </h3><p xmlns="http://www.w3.org/1999/xhtml">现在 <code class="function">run_rc_command</code> 可能有个缺陷，
+            它将影响保持参数之间的原本边界。也就是，
+            带有嵌入空白的参数可能不会被正确处理。该缺陷是由于对
+            <code class="envar">$*</code> 的误用。</p></div></td></tr></table></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="rcng-hookup.html">上一页</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="rcng-furthur.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">7. 链接脚本到 rc.d 框架 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 9. 进一步阅读</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

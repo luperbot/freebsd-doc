@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>23.5. Vinum-Objekte</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Das FreeBSD-Handbuch" /><link rel="up" href="vinum-vinum.html" title="Kapitel 23. Der Vinum Volume Manager" /><link rel="prev" href="vinum-data-integrity.html" title="23.4. Datenintegrität" /><link rel="next" href="vinum-examples.html" title="23.6. Einige Beispiele" /><link rel="copyright" href="legalnotice.html" title="Rechtlicher Hinweis" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">23.5. Vinum-Objekte</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-data-integrity.html">Zurück</a> </td><th width="60%" align="center">Kapitel 23. Der Vinum Volume Manager</th><td width="20%" align="right"> <a accesskey="n" href="vinum-examples.html">Weiter</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-objects"></a>23.5. Vinum-Objekte</h2></div></div></div><p>Um die in den vorigen Abschnitte besprochenen Probleme zu
+        lösen, verwendet Vinum eine vierstufige
+        Objekthierarchie:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Das auffälligste Objekt ist die virtuelle Platte,
+	    die <span class="emphasis"><em>Volume</em></span> genannt wird.  Volumes
+	    haben im Wesentlichen die gleichen Eigenschaften wie ein
+	    <span class="trademark">UNIX</span>®-Laufwerk, obwohl es ein paar kleine Unterschiede
+	    gibt.  So existieren für Volumes beispielsweise keine
+	    Größenbeschränkungen.</p></li><li class="listitem"><p>Volumes bestehen aus einem oder mehreren
+	    <span class="emphasis"><em>Plexus</em></span>,
+	    von denen jeder den gesamten Adressraum eines
+	    Datenträgers repräsentiert.  Diese Hierarchieebene
+	    ist für die benötigte Redundanz der Daten
+	    erforderlich.  Stellen Sie sich die Plexus als
+	    eigenständige Platten in einem gespiegelten
+	    Array vor, von denen jede die gleichen Daten
+	    enthält.</p></li><li class="listitem"><p>Da Vinum im <span class="trademark">UNIX</span>®-Plattenspeicher-Framework arbeitet,
+	    wäre es möglich, als Grundbaustein für
+	    Multiplatten-Plexus <span class="trademark">UNIX</span>®-Partitionen zu verwenden.  In
+	    der Praxis ist dieser Ansatz aber zu unflexibel, da
+	    <span class="trademark">UNIX</span>®-Platten nur eine begrenzte Anzahl von Partitionen
+	    haben können.  Daher unterteilt Vinum stattdessen
+	    eine einzige <span class="trademark">UNIX</span>®-Partition (die
+	    <span class="emphasis"><em>Platte</em></span>) in zusammenhängende
+	    Bereiche, die als <span class="emphasis"><em>Subdisks</em></span> bezeichnet
+	    werden und als Grundbausteine für einen Plexus
+	    benutzt werden.</p></li><li class="listitem"><p>Subdisks befinden sich auf
+	    Vinum-<span class="emphasis"><em>Platten</em></span>, eigentlich
+	    <span class="trademark">UNIX</span>®-Partitionen.  Vinum-Platten können eine
+	    beliebige Anzahl von Subdisks haben und den gesamten
+	    Speicher der Platte mit Ausnahme eines kleinen Bereiches
+	    am Anfang der Platte (welcher zur Speicherung von
+	    Konfigurations- und Statusinformationen verwenden wird)
+	    verwenden.</p></li></ul></div><p>Der folgende Abschnitt beschreibt, wie diese Objekte
+	die von Vinum benötigten Funktionen zur
+	Verfügung stellen.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84131920"></a>23.5.1. Überlegungungen zur Größe eines Volumes</h3></div></div></div><p>Plexus können mehrere Subdisks beinhalten, die
+	über alle Platten der Vinum-Konfiguration verteilt sind.
+	Daraus folgt, dass die Größe einer Platte nicht die
+	Größe eines Plexus (und damit eines Volumes)
+	limitiert.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84149584"></a>23.5.2. Redundante Datenspeicherung</h3></div></div></div><p>Vinum implementiert die Datenspiegelung, indem es ein
+	Volume auf mehrere Plexus verteilt.  Jeder Plexus ist
+	dabei die Repräsentation der Daten eines Volumes.
+	Ein Volume kann aus bis zu acht Plexus bestehen.</p><p>Obwohl ein Plexus die gesamten Daten eines Volumes
+	repräsentiert, ist es möglich, dass Teile der
+	Repräsentation physisch fehlen, entweder aufgrund des
+	Designs (etwa durch nicht definierte Subdisks für Teile
+	des Plexus) oder durch Zufall (als ein Ergebnis eines
+	Plattenfehlers).  Solange wenigstens ein Plexus die gesamten
+	Daten für den kompletten Adressbereich des Volumes zur
+	Verfügung stellen kann, ist das Volume voll
+	funktionsfähig.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84151120"></a>23.5.3. Überlegungen zur Leistung</h3></div></div></div><p>Sowohl Konkatenation als auch Striping werden von Vinum
+	auf der Plexus-Ebene realisiert:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Ein <span class="emphasis"><em>konkatenierter Plexus</em></span> benutzt
+	    abwechselnd den Adressraum jeder Subdisk.</p></li><li class="listitem"><p>Ein <span class="emphasis"><em>gestripter Plexus</em></span> striped die
+	    Daten über jede Subdisk. Die Subdisks müssen alle
+	    die gleiche Größe haben, und es muss mindestens
+	    zwei Subdisks in Reihenfolge geben, um ihn von einem
+	    konkatenierten Plexus unterscheiden zu können.</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84154960"></a>23.5.4. Wie ist ein Plexus aufgebaut?</h3></div></div></div><p>Die Version von Vinum, welche von FreeBSD-10.1
+	bereitgestellt wird, implementiert zwei Arten von Plexus:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Konkatenierte Plexus sind die flexibelsten:  Sie
+	    können aus einer beliebigen Anzahl von Subdisks
+	    unterschiedlicher Größe bestehen.  Der Plexus
+	    kann erweitert werden, indem man zusätzliche Subdisks
+	    hinzufügt.  Sie brauchen weniger
+	    <acronym class="acronym">CPU</acronym>-Zeit als gestripte Plexus, obwohl
+	    der Unterschied des <acronym class="acronym">CPU</acronym>-Overheads nicht
+	    messbar ist.  Auf der anderen Seite sind sie aber sehr
+	    anfällig für das Entstehen von "hot spots", wobei
+	    eine Platte sehr aktiv ist, andere hingegen nahezu ungenutzt
+	    sind.</p></li><li class="listitem"><p>Der größte Vorteil eines gestripten
+	    Plexus (<acronym class="acronym">RAID-0</acronym>) ist die Verringerung von
+	    "hot spots".  Dies wird durch die Auswahl eines Stripes
+	    optimaler Größe (etwa 256 kB) erreicht,
+	    wodurch die Last gleichmäßig auf die Platten
+	    verteilt werden kann. Nachteile dieser Vorgehensweise sind
+	    ein (geringfügig) komplexerer Code sowie einige
+	    Restriktionen für die Subdisks:  Diese müssen alle
+	    die gleiche Größe haben, und das Erweitern eines
+	    Plexus durch das Hinzufügen neuer Subdisks ist so
+	    kompliziert, dass es von Vinum derzeit nicht
+	    unterstützt wird.  Vinum fordert noch eine weitere
+	    triviale Beschränkung:  Ein gestripter Plexus muss
+	    aus mindestens zwei Subdisks bestehen, da er ansonsten nicht
+	    von einem konkatenierten Plexus unterscheidbar ist.</p></li></ul></div><p><a class="xref" href="vinum-objects.html#vinum-comparison" title="Tabelle 23.1. Vinum-Plexus - Aufbau">Tabelle 23.1, &#8222;Vinum-Plexus - Aufbau&#8220;</a> fasst die Vor- und
+	Nachteile jedes Plexus-Aufbaus zusammen.</p><div class="table"><a id="vinum-comparison"></a><div class="table-title">Tabelle 23.1. Vinum-Plexus - Aufbau</div><div class="table-contents"><table summary="Vinum-Plexus - Aufbau" border="0"><colgroup><col /><col /><col /><col /><col /></colgroup><thead><tr><th>Plexus-Typ</th><th>Minimum an Subdisks?</th><th>Kann Subdisks hinzufügen?</th><th>Müssen die gleiche Größe
+		haben</th><th>Applikation</th></tr></thead><tbody><tr><td>konkateniert</td><td>1</td><td>ja</td><td>nein</td><td>Großer Datenspeicher mit maximaler
+		Platzierungsflexibilität und moderater
+		Leistung</td></tr><tr><td>gestriped</td><td>2</td><td>nein</td><td>ja</td><td>Hohe Leistung in Kombination mit
+		gleichzeitigem Zugriff</td></tr></tbody></table></div></div><br class="table-break" /></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-data-integrity.html">Zurück</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Nach oben</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-examples.html">Weiter</a></td></tr><tr><td width="40%" align="left" valign="top">23.4. Datenintegrität </td><td width="20%" align="center"><a accesskey="h" href="index.html">Zum Anfang</a></td><td width="40%" align="right" valign="top"> 23.6. Einige Beispiele</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-questions@de.FreeBSD.org">de-bsd-questions@de.FreeBSD.org</a>&gt;.<br></br>
+    Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine E-Mail an
+    &lt;<a href="mailto:de-bsd-translators@de.FreeBSD.org">de-bsd-translators@de.FreeBSD.org</a>&gt;.</small></p></body></html>

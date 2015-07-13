@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>17.5. Amministrare il Sottosistema Audit</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuale di FreeBSD" /><link rel="up" href="audit.html" title="Capitolo 17. Auditing degli Eventi di Sicurezza" /><link rel="prev" href="audit-config.html" title="17.4. Configurazione dell'Audit" /><link rel="next" href="disks.html" title="Capitolo 18. Archiviazione dei Dati" /><link rel="copyright" href="legalnotice.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">17.5. Amministrare il Sottosistema Audit</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="audit-config.html">Indietro</a> </td><th width="60%" align="center">Capitolo 17. Auditing degli Eventi di Sicurezza</th><td width="20%" align="right"> <a accesskey="n" href="disks.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="audit-administration"></a>17.5. Amministrare il Sottosistema Audit</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84742480"></a>17.5.1. Leggere le Tracce di Audit</h3></div></div></div><p>Le tracce di audit sono conservate nel formato binario BSM,
+        così devono essere usati degli strumenti appositi
+        per modificare o convertirli a testo.  Il comando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=praudit&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">praudit</span>(1)</span></a>
+        converte file di traccia a semplice formato testo; il comando
+        <code class="command">auditreduce</code> può essere usato per ridurre
+        file di traccia per analisi, archiviazione o stampa.
+        <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=auditreduce&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">auditreduce</span>(1)</span></a> supporta una varietà di
+        parametri di selezione, incluso il tipo di evento, la classe
+        dell'evento, l'utente, la data o l'ora dell'evento, ed il percorso
+        del file o l'oggetto su cui si opera.</p><p>Per esempio, l'utility <code class="command">praudit</code> farà il
+        dump dell'intero contenuto di uno specifico file di log di audit
+        in semplice formato testuale:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /var/audit/AUDITFILE</code></strong></pre><p>Dove <code class="filename">AUDITFILE</code>
+        è il nome del file di log di cui fare il dump.</p><p>Le tracce di audit consistono in una serie di record di audit
+        composti da token, che <code class="command">praudit</code> scrive sequenzialmente
+        uno per linea.  Ogni token è per un tipo specifico,
+        come <code class="literal">header</code> che tiene un header di un record
+        audit, o <code class="literal">path</code> che tiene un percorso di file
+        da una ricerca del nome.
+        Il seguente è un esempio di un evento <code class="literal">execve</code>:</p><pre class="programlisting">header,133,10,execve(2),0,Mon Sep 25 15:58:03 2006, + 384 msec
+exec arg,finger,doug
+path,/usr/bin/finger
+attribute,555,root,wheel,90,24918,104944
+subject,robert,root,wheel,root,wheel,38439,38032,42086,128.232.9.100
+return,success,0
+trailer,133</pre><p>Questo audit rappresenta una chiamata di successo a
+        <code class="literal">execve</code>, in cui il comando
+        <code class="literal">finger doug</code> è stato eseguito.
+        Il token degli argomenti contiene la riga di comando presentata
+        dalla shell al kernel.  Il token <code class="literal">path</code> contiene
+        il percorso dell'eseguibile usato dal kernel.
+        Il token <code class="literal">attribute</code> descrive il binario, ed in particolare
+        include i permessi del file che possono essere usato per determinare
+        se l'applicazione era setuid.  Il token <code class="literal">subject</code>
+        descrive il processo
+        in oggetto e conserva in sequenza l'id utente dell'audit, l'id effettivo
+        dell'utente, il group id, lo user id reale ed il group id reale,
+        il process id, l'id della sessione, l'id della porta e l'indirizzo di login.
+        Nota che l'audit user id ed il real user id sono diversi:
+        l'utente <code class="systemitem">robert</code> è diventato
+        <code class="systemitem">root</code> prima di eseguire questo comando, ma questo
+        viene tenuto sotto audit usando lo user id originale.  Infine, il token
+        <code class="literal">return</code> indica l'esecuzione andata a buon fine, ed il
+        <code class="literal">trailer</code> chiude il record.</p><p>In FreeBSD 6.3 e successive, <code class="command">praudit</code> supporta
+        anche il formato di output XML, che può essere selezionato
+        usando l'argomento <code class="option">-x</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84776400"></a>17.5.2. Ridurre le Tracce di Audit</h3></div></div></div><p>Dato che i log dell'audit possono essere molto grandi,
+        un amministratore probabilmente vorrà selezionarne
+        solo un sottoinsieme utile, ad esempio i record
+        associati con un utente specifico:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>auditreduce -u trhodes /var/audit/AUDITFILE | praudit</code></strong></pre><p>Questo selezionerà tutti i record di audit per
+        l'utente <code class="systemitem">trhodes</code> conservati nel file
+        <code class="filename">AUDITFILE</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84779856"></a>17.5.3. Delegare Diritti di Ispezionare l'Audit</h3></div></div></div><p>I membri del gruppo <code class="systemitem">audit</code> hanno
+        il permesso di leggere tracce di audit in <code class="filename">/var/audit</code>;
+        di default questo gruppo e' vuoto, così solo
+        <code class="systemitem">root</code> può leggere le tracce di audit.
+        Utenti possono essere aggiunti al gruppo <code class="systemitem">audit</code>
+        per delegare diritti di lettura sull'audit.
+        Dato che l'abilità di tracciare contenuti del log di audit
+        fornisce significative informazioni sul comportamento di utenti
+        e processi, si raccomanda che la delega di lettura sia fatta con cautela.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84782928"></a>17.5.4. Monitoraggio dal Vivo Usando Pipe di Audit</h3></div></div></div><p>Le pipe di audit sono degli pseudo-device clonanti nel
+        file system dei device che permettono alle applicazioni di intercettare
+        lo stream dei record di audit in tempo reale.  Questo è
+        di primario interesse per i creatori di applicativi di intrusion
+        detection e di monitoraggio di sistemi.
+        In ogni caso, per l'amministratore il device della pipe dell'audit
+        è un modo conveniente per permettere il monitaraggio dal vivo
+        senza incontrare problemi con i permessi della traccia audit o
+        la rotazione dei log che interrompono lo stream degli eventi.
+        Per tracciare lo stream degli eventi dell'audit, usa la seguente
+        linea di comando:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>praudit /dev/auditpipe</code></strong></pre><p>Di default, i nodi di device delle pipe dell'audit sono accessibili
+        solo dall'utente <code class="systemitem">root</code>.  Per renderlo accessibile
+        ai membri del gruppo <code class="systemitem">audit</code>, aggiungi una
+        regola <code class="literal">devfs</code>
+        al file <code class="filename">devfs.rules</code>:</p><pre class="programlisting">add path 'auditpipe*' mode 0440 group audit</pre><p>Leggi <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs.rules&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">devfs.rules</span>(5)</span></a> per altre informazioni su come
+        configurare il filesystem devfs.</p><div xmlns="" class="warning"><h3 class="admontitle">Avvertimento: </h3><p xmlns="http://www.w3.org/1999/xhtml">È facile produrre cicli di feedback di eventi audit,
+          in cui il semplice osservare ogni evento di audit risulta nella
+          creazione di più eventi di audit.  Per esempio, se tutto
+          il traffico di rete viene tenuto sotto audit, e <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=praudit&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">praudit</span>(1)</span></a> viene
+          eseguito da una sessione SSH, un flusso continuo di notevoli dimensioni di eventi
+          audit sarà generato, dato che ogni evento scritto genererà
+          un altro evento.  È consigliabile eseguire
+          <code class="command">praudit</code> su un device
+          pipe di audit da sessioni senza audit I/O in grande dettaglio, per evitare
+          fenomeni come questo.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84790736"></a>17.5.5. Ruotare File di Traccia di Audit</h3></div></div></div><p>Le tracce di audit sono scritte solo dal kernel, e gestite
+        solo dal demone dell'audit, <span class="application">auditd</span>.  Gli
+        amministratori non dovrebbero cercare  di usare <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=newsyslog.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">newsyslog.conf</span>(5)</span></a>
+        o altri tool per ruotare direttamente i log di audit.  Invece,
+        il tool di gestione <code class="command">audit</code> può essere usato
+        per interrompere l'audit, riconfigurare il sistema di audit,
+        ed eseguire la rotazione dei log.  Il seguente comando fa sì
+        che il demone audit crei un nuovo log di audit e segnali al kernel
+        di usare il nuovo log.  I vecchio log sarà terminato
+        e rinominato, ed a questo punto potrà essere manipolato
+        dall'amministratore.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>audit -n</code></strong></pre><div xmlns="" class="warning"><h3 class="admontitle">Avvertimento: </h3><p xmlns="http://www.w3.org/1999/xhtml">Se il demone <span class="application">auditd</span> non sta girando
+          al momento, questo comando fallirà e sarà prodotto
+          un messaggio di errore.</p></div><p>Aggiungendo la seguente linea a
+        <code class="filename">/etc/crontab</code> forzerà la rotazione
+        ogni dodici ore da parte di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=cron&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">cron</span>(8)</span></a>:</p><pre class="programlisting">0     */12       *       *       *       root    /usr/sbin/audit -n</pre><p>Il cambiamento prenderà effetto dopo che hai salvato
+        il nuovo <code class="filename">/etc/crontab</code>.</p><p>La rotazione automatica della traccia dell'audit basata
+        sulla dimensione del file è possibile attraverso l'opzione
+        <code class="option">filesz</code> in <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=audit_control&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">audit_control</span>(5)</span></a>, ed è
+        descritta nella sezione sui file di configurazione di questo capitolo.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp84804048"></a>17.5.6. Comprimere le Tracce di Audit</h3></div></div></div><p>Man mano che i file di traccia dell'audit diventano
+        di grandi dimensioni, è spesso desiderabile
+        comprimerli o in qualche modo archiviarli dopo che sono
+        stati chiusi dal demone audit.  Lo script <code class="filename">audit_warn</code>
+        può essere usato per eseguire operazioni personalizzate
+        per una varietà di eventi relativi all'audit, incluse
+        la chiusura pulita delle tracce di audit quando sono ruotate.
+        Ad esempio, il seguente comando può essere aggiunto
+        allo script <code class="filename">audit_warn</code> per comprimere
+        le tracce di audit alla chiusura:</p><pre class="programlisting">#
+# Compress audit trail files on close.
+#
+if [ "$1" = closefile ]; then
+        gzip -9 $2
+fi</pre><p>Altre attività di archiviazione possono includere
+        copiare i file di traccia su di un server centralizzato, cancellare
+        file di traccia vecchi, o ridurre la traccia di audit per rimuovere
+        i record non voluti.  Lo script sarà eseguito solo quando
+        i file di traccia sono chiusi in maniera pulita, così
+        non sarà eseguito su tracce lasciate non terminate
+        a seguito di uno shutdown improprio.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="audit-config.html">Indietro</a> </td><td width="20%" align="center"><a accesskey="u" href="audit.html">Risali</a></td><td width="40%" align="right"> <a accesskey="n" href="disks.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">17.4. Configurazione dell'Audit </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> Capitolo 18. Archiviazione dei Dati</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>31.10. Network Address Translation</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="advanced-networking.html" title="Hoofdstuk 31. Geavanceerde netwerken" /><link rel="prev" href="network-isdn.html" title="31.9. ISDN" /><link rel="next" href="network-ipv6.html" title="31.11. IPv6" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">31.10. Network Address Translation</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-isdn.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 31. Geavanceerde netwerken</th><td width="20%" align="right"> <a accesskey="n" href="network-ipv6.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-natd"></a>31.10. Network Address Translation</h2></div><div><span class="authorgroup">Bijgedragen door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Chern</span> <span class="surname">Lee</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natoverview"></a>31.10.1. Overzicht</h3></div></div></div><a id="idp90415056" class="indexterm"></a><p>Het Network Address Translation daemon van FreeBSD, in het
+	algemeen bekend als <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>, is een daemon dat rauwe
+	binnenkomende IP-pakketten accepteert, de bron naar die van de
+	plaatselijke machine verandert en de pakketten terug in de
+	uitgaande IP-pakketstroom injecteert.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> doet dit
+	door het IP-adres en de poort van de bron zo te veranderen dat
+	wanneer de gegevens weer ontvangen worden, het in staat is om
+	de originele plaats van de gegevens te achterhalen en ze door
+	te sturen naar de originele aanvrager.</p><a id="idp90421840" class="indexterm"></a><a id="idp90422352" class="indexterm"></a><p>NAT wordt het meest gebruikt wat in het algemeen bekend is
+	als het delen van een Internetverbinding.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natsetup"></a>31.10.2. Installatie</h3></div></div></div><p>Wegens de krimpende IP-ruimte in IPv4, en het groeiend
+	aantal gebruikers van consumentenlijnen op hoge snelheid zoals
+	kabel of DSL, hebben steeds meer mensen een oplossing als het
+	delen van een Internetverbinding nodig.  Vanwege de mogelijkheid
+	om meerdere computers online te verbinden door één
+	verbinding en IP-adres is <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> een redelijke keuze.</p><p>In de meeste gevallen heeft een gebruiker een machine
+	verbonden met een kabel- of DSL-lijn met één
+	IP-adres en is het gewenst om deze ene verbonden computer te
+	gebruiken om Internettoegang aan meerdere computers over een LAN
+	te geven.</p><p>Hiervoor dient de FreeBSD-machine op het Internet dienst doen
+	als gateway.  Deze gateway-machine heeft twee NICs nodig &#8212;
+	één voor de verbinding met de Internetrouter, de
+	andere voor de verbinding met het LAN.  Alle machines op het LAN
+	zijn verbonden door een hub of switch.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Er zijn vele manieren om een LAN via een FreeBSD-gateway met
+	  het Internet te verbinden.  Dit voorbeeld behandelt slechts
+	  een gateway met tenminste twee NICs.</p></div><div class="mediaobject"><img src="advanced-networking/natd.png" alt="Netwerkschema" /></div><p>Dit soort installaties wordt in het algemeen gebruikt om een
+	Internetverbinding te delen.  Eén van de
+	<acronym class="acronym">LAN</acronym>-machines is verbonden met het Internet.
+	De rest van de machines hebben internettoegang via die
+	<span class="quote">&#8220;<span class="quote">gateway</span>&#8221;</span>-machine.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdloaderconfiguration"></a>31.10.3. Bootloader-configuratie</h3></div></div></div><a id="idp90435920" class="indexterm"></a><p>De mogelijkheden van de kernel voor network address translation met
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> staan niet aan in <code class="filename">GENERIC</code>, maar ze
+	kunnen worden voorgeladen tijdens het opstarten door enkele opties aan
+	<code class="filename">/boot/loader.conf</code> toe te voegen:</p><pre class="programlisting">ipfw_load="YES"
+ipdivert_load="YES"</pre><p>Ook moet de tunable
+	<code class="literal">net.inet.ip.fw.default_to_accept</code> op
+	<code class="literal">1</code> worden gezet:</p><pre class="programlisting">net.inet.ip.fw.default_to_accept="1"</pre><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het is een goed idee om deze optie aan te zetten tijdens de
+	  eerste pogingen om een firewall en NAT gateway te installeren.  Op
+	  deze manier zal het standaardbeleid van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>
+	  <code class="literal">allow ip from any to any</code> zijn in plaats van het
+	  minder vrije <code class="literal">deny ip from any to any</code>, en zal het
+	  iets moeilijker zijn om buitengesloten te worden net na het opnieuw
+	  opstarten van het systeem.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdkernconfiguration"></a>31.10.4. Kernelconfiguratie</h3></div></div></div><a id="idp90444368" class="indexterm"></a><p>Wanneer modules geen optie zijn of wanneer het gewenst is om alle
+	benodigde mogelijkheden in de draaiende kernel te bouwen, dienen de
+	volgende opties in het kernelinstellingenbestand aanwezig te
+	zijn:</p><pre class="programlisting">options IPFIREWALL
+options IPDIVERT</pre><p>De volgende opties kunnen ook van pas komen:</p><pre class="programlisting">options IPFIREWALL_DEFAULT_TO_ACCEPT
+options IPFIREWALL_VERBOSE</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdsystemconfiguration"></a>31.10.5. Systeeminstellingen voor het opstarten</h3></div></div></div><p>Om de firewall en NAT tijdens het opstarten aan te zetten, moet
+	het volgende in <code class="filename">/etc/rc.conf</code> staan:</p><pre class="programlisting">gateway_enable="YES" <a id="co-natd-gateway-enable"></a><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span>
+firewall_enable="YES" <a id="co-natd-firewall-enable"></a><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span>
+firewall_type="OPEN" <a id="co-natd-firewall-type"></a><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span>
+natd_enable="YES"
+natd_interface="<em class="replaceable"><code>fxp0</code></em>" <a id="co-natd-natd-interface"></a><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span>
+natd_flags="" <a id="co-natd-natd-flags"></a><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></pre><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-gateway-enable"><span><img src="./imagelib/callouts/1.png" alt="1" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Stelt de machine in om dienst te doen als gateway.  Het
+	    draaien van
+	    <code class="command">sysctl net.inet.ip.forwarding=1</code> heeft
+	    hetzelfde effect.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-firewall-enable"><span><img src="./imagelib/callouts/2.png" alt="2" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Activeert de firewall-regels in
+	    <code class="filename">/etc/rc.firewall</code> tijdens het opstarten.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-firewall-type"><span><img src="./imagelib/callouts/3.png" alt="3" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Dit specificeert een vooraf gedefinieerde verzameling
+	    van firewall-regels die alles binnenlaat.  Raadpleeg
+	    <code class="filename">/etc/rc.firewall</code> voor aanvullende
+	    types.</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-natd-interface"><span><img src="./imagelib/callouts/4.png" alt="4" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Geeft aan welke interface te gebruiken om pakketten naar
+	    door te sturen (de interface die met het Internet verbonden
+	    is).</p></td></tr><tr><td width="5%" valign="top" align="left"><p><a href="#co-natd-natd-flags"><span><img src="./imagelib/callouts/5.png" alt="5" border="0" /></span></a> </p></td><td valign="top" align="left"><p>Alle aanvullende instelopties die tijdens het opstarten
+	    aan <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> worden doorgegeven.</p></td></tr></table></div><p>Het gedefinieerd hebben van de bovenstaande opties in
+	<code class="filename">/etc/rc.conf</code> zal <code class="command">natd -interface
+	  fxp0</code> draaien tijdens het opstarten.  Dit kan ook
+	handmatig worden gedraaid.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het is ook mogelijk om een instellingenbestand voor
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> te gebruiken als er teveel opties zijn om door te
+	  geven.  In dit geval dient het instellingenbestand te worden
+	  gedefinieerd door de volgende regel aan
+	  <code class="filename">/etc/rc.conf</code> toe te voegen:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">natd_flags="-f /etc/natd.conf"</pre><p xmlns="http://www.w3.org/1999/xhtml">Het bestand <code class="filename">/etc/natd.conf</code> zal een
+	  lijst met instelopties bevatten, één per regel.
+	  Het geval in de volgende sectie bijvoorbeeld zal het volgende
+	  bestand gebruiken:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">redirect_port tcp 192.168.0.2:6667 6667
+redirect_port tcpc 192.168.0.3:80 80</pre><p xmlns="http://www.w3.org/1999/xhtml">Raadpleeg voor meer informatie over het
+	  instellingenbestand het gedeelte over de optie
+	  <code class="option">-f</code> van de hulppagina <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>.</p></div><p>Elke machine en interface achter het LAN dient een IP-adres
+	in de privé-netwerkruimte toegewezen te krijgen zoals
+	gedefinieerd in <a class="link" href="ftp://ftp.isi.edu/in-notes/rfc1918.txt" target="_top">RFC 1918</a>
+	en een standaard gateway van het interne IP-adres van de
+	<span class="application">natd</span>-machine hebben.</p><p>Bijvoorbeeld, cliënt <code class="systemitem">A</code> en
+	<code class="systemitem">B</code> achter het LAN hebben IP-adressen <code class="systemitem">192.168.0.2</code> en <code class="systemitem">192.168.0.3</code>, terwijl de LAN-interface
+	van de natd-machine IP-adres <code class="systemitem">192.168.0.1</code> heeft.  De standaard
+	gateway van cliënt <code class="systemitem">A</code> en
+	<code class="systemitem">B</code> dient ingesteld te worden op die van de
+	<span class="application">natd</span>-machine, <code class="systemitem">192.168.0.1</code>.  Voor de externe, of
+	Internet-interface van de
+	<span class="application">natd</span>-machine zijn geen speciale
+	wijzigingen nodig om <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> te laten werken.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdport-redirection"></a>31.10.6. Poorten omleiden</h3></div></div></div><p>Het nadeel van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> is dat de LAN-cliënten
+	niet vanaf het Internet toegankelijk zijn.  Cliënten op het
+	LAN kunnen uitgaande verbinden naar de wereld maken maar kunnen
+	geen inkomende verbindingen ontvangen.  Dit vormt een probleem
+	wanneer geprobeerd wordt om Internetdiensten op een van de
+	LAN-cliëntmachines te draaien.  Een eenvoudige om dit te
+	omzeilen is om bepaalde Internetpoorten op de
+	<span class="application">natd</span>-machine om te leiden naar een
+	LAN-cliënt.</p><p>Bijvoorbeeld, er draait een IRC-server op cliënt
+	<code class="systemitem">A</code>, en er draait een webserver op cliënt
+	<code class="systemitem">B</code>.  Om dit goed te laten werken, dienen
+	verbindingen die worden ontvangen op poorten 6667 (IRC) en 80
+	(web) te worden omgeleid naar de respectievelijke
+	machines.</p><p>De optie <code class="option">-redirect_port</code> dient aan
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> met de juiste opties te worden doorgegeven.  De
+	syntaxis is als volgt:</p><pre class="programlisting">     -redirect_port proto doelIP:doelPOORT[-doelPOORT]
+                 [aliasIP:]aliasPOORT[-aliasPOORT]
+                 [verIP[:verrePOORT[-verrePOORT]]]</pre><p>In het bovenstaand voorbeeld dienen de argumenten te
+	zijn:</p><pre class="programlisting">     -redirect_port tcp 192.168.0.2:6667 6667
+-redirectport tcp 192.168.0.3:80 80</pre><p>Dit zal de juiste <span class="emphasis"><em>tcp</em></span>-poorten naar de
+	LAN-cliënt-machines omleiden.</p><p>Het argument <code class="option">-redirect_port</code> kan worden
+	gebruikt om poortbereiken over individuele poorten aan te geven.
+	Bijvoorbeeld, <em class="replaceable"><code>tcp 192.168.0.2:2000-3000
+	  2000-3000</code></em> zal alle verbindingen die op poorten
+	2000 tot 3000 worden ontvangen omleiden naar poorten 2000 tot
+	3000 op cliënt <code class="systemitem">A</code>.</p><p>Deze opties kunnen worden gebruikt wanneer <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>
+	direct wordt gedraaid, wanneer ze zijn geplaatst in de optie
+	<code class="literal">natd_flags=""</code> van
+	<code class="filename">/etc/rc.conf</code>, of wanneer ze via een
+	instellingenbestand worden doorgegeven.</p><p>Raadpleeg voor meer instelopties <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-natdaddress-redirection"></a>31.10.7. Adressen omleiden</h3></div></div></div><a id="idp90508880" class="indexterm"></a><p>Adressen omleiden is handig wanneer er verschillende
+	IP-adressen beschikbaar zijn, maar ze op één
+	machine moeten zitten.  Hiermee kan <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> aan elke
+	LAN-cliënt een eigen extern IP-adres toewijzen.  Vervolgens
+	overschrijft <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a> de uitgaande pakketten van de
+	LAN-cliënten met het juiste IP-adres en leidt het al het
+	binnenkomende verkeer op dat ene IP-adres terug naar de
+	specifieke LAN-cliënt.  Dit staat ook bekend als statisch
+	NAT.  Bijvoorbeeld, de IP-adressen <code class="systemitem">128.1.1.1</code>, <code class="systemitem">128.1.1.2</code>, en <code class="systemitem">1281.2..3</code> behoren toe aan de
+	<span class="application">natd</span> gateway-machine.  <code class="systemitem">128.1.1.1</code> kan gebruikt worden als het
+	externe IP-adres van de <span class="application">natd</span>
+	gateway-machine, terwijl <code class="systemitem">128.1.1.2</code> en <code class="systemitem">128.1.1.3</code> terug worden gestuurd naar
+	de LAN-cliënten <code class="systemitem">A</code> en
+	<code class="systemitem">B</code>.</p><p>De syntaxis van <code class="option">-redirect_address</code> is als
+	volgt:</p><pre class="programlisting">-redirect_address lokaalIP publiekIP</pre><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>lokaalIP</td><td>Het interne IP-adres van de LAN-cliënt.</td></tr><tr><td>publiekIP</td><td>Het externe IP-adres overeenkomend met de
+		LAN-cliënt.</td></tr></tbody></table></div><p>In het voorbeeld zou dit argument zijn:</p><pre class="programlisting">-redirect_address 192.168.0.2 128.1.1.2
+-redirect_address 192.168.0.3 128.1.1.3</pre><p>Net zoals <code class="option">-redirect_port</code> worden ook deze
+	argumenten geplaatst in de optie
+	<code class="literal">natd_flags=""</code> van
+	<code class="filename">/etc/rc.conf</code>, of doorgegeven via een
+	instellingenbestand.  Met adresomleiding is het omleiden van
+	poorten niet nodig aangezien alle gegevens die op een bepaald
+	IP-adres worden ontvangen worden omgeleidt.</p><p>Het externe IP-adres op de <span class="application">natd</span>
+	machine dient actief en naar een externe interface gealiased te
+	zijn.  In <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> staat hoe dit te doen.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-isdn.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="network-ipv6.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">31.9. ISDN </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 31.11. IPv6</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

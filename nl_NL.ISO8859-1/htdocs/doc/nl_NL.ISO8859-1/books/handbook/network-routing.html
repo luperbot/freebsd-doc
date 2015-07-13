@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>31.2. Gateways en routes</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="advanced-networking.html" title="Hoofdstuk 31. Geavanceerde netwerken" /><link rel="prev" href="advanced-networking.html" title="Hoofdstuk 31. Geavanceerde netwerken" /><link rel="next" href="network-wireless.html" title="31.3. Draadloze netwerken" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">31.2. Gateways en routes</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="advanced-networking.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 31. Geavanceerde netwerken</th><td width="20%" align="right"> <a accesskey="n" href="network-wireless.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-routing"></a>31.2. Gateways en routes</h2></div><div><span class="authorgroup">Bijgedragen door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Coranth</span> <span class="surname">Gryphon</span></span>. </span></div></div></div><a id="idp88848208" class="indexterm"></a><a id="idp88848720" class="indexterm"></a><a id="idp88849232" class="indexterm"></a><p>Indien een machine een andere machine over een netwerk wil
+      vinden, dient er een mechanisme te zijn dat beschrijft hoe van de
+      ene naar de andere machine te gaan.  Dit wordt
+      <em class="firstterm">routen</em> genoemd.  Een <span class="quote">&#8220;<span class="quote">route</span>&#8221;</span>
+      is een gedefinieerd adressenpaar: een <span class="quote">&#8220;<span class="quote">bestemming</span>&#8221;</span> en
+      een <span class="quote">&#8220;<span class="quote">gateway</span>&#8221;</span>.  Het paar geeft aan dat door deze
+      <span class="emphasis"><em>gateway</em></span> gecommuniceerd moet worden om bij
+      deze <span class="emphasis"><em>bestemming</em></span> aan te komen.  Er zijn drie
+      soorten bestemmingen: individuele host, subnetten en
+      <span class="quote">&#8220;<span class="quote">standaard</span>&#8221;</span>.  De <span class="quote">&#8220;<span class="quote">standaardroute</span>&#8221;</span> wordt
+      gebruikt indien geen van de andere routes van toepassing zijn.
+      Verderop wordt verder op standaardroutes ingegaan.  Er zijn ook
+      drie soorten gateways: individuele hosts, interfaces (ook wel
+      <span class="quote">&#8220;<span class="quote">verbindingen </span>&#8221;</span> genoemd), en
+      Ethernet-hardware-adressen (MAC-adressen).</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88853584"></a>31.2.1. Een voorbeeld</h3></div></div></div><p>Om de verschillende aspecten van routen te illustreren,
+	wordt het volgende voorbeeld van <code class="command">netstat</code>
+	gebruikt:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>netstat -r</code></strong>
+Routing tables
+
+Destination      Gateway            Flags     Refs     Use     Netif Expire
+
+default          outside-gw         UGSc       37      418      ppp0
+localhost        localhost          UH          0      181       lo0
+test0            0:e0:b5:36:cf:4f   UHLW        5    63288       ed0     77
+10.20.30.255     link#1             UHLW        1     2421
+example.com      link#1             UC          0        0
+host1            0:e0:a8:37:8:1e    UHLW        3     4601       lo0
+host2            0:e0:a8:37:8:1e    UHLW        0        5       lo0 =&gt;
+host2.example.com link#1             UC          0        0
+224              link#1             UC          0        0</pre><a id="idp88856144" class="indexterm"></a><p>De eerste twee regels geven de standaardroute (die behandeld
+	wordt in de <a class="link" href="network-routing.html#network-routing-default" title="31.2.2. Standaardroutes">volgende
+	  sectie</a>) en de <code class="systemitem">localhost</code>-route aan.</p><a id="idp88857936" class="indexterm"></a><p>De interface (kolom <code class="literal">Netif</code>) dat deze
+	routeertabel aangeeft om voor <code class="literal">localhost</code> te
+	gebruiken is <code class="filename">lo0</code>, ook bekend als het
+	teruglusapparaat.  Dit geeft aan dat alle verkeer voor deze
+	bestemming intern gehouden moet worden, in plaats van het over
+	het LAN te sturen, aangezien het alleen aankomt op de plaats
+	waar het verzonden werd.</p><a id="idp88859984" class="indexterm"></a><p>Het volgende dat opvalt zijn de adressen die beginnen met
+	<code class="systemitem">0:e0:</code>.  Dit zijn Ethernet-hardware
+	adressen, ook bekend als MAC-adressen.  FreeBSD zal automatisch
+	elke host (<code class="systemitem">test0</code> in het voorbeeld) op het
+	lokale Ethernet identificeren en een route voor die host
+	toevoegen, direct van deze host over de Ethernet-interface,
+	<code class="filename">ed0</code>.  Er is ook een timeout (kolom
+	<code class="literal">Expire</code>) met deze routesoort geassocieerd,
+	die gebruikt wordt indien er binnen een bepaalde tijd geen
+	bericht komt van de host.  Indien dit gebeurt, wordt de route
+	naar deze host automatisch verwijderd.  Deze hosts worden
+	geïdentificeerd door middel van een mechanisme dat bekend
+	staat als RIP (Routing Information Protocol), dat routes naar
+	lokale hosts bepaald door middel van een kortste-pad
+	algoritme.</p><a id="idp88863312" class="indexterm"></a><p>FreeBSD zal ook subnetroutes voor het lokale subnet toevoegen
+	(<code class="systemitem">10.20.30.255</code> is het
+	broadcast-adres voor het subnet
+	<code class="systemitem">10.20.30</code>, en
+	<code class="systemitem">example.com</code> is de
+	domeinnaam die bij dat subnet hoort).  De aanduiding
+	<code class="literal">link#1</code> verwijst naar de eerste Ethernetkaart
+	in de machine.  Merk op dat voor hen geen aanvullende interface
+	is gespecificeerd.</p><p>Voor beide groepen (lokale netwerkhosts en lokale subnetten)
+	worden de routes automatisch ingesteld door een daemon genaamd
+	<span class="application">routed</span>.  Indien dit niet draait,
+	zullen alleen routes die statisch gedefinieerd (i.e., expliciet
+	vermeld zijn) bestaan.</p><p>De regel met <code class="literal">host1</code> verwijst naar deze
+	host, het kent deze door het Ethernetadres.  Aangezien het de
+	zendende host is, weet FreeBSD dat het de teruglus-interface
+	(<code class="filename">lo0</code>) moet gebruiken, in plaats van het
+	over de Ethernet-interface te verzenden.</p><p>De twee regels met <code class="literal">host2</code> geven een
+	voorbeeld van wat er gebeurt als een alias met <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>
+	gebruikt wordt (in de sectie over Ethernet staan redenen waarom
+	dit gedaan wordt).  Het symbool <code class="literal">=&gt;</code> na de
+	interface <code class="filename">lo0</code> zegt dat niet alleen de
+	teruglus gebruikt wordt (aangezien dit adres ook verwijst naar
+	de lokale host), maar specifiek dat dit een alias is.  Zulke
+	routes verschijnen alleen op de hosts die de alias ondersteunen;
+	alle andere hosts op het lokale netwerk vermelden simpelweg een
+	regel met <code class="literal">link#1</code> voor zulke routes.</p><p>De laatste regel (bestemming subnet
+	<code class="systemitem">224</code>) heeft te maken met
+	multicasten, wat in een andere sectie besproken wordt.</p><p>Als laatste staan in de kolom <code class="literal">Flags</code>
+	verschillende attributen.  Hieronder staat een korte tabel met
+	enkele van deze vlaggen en hun betekenis:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td>U</td><td>Up: De route is actief.</td></tr><tr><td>H</td><td>Host: De bestemming van de route is een enkele
+		host.</td></tr><tr><td>G</td><td>Gateway: Stuur alles voor deze bestemming door naar
+		dit verre systeem, dat zoekt daar uit waar het verder
+		naar te sturen.</td></tr><tr><td>S</td><td>Statisch: Deze route was handmatig ingesteld, dus
+		niet automatisch door het systeem aangemaakt.</td></tr><tr><td>C</td><td>Kloon: Maakt op basis van deze route een nieuwe
+		route aan voor machines waarmee verbinding wordt
+		gemaakt.  Dit soort routes wordt gewoonlijk in lokale
+		netwerken gebruikt.</td></tr><tr><td>W</td><td>WasGekloond: Geeft aan dat een route automatisch
+		was ingesteld gebaseerd op een LAN (kloon)-route.</td></tr><tr><td>L</td><td>Verbinding: De route maakt gebruik van verwijzingen
+		naar Ethernet-hardware.</td></tr></tbody></table></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-routing-default"></a>31.2.2. Standaardroutes</h3></div></div></div><a id="idp88892624" class="indexterm"></a><p>Wanneer het lokale systeem een verbinding met een verre host
+	moet maken, controleert het de routeertabel op reeds bekende
+	paden.  Indien de verre host binnen een subnet valt waarvan
+	bekend is hoe het bereikt kan worden (gekloonde routes),
+	controleert het systeem of het met de daarbij behorende
+	interface verbinding kan maken.</p><p>Indien alle bekende paden falen, heeft het systeem
+	één laatste mogelijkheid: de
+	<span class="quote">&#8220;<span class="quote">standaardroute</span>&#8221;</span>.  Deze route is een speciaal soort
+	gateway-route (gewoonlijk de enig aanwezige in het systeem) en
+	is altijd gemarkeerd met een <code class="literal">c</code> in het
+	vlaggenveld.  Voor hosts op een LAN staat deze gateway ingesteld
+	op de machine die een directe verbinding met de buitenwereld
+	heeft (via een PPP-verbinding, DSL, kabelmodem, T1, of een ander
+	netwerkinterface).</p><p>Indien de standaardroute wordt ingesteld voor een machine
+	die zelf als gateway naar de buitenwereld werkt, zal de
+	standaardroute de gateway-machine van de internetprovider
+	zijn.</p><p>Hieronder volgt een voorbeeld van standaardroutes.  Dit is
+	een veelgebruikte opstelling:</p><div class="mediaobject"><img src="advanced-networking/net-routing.png" /></div><p>De hosts <code class="systemitem">Lokaal1</code> en
+	<code class="systemitem">Lokaal2</code> staan op deze site.
+	<code class="systemitem">Lokaal1</code> is verbonden met een internetprovider
+	via een inbel-PPP-verbinding.  Deze PPP-server is door een LAN
+	verbonden met een andere gateway-computer door een externe
+	interface naar de Internet-feed van de internetprovider.</p><p>De standaardroutes voor de machines zijn:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /><col /></colgroup><thead><tr><th>Host</th><th>Standaard gateway</th><th>Interface</th></tr></thead><tbody><tr><td>Lokaal2</td><td>Lokaal1</td><td>Ethernet</td></tr><tr><td>Lokaal1</td><td>T1-GW</td><td>PPP</td></tr></tbody></table></div><p>Een veelvoorkomende vraag is <span class="quote">&#8220;<span class="quote">Waarom (of hoe) moet
+	  worden ingesteld dat <code class="systemitem">T1-GW</code> de standaard gateway
+	  is voor <code class="systemitem">Lokaal1</code>, in plaats van de server van
+	  de internetprovider waarmee het verbonden is?</span>&#8221;</span>.</p><p>Onthoud dat, aangezien de PPP-interface een adres gebruikt
+	op het lokale netwerk van de internetprovider voor deze kant van
+	de verbinding, routes voor alle andere machines op het lokale
+	netwerk van de internetprovider automatisch aangemaakt worden.
+	Daarom is het al bekend hoe de machine <code class="systemitem">T1-GW</code>
+	bereikt kan worden, dus is de tussenstap dat het verkeer eerst
+	naar de server van de internetprovider gestuurd wordt niet
+	nodig.</p><p>Het is gebruikelijk om het adres <code class="systemitem">X.X.X.1</code> te gebruiken als het
+	gateway-adres voor het lokale netwerk.  Dus (gebruikmakend van
+	hetzelfde voorbeeld), indien de lokale klasse-C adresruimte
+	<code class="systemitem">10.20.30</code> was en de
+	internetprovider <code class="systemitem">10.9.9</code>
+	gebruikte, zouden de standaardroutes als volgt zijn:</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><thead><tr><th>Host</th><th>Standaardroute</th></tr></thead><tbody><tr><td>Lokaal2 (10.20.30.2)</td><td>Lokaal1 (10.20.30.1)</td></tr><tr><td>Lokaal1 (10.20.30.1, 10.9.9.30)</td><td>T1-GW (10.9.9.1)</td></tr></tbody></table></div><p>De standaardroute kan eenvoudig in <code class="filename">/etc/rc.conf</code>
+	gedefinieerd worden.  In dit voorbeeld werd de volgende regel aan
+	<code class="filename">/etc/rc.conf</code> van <code class="systemitem">Lokaal2</code>
+	toegevoegd:</p><pre class="programlisting">defaultrouter="10.20.30.1"</pre><p>Het is ook mogelijk dit met het commando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a>
+	direct vanaf de opdrachtregel te doen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>route add default 10.20.30.1</code></strong></pre><p>Voor meer informatie over het handmatig manipuleren van
+	netwerkrouteertabellen kan de hulppagina <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a>
+	geraadpleegd worden.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-dual-homed-hosts"></a>31.2.3. Dual Homed machines</h3></div></div></div><a id="idp88930256" class="indexterm"></a><p>Er is nog één andere soort opstelling die
+	behandeld dient te worden, en dat is een host die in twee
+	verschillende netwerken zit.  Technisch gezien telt elke machine
+	die als gateway dienst doet (in bovenstaand voorbeeld door een
+	PPP-verbinding te gebruiken) als een dual-homed host.  Maar de
+	term wordt echt alleen gebruikt om naar een machine te verwijzen
+	die in twee LAN's zit.</p><p>In het ene geval heeft de machine twee Ethernetkaarten,
+	waarbij elke kaart een adres op de gescheiden subnetten heeft.
+	Een alternatief is dat de machine slechts één
+	Ethernetkaart heeft en gebruikt maakt van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a>
+	aliasing.  Het eerste wordt gebruikt indien er twee fysiek
+	gescheiden Ethernet-netwerken in gebruik zijn, het laatste
+	indien er één fysiek netwerksegment is, maar er
+	twee logisch gescheiden subnetten zijn.</p><p>In beide gevallen worden er routeertabellen aangemaakt zodat
+	elk subnet weet dat deze machine de gedefinieerde gateway
+	(ingaande route) naar het andere subnet is.  Deze opstelling,
+	waarbij de machine dienst doet als router tussen de twee
+	subnetten, wordt vaak gebruikt voor het implementeren van
+	pakketfilters of firewall-beveiliging in één of
+	beide richtingen.</p><p>Om deze machine daadwerkelijk pakketten te laten forwarden
+	tussen de twee interfaces, moet aan FreeBSD verteld worden dat het
+	deze mogelijkheid aan moet zetten.  In de volgende sectie staan
+	meer details over hoe dit te doen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-dedicated-router"></a>31.2.4. Een router bouwen</h3></div></div></div><a id="idp88933968" class="indexterm"></a><p>Een netwerkrouter is simpelweg een systeem dat pakketten van
+	de ene naar de andere interface doorstuurt.
+	Internetstandaarden en goede ontwerppraktijken verhinderen het
+	FreeBSD Project dit standaard in FreeBSD aan te zetten.  Deze
+	mogelijkheid kan worden aangezet door de volgende variabele in
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=rc.conf&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">rc.conf</span>(5)</span></a> op <code class="literal">YES</code> in te stellen:</p><pre class="programlisting">gateway_enable="YES"	# Op YES instellen indien deze host een gateway is</pre><p>Deze optie stelt de <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sysctl&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">sysctl</span>(8)</span></a> variabele
+	<code class="varname">net.inet.ip.forwarding</code> in op
+	<code class="literal">1</code>.  Indien het nodig is om het routen
+	tijdelijk te stoppen, kan deze variabele tijdelijk op
+	<code class="literal">0</code> worden teruggezet.</p><a id="idp88938832" class="indexterm"></a><a id="idp88939344" class="indexterm"></a><a id="idp88939856" class="indexterm"></a><p>De nieuwe router heeft routes nodig om te weten waar het
+	het verkeer naar toe moet sturen.  Voor een eenvoudig netwerk
+	kunnen statische routes gebruikt worden.  FreeBSD wordt met het
+	standaard BSD routeer-daemon <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=routed&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">routed</span>(8)</span></a> geleverd, dat
+	RIP (zowel versie 1 en versie 2) en IRDP spreekt.  Ondersteuning
+	voor BGP v4, OSPF v2, en andere slimme routeerprotocollen is
+	beschikbaar via het pakket <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/zebra/pkg-descr">net/zebra</a>.  Ook zijn
+	commerciële producten als
+	<span class="application"><span class="trademark">GateD</span>®</span> beschikbaar voor complexere
+	netwerkrouteer-oplossingen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-static-routes"></a>31.2.5. Statische routes opzetten</h3></div><div><span class="authorgroup">Bijgedragen door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Al</span> <span class="surname">Hoang</span></span>. </span></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88953808"></a>31.2.5.1. Handmatige configuratie</h4></div></div></div><p>Er wordt van het volgende netwerk uitgegaan:</p><div class="mediaobject"><img src="advanced-networking/static-routes.png" /></div><p>In dit scenario is <code class="systemitem">RouterA</code> een
+	  FreeBSD-machine die dienst doet als router naar de rest van het
+	  Internet.  Het heeft een standaardroute ingesteld op <code class="systemitem">10.0.0.1</code>, dat het in staat stelt om
+	  verbindingen met de buitenwereld te maken.  Er wordt
+	  aangenomen dat <code class="systemitem">RouterB</code> reeds juist is
+	  ingesteld en dat het weet hoe het waar naar toe moet gaan.  (In
+	  dit plaatje is dit simpel.  Voeg een standaardroute op
+	  <code class="systemitem">RouterB</code> toe door <code class="systemitem">192.168.1.1</code> als gateway te
+	  gebruiken.)</p><p>De routeertabel voor <code class="systemitem">RouterA</code> zou er
+	  ongeveer als volgt uitzien:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>netstat -nr</code></strong>
+Routing tables
+
+Internet:
+Destination        Gateway            Flags    Refs      Use  Netif  Expire
+default            10.0.0.1           UGS         0    49378    xl0
+127.0.0.1          127.0.0.1          UH          0        6    lo0
+10.0.0.0/24          link#1             UC          0        0    xl0
+192.168.1.0/24       link#2             UC          0        0    xl1</pre><p>Met de huidige routeertabel is <code class="systemitem">RouterA</code>
+	  niet in staat om Intern Net 2 te bereiken.  Het heeft geen
+	  route voor <code class="systemitem">192.168.2.0/24</code>.  Een
+	  manier om dit te verhelpen is om de route handmatig toe te
+	  voegen.  Het volgende commando voegt het netwerk Intern Net 2
+	  toe aan de routeertabel van <code class="systemitem">RouterA</code> door
+	  <code class="systemitem">192.168.1.2</code> als de volgende hop
+	  te gebruiken:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>route add -net 192.168.2.0/24 192.168.1.2</code></strong></pre><p>Nu kan <code class="systemitem">RouterA</code> elke host op het netwerk
+	  <code class="systemitem">192.168.2.0/24</code> bereiken.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp88965840"></a>31.2.5.2. Persistente configuratie</h4></div></div></div><p>Bovenstaand voorbeeld is perfect voor het instellen van
+	  een statische route op een draaiend systeem.  Een probleem is
+	  dat de routeerinformatie verdwijnt indien de FreeBSD-machine
+	  opnieuw wordt opgestart.  Aanvullende statische routes kunnen in
+	  <code class="filename">/etc/rc.conf</code> opgenomen worden:</p><pre class="programlisting"># Voeg Intern Net 2 als een statische route toe
+static_routes="internnet2"
+route_internnet2="-net 192.168.2.0/24 192.168.1.2"</pre><p>De instellingsvariabele <code class="literal">static_routes</code>
+	  is een lijst van strings gescheiden door een spatie.  Elke
+	  string verwijst naar een routenaam.  Bovenstaand voorbeeld
+	  heeft slechts één string in
+	  <code class="literal">static_routes</code>.  Dit is de string
+	  <em class="replaceable"><code>internnet2</code></em>.  Vervolgens wordt een
+	  instellingsvariabele
+	  <code class="literal">route_internnet2</code>
+	  toegevoegd waarin alle instellingsparameters staan die aan
+	  het commando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=route&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">route</span>(8)</span></a> moeten worden doorgegeven.  Voor
+	  bovenstaand voorbeeld zou het volgende commando zijn
+	  gebruikt:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>route add -net 192.168.2.0/24 192.168.1.2</code></strong></pre><p>Dus is <code class="literal">"-net 192.168.2.0/24 192.168.1.2"</code>
+	  nodig.</p><p>Zoals hierboven is vermeld is het mogelijk om meerdere
+	  strings in <code class="literal">static_routes</code> te hebben.  Dit
+	  maakt het mogelijk om meerdere statische routes aan te maken.
+	  De volgende regels geven een voorbeeld van het toevoegen van
+	  statische routes voor de netwerken <code class="systemitem">192.168.0.0/24</code> en <code class="systemitem">192.168.1.0/24</code> op een denkbeeldige
+	  router:</p><pre class="programlisting">static_routes="net1 net2"
+route_net1="-net 192.168.0.0/24 192.168.0.1"
+route_net2="-net 192.168.1.0/24 192.168.1.1"</pre></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-routing-propagation"></a>31.2.6. Routes propageren</h3></div></div></div><a id="idp88975568" class="indexterm"></a><p>Er is al gesproken over hoe routes naar de buitenwereld te
+	definiëren, maar niet over hoe de buitenwereld ons kan
+	vinden.</p><p>Het is al bekend dat routeertabellen aangemaakt kunnen
+	worden zodat al het verkeer voor een bepaalde adresruimte (in
+	ons voorbeeld een klasse-C subnet) naar een bepaalde host op dat
+	netwerk gezonden kan worden, dat de ingaande pakketten
+	doorgeeft.</p><p>Wanneer een adresruimte aan een site wordt toegewezen, stelt
+	de serviceprovider al hun routeertabellen zodanig in dat al het
+	verkeer voor het bijhorende subnet naar de PPP-verbinding van de
+	site gezonden wordt.  Maar hoe weten sites door het land heen
+	hoe naar de internetprovider van deze site te versturen?</p><p>Er bestaat een systeem (dat veel lijkt op de gedistribueerde
+	DNS-informatie) dat alle toegewezen adresruimtes bijhoudt, en
+	hun verbindingspunt met de Internet Backbone definieert.  De
+	<span class="quote">&#8220;<span class="quote">Backbone</span>&#8221;</span> zijn de grote kabels die Internetverkeer
+	door het land en over de wereld sturen.  Elke backbone-machine
+	heeft een kopie van een master-verzameling van tabellen, die
+	verkeer voor een bepaald netwerk naar een bepaalde
+	backbone-carrier sturen, en van daaruit naar een keten van
+	serviceproviders totdat het netwerk van de site
+	bereikt is.</p><p>Het is de taak van de serviceprovider om bij de
+	backbone-sites aan te geven dat zij het verbindingspunt (en dus
+	het ingaande pad) zijn voor de site.  Dit staat bekend als
+	routepropagatie.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-routing-troubleshooting"></a>31.2.7. Problemen oplossen</h3></div></div></div><a id="idp88979408" class="indexterm"></a><p>Soms is er een probleem met routepropagatie en kunnen
+	sommige sites geen verbinding maken.  Misschien is het nuttigste
+	commando om proberen uit te zoeken waar het routen misgaat
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a>.  Het is ook nuttig als er geen verbinding
+	mogelijk lijkt met een verre machine (dus als <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ping&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ping</span>(8)</span></a>
+	faalt).</p><p>Het commando <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a> wordt gedraaid met de naam
+	van de verre host waarmee geprobeerd wordt te verbinden.  Het
+	laat de gateway-hosts zien langs het gepoogde pad, dat
+	uiteindelijk de doelhost bereikt, of wegens een gebrek aan
+	verbinding afgebroken wordt.</p><p>Raadpleeg voor meer informatie de hulppagina voor
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=traceroute&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">traceroute</span>(8)</span></a>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="network-routing-multicast"></a>31.2.8. Multicast routen</h3></div></div></div><a id="idp88985168" class="indexterm"></a><a id="idp88985680" class="indexterm"></a><p>FreeBSD ondersteunt zowel multicast-applicaties als multicast
+	routen van huis uit.  Voor multicast-applicaties is geen
+	speciale configuratie van FreeBSD nodig; applicaties draaien over
+	het algemeen als geleverd.  Voor multicast routen dient
+	ondersteuning in de kernel gecompileerd te worden:</p><pre class="programlisting">options MROUTING</pre><p>Ook dient de multicast-routeer-daemon <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrouted&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrouted</span>(8)</span></a>
+	ingesteld worden zodat het tunnels en <acronym class="acronym">DVMRP</acronym>
+	via <code class="filename">/etc/mrouted.conf</code> aanmaakt.  Kijk voor
+	meer details over multicast-instellingen in de hulppagina voor
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrouted&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrouted</span>(8)</span></a>.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">De <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrouted&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrouted</span>(8)</span></a> multicast-routeer-daemon implementeert
+	  het multicast-routeer-protocol <acronym class="acronym">DVRMP</acronym> welke
+	  in veel multicast-installaties grotendeels is vervangen door
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pim&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">pim</span>(4)</span></a>.  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrouted&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrouted</span>(8)</span></a> en de gerelateerde
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=map-mbone&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">map-mbone</span>(8)</span></a> en <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=mrinfo&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">mrinfo</span>(8)</span></a> gereedschappen zijn
+	  beschikbaar in de FreeBSD Ports Collectie als
+	  <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net/mrouted/pkg-descr">net/mrouted</a>.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="advanced-networking.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="network-wireless.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">Hoofdstuk 31. Geavanceerde netwerken </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 31.3. Draadloze netwerken</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

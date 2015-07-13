@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>14.2. Newbus概览</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="newbus.html" title="第 14 章 Newbus" /><link rel="prev" href="newbus.html" title="第 14 章 Newbus" /><link rel="next" href="newbus-api.html" title="14.3. Newbus API" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">14.2. Newbus概览</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="newbus.html">上一页</a> </td><th width="60%" align="center">第 14 章 Newbus</th><td width="20%" align="right"> <a accesskey="n" href="newbus-api.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="newbus-overview"></a>14.2. Newbus概览</h2></div></div></div><a id="idp72619856" class="indexterm"></a><p><span class="emphasis"><em>Newbus</em></span>实现了一种基于抽象层的新型总线结构，
+    可以在FreeBSD 3.0中看到这种总线结构的介绍，当时Alpha的移植被导入到
+    代码树中。直到4.0它才成为设备驱动程序使用的默认系统。其目的是为主机
+    系统提供给<span class="emphasis"><em>操作系统</em></span>的各种总线和设备的互连提供更加
+    面向对象的方法。</p><p>其主要特性包括：</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>动态连接</p></li><li class="listitem"><p>驱动程序容易模块化</p></li><li class="listitem"><p>伪总线</p></li></ul></div><p>最显著的改变之一是从平面和特殊系统演变为设备树布局。</p><p>顶层驻留的是<span class="emphasis"><em><span class="quote">“<span class="quote">根</span>”</span></em></span>设备，它作为
+    父设备，所有其他设备挂接在它上面。对于每个结构，通常<span class="quote">“<span class="quote">根</span>”</span>
+    只有单个孩子，其上连接着诸如<span class="emphasis"><em>host-to-PCI桥</em></span>
+    等东西。对于x86，这种<span class="quote">“<span class="quote">根</span>”</span>设备为
+    <span class="emphasis"><em><span class="quote">“<span class="quote">nexus</span>”</span></em></span>设备，对于Alpha，Alpha的各种
+    不同型号有不同的顶层设备，对应不同的硬件芯片组，包括
+    <span class="emphasis"><em>lca</em></span>，<span class="emphasis"><em>apecs</em></span>，
+    <span class="emphasis"><em>cia</em></span>和<span class="emphasis"><em>tsunami</em></span>。</p><p>Newbus上下文中的设备表示系统中的单个硬件实体。例如，每个PCI设备被
+    表示为一个Newbus设备。系统中的任何设备可以有孩子；有孩子的设备通常被
+    称为<span class="emphasis"><em><span class="quote">“<span class="quote">bus</span>”</span></em></span>。系统中常用总线的例子就是
+    ISA和PCI，他们各自管理连接到ISA和PCI总线上的设备列表。</p><p>通常，不同类型的总线之间的连接被表示为
+    <span class="emphasis"><em><span class="quote">“<span class="quote">桥</span>”</span></em></span>设备，它的孩子就是它所连接的
+    总线。一个例子就是<span class="emphasis"><em>PCI-to-PCI桥</em></span>，它在父PCI总线上被
+    表示为<span class="emphasis"><em><code class="filename">pcibN</code></em></span>，而用它的孩子
+    <span class="emphasis"><em><code class="filename">pciN</code></em></span>表示连接在它上面的
+    总线。这种布局简化了PCI总线树的实现，允许公共代码同时用于顶层和桥接的
+    总线。</p><p>Newbus结构中的每个设备请求它的父设备来为其映射资源。父设备接着请求
+    它的父设备，直到到达nexus。因此，基本上nexus是Newbus系统中唯一知道所有
+    资源的部分。</p><div xmlns="" class="tip"><h3 class="admontitle">提示: </h3><p xmlns="http://www.w3.org/1999/xhtml">ISA设备可能想在<code class="literal">0x230</code>映射其IO端口，因此它向其
+    父设备请求，这种情况下是ISA总线。ISA总线将它交给PCI-to-ISA桥，PCI-to-ISA
+    桥接着请求PCI总线，PCI总线到达host-to-PCI桥，最后到达nexus。这种向上
+    过渡的优美之处在于可以有空间来变换请求。对<code class="literal">0x230</code>IO端口
+    的请求在<acronym class="acronym">MIPS</acronym>机器上可以被PCI桥变成
+    <code class="literal">0xb0000230</code>处的内存映射。</p></div><p>资源分配可以在设备树的任何地方加以控制。例如，在很多Alpha平台上，
+    ISA中断与PCI中断是单独管理的，对ISA中断的资源分配是由Alpha的ISA总线设备
+    管理的。在IA-32上，ISA和PCI中断都由顶层的nexus设备管理。对于两种移植，
+    内存和端口地址空间由单个实体管理 - 在IA-32上是nexus，在Alpha（例如，CIA
+    或tsunami）上是相关的芯片组驱动程序。</p><p>为了规范化对内存和端口映射资源的访问，Newbus整合了NetBSD的
+    <code class="literal">bus_space</code> API。他们提供了单一的API来代替inb/outb
+    和直接内存读写。这样做的优势在于单个驱动程序就可以使用内存映射寄存器
+    或端口映射寄存器（有些硬件支持两者）。</p><p>这种支持被合并到了资源分配机制中。分配资源时，驱动程序可以从资源
+    中检取关联的<code class="varname">bus_space_tag_t</code>和
+    <code class="varname">bus_space_handle_t</code>。</p><p>Newbus也允许在专用于此目的的文件中定义接口方法。这些是
+    <code class="filename">.m</code>文件，可以在<code class="filename">src/sys</code>
+    目录树中找到。</p><p>Newbus系统的核心是可扩展的<span class="quote">“<span class="quote">基于对象编程(object-based
+    programming)</span>”</span>的模型。系统中的每个设备具有它所支持的一个方法表。
+    系统和其他设备使用这些方法来控制设备并请求服务。设备所支持的不同方法
+    被定义为多个<span class="quote">“<span class="quote">接口</span>”</span>。<span class="quote">“<span class="quote">接口</span>”</span>只是
+    设备实现的一组相关的方法。</p><p>在Newbus系统中，设备方法是通过系统中的各种设备驱动程序提供的。当
+    <span class="emphasis"><em>自动配置(auto-configuration)</em></span>期间设备被连接(attach)
+    到驱动程序，它使用驱动程序声明的方法表。以后设备可以从其驱动程序
+    <span class="emphasis"><em>分离(detach)</em></span>，并
+    <span class="emphasis"><em>重新连接(re-attach)</em></span>到具有新方法表的新驱动程序。这就
+    允许驱动程序的动态替换，而动态替换对于驱动程序的开发非常有用。</p><p>接口通过与文件系统中用于定义vnode操作的语言相似的接口定义语言来
+    描述。接口被保存在方法文件中（通常命名为<code class="filename">foo_if.m</code>）。
+    </p><div class="example"><a id="idp72650192"></a><div class="example-title">例 14.1. Newbus的方法</div><div class="example-contents"><pre class="programlisting">
+      # Foo 子系统/驱动程序（注释...）
+
+	  INTERFACE foo
+
+       	METHOD int doit {
+       		device_t dev;
+       	};
+
+       	# 如果没有通过DEVMETHOD()提供一个方法，则DEFAULT为将会被使用的方法
+
+       	METHOD void doit_to_child {
+       		device_t dev;
+       		driver_t child;
+       	} DEFAULT doit_generic_to_child;
+      </pre></div></div><br class="example-break" /><p>当接口被编译后，它产生一个头文件
+    <span class="quote">“<span class="quote"><code class="filename">foo_if.h</code></span>”</span>，其中包含函数声明：</p><pre class="programlisting">
+      int FOO_DOIT(device_t dev);
+      int FOO_DOIT_TO_CHILD(device_t dev, device_t child);
+    </pre><p>伴随自动产生的头文件，也会创建一个源文件
+    <span class="quote">“<span class="quote"><code class="filename">foo_if.c</code></span>”</span>；其中包含一些函数的实现，
+    这些函数用于在对象方法表中查找相关函数的位置并调用那个函数。</p><p>系统定义了两个主要接口。第一个基本接口被称为
+    <span class="emphasis"><em><span class="quote">“<span class="quote">设备(device)</span>”</span></em></span>，并包括与所有设备相关
+    的方法。<span class="emphasis"><em><span class="quote">“<span class="quote">设备(device)</span>”</span></em></span>接口中的方法
+    包括<span class="emphasis"><em><span class="quote">“<span class="quote">探测(probe)</span>”</span></em></span>，
+    <span class="emphasis"><em><span class="quote">“<span class="quote">连接(attach)</span>”</span></em></span>和
+    <span class="emphasis"><em><span class="quote">“<span class="quote">分离(detach)</span>”</span></em></span>，他们用来控制硬件的侦测，
+    以及<span class="emphasis"><em><span class="quote">“<span class="quote">关闭(shutdown)</span>”</span></em></span>，
+    <span class="emphasis"><em><span class="quote">“<span class="quote">挂起(suspend)</span>”</span></em></span>和
+    <span class="emphasis"><em><span class="quote">“<span class="quote">恢复(resume)</span>”</span></em></span>，他们用于关键事件通知。
+    </p><p>另一个，更加复杂接口是<span class="emphasis"><em><span class="quote">“<span class="quote">bus</span>”</span></em></span>。
+    此接口包含的方法适用于带有孩子的设备，包括访问总线特定的每设备信息
+    <a href="#ftn.idp72675408" class="footnote" id="idp72675408"><sup class="footnote">[2]</sup></a>，事件通知
+    （<span class="emphasis"><em><code class="literal">child_detached</code></em></span>，
+    <span class="emphasis"><em><code class="literal">driver_added</code></em></span>）和响应管理
+    （<span class="emphasis"><em><code class="literal">alloc_resource</code></em></span>，
+    <span class="emphasis"><em><code class="literal">activate_resource</code></em></span>，
+    <span class="emphasis"><em><code class="literal">deactivate_resource</code></em></span>，
+    <span class="emphasis"><em><code class="literal">release_resource</code></em></span>）。</p><p><span class="quote">“<span class="quote">bus</span>”</span>接口中的很多方法为总线设备的某些孩子执行服务。
+    这些方法通常使用前两个参量指定提供服务的总线和请求服务的子设备。为了
+    简化设备驱动程序代码，这些方法中的很多都有访问者(accessor)函数，访问者
+    函数用来查找父设备并调用父设备上的方法。例如，方法
+    <code class="literal">BUS_TEARDOWN_INTR(device_t dev, device_t child, ...)</code>
+    可以使用函数
+    <code class="literal">bus_teardown_intr(device_t child, ...)</code>来调用。</p><p>系统中的某些总线类型提供了额外接口以提供对总线特定功能的访问。
+    例如，PCI总线驱动程序定义了<span class="quote">“<span class="quote">pci</span>”</span>接口，此接口有两个方法
+    <span class="emphasis"><em><code class="literal">read_config</code></em></span>和
+    <span class="emphasis"><em><code class="literal">write_config</code></em></span>，用于访问PCI设备
+    的配置寄存器。</p><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp72675408" class="footnote"><p><a href="#idp72675408" class="para"><sup class="para">[2] </sup></a><a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bus_generic_read_ivar&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">bus_generic_read_ivar</span>(9)</span></a> and
+    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bus_generic_write_ivar&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">bus_generic_write_ivar</span>(9)</span></a></p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="newbus.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="newbus.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="newbus-api.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">第 14 章 Newbus </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 14.3. Newbus API</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="iso-8859-2" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>21. fejezet - A Vinum kötetkezelő</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD kézikönyv" /><link rel="up" href="system-administration.html" title="III. rész - Rendszeradminisztráció" /><link rel="prev" href="filesystems-zfs.html" title="20.2. A Z állományrendszer (ZFS)" /><link rel="next" href="vinum-intro.html" title="21.2. Kicsik a lemezeink" /><link rel="copyright" href="legalnotice.html" title="Jogi közlemény" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21. fejezet - A Vinum kötetkezelő</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="filesystems-zfs.html">Vissza</a> </td><th width="60%" align="center">III. rész - Rendszeradminisztráció</th><td width="20%" align="right"> <a accesskey="n" href="vinum-intro.html">Előre</a></td></tr></table><hr /></div><div xml:lang="hu" class="chapter" lang="hu"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="vinum-vinum"></a>21. fejezet - A Vinum kötetkezelő</h2></div><div><span class="authorgroup">Az eredeti változatot írta:<span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="surname">Lehey</span>, <span class="firstname">Greg</span></span>. </span></div></div></div><div class="toc"><div class="toc-title">Tartalom</div><dl class="toc"><dt><span class="sect1"><a href="vinum-vinum.html#vinum-synopsis">21.1. Áttekintés</a></span></dt><dt><span class="sect1"><a href="vinum-intro.html">21.2. Kicsik a lemezeink</a></span></dt><dt><span class="sect1"><a href="vinum-access-bottlenecks.html">21.3. A hozzáférési idők szűk
+      keresztmetszetei</a></span></dt><dt><span class="sect1"><a href="vinum-data-integrity.html">21.4. Adatintegritás</a></span></dt><dt><span class="sect1"><a href="vinum-objects.html">21.5. A Vinum objektumai</a></span></dt><dt><span class="sect1"><a href="vinum-examples.html">21.6. Példák</a></span></dt><dt><span class="sect1"><a href="vinum-object-naming.html">21.7. Az objektumok elnevezése</a></span></dt><dt><span class="sect1"><a href="vinum-config.html">21.8. A Vinum beállítása</a></span></dt><dt><span class="sect1"><a href="vinum-root.html">21.9. Rendszerindítás
+      Vinum-kötetről</a></span></dt></dl></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="vinum-synopsis"></a>21.1. Áttekintés</h2></div></div></div><p>Nem számít, milyen lemezeink is vannak, ugyanis
+      mindig adódnak velük kapcsolatban gondjaink:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Kicsik.</p></li><li class="listitem"><p>Lassúk.</p></li><li class="listitem"><p>Nem elég megbízhatóak.</p></li></ul></div><p>Ezekre a problémákra javasoltak és meg is
+      valósítottak számos megoldást.  A
+      felhasználók egy része
+      általában úgy védekezik ellenük,
+      hogy több, gyakran redundánsan tároló
+      lemezt használ.  A különféle
+      kártyák és hardveres
+      RAID-vezérlők támogatása mellett a FreeBSD
+      alaprendszerében megtalálható egy blokkos
+      eszközmeghajtóként a Vinum
+      kötetkezelő is, amellyel virtuális
+      lemezmeghajtókat lehet létrehozni.  Tehát a
+      <span class="emphasis"><em>Vinum</em></span> egy olyan ún.
+      <span class="emphasis"><em>kötetkezelő</em></span>, vagyis
+      virtuális lemezkezelő, ami az említett
+      három problémára próbál
+      megoldást adni.  A Vinum a hagyományos lemezes
+      tárolásnál jóval nagyobb
+      rugalmasságot, teljesítményt és
+      megbízhatóságot biztosít, valamint
+      ismeri a RAID-0, RAID-1 és RAID-5 modelleket
+      külön-külön és kombinálva
+      is.</p><p>Ebben a fejezetben összefoglaljuk a hagyományos
+      lemezes tárolás jellegzetes problémáit
+      és bemutatjuk a Vinum kötetkezelőt.</p><div xmlns="" class="note"><h3 class="admontitle">Megjegyzés: </h3><p xmlns="http://www.w3.org/1999/xhtml">A FreeBSD 5-ös verziójától kezdve a
+	Vinumot újraírták a GEOM-nak
+	megfelelően (<a class="xref" href="GEOM.html" title="19. fejezet - GEOM: A moduláris lemezszervező rendszer">19. fejezet - <em>GEOM: A moduláris lemezszervező rendszer</em></a>), megtartva az eredeti
+	elgondolásokat, elnevezéseket és a lemezen
+	tárolt metaadatok formátumát.  Ezt az
+	újraírt változatot nevezik
+	<span class="emphasis"><em>gvinum</em></span>nak (<span class="emphasis"><em>GEOM
+	vinum</em></span>).  A szövegben a
+	<span class="emphasis"><em>Vinum</em></span>ra kizárólag csak
+	általánosságban hivatkozunk,
+	függetlenül az
+	implementációjától.  Most már
+	az összes parancsot a <code class="command">gvinum</code>
+	használatával kell kiadni, illetve a
+	hozzá tartozó modul neve
+	<code class="filename">vinum.ko</code>-ról
+	<code class="filename">geom_vinum.ko</code>-ra változott és
+	a megfelelő eszközleírók a
+	<code class="filename">/dev/vinum</code>
+	könyvtár helyett a <code class="filename">/dev/gvinum</code>
+	könyvtárban találhatóak.  A FreeBSD 6.
+	verziójától pedig a régi Vinum
+	implementáció többé már nem is
+	része az alaprendszernek.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="filesystems-zfs.html">Vissza</a> </td><td width="20%" align="center"><a accesskey="u" href="system-administration.html">Fel</a></td><td width="40%" align="right"> <a accesskey="n" href="vinum-intro.html">Előre</a></td></tr><tr><td width="40%" align="left" valign="top">20.2. A Z állományrendszer (ZFS) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Főoldal</a></td><td width="40%" align="right" valign="top"> 21.2. Kicsik a lemezeink</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ha kérdése van a FreeBSD-vel kapcsolatban, a
+    következő címre írhat (angolul):
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Ha ezzel a dokumentummal kapcsolatban van kérdése, kérjük erre a címre írjon:
+    &lt;<a href="mailto:gabor@FreeBSD.org">gabor@FreeBSD.org</a>&gt;.</small></p></body></html>

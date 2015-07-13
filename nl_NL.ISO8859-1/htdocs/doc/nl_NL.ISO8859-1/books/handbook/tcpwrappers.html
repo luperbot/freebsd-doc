@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>15.6. TCP Wrappers</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="security.html" title="Hoofdstuk 15. Beveiliging" /><link rel="prev" href="one-time-passwords.html" title="15.5. Eenmalige wachtwoorden" /><link rel="next" href="kerberos5.html" title="15.7. Kerberos5" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">15.6. TCP Wrappers</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="one-time-passwords.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 15. Beveiliging</th><td width="20%" align="right"> <a accesskey="n" href="kerberos5.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="tcpwrappers"></a>15.6. TCP Wrappers</h2></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Tom</span> <span class="surname">Rhodes</span></span>. </span></div></div></div><a id="idp77261264" class="indexterm"></a><p>Iedereen die bekend is met <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a> heeft waarschijnlijk
+      wel eens van <acronym class="acronym">TCP</acronym> Wrappers gehoord.  Maar
+      slechts weinigen lijken volledig te begrijpen hoe ze in een
+      netwerkomgeving toegepast kunnen worden.  Het schijnt dat
+      iedereen een firewall wil hebben om netwerkverbindingen af te
+      handelen.  Ondanks dat een firewall veel kan, zijn er toch dingen
+      die het niet kan, zoals tekst terugsturen naar de bron van een
+      verbinding.  De <acronym class="acronym">TCP</acronym> Wrappers software kan dat
+      en nog veel meer.  In dit onderdeel worden de mogelijkheden van
+      <acronym class="acronym">TCP</acronym> Wrappers besproken en, waar dat van
+      toepassing is, worden ook voorbeelden voor implementatie
+      gegeven.</p><p>De <acronym class="acronym">TCP</acronym> Wrappers software vergroot de
+      mogelijkheden van <span class="application">inetd</span> door de
+      mogelijkheid al zijn serverdaemons te controleren.  Met deze
+      methode is het mogelijk om te loggen, berichten te zenden naar
+      verbindingen, een daemon toe te staan alleen interne verbindingen
+      te accepteren, etc.  Hoewel een aantal van deze mogelijkheden ook
+      ingesteld kunnen worden met een firewall, geeft deze manier niet
+      alleen een extra laag beveiliging, maar gaat dit ook verder dan
+      wat een firewall kan bieden.</p><p>De toegevoegde waarde van <acronym class="acronym">TCP</acronym> Wrappers
+      is niet dat het een goede firewall vervangt.
+      <acronym class="acronym">TCP</acronym> Wrappers kunnen samen met een firewall en
+      andere beveiligingsinstellingen gebruikt worden om een extra laag
+      van beveiliging voor het systeem te bieden.</p><p>Omdat dit een uitbreiding is op de instellingen van
+      <span class="application">inetd</span>, wordt aangenomen dat de lezer
+      het onderdeel <a class="link" href="network-inetd.html" title="29.2. De inetd &#8220;Super-Server&#8221;">inetd configuratie</a> heeft
+      gelezen.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">Hoewel programma's die onder <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=inetd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">inetd</span>(8)</span></a> draaien niet
+	echt <span class="quote">&#8220;<span class="quote">daemons</span>&#8221;</span> zijn, heten ze traditioneel wel zo.
+	Deze term wordt hier dus ook gebruikt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77269840"></a>15.6.1. Voor het eerst instellen</h3></div></div></div><p>De enige voorwaarde voor het gebruiken van
+	<acronym class="acronym">TCP</acronym> Wrappers in FreeBSD is ervoor te zorgen
+	dat de server <span class="application">inetd</span> gestart wordt
+	vanuit <code class="filename">rc.conf</code> met de optie
+	<code class="option">-Ww</code>; dit is de standaardinstelling.  Er wordt
+	vanuit gegaan dat <code class="filename">/etc/hosts.allow</code> juist is
+	ingesteld, maar als dat niet zo is, dan zal <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> dat
+	melden.</p><div xmlns="" class="note"><h3 class="admontitle">Opmerking: </h3><p xmlns="http://www.w3.org/1999/xhtml">In tegenstelling tot bij andere implementaties van
+	  <acronym class="acronym">TCP</acronym> Wrappers is het gebruik van
+	  <code class="filename">hosts.deny</code> niet langer mogelijk.  Alle
+	  instellingen moeten in <code class="filename">/etc/hosts.allow</code>
+	  staan.</p></div><p>In de meest eenvoudige instelling worden verbindingen naar
+	daemons toegestaan of geweigerd afhankelijk van de opties in
+	<code class="filename">/etc/hosts.allow</code>.  De standaardinstelling
+	in FreeBSD is verbindingen toe te staan naar iedere daemon die met
+	<span class="application">inetd</span> is gestart.  Na de
+	basisinstelling wordt aangegeven hoe dit gewijzigd kan worden.</p><p>De basisinstelling heeft meestal de vorm
+	<code class="literal">daemon : adres : actie</code>.
+	<code class="literal">daemon</code> is de daemonnaam die
+	<code class="command">inetd</code> heeft gestart.  Het
+	<code class="literal">adres</code> kan een geldige hostnaam, een
+	<acronym class="acronym">IP</acronym>-adres of een IPv6-adres tussen
+	blokhaken ([ ]) zijn.  Het veld <code class="literal">actie</code>
+	kan <code class="literal">allow</code> of <code class="literal">deny</code> zijn,
+	afhankelijk van of toegang toegestaan of geweigerd moet worden.
+	De instellingen werken zo dat ze worden doorlopen van onder naar
+	boven om te kijken welke regel als eerste van toepassing is.
+	Als een regel van toepassing is gevonden, dan stop het
+	zoekproces.</p><p>Er zijn nog andere mogelijkheden, maar die worden elders
+	toegelicht.  Een eenvoudige instelling kan al van met deze
+	informatie worden gemaakt.  Om bijvoorbeeld
+	<acronym class="acronym">POP</acronym>3 verbindingen toe te staan via de
+	<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/mail/qpopper/pkg-descr">mail/qpopper</a> daemon,
+	zouden de volgende instellingen moeten worden toegevoegd aan
+	<code class="filename">hosts.allow</code>:</p><pre class="programlisting"># Deze regel is nodig voor POP3-verbindingen
+qpopper : ALL : allow</pre><p>Nadat deze regel is toegevoegd moet
+	<span class="application">inetd</span> herstart worden door gebruik te maken
+	van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=service&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">service</span>(8)</span></a>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>service inetd restart</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77289040"></a>15.6.2. Gevorderde instellingen</h3></div></div></div><p><acronym class="acronym">TCP</acronym> Wrappers hebben ook gevorderde
+	instellingen.  Daarmee komt meer controle over de wijze waarop
+	er met verbindingen wordt omgegaan.  Soms is het een goed idee
+	om commentaar te sturen naar bepaalde hosts of
+	daemonverbindingen.  In andere gevallen moet misschien iets
+	in een logboekbestand geschreven worden of een email naar de
+	beheerder gestuurd worden.  Dit kan allemaal met instellingen
+	die <code class="literal">wildcards</code>, uitbreidingskarakters
+	(expansion characters) en het uitvoeren van externe commando's
+	heten.  De volgende twee paragrafen beschrijven deze
+	mogelijkheden.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77290704"></a>15.6.2.1. Externe commando's</h4></div></div></div><p>Stel dat zich de situatie voordoet waar een verbinding
+	  geweigerd moet worden, maar er een reden gestuurd moet
+	  worden naar het individu dat die verbinding probeerde op te
+	  zetten.  Hoe gaat dat?  Dat is mogelijk door gebruik te
+	  maken van de optie <code class="option">twist</code>.  Als er een
+	  poging tot verbinding wordt gedaan, wordt er met
+	  <code class="option">twist</code> een shellcommando of script
+	  uitgevoerd.  Er staat al een voorbeeld in
+	  <code class="filename">hosts.allow</code>:</p><pre class="programlisting"># De andere daemons zijn beschermd.
+ALL : ALL \
+	: severity auth.info \
+	: twist /bin/echo "You are not welcome to use %d from %h."</pre><p>Dit voorbeeld geeft aan dat het bericht <span class="quote">&#8220;<span class="quote">You are
+	    not allowed to use <code class="literal">daemon</code> from
+	  <code class="literal">hostname</code>.</span>&#8221;</span> wordt teruggestuurd
+	  voor iedere daemon die niet al is ingesteld in het
+	  toegangsbestand.  Het is erg handig om een antwoord terug
+	  te sturen naar degene die een verbinding op heeft willen
+	  zetten meteen nadat een tot stand gekomen verbinding is
+	  verbroken.  Let wel dat alle berichten die gezonden worden
+	  <span class="emphasis"><em>moeten</em></span> staan tussen <code class="literal">"</code>
+	  karakters.  Hier zijn geen uitzonderingen op.</p><div xmlns="" class="warning"><h3 class="admontitle">Waarschuwing: </h3><p xmlns="http://www.w3.org/1999/xhtml"> Het is mogelijk een ontzegging van dienst aanval uit
+	    te voeren op de server als een aanvaller, of een groep
+	    aanvallers, deze daemons kan overstromen met verzoeken om
+	    verbindingen te maken.</p></div><p>Het is ook mogelijk hier de optie <code class="option">spawn</code>
+	  te gebruiken.  Net als <code class="option">twist</code> weigert
+	  de optie <code class="option">spawn</code> impliciet de verbinding en kan
+	  het gebruikt worden om shellcommando's of scripts uit te
+	  voeren.  Anders dan bij <code class="option">twist</code> stuurt
+	  <code class="option">spawn</code> geen bericht aan degene die de
+	  verbinding wilde maken.  Zie bijvoorbeeld de volgende
+	  instelling:</p><pre class="programlisting"># Geen verbindingen van example.com:
+ALL : .example.com \
+	: spawn (/bin/echo %a from %h attempted to access %d &gt;&gt; \
+	  /var/log/connections.log) \
+	: deny</pre><p>Hiermee worden alle verbindingen van het domein
+	  <code class="systemitem">*.example.com</code> geweigerd.
+	  Tegelijkertijd worden ook hostnaam, <acronym class="acronym">IP</acronym>
+	  adres en de daemon waarmee verbinding werd gemaakt naar
+	  <code class="filename">/var/log/connections.log</code>
+	  geschreven.</p><p>Naast de vervangingskarakters die al zijn toegelicht,
+	  zoals <code class="literal">%a</code>, bestaan er nog een paar andere.
+	  In de handleiding van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> staat een volledige
+	  lijst.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp77310800"></a>15.6.2.2. Wildcardopties</h4></div></div></div><p>Tot nu toe is in ieder voorbeeld <code class="literal">ALL</code>
+	  gebruikt.  Er bestaan nog andere opties waarmee de
+	  mogelijkheden nog verder gaan.  Zo kan <code class="literal">ALL</code>
+	  gebruikt worden om van toepassing te zijn op iedere instantie
+	  van een daemon, domein of een <acronym class="acronym">IP</acronym> adres.
+	  Een andere wildcard die gebruikt kan worden is
+	  <code class="literal">PARANOID</code>.  Daarmee wordt iedere host die
+	  een <acronym class="acronym">IP</acronym>-adres geeft dat gefingeerd kan zijn
+	  aangeduid.  Met andere woorden: <code class="literal">PARANOID</code>
+	  kan gebruikt worden om een actie aan te geven als er een
+	  <acronym class="acronym">IP</acronym>-adres gebruikt wordt dat verschilt van
+	  de hostnaam.  Het volgende voorbeeld kan wat verheldering
+	  brengen:</p><pre class="programlisting"># Weiger mogelijke gespoofte verzoeken aan sendmail:
+sendmail : PARANOID : deny</pre><p>In het voorgaande voorbeeld worden alle
+	  verbindingsverzoeken aan <code class="command">sendmail</code> met een
+	  <acronym class="acronym">IP</acronym>-adres dat verschilt van de hostnaam
+	  geweigerd.</p><div xmlns="" class="caution"><h3 class="admontitle">Let op: </h3><p xmlns="http://www.w3.org/1999/xhtml">Het gebruik van de wildcard <code class="literal">PARANOID</code>
+	    kan nogal wat schade aanrichten als de cliënt of de
+	    server kapotte <acronym class="acronym">DNS</acronym>-instellingen heeft.
+	    Voorzichtigheid van de beheerder is geboden.</p></div><p>De handleiding van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=hosts_access&amp;sektion=5"><span class="citerefentry"><span class="refentrytitle">hosts_access</span>(5)</span></a> geeft meer
+	  uitleg over wildcards en de mogelijkheden die ze
+	  bieden.</p><p>Voordat de bovenstaande instellingen werken, dient de
+	  eerste regels in <code class="filename">hosts.allow</code> als
+	  commentaar gemarkeerd te worden.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="one-time-passwords.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="security.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="kerberos5.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">15.5. Eenmalige wachtwoorden </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 15.7. <span class="application">Kerberos5</span></td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

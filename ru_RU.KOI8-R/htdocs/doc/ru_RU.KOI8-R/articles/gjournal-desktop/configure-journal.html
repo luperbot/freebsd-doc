@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>4. Настройка журналирования</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Настройка журналирования UFS для настольного компьютера." /><link rel="up" href="index.html" title="Настройка журналирования UFS для настольного компьютера." /><link rel="prev" href="reserve-space.html" title="3. Действия, необходимые во время установки FreeBSD" /><link rel="next" href="troubleshooting-gjournal.html" title="5. Устранение неполадок с журналированием" /><link rel="copyright" href="trademarks.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">4. Настройка журналирования</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="reserve-space.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="troubleshooting-gjournal.html">След.</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="configure-journal"></a>4. Настройка журналирования</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="running-gjournal"></a>4.1. Работа с командой <code class="command">gjournal</code></h3></div></div></div><p>Подготовив необходимые разделы, перейдем к конфигурированию
+	журналирования. Нам будет необходимо загрузиться в
+	однопользовательском режиме, для этого залогинимся пользователем
+	<code class="systemitem">root</code> и напечатаем:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>shutdown now</code></strong></pre><p>Нажмите <span class="keycap"><strong>Enter</strong></span> для получения приглашения
+	командного интерпретатора. Нам необходимо будет размонтировать
+	разделы, которые подлежат журналированию, в нашем примере это
+	<code class="filename">/usr</code> и <code class="filename">/var</code>.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>umount /usr /var</code></strong></pre><p>Загрузите модуль ядра, необходимый для журналирования:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal load</code></strong></pre><p>На данном этапе сверьтесь со своими записями и определите, какие
+	разделы будут использоваться под какой журнал. В нашем примере
+	<code class="filename">/usr</code> располагается на
+	<code class="filename">ad0s1f</code>, а его журнал
+	будет располагаться на <code class="filename">ad0s1g</code>,
+	и, по аналогии, для <code class="filename">/var</code>: файловая система
+	располагается на <code class="filename">ad0s1d</code>,
+	а ее журнал - на <code class="filename">ad0s1h</code>.
+	Наберите следующие команды:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label ad0s1f ad0s1g</code></strong>
+
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+
+<code class="prompt">#</code> <strong class="userinput"><code>gjournal label ad0s1d ad0s1h</code></strong>
+
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.</pre><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml">Если последний сектор любого из двух разделов (поставщиков
+	  данных) используется, команда <code class="command">gjournal</code>
+	  возвратит ошибку. Вам необходимо будет использовать флаг
+	  <code class="option">-f</code> для принудительной перезаписи, например:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label -f ad0s1d ad0s1h</code></strong></pre><p xmlns="http://www.w3.org/1999/xhtml">Так как это - новая установка, очень маловероятен факт,
+	  что что-нибудь будет действительно переписано.</p></div><p>На данном этапе созданы два устройства:
+	<code class="filename">ad0s1d.journal</code> и
+	<code class="filename">ad0s1f.journal</code>. Они
+	представляют <code class="filename">/var</code> и <code class="filename">/usr</code>
+	соответственно. Перед монтированием, нам необходимо установить флаг
+	журналирования и снять флаг механизма Soft Updates:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>tunefs -J enable -n disable ad0s1d.journal</code></strong>
+
+tunefs: gjournal set
+tunefs: soft updates cleared
+
+<code class="prompt">#</code> <strong class="userinput"><code>tunefs -J enable -n disable ad0s1f.journal</code></strong>
+
+tunefs: gjournal set
+tunefs: soft updates cleared</pre><p>Теперь, смонтируйте новые устройства в соответствующие места
+	файловой системы (обратите внимание на то, что мы можем использовать
+	опцию монтирования <code class="option">async</code>):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>mount -o async /dev/ad0s1d.journal /var</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>mount -o async /dev/ad0s1f.journal /usr</code></strong></pre><p>Откройте <code class="filename">/etc/fstab</code> и исправьте записи для
+	следующих файловых систем: <code class="filename">/usr</code> и
+	<code class="filename">/var</code>:</p><pre class="programlisting">/dev/ad0s1f.journal     /usr            ufs     rw,async      2       2
+/dev/ad0s1d.journal     /var            ufs     rw,async      2       2</pre><div xmlns="" class="warning"><h3 class="admontitle">Предупреждение: </h3><p xmlns="http://www.w3.org/1999/xhtml">Убедитесь, что упомянутые выше записи правильные, иначе старт
+	  системы будет проблематичным после перезагрузки!</p></div><p>И напоследок, подредактируйте
+	<code class="filename">/boot/loader.conf</code>: добавьте следующую строку
+	и модуль <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> будет загружаться автоматически при старте
+	системы:</p><pre class="programlisting">geom_journal_load="YES"</pre><p>Поздравляем! Журналирование успешно сконфигурировано. Вам
+	необходимо лишь набрать <strong class="userinput"><code>exit</code></strong> для возвращения
+	в многопользовательский	режим или перезагрузить систему, чтобы полностью
+	проверить вашу конфигурацию (рекомендуется). Во время загрузки
+	вы увидите сообщения, подобные следующим:</p><pre class="screen">ad0: 76293MB XEC XE800JD-00HBC0 08.02D08 at ata0-master SATA150
+GEOM_JOURNAL: Journal 2948326772: ad0s1g contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1h contains journal.
+GEOM_JOURNAL: Journal 3193218002: ad0s1d contains data.
+GEOM_JOURNAL: Journal ad0s1d clean.
+GEOM_JOURNAL: Journal 2948326772: ad0s1f contains data.
+GEOM_JOURNAL: Journal ad0s1f clean.</pre><p>После непредвиденного останова работы системы сообщения будут
+	немного отличаться, например:</p><pre class="screen">GEOM_JOURNAL: Journal ad0s1d consistent.</pre><p>Это обычно значит, что <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> воспользовался
+	информацией в журнале для возвращения файловой системы к целостному
+	состоянию.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="gjournal-new"></a>4.2. Журналирование новых разделов</h3></div></div></div><p>Процедура, описанная выше, необходима для подключения
+	журналирования разделов, содержащих данные. Журналирование пустых
+	разделов немного проще, ввиду того, что поставщик данных и поставщик
+	журнала могут быть размещены на одном и том же разделе. Например,
+	предположим, что был установлен новый жесткий диск и был создан новый
+	раздел <code class="filename">/dev/ad1s1d</code>. Создание
+	журнала не сложнее набора:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label ad1s1d</code></strong></pre><p>Размер журнала - 1 Гб по умолчанию. Однако, вы можете
+	изменить это значение используя ключ <code class="option">-s</code>. Значение
+	можно задавать в байтах, в килобайтах, мегабайтах или гигабайтах
+	(используя суффикс <code class="literal">K</code>, <code class="literal">M</code> или
+	<code class="literal">G</code>). Имейте ввиду, что команда
+	<code class="command">gjournal</code> не позволит вам создать журнал
+	недопустимо малого размера.</p><p>К примеру, чтобы создать журнал размером в 2Гб, можно использовать
+	следующую команду:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>gjournal label -s 2G ad1s1d</code></strong></pre><p>Далее, вы можете создать файловую систему на новом разделе,
+	а также разрешить журналирование ключом <code class="option">-J</code>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>newfs -J /dev/ad1s1d.journal</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="configure-kernel"></a>4.3. Встраивание журналирования в специализированное ядро</h3></div></div></div><p>Если вы не желаете загружать <code class="literal">geom_journal</code>
+	как модуль, то можно встроить его функции прямо в ваше
+	специализированное ядро. Редактируя конфигурационный файл ядра,
+	убедитесь, что в нем находятся следующие две строки:</p><pre class="programlisting">options UFS_GJOURNAL # Прим.: Это включено в GENERIC
+
+options GEOM_JOURNAL # А эту строку необходимо добавить</pre><p>Соберите и установите новое ядро следуя указаниям
+	<a class="link" href="../../../../doc/ru_RU.KOI8-R/books/handbook/kernelconfig.html" target="_top">
+	Руководства FreeBSD .</a></p><p>И не забудьте удалить соответствующую строку загрузки модуля
+	(<span class="quote"><<<span class="quote">load</span>>></span>) из <code class="filename">/boot/loader.conf</code>
+	(если на предыдущем этапе она была туда внесена).</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="reserve-space.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="troubleshooting-gjournal.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">3. Действия, необходимые во время установки FreeBSD </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 5. Устранение неполадок с журналированием</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

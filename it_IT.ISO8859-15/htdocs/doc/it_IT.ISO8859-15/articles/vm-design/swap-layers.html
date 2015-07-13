@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>3. Livelli di SWAP</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="up" href="index.html" title="Elementi di progettazione del sistema di VM di FreeBSD" /><link rel="prev" href="vm-objects.html" title="2. Oggetti VM" /><link rel="next" href="freeing-pages.html" title="4. Quando liberare una pagina" /><link rel="copyright" href="trademarks.html" title="Nota Legale" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">3. Livelli di SWAP</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vm-objects.html">Indietro</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="freeing-pages.html">Avanti</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="swap-layers"></a>3. Livelli di SWAP</h2></div></div></div><p>Le pagine di dati private sono inizialmente o pagine
+      copy-on-write o pagine zero-fill.
+      Quando avviene un cambiamento, e dunque una copia, l'oggetto di copia
+      originale (in genere un file) non può più essere utilizzato
+      per salvare la copia quando il sistema della VM ha bisogno di
+      riutilizzarla per altri scopi.  A questo punto entra in gioco lo SWAP.  Lo
+      SWAP viene allocato per creare spazio dove salvare memoria che altrimenti
+      non sarebbe disponibile.  FreeBSD alloca la struttura di gestione di
+      un Oggetto VM solo quando è veramente necessario.
+      Ad ogni modo, la struttura di gestione dello swap ha avuto storicamente
+      dei problemi.</p><p>Su FreeBSD 3.X la gestione della struttura di swap prealloca un
+      array che contiene l'intero oggetto che necessita di subire
+      swap-anche se solo poche pagine di quell'oggetto sono effettivamente
+      swappate questo crea una frammentazione della memoria del kernel quando
+      vengono mappati oggetti grandi, o processi con grandi dimensioni
+      all'esecuzione (large runsizes, RSS).  Inoltre, per poter tenere traccia
+      dello spazio di swap, viene mantenuta una <span class="quote">«<span class="quote">lista dei buchi</span>»</span>
+      nella memoria del kernel, ed anche questa tende ad essere pesantemente
+      frammentata.  Poiché la <span class="quote">«<span class="quote">lista dei buchi</span>»</span> è una
+      lista lineare, l'allocazione di swap e la liberazione hanno prestazioni
+      non ottimali O(n) per ogni pagina.
+      Questo richiede anche che avvengano allocazioni di memoria
+      durante il processo di liberazione dello swap, e questo crea
+      problemi di deadlock, blocchi senza uscita, dovuti a scarsa memoria.
+      Il problema è ancor più esacerbato dai buchi creati a causa
+      dell'algoritmo di interleaving.
+      Inoltre il blocco di swap può divenire frammentato molto facilmente
+      causando un'allocazione non contigua.  Anche la memoria del Kernel deve
+      essere allocata al volo per le strutture aggiuntive di gestione dello
+      swap quando avviene uno swapout.  È evidente che c'era molto spazio
+      per dei miglioramenti.</p><p>Per FreeBSD 4.X, ho completamente riscritto il sottosistema di swap.
+      Con questa riscrittura, le strutture di gestione dello swap vengono
+      allocate attraverso una tabella di hash invece che con un array lineare
+      fornendo una dimensione di allocazione fissata e una granularità
+      molto maggiore.
+      Invece di usare una lista lineare collegata per tenere traccia delle
+      riserve di spazio di swap, essa usa una mappa di bit di blocchi di swap
+      organizzata in una struttura ad albero radicato con riferimenti allo
+      spazio libero nelle strutture nei nodi dell'albero.  Ciò rende in
+      effetti l'operazione di allocazione e liberazione delle risorse
+      un'operazione O(1).
+      L'intera mappa di bit dell'albero radicato viene anche preallocata in modo
+      da evitare l'allocazione di memoria kernel durante le operazioni di swap
+      critiche nei momenti in cui la memoria disponibile è ridotta.
+      Dopo tutto, il sistema tende a fare uso dello swap quando ha poca memoria
+      quindi dovremmo evitare di allocare memoria per il kernel in quei momenti
+      per poter evitare potenziali deadlock.  Infine, per ridurre la
+      frammentazione l'albero radicato è in grado di allocare grandi
+      spezzoni contigui in una volta, saltando i pezzetti frammentati.
+      Non ho ancora compiuto il passo finale di avere un <span class="quote">«<span class="quote">puntatore di
+        supportoall'allocazione</span>»</span> che scorra su una porzione di swap nel
+      momento in cui vengano effettuate delle allocazioni, in modo da garantire
+      ancor di più le allocazioni contigue o almeno una località
+      nel riferimento, ma ho assicurato che un'aggiunta simile possa essere
+      effettuata.</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vm-objects.html">Indietro</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="freeing-pages.html">Avanti</a></td></tr><tr><td width="40%" align="left" valign="top">2. Oggetti VM </td><td width="20%" align="center"><a accesskey="h" href="index.html">Partenza</a></td><td width="40%" align="right" valign="top"> 4. Quando liberare una pagina</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Questo, ed altri documenti, possono essere scaricati da
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Per domande su FreeBSD, leggi la
+    <a href="http://www.FreeBSD.org/docs.html">documentazione</a> prima di contattare
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Per domande su questa documentazione, invia una e-mail a
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

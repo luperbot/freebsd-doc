@@ -1,0 +1,910 @@
+<?xml version="1.0" encoding="iso-8859-7" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-7" /><title>30.6. IPFW</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Εγχειρίδιο του FreeBSD" /><link rel="up" href="firewalls.html" title="Κεφάλαιο 30. Firewalls" /><link rel="prev" href="firewalls-ipf.html" title="30.5. Το IPFILTER (IPF) Firewall" /><link rel="next" href="advanced-networking.html" title="Κεφάλαιο 31. Προχωρημένα Θέματα Δικτύωσης" /><link rel="copyright" href="legalnotice.html" title="Νομική Σημείωση" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">30.6. IPFW</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="firewalls-ipf.html">Προηγ</a> </td><th width="60%" align="center">Κεφάλαιο 30. Firewalls</th><td width="20%" align="right"> <a accesskey="n" href="advanced-networking.html">Επόμενο</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="firewalls-ipfw"></a>30.6. IPFW</h2></div></div></div><a id="idp99500240" class="indexterm"></a><p>Το IPFIREWALL (<acronym class="acronym">IPFW</acronym>) είναι λογισμικό που
+      αναπτύχθηκε για το FreeBSD.  Έχει γραφεί και συντηρείται από εθελοντές που
+      ανήκουν στο Project.  Χρησιμοποιεί τους κλασικούς κανόνες χωρίς
+      διατήρηση της κατάστασης (stateless) καθώς και μια τεχνική
+      κωδικοποίησης που επιτυγχάνει αυτό που αναφέρεται ως Απλή Stateful
+      Λογική (Simple Stateful Logic).</p><p>Το υπόδειγμα κανόνων για το IPFW (στα αρχεία
+      <code class="filename">/etc/rc.firewall</code> και
+      <code class="filename">/etc/rc.firewall6</code>) της τυπικής εγκατάστασης του
+      FreeBSD είναι μάλλον απλό και θα χρειαστεί να κάνετε κάποιες αλλαγές
+      πριν το χρησιμοποιήσετε.  Το παράδειγμα δεν χρησιμοποιεί φιλτράρισμα
+      τύπου stateful.  Η stateful λειτουργία είναι ευεργετική στις
+      περισσότερες περιπτώσεις, έτσι δεν θα χρησιμοποιήσουμε αυτό το
+      παράδειγμα ως βάση αυτής της ενότητας.</p><p>Η σύνταξη των κανόνων stateless του IPFW έχει ενισχυθεί με
+      εξελιγμένες δυνατότητες επιλογής οι οποίες συνήθως ξεπερνάνε κατά πολύ
+      τις τυπικές γνώσεις του ατόμου που καλείται να το ρυθμίσει.  Το IPFW
+      απευθύνεται στον επαγγελματία χρήστη ή τον τεχνικά προχωρημένο χομπίστα,
+      ο οποίος έχει ανάγκη προχωρημένου φιλτραρίσματος πακέτων.  Η πραγματική
+      δύναμη των κανόνων του IPFW αποκαλύπτεται μόνο αν διαθέτετε προχωρημένες
+      γνώσεις σχετικά με το πως διαφορετικά πρωτόκολλα δημιουργούν και
+      χρησιμοποιούν την επικεφαλίδα των πακέτων τους.  Τέτοιο επίπεδο
+      επεξηγήσεων είναι πέρα από το σκοπό αυτής της ενότητας του
+      Εγχειριδίου.</p><p>Το IPFW αποτελείται από επτά εξαρτήματα.  Το βασικό εξάρτημα είναι
+      ο επεξεργαστής κανόνων του firewall στον πυρήνα, με ενσωματωμένη τη
+      δυνατότητα καταγραφής.  Τα υπόλοιπα εξαρτήματα είναι το σύστημα
+      καταγραφής (logging), ο κανόνας <code class="literal">divert</code> ο οποίος
+      ενεργοποιεί τη λειτουργία <acronym class="acronym">NAT</acronym>, καθώς και οι
+      προχωρημένες δυνατότητες ειδικού σκοπού: το σύστημα διαμόρφωσης κίνησης
+      (traffic shaper) dummynet, η δυνατότητα προώθησης μέσω του
+      <code class="literal">fwd rule</code>, η δυνατότητα γεφύρωσης (bridge) καθώς και
+      η δυνατότητα απόκρυψης (ipstealth).  To IPFW υποστηρίζει τόσο το
+      πρωτόκολλο IPv4 όσο και το IPv6.</p><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-enable"></a>30.6.1. Ενεργοποιώντας το IPFW</h3></div></div></div><a id="idp99510224" class="indexterm"></a><p>Το IPFW περιλαμβάνεται στην βασική εγκατάσταση του FreeBSD ως άρθρωμα
+	του πυρήνα το οποίο μπορεί να φορτωθεί δυναμικά.  Το σύστημα θα
+	φορτώσει δυναμικά το άρθρωμα όταν βρει την καταχώριση
+	<code class="literal">firewall_enable="YES"</code> στο αρχείο
+	<code class="filename">/etc/rc.conf</code>.  Δεν χρειάζεται να μεταγλωττίσετε
+	το IPFW μέσα στον πυρήνα.</p><p>Αφού επανεκκινήσετε το σύστημα σας με την καταχώριση
+	<code class="literal">firewall_enable="YES"</code> στο
+	<code class="filename">rc.conf</code>, θα δείτε με άσπρα έντονα γράμματα το
+	ακόλουθο μήνυμα κατά τη διαδικασία της εκκίνησης:</p><pre class="screen">ipfw2 initialized, divert disabled, rule-based forwarding disabled, default to deny, logging disabled</pre><p>Το άρθρωμα έχει ενσωματωμένη τη δυνατότητα καταγραφής.  Για να
+	ενεργοποιήσετε την καταγραφή και να θέσετε το επίπεδο λεπτομέρειας,
+	υπάρχουν κάποιες ρυθμίσεις που μπορείτε να θέσετε στο
+	<code class="filename">/etc/sysctl.conf</code>.  Προσθέτοντας τις παρακάτω
+	καταχωρίσεις, θα ενεργοποιηθεί η καταγραφή στις επόμενες
+	εκκινήσεις:</p><pre class="programlisting">net.inet.ip.fw.verbose=1
+net.inet.ip.fw.verbose_limit=5</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-kernel"></a>30.6.2. Επιλογές του Πυρήνα</h3></div></div></div><a id="idp99516112" class="indexterm"></a><a id="idp99517392" class="indexterm"></a><a id="idp99518544" class="indexterm"></a><a id="idp99519696" class="indexterm"></a><p>Δεν είναι υποχρεωτικό να ενεργοποιήσετε το IPFW μεταγλωττίζοντας
+	τις παρακάτω επιλογές στον πυρήνα του FreeBSD.  Ο σκοπός αυτής της
+	παρουσίασης είναι καθαρά ενημερωτικός.</p><pre class="programlisting">options    IPFIREWALL</pre><p>Η επιλογή αυτή ενεργοποιεί το IPFW ως μέρος του πυρήνα.</p><pre class="programlisting">options    IPFIREWALL_VERBOSE</pre><p>Ενεργοποιεί την καταγραφή των πακέτων που περνούν μέσω του IPFW
+	και περιλαμβάνουν τη λέξη <code class="literal">log</code> στον κανόνα
+	τους.</p><pre class="programlisting">options    IPFIREWALL_VERBOSE_LIMIT=5</pre><p>Περιορίζει τον πλήθος των πακέτων που καταγράφονται μέσω του
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> σε συγκεκριμένο αριθμό ανά καταχώριση.  Η ρύθμιση
+	είναι χρήσιμη σε εχθρικά περιβάλλοντα στα οποία είναι επιθυμητή
+	η καταγραφή.  Με αυτό τον τρόπο μπορεί να αποφευχθεί μια πιθανή
+	επίθεση με στόχο την υπερχείλιση των αρχείων καταγραφής.</p><a id="idp99524816" class="indexterm"></a><pre class="programlisting">options    IPFIREWALL_DEFAULT_TO_ACCEPT</pre><p>Η επιλογή αυτή αφήνει τα πάντα να περνάνε μέσα από το firewall,
+	το οποίο είναι καλή ιδέα την πρώτη φορά που ρυθμίζετε το firewall
+	σας.</p><a id="idp99530960" class="indexterm"></a><pre class="programlisting">options    IPDIVERT</pre><p>Η επιλογή αυτή ενεργοποιεί τη λειτουργία
+	<acronym class="acronym">NAT</acronym>.</p><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Το firewall θα απορρίπτει όλα τα πακέτα που κατευθύνονται από
+	  και προς το μηχάνημα, αν δεν περιλάβετε την επιλογή
+	  <code class="literal">IPFIREWALL_DEFAULT_TO_ACCEPT</code> ή αν δεν ρυθμίσετε
+	  ένα κατάλληλο κανόνα που να επιτρέπει αυτές τις συνδέσεις.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rc"></a>30.6.3. Επιλογές στο <code class="filename">/etc/rc.conf</code></h3></div></div></div><p>Ενεργοποιήστε το firewall:</p><pre class="programlisting">firewall_enable="YES"</pre><p>Για να επιλέξετε ένα από τους προεπιλεγμένους τύπους firewall που
+	υποστηρίζονται από το FreeBSD, διαβάστε το αρχείο
+	<code class="filename">/etc/rc.firewall</code> και δημιουργήστε μια εγγραφή
+	όπως την παρακάτω:</p><pre class="programlisting">firewall_type="open"</pre><p>Οι διαθέσιμες τιμές για αυτή τη ρύθμιση είναι:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">open</code> - επιτρέπει τη διέλευση όλης
+	    της κίνησης.</p></li><li class="listitem"><p><code class="literal">client</code> - προστατεύει μόνο το
+	    συγκεκριμένο μηχάνημα.</p></li><li class="listitem"><p><code class="literal">simple</code> - προστατεύει ολόκληρο το
+	    δίκτυο.</p></li><li class="listitem"><p><code class="literal">closed</code> - απενεργοποιεί εντελώς την
+	    κίνηση πακέτων, εκτός από την εσωτερική διεπαφή (loopback).</p></li><li class="listitem"><p><code class="literal">UNKNOWN</code> - απενεργοποιεί την φόρτωση
+	    κανόνων του firewall.</p></li><li class="listitem"><p><code class="filename">filename</code>
+	    - το πλήρες μονοπάτι του αρχείου που περιέχει τους κανόνες
+	    του firewall.</p></li></ul></div><p>Μπορείτε να χρησιμοποιήσετε δύο διαφορετικούς τρόπους για να
+	φορτώσετε προσαρμοσμένους κανόνες στο
+	<span class="application">ipfw</span> firewall.  Ο ένας είναι θέτοντας τη
+	μεταβλητή <code class="literal">firewall_type</code> στην απόλυτη διαδρομή του
+	αρχείου που περιέχει τους <span class="emphasis"><em>κανόνες του firewall</em></span>,
+	χωρίς να δώσετε ορίσματα στην γραμμή εντολών για το ίδιο το
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>.  Το αρχείο κανόνων που φαίνεται παρακάτω, απορρίπτει
+	όλη την εισερχόμενη και εξερχόμενη κίνηση:</p><pre class="programlisting">add deny in
+add deny out</pre><p>Από την άλλη μεριά, είναι επίσης δυνατό να θέσετε τη μεταβλητή
+	<code class="literal">firewall_script</code> στην απόλυτη διαδρομή ενός
+	εκτελέσιμου script που περιλαμβάνει μια σειρά από εντολές
+	<code class="command">ipfw</code> που θα εκτελεστούν κατά την εκκίνηση.
+	Ένα έγκυρο τέτοιο script το οποίο είναι αντίστοιχο με το αρχείο
+	κανόνων που δείξαμε παραπάνω, είναι το ακόλουθο:</p><pre class="programlisting">#!/bin/sh
+
+ipfw -q flush
+
+ipfw add deny in
+ipfw add deny out</pre><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Αν θέσετε την τιμή του <code class="literal">firewall_type</code> είτε
+	  σε <code class="literal">client</code> είτε σε <code class="literal">simple</code>,
+	  θα πρέπει να ελέγξετε ότι οι προεπιλεγμένοι κανόνες που περιέχονται
+	  στο <code class="filename">/etc/rc.firewall</code> ταιριάζουν με τις
+	  ρυθμίσεις του συγκεκριμένου μηχανήματος.  Παρατηρήστε επίσης ότι τα
+	  παραδείγματα που χρησιμοποιούνται σε αυτό το κεφάλαιο αναμένουν να
+	  να έχετε θέσει τη μεταβλητή <code class="literal">firewall_script</code> στην
+	  τιμή <code class="filename">/etc/ipfw.rules</code>.</p></div><p>Ενεργοποιήστε την καταγραφή:</p><pre class="programlisting">firewall_logging="YES"</pre><div xmlns="" class="warning"><h3 class="admontitle">Προειδοποίηση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Το μόνο πράγμα που κάνει η μεταβλητή
+	  <code class="varname">firewall_logging</code> είναι να θέσει την τιμή
+	  της μεταβλητής sysctl <code class="varname">net.inet.ip.fw.verbose</code> στην
+	  τιμή <code class="literal">1</code> (δείτε το <a class="xref" href="firewalls-ipfw.html#firewalls-ipfw-enable" title="30.6.1. Ενεργοποιώντας το IPFW">Τμήμα 30.6.1, «Ενεργοποιώντας το IPFW»</a>).  Δεν υπάρχει μεταβλητή του
+	  <code class="filename">rc.conf</code> που να ορίζει περιορισμούς στην
+	  καταγραφή, αλλά αυτό μπορεί να ρυθμιστεί μέσω της παραπάνω
+	  μεταβλητής sysctl είτε χειροκίνητα, είτε μέσω του αρχείου
+	  <code class="filename">/etc/sysctl.conf</code>:</p><pre xmlns="http://www.w3.org/1999/xhtml" class="programlisting">net.inet.ip.fw.verbose_limit=5</pre></div><p>Αν το μηχάνημα σας λειτουργεί ως πύλη (gateway), δηλαδή παρέχει
+	υπηρεσία μετάφρασης διευθύνσεων δικτύου (Network Address
+	Translation, NAT) μέσω του <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=natd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">natd</span>(8)</span></a>, παρακαλούμε να διαβάσετε το
+	<a class="xref" href="network-natd.html" title="31.8. Network Address Translation">Τμήμα 31.8, «Network Address Translation»</a> για πληροφορίες σχετικά με τις
+	ρυθμίσεις που απαιτούνται στο αρχείο
+	<code class="filename">/etc/rc.conf</code>.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-cmd"></a>30.6.4. Η Εντολή IPFW</h3></div></div></div><a id="idp99571536" class="indexterm"></a><p>Η εντολή <code class="command">ipfw</code> είναι ο συνήθης τρόπος για την
+	προσθήκη η διαγραφή κανόνων στους εσωτερικούς ενεργούς κανόνες του
+	firewall, καθώς αυτό εκτελείται.  Το πρόβλημα με τη χρήση αυτής της
+	μεθόδου είναι ότι οι αλλαγές χάνονται με τον τερματισμό λειτουργίας
+	του μηχανήματος.  Μπορείτε να γράψετε όλους τους κανόνες σας σε ένα
+	αρχείο και να το χρησιμοποιείτε για να τους φορτώνετε στην εκκίνηση.
+	Μπορείτε να χρησιμοποιήσετε το ίδιο αρχείο για να αντικαταστήσετε
+	τους τρέχοντες κανόνες του firewall, την ώρα που αυτό εκτελείται.
+	Αυτός είναι και ο συνιστώμενος τρόπος που χρησιμοποιούμε στα
+	παραδείγματα μας.</p><p>Η εντολή <code class="command">ipfw</code> είναι επίσης χρήσιμη για να
+	απεικονίζει τους τρέχοντες κανόνες στη κονσόλα σας.  Το σύστημα
+	καταγραφής χρήσης της IPFW δημιουργεί αυτόματα ένα μετρητή για κάθε
+	κανόνα, ο οποίος μετράει πόσα πακέτα ταίριαξαν με αυτόν.  Κατά τη
+	διάρκεια των δοκιμών, η δυνατότητα να ελέγξετε την τιμή του μετρητή
+	είναι ένας τρόπος για να διαπιστώσετε αν ο κανόνας λειτουργεί
+	κανονικά.</p><p>Για να δείτε όλους τους κανόνες με τη σειρά:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw list</code></strong></pre><p>Για να δείτε μια λίστα όλων των κανόνων, μαζί με την ώρα που
+	ενεργοποιήθηκε τελευταία φορά ο κάθε κανόνας, γράψτε:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -t list</code></strong></pre><p>Το επόμενο παράδειγμα δείχνει τον αριθμό των πακέτων που ταίριαξαν
+	μαζί με τον αντίστοιχο κανόνα.  Η πρώτη στήλη δείχνει τον αριθμό του
+	κανόνα, ακολουθείται από τον αριθμό πακέτων που ταίριαξαν (πρώτα τα
+	εξερχόμενα και μετά τα εισερχόμενα) και τέλος από τον ίδιο τον
+	κανόνα.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -a list</code></strong></pre><p>Για να δείτε μια λίστα που να περιλαμβάνει τόσο τους δυναμικούς
+	όσο και τους στατικούς κανόνες:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d list</code></strong></pre><p>Για να δείτε και τους δυναμικούς κανόνες που έχουν λήξει:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -d -e list</code></strong></pre><p>Για να μηδενίσετε τους μετρητές:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero</code></strong></pre><p>Για να μηδενίσετε τους μετρητές μόνο για τον κανόνα με τον αριθμό
+	<em class="replaceable"><code>NUM</code></em>:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw zero NUM</code></strong></pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules"></a>30.6.5. Το Σύνολο Κανόνων του IPFW</h3></div></div></div><p>Ως <span class="quote">«<span class="quote">σύνολο κανόνων</span>»</span> στο IPFW, ορίζουμε μια ομάδα
+	κανόνων που έχουν γραφεί για να επιτρέπουν ή να απορρίπτουν πακέτα
+	ανάλογα με τις τιμές που περιέχονται σε αυτά.  Η διπλής κατεύθυνσης
+	ανταλλαγή πακέτων μεταξύ υπολογιστών αποτελεί μια συνεδρία.
+	Το σύνολο κανόνων του firewall επεξεργάζεται τόσο τα πακέτα που
+	έρχονται από το Internet, όσο και τα πακέτα που παράγονται από το
+	σύστημα ως απάντηση σε αυτά.  Κάθε υπηρεσία <acronym class="acronym">TCP/IP</acronym>
+	(π.χ. telnet, www, mail, κ.λ.π.) καθορίζεται από το πρωτόκολλο και
+	την προνομιακή (privileged) θύρα που χρησιμοποιεί για να δέχεται
+	αιτήματα εξυπηρέτησης.  Τα πακέτα που προορίζονται για μια
+	συγκεκριμένη υπηρεσία, ξεκινούν από τη διεύθυνση αφετηρίας
+	χρησιμοποιώντας μια μη-προνομιακή θύρα και καταλήγουν στη
+	συγκεκριμένη θύρα υπηρεσίας στον προορισμό.  Όλες οι παραπάνω
+	παράμετροι (θύρες και διευθύνσεις) μπορούν να χρησιμοποιηθούν ως
+	κριτήρια επιλογής για την δημιουργία κανόνων που επιτρέπουν
+	ή εμποδίζουν την πρόσβαση σε υπηρεσίες.</p><a id="idp99589840" class="indexterm"></a><p>Όταν ένα πακέτο εισέρχεται στο firewall, συγκρίνεται με βάση τον
+	πρώτο κανόνα.  Η σύγκριση συνεχίζεται διαδοχικά με τους υπόλοιπους
+	κανόνες, από τον πρώτο προς τον τελευταίο, με βάση τον αύξοντα αριθμό
+	τους.  Όταν το πακέτο ταιριάξει με τις παραμέτρους επιλογής κάποιου
+	κανόνα, εκτελείται η οδηγία που αναφέρεται στο πεδίο ενεργειών του
+	κανόνα αυτού και η αναζήτηση κανόνων για το συγκεκριμένο πακέτο
+	τερματίζεται.  Σε αυτή τη μέθοδο αναζήτησης,
+	<span class="quote">«<span class="quote">ο πρώτος κανόνας που ταιριάζει, είναι ο νικητής</span>»</span>.  Αν
+	το πακέτο δεν ταιριάζει με κανένα από τους κανόνες, θα ληφθεί από τον
+	υποχρεωτικό προεπιλεγμένο κανόνα του IPFW, με αριθμό 65535, ο οποίος
+	εμποδίζει τη διέλευση όλων των πακέτων, και τα απορρίπτει χωρίς να
+	στείλει καμιά απάντηση στον αρχικό αποστολέα τους.</p><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Η αναζήτηση συνεχίζεται μετά από κανόνες τύπου
+	  <code class="literal">count</code>, <code class="literal">skipto</code> και
+	  <code class="literal">tee</code>.</p></div><p>Οι οδηγίες που φαίνονται εδώ, βασίζονται στη χρήση κανόνων που
+	περιέχουν τις οδηγίες <code class="literal">keep state</code>,
+	<code class="literal">limit</code>, <code class="literal">in</code>,
+	<code class="literal">out</code> και <code class="literal">via</code>.  Αυτές είναι και
+	οι βασικές λειτουργίες για την δόμηση ενός firewall τύπου
+	inclusive με stateful λειτουργία.</p><div xmlns="" class="warning"><h3 class="admontitle">Προειδοποίηση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Να δίνετε μεγάλη προσοχή όταν δουλεύετε με τους κανόνες ενός
+	  firewall.  Μπορεί άθελα σας να κλειδωθείτε έξω από το σύστημα
+	  σας.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-syntax"></a>30.6.5.1. Σύνταξη Κανόνων</h4></div></div></div><a id="idp99602000" class="indexterm"></a><p>Στην ενότητα αυτή, θα παρουσιάσουμε μια απλοποιημένη σύνταξη
+	  κανόνων.  Δείχνουμε μόνο ότι χρειάζεται για να δημιουργηθεί ένα
+	  τυποποιημένο σύνολο κανόνων για ένα inclusive firewall.  Για πλήρη
+	  περιγραφή, δείτε τη σελίδα manual του <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ipfw&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ipfw</span>(8)</span></a>.</p><p>Οι κανόνες περιέχουν λέξεις-κλειδιά.  Οι λέξεις αυτές θα πρέπει
+	  να κωδικοποιηθούν με συγκεκριμένη σειρά από τα αριστερά προς τα
+	  δεξιά της γραμμής.  Οι λέξεις-κλειδιά φαίνονται παρακάτω με έντονα
+	  γράμματα.  Μερικές λέξεις έχουν υπο-επιλογές οι οποίες μπορεί να
+	  είναι επίσης λέξεις-κλειδιά και να περιλαμβάνουν επίσης ακόμα
+	  περισσότερες υπο-επιλογές.</p><p>Η αρχή ενός σχολίου, σηματοδοτείται με το σύμβολο
+	  <code class="literal">#</code>, το οποίο μπορεί να εμφανίζεται στο τέλος μιας
+	  γραμμής κανόνα, ή και σε μια δική του γραμμή.  Οι κενές γραμμές
+	  αγνοούνται.</p><p><em class="replaceable"><code>CMD RULE_NUMBER ACTION LOGGING SELECTION
+	    STATEFUL</code></em></p><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99605968"></a>30.6.5.1.1. CMD</h5></div></div></div><p>Για να γίνει η προσθήκη ενός νέου κανόνα στον εσωτερικό
+	    πίνακα, τοποθετείται μπροστά από αυτόν η παράμετρος
+	    <em class="parameter"><code>add</code></em>.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99611728"></a>30.6.5.1.2. RULE_NUMBER</h5></div></div></div><p>Κάθε κανόνας σχετίζεται με ένα αριθμό κανόνα (rule_number)
+	    στην περιοχή 1..65535.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99612880"></a>30.6.5.1.3. ACTION</h5></div></div></div><p>Ένας κανόνας μπορεί να σχετίζεται με μια ή περισσότερες
+	    ενέργειες, οι οποίες εκτελούνται όταν το πακέτο ταιριάζει με τα
+	    κριτήρια επιλογής αυτού του κανόνα.</p><p><em class="parameter"><code>allow | accept | pass |
+	      permit</code></em></p><p>Όλα τα παραπάνω έχουν το ίδιο αποτέλεσμα: το πακέτο εξέρχεται
+	    από την σύστημα του firewall.  Η αναζήτηση για το συγκεκριμένο
+	    πακέτο τερματίζεται σε αυτό τον κανόνα.</p><p><em class="parameter"><code>check-state</code></em></p><p>Ελέγχει το πακέτο με βάση το δυναμικό πίνακα κανόνων.  Αν
+	    βρεθεί κανόνας που να ταιριάζει, θα εκτελεστεί η ενέργεια του
+	    κανόνα ο οποίος δημιούργησε τον συγκεκριμένο δυναμικό κανόνα.
+	    Διαφορετικά, η αναζήτηση συνεχίζεται με τον επόμενο κανόνα.
+	    Ένας κανόνας check-state δεν έχει κριτήρια επιλογής.  Αν δεν
+	    υπάρχει κανόνας check-state στο σύνολο κανόνων, ο έλεγχος του
+	    πίνακα δυναμικών κανόνων ξεκινάει από τον πρώτο κανόνα τύπου
+	    keep-state ή limit.</p><p><em class="parameter"><code>deny | drop</code></em></p><p>Και οι δύο λέξεις σημαίνουν το ίδιο πράγμα: τα πακέτα που
+	    ταιριάζουν με αυτό τον κανόνα απορρίπτονται.  Η αναζήτηση
+	    τερματίζεται.</p></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99616720"></a>30.6.5.1.4. Καταγραφή</h5></div></div></div><p><em class="parameter"><code>log</code></em> ή
+	    <em class="parameter"><code>logamount</code></em></p><p>Όταν ένα πακέτο ταιριάζει με ένα κανόνα που περιέχει τη λέξη
+	    <code class="literal">log</code>, γίνεται καταγραφή του μηνύματος μέσω του
+	    <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> στη δυνατότητα SECURITY.  Η καταγραφή συμβαίνει
+	    μόνο αν ο αριθμός των πακέτων που έχει καταγραφεί μέχρι στιγμής
+	    δεν υπερβαίνει την παράμετρο <code class="literal">logamount</code>.  Αν η
+	    παράμετρος αυτή δεν έχει καθοριστεί, το όριο ρυθμίζεται με βάση
+	    την τιμή της μεταβλητής sysctl
+	    <code class="literal">net.inet.ip.fw.verbose_limit</code>.  Και στις δύο
+	    περιπτώσεις, μια μηδενική τιμή σημαίνει ότι δεν θα υπάρχει όριο
+	    στην καταγραφή.  Μόλις η καταγραφή φτάσει στο όριο, μπορεί να
+	    γίνει επανενεργοποίηση της με το μηδενισμό του μετρητή
+	    καταγραφής, ή του μετρητή για το συγκεκριμένο κανόνα.  Δείτε την
+	    εντολή <code class="command">ipfw reset log</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Σημείωση: </h3><p xmlns="http://www.w3.org/1999/xhtml">Η καταγραφή γίνεται μόνο αφού επαληθευθούν όλες οι άλλες
+	      συνθήκες ταιριάσματος του πακέτου, και πριν την τελική αποδοχή
+	      ή απόρριψη του.  Είναι στη δική σας ευχέρεια να αποφασίσετε σε
+	      ποιους κανόνες θα ενεργοποιήσετε την καταγραφή.</p></div></div><div class="sect4"><div xmlns="" class="titlepage"><div><div><h5 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99622096"></a>30.6.5.1.5. Επιλογή</h5></div></div></div><p>Οι λέξεις-κλειδιά που περιγράφονται σε αυτή την ενότητα,
+	    χρησιμοποιούνται για να περιγράψουν χαρακτηριστικά του πακέτου που
+	    θα πρέπει να διερευνηθούν για να καθοριστεί αν το πακέτο ταιριάζει
+	    ή όχι με τον κανόνα.  Η επιλογή μπορεί να γίνει με βάση τα
+	    παρακάτω γενικής φύσεως χαρακτηριστικά, τα οποία και θα πρέπει να
+	    χρησιμοποιηθούν με τη σειρά που φαίνονται:</p><p><em class="parameter"><code>udp | tcp | icmp</code></em></p><p>Μπορούν επίσης να χρησιμοποιηθούν τα πρωτόκολλα που
+	    περιέχονται στο αρχείο <code class="filename">/etc/protocols</code>.
+	    Η τιμή που καθορίζεται χρησιμοποιείται για το ταίριασμα του
+	    πρωτοκόλλου.  Πρόκειται για υποχρεωτική παράμετρο.</p><p><em class="parameter"><code>from src to dst</code></em></p><p>Οι λέξεις <code class="literal">from</code> και <code class="literal">to</code>
+	    χρησιμοποιούνται για το ταίριασμα IP διευθύνσεων.  Οι κανόνες
+	    πρέπει να καθορίζουν <span class="emphasis"><em>τόσο</em></span> την πηγή όσο και
+	    τον προορισμό.  Η λέξη <code class="literal">any</code> μπορεί να
+	    χρησιμοποιηθεί για ταίριασμα με οποιαδήποτε διεύθυνση.  Η λέξη
+	    <code class="literal">me</code> έχει επίσης ειδική σημασία.  Ταιριάζει με
+	    οποιαδήποτε διεύθυνση που έχει ρυθμιστεί σε κάποια διεπαφή του
+	    συστήματος σας, αντιπροσωπεύοντας έτσι το PC στο οποίο εκτελείται
+	    το firewall.  Μπορούν έτσι να γραφούν κανόνες του τύπου
+	    <code class="literal">from me to any</code> ή
+	    <code class="literal">from any to me</code> ή
+	    <code class="literal">from any to 0.0.0.0/0</code> ή
+	    <code class="literal">from 0.0.0.0/0 to me</code> ή
+	    <code class="literal">from any to 0.0.0.0</code> ή
+	    <code class="literal">from me to 0.0.0.0</code>.  Οι διευθύνσεις IP
+	    καθορίζονται ως αριθμητικές οκτάδες χωρισμένες με τελείες
+	    και ακολουθούνται από το μήκος της μάσκας υποδικτύου.  Μια
+	    IP διεύθυνση μπορεί να καθορίζεται με αριθμούς που χωρίζονται
+	    με τελείες.  Μπορεί επίσης να ακολουθείται από το μέγεθος της
+	    μάσκας υποδικτύου (μορφή CIDR).  Πρόκειται για υποχρεωτική
+	    παράμετρο.  Μπορείτε να χρησιμοποιήσετε το βοηθητικό πρόγραμμα
+	    <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/ipcalc/pkg-descr">net-mgmt/ipcalc</a> για
+	    διευκόλυνση σας στους υπολογισμούς.  Δείτε την δικτυακή τοποθεσία
+	    του προγράμματος για περισσότερες πληροφορίες: <code class="uri"><a class="uri" href="http://jodies.de/ipcalc" target="_top">http://jodies.de/ipcalc</a></code>.</p><p><em class="parameter"><code>port number</code></em></p><p>Χρησιμοποιείται σε πρωτόκολλα που υποστηρίζουν αριθμούς θυρών
+	    (όπως είναι τα <acronym class="acronym">TCP</acronym> και <acronym class="acronym">UDP</acronym>).
+	    Είναι υποχρεωτικό να δίνεται ο αριθμός θύρας της υπηρεσίας
+	    που θέλετε να ταιριάξετε.  Μπορείτε να χρησιμοποιήσετε τα
+	    ονόματα των υπηρεσιών (μπορείτε να τα βρείτε στο αρχείο
+	    <code class="filename">/etc/services</code>) αντί για τους κανονικούς
+	    αριθμούς θυρών.</p><p><em class="parameter"><code>in | out</code></em></p><p>Με το παραπάνω μπορεί να καθοριστεί αν το ταίριασμα θα
+	    γίνεται σε εισερχόμενα ή σε εξερχόμενα πακέτα αντίστοιχα.  Είναι
+	    υποχρεωτικό να έχετε ως μέρος των κριτηρίων του κανόνα σας, είτε
+	    τη λέξη <code class="literal">in</code> είτε τη λέξη
+	    <code class="literal">out</code>.</p><p><em class="parameter"><code>via IF</code></em></p><p>Ταιριάζει τα πακέτα τα οποία διέρχονται μέσω της διεπαφής με
+	    το όνομα που καθορίζεται.  Η λέξη <code class="literal">via</code>
+	    εξασφαλίζει ότι το όνομα της διεπαφής θα είναι πάντα μέρος των
+	    κριτηρίων κατά τη διαδικασία ταιριάσματος.</p><p><em class="parameter"><code>setup</code></em></p><p>Πρόκειται για υποχρεωτική παράμετρο που αναγνωρίζει την
+	    αίτηση έναρξης μιας συνεδρίας για πακέτα
+	    <acronym class="acronym">TCP</acronym>.</p><p><em class="parameter"><code>keep-state</code></em></p><p>Πρόκειται για υποχρεωτική παράμετρο.  Μόλις υπάρξει ταίριασμα,
+	    το firewall θα δημιουργήσει ένα δυναμικό κανόνα, του οποίου η
+	    προεπιλεγμένη συμπεριφορά είναι να ταιριάζει επικοινωνία διπλής
+	    κατεύθυνσης μεταξύ της διεύθυνσης IP και της θύρας αφετηρίας και
+	    προορισμού, χρησιμοποιώντας το ίδιο πρωτόκολλο.</p><p><em class="parameter"><code>limit {src-addr | src-port | dst-addr |
+	      dst-port}</code></em></p><p>Το firewall θα επιτρέψει μόνο <em class="replaceable"><code>N</code></em>
+	    πλήθος συνδέσεων με τις παραμέτρους που περιγράφονται σε αυτό
+	    τον κανόνα.  Μπορούν να καθοριστούν περισσότερες από μια
+	    διευθύνσεις και πόρτες αφετηρίας και προορισμού.  Δεν μπορούν
+	    να χρησιμοποιηθούν στον ίδιο κανόνα οι παράμετροι
+	    <code class="literal">limit</code> και <code class="literal">keep-state</code>.
+	    Η επιλογή <code class="literal">limit</code> παρέχει την ίδια λειτουργία
+	    stateful με την <code class="literal">keep-state</code>, καθώς και
+	    επιπρόσθετες δικές της λειτουργίες.</p></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99649104"></a>30.6.5.2. Επιλογή για Stateful Κανόνες</h4></div></div></div><a id="idp99649744" class="indexterm"></a><p>Το stateful φιλτράρισμα, αντιμετωπίζει την κίνηση του δικτύου ως
+	  διπλής κατεύθυνσης ανταλλαγή πακέτων τα οποία δημιουργούν μια
+	  συνεδρία.  Έχει επίσης τη δυνατότητα να διερευνήσει αν τηρούνται
+	  οι έγκυροι κανόνες ανταλλαγής μηνυμάτων μεταξύ του αποστολέα και
+	  του παραλήπτη.  Οποιαδήποτε πακέτα δεν ταιριάζουν με το πρότυπο
+	  αυτής της επικοινωνίας, απορρίπτονται ως ψεύτικα.</p><p>Η επιλογή <code class="literal">check-state</code> χρησιμοποιείται για
+	  να αναγνωριστεί σε ποιο σημείο του συνόλου κανόνων του IPFW θα
+	  ελεγχθεί το πακέτο με βάση τη δυνατότητα των δυναμικών κανόνων.
+	  Σε περίπτωση ταιριάσματος, το πακέτο εξέρχεται από το firewall και
+	  συνεχίζει την πορεία του, ενώ την ίδια στιγμή δημιουργείται ένας
+	  νέος δυναμικός κανόνας για το επόμενο πακέτο που αναμένεται να
+	  έρθει με βάση τη συγκεκριμένη διπλής κατεύθυνσης επικοινωνία.  Σε
+	  περίπτωση που το πακέτο δεν ταιριάζει με το δυναμικό κανόνα, θα
+	  προχωρήσει για να ελεγχθεί από τον επόμενο κανόνα του
+	  firewall.</p><p>Η δυνατότητα δυναμικών κανόνων είναι ευάλωτη σε εξάντληση πόρων
+	  σε περίπτωση επίθεσης υπερχείλισης (flood) SYN.  Η επίθεση αυτή
+	  μπορεί να δημιουργήσει πολύ μεγάλο πλήθος δυναμικών κανόνων.
+	  Για την αντιμετώπιση μιας τέτοιας επίθεσης, το FreeBSD χρησιμοποιεί
+	  μια ακόμα επιλογή που ονομάζεται <code class="literal">limit</code>.
+	  Η επιλογή αυτή μπορεί να περιορίσει τον αριθμό των ταυτόχρονων
+	  συνεδριών, εξετάζοντας τα πεδία αφετηρίας και προορισμού των
+	  κανόνων.  Ανιχνεύει με αυτό τον τρόπο το πλήθος των δυναμικών
+	  κανόνων και πόσες φορές έχει χρησιμοποιηθεί ο καθένας από
+	  τη συγκεκριμένη IP διεύθυνση.  Αν ο αριθμός αυτός ξεπερνάει το
+	  όριο που έχει τεθεί με την επιλογή <code class="literal">limit</code>, το
+	  πακέτο απορρίπτεται.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99661904"></a>30.6.5.3. Καταγραφή Μηνυμάτων του Firewall</h4></div></div></div><a id="idp99662544" class="indexterm"></a><p>Τα πλεονεκτήματα της καταγραφής συμβάντων του firewall, είναι
+	  προφανή: παρέχουν τη δυνατότητα να δείτε για ποιο λόγο
+	  ενεργοποιήθηκαν οι κανόνες στους οποίους έχετε ενεργοποιήσει την
+	  καταγραφή.  Οι πληροφορίες περιλαμβάνουν τα πακέτα που απορρίφθηκαν,
+	  τις διευθύνσεις από τις οποίες προήλθαν και που κατευθύνονταν.
+	  Με αυτό τον τρόπο, έχετε ένα σημαντικό πλεονέκτημα στην ανίχνευση
+	  των εισβολέων.</p><p>Ακόμα και αν ενεργοποιήσετε τη λειτουργία καταγραφής, το IPFW
+	  δεν θα αρχίσει από μόνο του την καταγραφή για κανένα κανόνα.
+	  Ο διαχειριστής του firewall θα αποφασίσει σε ποιους από όλους τους
+	  κανόνες θα ενεργοποιήσει την καταγραφή, και θα προσθέσει την
+	  λέξη <code class="literal">log</code> στην αντίστοιχη καταχώριση.
+	  Φυσιολογικά, γίνεται καταγραφή μόνο για κανόνες που απορρίπτουν
+	  πακέτα (κανόνες <code class="literal">deny</code>), όπως για παράδειγμα ο
+	  κανόνας απόρριψης των εισερχόμενων <acronym class="acronym">ICMP</acronym> pings.
+	  Είναι κοινή πρακτική, να αντιγράφεται στο τέλος των κανόνων ο
+	  κανόνας <span class="quote">«<span class="quote">ipfw default deny everything</span>»</span> και να
+	  προστίθεται σε αυτόν η επιλογή <code class="literal">log</code>.
+	  Με τον τρόπο αυτό, μπορείτε να δείτε όλα τα πακέτα που δεν
+	  ταίριαξαν με κανένα κανόνα του συνόλου.</p><p>Η καταγραφή συμβάντων είναι δίκοπο μαχαίρι.  Αν δεν είστε
+	  προσεκτικός, θα χαθείτε μέσα στο πλήθος των δεδομένων της
+	  καταγραφής και θα γεμίσετε το δίσκο σας με άχρηστα αρχεία.  Οι πιο
+	  παλιές και κοινές επιθέσεις τύπου άρνησης υπηρεσίας (DoS), είναι
+	  αυτές που προσπαθούν να γεμίσουν τους δίσκους σας.  Τα μηνύματα
+	  αυτά όχι μόνο καταγράφονται στο <span class="application">syslogd</span>,
+	  αλλά εμφανίζονται και στην κονσόλα του συστήματος σας, και σύντομα
+	  γίνονται πολύ ενοχλητικά.</p><p>Η επιλογή <code class="literal">IPFIREWALL_VERBOSE_LIMIT=5</code> στον
+	  πυρήνα, περιορίζει τον αριθμό των συνεχόμενων όμοιων μηνυμάτων που
+	  στέλνονται στον καταγραφέα συστήματος <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=syslogd&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">syslogd</span>(8)</span></a> σχετικά με
+	  το ταίριασμα πακέτων ενός συγκεκριμένου κανόνα.  Όταν ενεργοποιείται
+	  αυτή η επιλογή στον πυρήνα, ο αριθμός των συνεχόμενων μηνυμάτων
+	  ενός συγκεκριμένου κανόνα, σταματάει μετά τον αριθμό που
+	  καθορίζεται.  Δεν υπάρχει κανένα όφελος από 200 συνεχόμενα μηνύματα
+	  με το ίδιο ακριβώς περιεχόμενο.  Για παράδειγμα, πέντε συνεχόμενα
+	  μηνύματα για ένα συγκεκριμένο κανόνα θα καταγράφονταν κανονικά στο
+	  <span class="application">syslogd</span>.  Τα υπόλοιπα όμοια μηνύματα θα
+	  καταμετρηθούν και θα καταγραφούν όπως φαίνεται παρακάτω:</p><pre class="programlisting">last message repeated 45 times</pre><p>Όλα τα μηνύματα καταγραφής των πακέτων, γράφονται από προεπιλογή
+	  στο αρχείο <code class="filename">/var/log/security</code> το οποίο
+	  καθορίζεται στο αρχείο <code class="filename">/etc/syslog.conf</code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="firewalls-ipfw-rules-script"></a>30.6.5.4. Δημιουργία Ενός Script Κανόνων</h4></div></div></div><p>Οι περισσότεροι έμπειροι χρήστες του IPFW, δημιουργούν ένα
+	  αρχείο που περιέχει τους κανόνες και το γράφουν με τέτοιο τρόπο
+	  ώστε να να μπορεί να εκτελεστεί ως script.  Το βασικό πλεονέκτημα
+	  του παραπάνω τρόπου, είναι ότι οι κανόνες του firewall μπορούν να
+	  ανανεωθούν χωρίς την ανάγκη να επανεκκινήσει το σύστημα για να
+	  φορτωθούν οι νέοι.  Η μέθοδος αυτή είναι πολύ βολική για
+	  την δοκιμή νέων κανόνων, καθώς η διαδικασία μπορεί να επαναληφθεί
+	  όσες φορές χρειάζεται.  Καθώς πρόκειται για κανονικό script,
+	  μπορείτε να χρησιμοποιήσετε συμβολική υποκατάσταση για να
+	  κωδικοποιήσετε και να υποκαταστήσετε συχνά χρησιμοποιούμενες τιμές
+	  σε πολλαπλούς κανόνες.  Αυτό φαίνεται στο παρακάτω
+	  παράδειγμα.</p><p>Η σύνταξη που χρησιμοποιείται εδώ, είναι συμβατή με τα κελύφη
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=sh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">sh</span>(1)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=csh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">csh</span>(1)</span></a> και <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcsh&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcsh</span>(1)</span></a>.  Μπροστά από τα πεδία
+	  της συμβολικής υποκατάστασης, υπάρχει το σήμα του δολαρίου,
+	  $.  Το σύμβολο αυτό δεν υπάρχει μπροστά από τα συμβολικά
+	  πεδία.  Η τιμή που θα αποδοθεί στο συμβολικό πεδίο, πρέπει να
+	  εσωκλείεται σε διπλά εισαγωγικά.</p><p>Ξεκινήστε το αρχείο των κανόνων σας όπως φαίνεται
+	  παρακάτω:</p><pre class="programlisting">############### start of example ipfw rules script #############
+#
+ipfw -q -f flush       # Delete all rules
+# Set defaults
+oif="tun0"             # out interface
+odns="192.0.2.11"      # ISP's DNS server IP address
+cmd="ipfw -q add "     # build rule prefix
+ks="keep-state"        # just too lazy to key this each time
+$cmd 00500 check-state
+$cmd 00502 deny all from any to any frag
+$cmd 00501 deny tcp from any to any established
+$cmd 00600 allow tcp from any to any 80 out via $oif setup $ks
+$cmd 00610 allow tcp from any to $odns 53 out via $oif setup $ks
+$cmd 00611 allow udp from any to $odns 53 out via $oif $ks
+################### End of example ipfw rules script ############</pre><p>Αυτό είναι όλο.  Στο παράδειγμα αυτό δεν είναι σημαντικοί οι
+	  κανόνες, αλλά ο τρόπος με τον οποίο λειτουργούν και παίρνουν τιμές
+	  τα πεδία συμβολικής υποκατάστασης.</p><p>Αν το παραπάνω παράδειγμα ήταν στο αρχείο
+	  <code class="filename">/etc/ipfw.rules</code> θα μπορούσατε να φορτώσετε
+	  αυτούς τους κανόνες, γράφοντας την παρακάτω εντολή:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>sh /etc/ipfw.rules</code></strong></pre><p>Το αρχείο <code class="filename">/etc/ipfw.rules</code> μπορεί να
+	  βρίσκεται σε όποιο κατάλογο θέλετε, και να ονομάζεται επίσης όπως
+	  θέλετε.</p><p>Θα μπορούσατε να επιτύχετε το ίδιο πράγμα, εκτελώντας τις
+	  παρακάτω εντολές χειροκίνητα:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ipfw -q -f flush</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add check-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add deny all from any to any frag</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add deny tcp from any to any established</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add allow tcp from any to any 80 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add allow tcp from any to 192.0.2.11 53 out via tun0 setup keep-state</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ipfw -q add 00611 allow udp from any to 192.0.2.11 53 out via tun0 keep-state</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99689040"></a>30.6.5.5. Σύνολο Κανόνων Stateful</h4></div></div></div><p>Το παρακάτω σύνολο κανόνων (που δεν περιέχει κανόνες για
+	  <acronym class="acronym">NAT</acronym>) είναι ένα παράδειγμα γραφής ενός inclusive
+	  firewall.  Ένα inclusive firewall επιτρέπει την είσοδο μόνο των
+	  πακέτων που ταιριάζουν με τους κανόνες αποδοχής (pass) και
+	  απορρίπτει από προεπιλογή όλα τα άλλα.  Τα firewalls που έχουν
+	  σχεδιαστεί να προστατεύουν ολόκληρα δίκτυα, διαθέτουν το λιγότερο
+	  δύο διεπαφές, στις οποίες πρέπει να υπάρχουν κανόνες ώστε το
+	  firewall να λειτουργεί.</p><p>Όλα τα λειτουργικά συστήματα τύπου <span class="trademark">UNIX</span>(R), συμπεριλαμβανομένου
+	  και του FreeBSD, έχουν σχεδιαστεί να χρησιμοποιούν τη διεπαφή
+	  <code class="filename">lo0</code> και τη διεύθυνση IP
+	  <code class="systemitem">127.0.0.1</code> για εσωτερική επικοινωνία
+	  με το λειτουργικό σύστημα.  Το firewall πρέπει να περιέχει κανόνες
+	  που να επιτρέπουν την απρόσκοπτη κίνηση αυτών των ειδικών, για
+	  εσωτερική χρήση, πακέτων.</p><p>Οι κανόνες που ορίζουν την πρόσβαση εισερχόμενων και
+	  εξερχόμενων πακέτων, γράφονται για τη διεπαφή που συνδέεται στο
+	  δημόσιο Internet.  Η διεπαφή αυτή μπορεί να είναι για παράδειγμα η
+	  <code class="filename">tun0</code> (σε περίπτωση που χρησιμοποιείτε το
+	  <acronym class="acronym">PPP</acronym> χρήστη), ή η κάρτα δικτύου που συνδέεται στο
+	  καλωδιακό ή DSL modem σας.</p><p>Σε περίπτωση που μια ή περισσότερες κάρτες δικτύου συνδέονται σε
+	  εσωτερικά ιδιωτικά δίκτυα πίσω από το firewall, θα πρέπει να
+	  υπάρχουν οι αντίστοιχοι κανόνες που να επιτρέπουν την ελεύθερη
+	  διακίνηση των πακέτων ανάμεσα στις διεπαφές αυτές ή/και στο
+	  Internet.</p><p>Οι κανόνες πρέπει να οργανώνονται σε τρεις κύριες ενότητες:
+	  αρχικά όλες οι διεπαφές στις οποίες επιτρέπεται η ελεύθερη διακίνηση
+	  δεδομένων, έπειτα η διεπαφή από την οποία εξέρχονται τα πακέτα προς
+	  το δημόσιο δίκτυο (Internet) και τέλος η διεπαφή από την οποία
+	  λαμβάνονται πακέτα από το Internet.</p><p>Σε κάθε μια από τις ενότητες των διεπαφών που συνδέονται στο
+	  Internet, πρέπει να τοποθετούνται πρώτοι οι κανόνες που ταιριάζουν
+	  συχνότερα με την αντίστοιχη κίνηση.  Ο τελευταίος κανόνας της
+	  ενότητας θα πρέπει να απορρίπτει και να καταγράφει όλα τα πακέτα
+	  της συγκεκριμένης διεπαφής/κατεύθυνσης.</p><p>Η ενότητα εξερχομένων (Outbound) στο σύνολο κανόνων που φαίνεται
+	  παρακάτω, περιέχει μόνο κανόνες τύπου <code class="literal">allow</code>.  Οι
+	  κανόνες αυτοί περιέχουν συγκεκριμένες επιλεγμένες τιμές, με τις
+	  οποίες αναγνωρίζεται με μοναδικό τρόπο η υπηρεσία στην οποία
+	  επιτρέπεται η πρόσβαση από το δημόσιο Internet.  Όλοι οι κανόνες
+	  έχουν τις επιλογές <code class="literal">proto</code>,
+	  <code class="literal">port</code>, <code class="literal">in/out</code> και
+	  <code class="literal">keep-state</code>.  Οι κανόνες τύπου
+	  <code class="literal">proto tcp</code> περιέχουν την επιλογή
+	  <code class="literal">setup</code> για την αναγνώριση του πακέτου έναρξης της
+	  συνεδρίας, ώστε να γίνει η καταχώριση της στον πίνακα συνδέσεων
+	  (stateful).</p><p>Στην ενότητα των εισερχόμενων πακέτων (Inbound) που φαίνεται
+	  παρακάτω, εμφανίζονται πρώτοι οι κανόνες που χρησιμοποιούνται για
+	  την απόρριψη των ανεπιθύμητων πακέτων.  Αυτό γίνεται για δύο
+	  διαφορετικούς λόγους.  Ο πρώτος είναι ότι τα κακόβουλα πακέτα
+	  μπορεί εν μέρει να ταιριάζουν με κάποια χαρακτηριστικά της έγκυρης
+	  κίνησης.  Τα πακέτα αυτά θα πρέπει να απορριφθούν, αντί να γίνουν
+	  δεκτά από κάποιο επόμενο κανόνα <code class="literal">allow</code>.
+	  Ο δεύτερος είναι ότι μπορείτε να απορρίψετε συγκεκριμένα πακέτα τα
+	  οποία γνωρίζετε ότι δεν είναι έγκυρα, αλλά σας είναι αδιάφορη η
+	  καταγραφή τους.  Με τον τρόπο αυτό εμποδίζεται η λήψη και καταγραφή
+	  τους από τον τελευταίο κανόνα.  Ο τελευταίος κανόνας τυπικά
+	  απορρίπτει και καταγράφει όλα τα πακέτα που έφτασαν μέχρι αυτόν.
+	  Ο κανόνας αυτός χρησιμοποιείται για την παροχή νομικών αποδείξεων
+	  σε περίπτωση που κινήσετε νομική διαδικασία κατά ατόμων που
+	  προέβησαν σε επιθέσεις στο σύστημα σας.</p><p>Θα πρέπει επίσης να εξασφαλίσετε ότι το σύστημα σας δεν θα
+	  δώσει καμιά απάντηση σε κανένα από τα ανεπιθύμητα πακέτα.
+	  Τα πακέτα αυτά θα πρέπει να απορριφθούν και να εξαφανιστούν.
+	  Με τον τρόπο αυτό, ο επιτιθέμενος δεν έχει καμιά γνώση αν τα πακέτα
+	  του έφτασαν μέχρι το σύστημα σας.  Όσο λιγότερα μπορούν να μάθουν
+	  οι επιτιθέμενοι σχετικά με το σύστημα σας, τόσο πιο ασφαλές
+	  είναι.  Όταν εκτελείτε καταγραφή πακέτων με αριθμούς θυρών που δεν
+	  αναγνωρίζετε, κοιτάξτε στο αρχείο
+	  <code class="filename">/etc/services/</code> ή δείτε το <code class="uri"><a class="uri" href="http://www.securitystats.com/tools/portsearch.php" target="_top">http://www.securitystats.com/tools/portsearch.php</a></code>
+	  και αναζητήστε τον αριθμό της θύρας για να δείτε ποιος είναι ο
+	  σκοπός της.  Ελέγξτε την παρακάτω τοποθεσία για τους αριθμούς θυρών
+	  που χρησιμοποιούνται συχνά από κακόβουλα προγράμματα (Trojans):
+	  <code class="uri"><a class="uri" href="http://www.simovits.com/trojans/trojans.html" target="_top">http://www.simovits.com/trojans/trojans.html</a></code>.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99737296"></a>30.6.5.6. Ένα Υπόδειγμα Συνόλου Κανόνων Inclusive</h4></div></div></div><p>Το παρακάτω σύνολο κανόνων (στο οποίο δεν υλοποιείται λειτουργία
+	  <acronym class="acronym">NAT</acronym>) είναι αρκετά πλήρες και πολύ ασφαλές.
+	  Δημιουργεί firewall τύπου inclusive, και έχει δοκιμαστεί σε
+	  πραγματικές συνθήκες λειτουργίας.  Μπορεί να εξυπηρετήσει το ίδιο
+	  καλά και το δικό σας σύστημα.  Απλώς μετατρέψτε σε σχόλιο τους
+	  κανόνες <code class="literal">pass</code> για τις υπηρεσίες που δεν θέλετε
+	  να ενεργοποιήσετε.  Για να αποφύγετε την καταγραφή ανεπιθύμητων
+	  μηνυμάτων, απλώς προσθέστε ένα κανόνα τύπου
+	  <code class="literal">deny</code> στην ενότητα των εισερχομένων.  Σε όλους
+	  τους κανόνες, Θα πρέπει να αλλάξετε το όνομα της διεπαφής από
+	  <code class="filename">dc0</code> στο πραγματικό όνομα της διεπαφής που
+	  συνδέεται στο δημόσιο Internet.  Σε περίπτωση που χρησιμοποιείτε το
+	  <acronym class="acronym">PPP</acronym> χρήστη, το όνομα της διεπαφής θα είναι
+	  <code class="filename">tun0</code>.</p><p>Θα διαπιστώσετε ότι υπάρχει μια συγκεκριμένη λογική στη χρήση
+	  αυτών των κανόνων.</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Όλοι οι κανόνες που αποτελούν αίτηση για έναρξη μιας νέας
+	      συνεδρίας με το δημόσιο Internet, χρησιμοποιούν την επιλογή
+	      <code class="literal">keep-state</code>.</p></li><li class="listitem"><p>Όλες οι διαπιστευμένες υπηρεσίες που προέρχονται από το
+	      δημόσιο Internet, διαθέτουν την επιλογή
+	      <code class="literal">limit</code>, για την αποφυγή επιθέσεων
+	      υπερχείλισης (flooding).</p></li><li class="listitem"><p>Όλοι οι κανόνες χρησιμοποιούν τις επιλογές
+	      <code class="literal">in</code> ή <code class="literal">out</code> για να
+	      διευκρινίζουν την κατεύθυνση της επικοινωνίας.</p></li><li class="listitem"><p>Όλοι οι κανόνες χρησιμοποιούν την επιλογή
+	      <code class="literal">via όνομα-διεπαφής</code>
+	      για να καθορίσουν τη διεπαφή από την οποία διέρχεται το
+	      πακέτο.</p></li></ul></div><p>Οι κανόνες που φαίνονται παρακάτω, θα πρέπει να γραφούν στο
+	  <code class="filename">/etc/ipfw.rules</code>.</p><pre class="programlisting">################ Start of IPFW rules file ###############################
+# Flush out the list before we begin.
+ipfw -q -f flush
+
+# Set rules command prefix
+cmd="ipfw -q add"
+pif="dc0"     # public interface name of NIC
+              # facing the public Internet
+
+#################################################################
+# No restrictions on Inside LAN Interface for private network
+# Not needed unless you have LAN.
+# Change xl0 to your LAN NIC interface name
+#################################################################
+#$cmd 00005 allow all from any to any via xl0
+
+#################################################################
+# No restrictions on Loopback Interface
+#################################################################
+$cmd 00010 allow all from any to any via lo0
+
+#################################################################
+# Allow the packet through if it has previous been added to the
+# the "dynamic" rules table by a allow keep-state statement.
+#################################################################
+$cmd 00015 check-state
+
+#################################################################
+# Interface facing Public Internet (Outbound Section)
+# Check session start requests originating from behind the
+# firewall on the private network or from this gateway server
+# destined for the public Internet.
+#################################################################
+
+# Allow out access to my ISP's Domain name server.
+# x.x.x.x must be the IP address of your ISP.s DNS
+# Dup these lines if your ISP has more than one DNS server
+# Get the IP addresses from /etc/resolv.conf file
+$cmd 00110 allow tcp from any to x.x.x.x 53 out via $pif setup keep-state
+$cmd 00111 allow udp from any to x.x.x.x 53 out via $pif keep-state
+
+# Allow out access to my ISP's DHCP server for cable/DSL configurations.
+# This rule is not needed for .user ppp. connection to the public Internet.
+# so you can delete this whole group.
+# Use the following rule and check log for IP address.
+# Then put IP address in commented out rule &amp; delete first rule
+$cmd 00120 allow log udp from any to any 67 out via $pif keep-state
+#$cmd 00120 allow udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Allow out non-secure standard www function
+$cmd 00200 allow tcp from any to any 80 out via $pif setup keep-state
+
+# Allow out secure www function https over TLS SSL
+$cmd 00220 allow tcp from any to any 443 out via $pif setup keep-state
+
+# Allow out send &amp; get email function
+$cmd 00230 allow tcp from any to any 25 out via $pif setup keep-state
+$cmd 00231 allow tcp from any to any 110 out via $pif setup keep-state
+
+# Allow out FBSD (make install &amp; CVSUP) functions
+# Basically give user root "GOD" privileges.
+$cmd 00240 allow tcp from me to any out via $pif setup keep-state uid root
+
+# Allow out ping
+$cmd 00250 allow icmp from any to any out via $pif keep-state
+
+# Allow out Time
+$cmd 00260 allow tcp from any to any 37 out via $pif setup keep-state
+
+# Allow out nntp news (i.e. news groups)
+$cmd 00270 allow tcp from any to any 119 out via $pif setup keep-state
+
+# Allow out secure FTP, Telnet, and SCP
+# This function is using SSH (secure shell)
+$cmd 00280 allow tcp from any to any 22 out via $pif setup keep-state
+
+# Allow out whois
+$cmd 00290 allow tcp from any to any 43 out via $pif setup keep-state
+
+# deny and log everything else that.s trying to get out.
+# This rule enforces the block all by default logic.
+$cmd 00299 deny log all from any to any out via $pif
+
+#################################################################
+# Interface facing Public Internet (Inbound Section)
+# Check packets originating from the public Internet
+# destined for this gateway server or the private network.
+#################################################################
+
+# Deny all inbound traffic from non-routable reserved address spaces
+$cmd 00300 deny all from 192.168.0.0/16 to any in via $pif  #RFC 1918 private IP
+$cmd 00301 deny all from 172.16.0.0/12 to any in via $pif     #RFC 1918 private IP
+$cmd 00302 deny all from 10.0.0.0/8 to any in via $pif          #RFC 1918 private IP
+$cmd 00303 deny all from 127.0.0.0/8 to any in via $pif        #loopback
+$cmd 00304 deny all from 0.0.0.0/8 to any in via $pif            #loopback
+$cmd 00305 deny all from 169.254.0.0/16 to any in via $pif   #DHCP auto-config
+$cmd 00306 deny all from 192.0.2.0/24 to any in via $pif       #reserved for docs
+$cmd 00307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster interconnect
+$cmd 00308 deny all from 224.0.0.0/3 to any in via $pif         #Class D &amp; E multicast
+
+# Deny public pings
+$cmd 00310 deny icmp from any to any in via $pif
+
+# Deny ident
+$cmd 00315 deny tcp from any to any 113 in via $pif
+
+# Deny all Netbios service. 137=name, 138=datagram, 139=session
+# Netbios is MS/Windows sharing services.
+# Block MS/Windows hosts2 name server requests 81
+$cmd 00320 deny tcp from any to any 137 in via $pif
+$cmd 00321 deny tcp from any to any 138 in via $pif
+$cmd 00322 deny tcp from any to any 139 in via $pif
+$cmd 00323 deny tcp from any to any 81 in via $pif
+
+# Deny any late arriving packets
+$cmd 00330 deny all from any to any frag in via $pif
+
+# Deny ACK packets that did not match the dynamic rule table
+$cmd 00332 deny tcp from any to any established in via $pif
+
+# Allow traffic in from ISP's DHCP server. This rule must contain
+# the IP address of your ISP.s DHCP server as it.s the only
+# authorized source to send this packet type.
+# Only necessary for cable or DSL configurations.
+# This rule is not needed for .user ppp. type connection to
+# the public Internet. This is the same IP address you captured
+# and used in the outbound section.
+#$cmd 00360 allow udp from any to x.x.x.x 67 in via $pif keep-state
+
+# Allow in standard www function because I have apache server
+$cmd 00400 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Allow in secure FTP, Telnet, and SCP from public Internet
+$cmd 00410 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Allow in non-secure Telnet session from public Internet
+# labeled non-secure because ID &amp; PW are passed over public
+# Internet as clear text.
+# Delete this sample group if you do not have telnet server enabled.
+$cmd 00420 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Reject &amp; Log all incoming connections from the outside
+$cmd 00499 deny log all from any to any in via $pif
+
+# Everything else is denied by default
+# deny and log all packets that fell through to see what they are
+$cmd 00999 deny log all from any to any
+################ End of IPFW rules file ###############################</pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp99748048"></a>30.6.5.7. Ένα Υπόδειγμα <acronym class="acronym">NAT</acronym> με Stateful Σύνολο
+	  Κανόνων</h4></div></div></div><a id="idp99749072" class="indexterm"></a><p>Για να ενεργοποιηθεί η λειτουργία <acronym class="acronym">NAT</acronym> στο
+	  IPFW, χρειάζονται κάποιες επιπλέον ρυθμίσεις.  Θα πρέπει να
+	  προσθέσετε την επιλογή <code class="literal">option IPDIVERT</code> μαζί με
+	  τις υπόλοιπες επιλογές για το IPFIREWALL στο αρχείο ρυθμίσεων του
+	  πυρήνα.  Θα πρέπει έπειτα να μεταγλωττίσετε και να εγκαταστήσετε
+	  το νέο σας προσαρμοσμένο πυρήνα.</p><p>Εκτός από τις συνηθισμένες επιλογές για το IPFW, θα πρέπει να
+	  προσθέσετε και τις παρακάτω στο αρχείο
+	  <code class="filename">/etc/rc.conf</code>:</p><pre class="programlisting">natd_enable="YES"                   # Enable <acronym class="acronym">NAT</acronym>D function
+natd_interface="rl0"                # interface name of public Internet NIC
+natd_flags="-dynamic -m"            # -m = preserve port numbers if possible</pre><p>Η χρήση κανόνων stateful μαζί με τον κανόνα
+	  <code class="literal">divert natd</code> (NAT), περιπλέκει πολύ την λογική
+	  συγγραφής των κανόνων.  Η θέση εμφάνισης των κανόνων
+	  <code class="literal">check-state</code> και <code class="literal">divert natd</code>
+	  μέσα στο σύνολο κανόνων γίνεται πολύ κρίσιμη.  Δεν πρόκειται πλέον
+	  για απλή λογική περάσματος από τον ένα κανόνα στον επόμενο.
+	  Χρησιμοποιείται ένα νέο είδος ενέργειας που ονομάζεται
+	  <code class="literal">skipto</code>.  Για να χρησιμοποιηθεί η εντολή
+	  <code class="literal">skipto</code>, είναι υποχρεωτικό να έχετε αριθμήσει τους
+	  κανόνες, ώστε να ξέρετε σε ποιο κανόνα θα καταλήξει το άλμα που θα
+	  εκτελεστεί από την εντολή αυτή.</p><p>Παρακάτω θα βρείτε ένα υπόδειγμα (χωρίς πρόσθετα σχόλια) μιας
+	  μεθόδου συγγραφής που επιλέξαμε εδώ για να εξηγήσουμε την ακολουθία
+	  ροής του πακέτου μέσα στο σύνολο κανόνων.</p><p>Η ροή της επεξεργασίας ξεκινάει με τον πρώτο από την κορυφή
+	  κανόνα και συνεχίζει ένα κανόνα κάθε φορά προς τα κάτω, είτε μέχρι
+	  να φτάσει τον τελευταίο, ή μέχρι το πακέτο να ταιριάξει με τα
+	  κριτήρια επιλογής κάποιου κανόνα και να ελευθερωθεί από το firewall.
+	  Είναι σημαντικό να παρατηρήσουμε τη θέση των κανόνων με αριθμούς
+	  100, 101, 450, 500 και 510.  Οι κανόνες αυτοί ελέγχουν την
+	  μετάφραση των εξερχόμενων και εισερχόμενων πακέτων, ώστε οι
+	  καταχωρήσεις τους στο δυναμικό πίνακα καταστάσεων να περιέχουν
+	  πάντα την ιδιωτική IP διεύθυνση του τοπικού δικτύου.  Παρατηρήστε
+	  επίσης ότι όλοι οι κανόνες allow και deny καθορίζουν την κατεύθυνση
+	  κίνησης του πακέτου καθώς και την διεπαφή.  Επίσης, όλες οι
+	  εξερχόμενες αιτήσεις για νέες συνεδρίες μεταφέρονται απευθείας
+	  (μέσω του <code class="literal">skipto rule 500</code>) στον κανόνα 500 για
+	  να γίνει η μετάφραση διευθύνσεων δικτύου (NAT).</p><p>Ας υποθέσουμε ότι ένα χρήστης του τοπικού δικτύου χρησιμοποιεί
+	  τον φυλλομετρητή του για να δει μια ιστοσελίδα.  Οι ιστοσελίδες
+	  χρησιμοποιούν την πόρτα 80 για την επικοινωνία.  Το πακέτο
+	  εισέρχεται στο firewall.  Δεν ταιριάζει με τον κανόνα 100 γιατί
+	  είναι εξερχόμενο και όχι εισερχόμενο.  Περνάει τον κανόνα 101 γιατί
+	  πρόκειται για νέα επικοινωνία και έτσι δεν υπάρχει ακόμα στον
+	  δυναμικό πίνακα καταστάσεων.  Το πακέτο τελικά φτάνει στον κανόνα
+	  125 με τον οποίο και ταιριάζει.  Εξέρχεται μέσω της κάρτας δικτύου
+	  που συνδέεται στο δημόσιο Internet.  Το πακέτο έχει ακόμα ως IP
+	  αφετηρίας την ιδιωτική διεύθυνση του τοπικού δικτύου.  Το ταίριασμα
+	  με αυτό τον κανόνα προκαλεί δύο ενέργειες.  Η επιλογή
+	  <code class="literal">keep-state</code> θα δημιουργήσει ένα νέο δυναμικό
+	  κανόνα, θα τον καταχωρήσει στον πίνακα, και θα εκτελέσει την
+	  αντίστοιχη ενέργεια.  Η ενέργεια αυτή είναι μέρος της πληροφορίας
+	  που γράφεται στον δυναμικό πίνακα.  Στην περίπτωση αυτή είναι
+	  η <span class="quote">«<span class="quote">skipto rule 500</span>»</span>.  Ο κανόνας 500 μεταφράζει μέσω
+	  <acronym class="acronym">NAT</acronym> τη διεύθυνση IP του πακέτου, πριν αυτό
+	  εξέλθει προς το Internet.  Αυτό είναι ιδιαίτερα σημαντικό.
+	  Το πακέτο κατευθύνεται προς τον προορισμό του, όπου δημιουργείται
+	  και αποστέλλεται ένα νέο πακέτο ως απάντηση.  Το νέο αυτό πακέτο
+	  εισέρχεται ξανά στο firewall, στον κανόνα που είναι στην κορυφή
+	  της λίστας.  Αυτή τη φορά ταιριάζει με τον κανόνα 100 και η
+	  διεύθυνση προορισμού του αλλάζει ξανά στην αρχική του τοπικού
+	  δικτύου.  Έπειτα, γίνεται η επεξεργασία του από τον κανόνα
+	  <code class="literal">check-state</code> ο οποίος ανακαλύπτει ότι πρόκειται
+	  για πακέτο συνεδρίας σε εξέλιξη και το απελευθερώνει στο τοπικό
+	  δίκτυο.  Κατευθύνεται προς τον υπολογιστή του τοπικού δικτύου που το
+	  έστειλε, ο οποίος στέλνει ένα νέο πακέτο ζητώντας περισσότερα
+	  δεδομένα από τον απομακρυσμένο εξυπηρετητή.  Το πακέτο αυτό
+	  ελέγχεται από τον κανόνα <code class="literal">check-state</code>, ο οποίος
+	  βρίσκει την καταχώριση του στα εξερχόμενα και εκτελεί την αντίστοιχη
+	  ενέργεια που σε αυτή την περίπτωση είναι <span class="quote">«<span class="quote">skipto 500</span>»</span>.
+	  Το πακέτο προωθείται στον κανόνα 500, γίνεται η μετάφραση της
+	  διεύθυνσης του μέσω <acronym class="acronym">NAT</acronym> και απελευθερώνεται στο
+	  Internet.</p><p>Από την μεριά των εισερχόμενων, όποιο πακέτο αναγνωρίζεται ως
+	  μέρος μιας υπάρχουσας συνεδρίας, ελέγχεται αυτόματα από τον κανόνα
+	  <code class="literal">check-state</code> και τους αντίστοιχους κανόνες
+	  <code class="literal">divert natd</code>.  Το μόνο που χρειάζεται να
+	  αντιμετωπίσουμε είναι η απόρριψη όλων των προβληματικών πακέτων και
+	  η έγκριση μόνο των πακέτων που προορίζονται για εγκεκριμένες
+	  υπηρεσίες.  Ας υποθέσουμε ότι έχουμε ένα εξυπηρετητή apache ο οποίος
+	  εκτελείται στο μηχάνημα με το firewall, και επιθυμούμε το τοπικό
+	  site να είναι προσβάσιμο από το δημόσιο Internet.  Η εισερχόμενη
+	  αίτηση νέας συνεδρίας ταιριάζει με τον κανόνα 100 και η IP διεύθυνση
+	  της αντιστοιχίζεται στο τοπικό IP του μηχανήματος με το firewall.
+	  Το πακέτο έπειτα ελέγχεται για οποιοδήποτε πρόβλημα μπορεί να έχει
+	  σύμφωνα με τους κανόνες που χρησιμοποιούμε, και τελικά ταιριάζει με
+	  τον κανόνα 425.  Στην περίπτωση αυτή συμβαίνουν δύο πράγματα.
+	  Ο κανόνας για το πακέτο γράφεται στο δυναμικό πίνακα καταστάσεων,
+	  αλλά αυτή τη φορά περιορίζεται ο αριθμός αιτήσεων νέας συνεδρίας
+	  από το συγκεκριμένο IP σε 2.  Με αυτό τον τρόπο μπορούμε να
+	  αμυνθούμε σε επιθέσεις τύπου άρνησης υπηρεσίας (DoS) όσο αφορά τη
+	  συγκεκριμένη θύρα επικοινωνίας.  Η ενέργεια του κανόνα είναι το
+	  <code class="literal">allow</code>, και έτσι το πακέτο απελευθερώνεται στο
+	  τοπικό δίκτυο.  Το πακέτο που παράγεται ως απάντηση, ελέγχεται από
+	  τον κανόνα <code class="literal">check-state</code>, ο οποίος αναγνωρίζει ότι
+	  ανήκει σε μια ήδη ενεργή συνεδρία, και αποστέλλεται στον κανόνα 500
+	  όπου γίνεται η μετάφραση της διεύθυνσης του μέσω
+	  <acronym class="acronym">NAT</acronym>.  Το πακέτο τελικά απελευθερώνεται μέσω της
+	  διεπαφής εξερχομένων.</p><p>Υπόδειγμα Κανόνων #1:</p><pre class="programlisting">#!/bin/sh
+cmd="ipfw -q add"
+skip="skipto 500"
+pif=rl0
+ks="keep-state"
+good_tcpo="22,25,37,43,53,80,443,110,119"
+
+ipfw -q -f flush
+
+$cmd 002 allow all from any to any via xl0  # exclude LAN traffic
+$cmd 003 allow all from any to any via lo0  # exclude loopback traffic
+
+$cmd 100 divert natd ip from any to any in via $pif
+$cmd 101 check-state
+
+# Authorized outbound packets
+$cmd 120 $skip udp from any to xx.168.240.2 53 out via $pif $ks
+$cmd 121 $skip udp from any to xx.168.240.5 53 out via $pif $ks
+$cmd 125 $skip tcp from any to any $good_tcpo out via $pif setup $ks
+$cmd 130 $skip icmp from any to any out via $pif $ks
+$cmd 135 $skip udp from any to any 123 out via $pif $ks
+
+
+# Deny all inbound traffic from non-routable reserved address spaces
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 private IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 private IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 private IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #reserved for docs
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Class D &amp; E multicast
+
+# Authorized inbound packets
+$cmd 400 allow udp from xx.70.207.54 to any 68 in $ks
+$cmd 420 allow tcp from any to me 80 in via $pif setup limit src-addr 1
+
+
+$cmd 450 deny log ip from any to any
+
+# This is skipto location for outbound stateful rules
+$cmd 500 divert natd ip from any to any out via $pif
+$cmd 510 allow ip from any to any
+
+######################## end of rules  ##################</pre><p>Οι παρακάτω κανόνες είναι σχεδόν ίδιοι με τους παραπάνω, αλλά
+	  περιέχουν περισσότερα σχόλια για να βοηθήσουν τον αρχάριο χρήστη
+	  του IPFW να καταλάβει καλύτερα πως λειτουργούν.</p><p>Υπόδειγμα Κανόνων #2:</p><pre class="programlisting">#!/bin/sh
+################ Start of IPFW rules file ###############################
+# Flush out the list before we begin.
+ipfw -q -f flush
+
+# Set rules command prefix
+cmd="ipfw -q add"
+skip="skipto 800"
+pif="rl0"     # public interface name of NIC
+              # facing the public Internet
+
+#################################################################
+# No restrictions on Inside LAN Interface for private network
+# Change xl0 to your LAN NIC interface name
+#################################################################
+$cmd 005 allow all from any to any via xl0
+
+#################################################################
+# No restrictions on Loopback Interface
+#################################################################
+$cmd 010 allow all from any to any via lo0
+
+#################################################################
+# check if packet is inbound and nat address if it is
+#################################################################
+$cmd 014 divert natd ip from any to any in via $pif
+
+#################################################################
+# Allow the packet through if it has previous been added to the
+# the "dynamic" rules table by a allow keep-state statement.
+#################################################################
+$cmd 015 check-state
+
+#################################################################
+# Interface facing Public Internet (Outbound Section)
+# Check session start requests originating from behind the
+# firewall on the private network or from this gateway server
+# destined for the public Internet.
+#################################################################
+
+# Allow out access to my ISP's Domain name server.
+# x.x.x.x must be the IP address of your ISP's DNS
+# Dup these lines if your ISP has more than one DNS server
+# Get the IP addresses from /etc/resolv.conf file
+$cmd 020 $skip tcp from any to x.x.x.x 53 out via $pif setup keep-state
+
+
+# Allow out access to my ISP's DHCP server for cable/DSL configurations.
+$cmd 030 $skip udp from any to x.x.x.x 67 out via $pif keep-state
+
+# Allow out non-secure standard www function
+$cmd 040 $skip tcp from any to any 80 out via $pif setup keep-state
+
+# Allow out secure www function https over TLS SSL
+$cmd 050 $skip tcp from any to any 443 out via $pif setup keep-state
+
+# Allow out send &amp; get email function
+$cmd 060 $skip tcp from any to any 25 out via $pif setup keep-state
+$cmd 061 $skip tcp from any to any 110 out via $pif setup keep-state
+
+# Allow out FreeBSD (make install &amp; CVSUP) functions
+# Basically give user root "GOD" privileges.
+$cmd 070 $skip tcp from me to any out via $pif setup keep-state uid root
+
+# Allow out ping
+$cmd 080 $skip icmp from any to any out via $pif keep-state
+
+# Allow out Time
+$cmd 090 $skip tcp from any to any 37 out via $pif setup keep-state
+
+# Allow out nntp news (i.e. news groups)
+$cmd 100 $skip tcp from any to any 119 out via $pif setup keep-state
+
+# Allow out secure FTP, Telnet, and SCP
+# This function is using SSH (secure shell)
+$cmd 110 $skip tcp from any to any 22 out via $pif setup keep-state
+
+# Allow out whois
+$cmd 120 $skip tcp from any to any 43 out via $pif setup keep-state
+
+# Allow ntp time server
+$cmd 130 $skip udp from any to any 123 out via $pif keep-state
+
+#################################################################
+# Interface facing Public Internet (Inbound Section)
+# Check packets originating from the public Internet
+# destined for this gateway server or the private network.
+#################################################################
+
+# Deny all inbound traffic from non-routable reserved address spaces
+$cmd 300 deny all from 192.168.0.0/16  to any in via $pif  #RFC 1918 private IP
+$cmd 301 deny all from 172.16.0.0/12   to any in via $pif  #RFC 1918 private IP
+$cmd 302 deny all from 10.0.0.0/8      to any in via $pif  #RFC 1918 private IP
+$cmd 303 deny all from 127.0.0.0/8     to any in via $pif  #loopback
+$cmd 304 deny all from 0.0.0.0/8       to any in via $pif  #loopback
+$cmd 305 deny all from 169.254.0.0/16  to any in via $pif  #DHCP auto-config
+$cmd 306 deny all from 192.0.2.0/24    to any in via $pif  #reserved for docs
+$cmd 307 deny all from 204.152.64.0/23 to any in via $pif  #Sun cluster
+$cmd 308 deny all from 224.0.0.0/3     to any in via $pif  #Class D &amp; E multicast
+
+# Deny ident
+$cmd 315 deny tcp from any to any 113 in via $pif
+
+# Deny all Netbios service. 137=name, 138=datagram, 139=session
+# Netbios is MS/Windows sharing services.
+# Block MS/Windows hosts2 name server requests 81
+$cmd 320 deny tcp from any to any 137 in via $pif
+$cmd 321 deny tcp from any to any 138 in via $pif
+$cmd 322 deny tcp from any to any 139 in via $pif
+$cmd 323 deny tcp from any to any 81  in via $pif
+
+# Deny any late arriving packets
+$cmd 330 deny all from any to any frag in via $pif
+
+# Deny ACK packets that did not match the dynamic rule table
+$cmd 332 deny tcp from any to any established in via $pif
+
+# Allow traffic in from ISP's DHCP server. This rule must contain
+# the IP address of your ISP's DHCP server as it's the only
+# authorized source to send this packet type.
+# Only necessary for cable or DSL configurations.
+# This rule is not needed for 'user ppp' type connection to
+# the public Internet. This is the same IP address you captured
+# and used in the outbound section.
+$cmd 360 allow udp from x.x.x.x to any 68 in via $pif keep-state
+
+# Allow in standard www function because I have Apache server
+$cmd 370 allow tcp from any to me 80 in via $pif setup limit src-addr 2
+
+# Allow in secure FTP, Telnet, and SCP from public Internet
+$cmd 380 allow tcp from any to me 22 in via $pif setup limit src-addr 2
+
+# Allow in non-secure Telnet session from public Internet
+# labeled non-secure because ID &amp; PW are passed over public
+# Internet as clear text.
+# Delete this sample group if you do not have telnet server enabled.
+$cmd 390 allow tcp from any to me 23 in via $pif setup limit src-addr 2
+
+# Reject &amp; Log all unauthorized incoming connections from the public Internet
+$cmd 400 deny log all from any to any in via $pif
+
+# Reject &amp; Log all unauthorized out going connections to the public Internet
+$cmd 450 deny log all from any to any out via $pif
+
+# This is skipto location for outbound stateful rules
+$cmd 800 divert natd ip from any to any out via $pif
+$cmd 801 allow ip from any to any
+
+# Everything else is denied by default
+# deny and log all packets that fell through to see what they are
+$cmd 999 deny log all from any to any
+################ End of IPFW rules file ###############################</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="firewalls-ipf.html">Προηγ</a> </td><td width="20%" align="center"><a accesskey="u" href="firewalls.html">Πάνω</a></td><td width="40%" align="right"> <a accesskey="n" href="advanced-networking.html">Επόμενο</a></td></tr><tr><td width="40%" align="left" valign="top">30.5. Το IPFILTER (IPF) Firewall </td><td width="20%" align="center"><a accesskey="h" href="index.html">Αρχή</a></td><td width="40%" align="right" valign="top"> Κεφάλαιο 31. Προχωρημένα Θέματα Δικτύωσης</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Αυτό το κείμενο, και άλλα κείμενα, μπορεί να βρεθεί στο
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Για ερωτήσεις σχετικά με το FreeBSD, διαβάστε την
+    <a href="http://www.FreeBSD.org/docs.html">τεκμηρίωση</a> πριν να επικοινωνήσετε με την
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Για ερωτήσεις σχετικά με αυτή την τεκμηρίωση, στείλτε e-mail στην
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

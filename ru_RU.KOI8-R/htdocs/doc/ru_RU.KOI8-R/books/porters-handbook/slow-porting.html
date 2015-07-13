@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="koi8-r" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r" /><title>Глава 4. Медленное портирование</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Руководство FreeBSD по созданию портов" /><link rel="up" href="index.html" title="Руководство FreeBSD по созданию портов" /><link rel="prev" href="porting-submitting.html" title="3.6. Посылка нового порта" /><link rel="next" href="slow-sources.html" title="4.2. Получение исходного кода" /><link rel="copyright" href="legalnotice.html" title="Юридическое уведомление" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Глава 4. Медленное портирование</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="porting-submitting.html">Пред.</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="slow-sources.html">След.</a></td></tr></table><hr /></div><div class="chapter"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="slow-porting"></a>Глава 4. Медленное портирование</h1></div></div></div><div class="toc"><div class="toc-title">Содержание</div><dl class="toc"><dt><span class="sect1"><a href="slow-porting.html#slow-work">4.1. Как всё это работает</a></span></dt><dt><span class="sect1"><a href="slow-sources.html">4.2. Получение исходного кода</a></span></dt><dt><span class="sect1"><a href="slow-modifying.html">4.3. Модификация порта</a></span></dt><dt><span class="sect1"><a href="slow-patch.html">4.4. Создание патчей</a></span></dt><dt><span class="sect1"><a href="slow-configure.html">4.5. Конфигурирование</a></span></dt><dt><span class="sect1"><a href="slow-user-input.html">4.6. Обработка пользовательского ввода</a></span></dt></dl></div><p>Итак, все оказалось не так уж и просто, и порт потребовал
+    некоторых модификаций для того, чтобы заставить его работать.  В
+    этом разделе мы расскажем, шаг за шагом, как его модифицировать,
+    чтобы он работал с нашей системой портов.</p><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="slow-work"></a>4.1. Как всё это работает</h2></div></div></div><p>Во-первых, когда пользователь дает в своем каталоге с
+      портом команду <code class="command">make</code>, происходит целая череда
+      событий.  Во время чтения этого текста может оказаться полезным
+      иметь файл <code class="filename">bsd.port.mk</code> открытым в другом
+      окне, что сильно поможет в их понимании.</p><p>Но не волнуйтесь сильно, если вы не до конца понимаете, что
+      делается в <code class="filename">bsd.port.mk</code>, не так уж много
+      людей его понимает... <span class="emphasis"><em>:-&gt;</em></span></p><div class="procedure"><ol class="procedure" type="1"><li class="step"><p>Запускается цель <code class="buildtarget">fetch</code>.
+	  Цель <code class="buildtarget">fetch</code> отвечает за то, что
+	  архив исходных текстов имеется в наличии локально в
+	  каталоге <code class="varname">DISTDIR</code>.  Если цель
+	  <code class="buildtarget">fetch</code> не может найти требуемые
+	  файлы в каталоге <code class="varname">DISTDIR</code>, то они будут
+	  искаться по указателю URL <code class="varname">MASTER_SITES</code>,
+	  который устанавливается в Makefile, а также на наших FTP
+	  зеркалах, куда мы по возможности помещаем дистрибутивные
+	  файлы для архива.  Затем она попытается сгрузить указанный
+	  файл с помощью <code class="varname">FETCH</code>, полагая, что
+	  запрашивающая машина имеет прямое подключение к Интернет.
+	  Если файл скачается удачно, то он будет помещен в каталог
+	  <code class="varname">DISTDIR</code> для последующего использования и
+	  обработки.</p></li><li class="step"><p>Выполняется цель <code class="buildtarget">extract</code>.
+	  Она ищет дистрибутивный файл порта (как правило, tar-архив
+	  <code class="command">gzip</code>) в каталоге
+	  <code class="varname">DISTDIR</code> и распаковывает его во временный
+	  каталог, задаваемый переменной <code class="varname">WRKDIR</code>
+	  (по умолчанию <code class="filename">work</code>).</p></li><li class="step"><p>Выполняется цель <code class="buildtarget">patch</code>.
+	  Во-первых, применяются все патчи, заданные переменной
+	  <code class="varname">PATCHFILES</code>.  Во-вторых, если какие-либо
+	  файлы с патчами, носящие имена
+	  <code class="filename">patch-*</code>, имеются в подкаталоге
+	  <code class="varname">PATCHDIR</code> (по умолчанию это каталог
+	  <code class="filename">files</code>), то они применяются в этот
+	  момент в алфавитном порядке.</p></li><li class="step"><p>Запускается цель <code class="buildtarget">configure</code>.
+	  Здесь может выполняться любая из многих различных
+	  вещей.</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>Если существует скрипт
+	      <code class="filename">scripts/configure</code>, то он
+	      запускается.</p></li><li class="listitem"><p>Если задана переменная
+	      <code class="varname">HAS_CONFIGURE</code> или
+	      <code class="varname">GNU_CONFIGURE</code>, то запускается скрипт
+	      <code class="filename">WRKSRC/configure</code>.</p></li></ol></div></li><li class="step"><p>Выполняется цель <code class="buildtarget">build</code>.  Она
+	  отвечает за переход в собственный рабочий каталог порта
+	  (<code class="varname">WRKSRC</code>) и его построение.</p></li><li class="step"><p>Выполняется цель <code class="buildtarget">stage</code>.
+	  Конечный набор построенных файлов помещается во временный
+	  каталог (<code class="varname">STAGEDIR</code>, смотрите <a class="xref" href="special.html#staging" title="6.1. Staging">Раздел 6.1, <<Staging>></a>).  Иерархия этого каталога отражает
+	  иерархию каталогов системы, в которую данный пакет будет
+	  устанавливаться.</p></li><li class="step"><p>Выполняется цель <code class="buildtarget">install</code>.
+	  В систему копируются файлы, перечисленные в pkg-plist
+	  порта.</p></li></ol></div><p>Выше перечислены стандартные действия.  Кроме того, вы сами
+      можете определить цели
+      <code class="buildtarget">pre-<em class="replaceable"><code>что-то</code></em></code>
+      или
+      <code class="buildtarget">post-<em class="replaceable"><code>что-то</code></em></code>,
+      или создать скрипты с такими именами в подкаталоге
+      <code class="filename">scripts</code>, и они будут запущены до или после
+      выполнения действий по умолчанию.</p><p>Например, если у вас есть цель
+      <code class="buildtarget">post-extract</code>, определённая в вашем
+      файле <code class="filename">Makefile</code> и файл
+      <code class="filename">pre-build</code> в подкаталоге
+      <code class="filename">scripts</code>, то после выполнения обычных
+      действий по распаковке, будет вызвана цель
+      <code class="buildtarget">post-extract</code> а скрипт
+      <code class="filename">pre-build</code> будет выполнен перед запуском
+      стандартных правил построения.  Рекомендуется использовать цели
+      из <code class="filename">Makefile</code>, если действия достаточно
+      просты, потому что в дальнейшем будет проще определить, какие
+      нестандартные действия требует порт.</p><p>Действия по умолчанию выполняются целями
+      <code class="buildtarget">do-<em class="replaceable"><code>что-то</code></em></code>
+      из <code class="filename">bsd.port.mk</code>.  Например, команды для
+      распаковки порта находятся в цели
+      <code class="buildtarget">do-extract</code>.  Если вам не хватает
+      цели по умолчанию, вы можете ее исправить, переопределив цель
+      <code class="buildtarget">do-<em class="replaceable"><code>something</code></em></code>
+      в вашем файле <code class="filename">Makefile</code>.</p><div xmlns="" class="note"><h3 class="admontitle">Примечание: </h3><p xmlns="http://www.w3.org/1999/xhtml"><span class="quote"><<<span class="quote">Основные</span>>></span> цели (к примеру,
+	<code class="buildtarget">extract</code>,
+	<code class="buildtarget">configure</code> и так далее) не делают
+	ничего больше, чем проверяют успешность завершения всех
+	предыдущих шагов и вызывают настоящие цели или скрипты, и их
+	не нужно менять.  Если вам нужно изменить распаковку,
+	исправляйте <code class="buildtarget">do-extract</code>, но никогда
+	не меняйте способ работы <code class="buildtarget">extract</code>!
+	Кроме того, цель <code class="buildtarget">post-deinstall</code>
+	является недействительной и не выполняется инфраструктурой
+	портов.</p></div><p>Теперь, когда вы представляете, что происходит, когда
+      пользователь набирает команду <code class="command">make install</code>,
+      давайте пройдемся через шаги, рекомендуемые для создания
+      настоящего порта.</p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="porting-submitting.html">Пред.</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="slow-sources.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">3.6. Посылка нового порта </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> 4.2. Получение исходного кода</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Этот, и другие документы, могут быть скачаны с
+    <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>По вопросам, связанным с FreeBSD, прочитайте
+    <a href="http://www.FreeBSD.org/ru/docs.html">документацию</a> прежде чем писать в
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    По вопросам, связанным с этой документацией, пишите в рассылку
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.<br></br></small></p></body></html>

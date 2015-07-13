@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>1.7. 内核初始化</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD 系统结构手册" /><link rel="up" href="boot.html" title="第 1 章 引导过程与内核初始化" /><link rel="prev" href="boot-loader.html" title="1.6. loader阶段" /><link rel="next" href="locking.html" title="第 2 章 内核中的锁" /><link rel="copyright" href="trademarks.html" title="法律声明" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">1.7. 内核初始化</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="boot-loader.html">上一页</a> </td><th width="60%" align="center">第 1 章 引导过程与内核初始化</th><td width="20%" align="right"> <a accesskey="n" href="locking.html">下一页</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="boot-kernel"></a>1.7. 内核初始化</h2></div></div></div><p>让我们来看一下链接内核的命令。
+      这能帮助我们了解 loader 传递给内核的准确位置。
+      这个位置就是内核真实的入口点。</p><pre class="programlisting"><code class="filename">sys/conf/Makefile.i386:</code>
+ld -elf -Bdynamic -T /usr/src/sys/conf/ldscript.i386  -export-dynamic \
+-dynamic-linker /red/herring -o kernel -X locore.o \
+&lt;lots of kernel .o files&gt;</pre><a id="idp63827664" class="indexterm"></a><p>在这一行中有一些有趣的东西。首先，内核是一个ELF动态链接二进制文件，
+      可是动态链接器却是<code class="filename">/red/herring</code>，一个莫须有的文件。
+      其次，看一下文件<code class="filename">sys/conf/ldscript.i386</code>，
+      可以对理解编译内核时<span class="application">ld</span>的选项有一些启发。
+      阅读最前几行，字符串</p><pre class="programlisting"><code class="filename">sys/conf/ldscript.i386:</code>
+ENTRY(btext)</pre><p>表示内核的入口点是符号 `btext'。这个符号在<code class="filename">locore.s</code>
+      中定义:</p><pre class="programlisting"><code class="filename">sys/i386/i386/locore.s:</code>
+	.text
+/**********************************************************************
+ *
+ * This is where the bootblocks start us, set the ball rolling...
+ * 入口
+ */
+NON_GPROF_ENTRY(btext)</pre><p>首先将寄存器EFLAGS设为一个预定义的值0x00000002，
+      然后初始化所有段寄存器:</p><pre class="programlisting"><code class="filename">sys/i386/i386/locore.s</code>
+/* 不要相信BIOS给出的EFLAGS值 */
+	pushl	$PSL_KERNEL
+	popfl
+
+/*
+ * 不要相信BIOS给出的%fs、%gs值。相信引导过程中设定的%cs、%ds、%es、%ss值
+ */
+	mov	%ds, %ax
+	mov	%ax, %fs
+	mov	%ax, %gs</pre><p>btext调用例程<code class="function">recover_bootinfo()</code>,
+      <code class="function">identify_cpu()</code>,<code class="function">create_pagetables()</code>。
+      这些例程也定在<code class="filename">locore.s</code>之中。这些例程的功能如下：</p><div class="informaltable"><table width="100%" border="0"><colgroup><col /><col /></colgroup><tbody><tr><td align="left"><code class="function">recover_bootinfo</code></td><td align="left">这个例程分析由引导程序传送给内核的参数。引导内核有3种方式:
+           由loader引导(如前所述), 由老式磁盘引导块引导,无盘引导方式。
+           这个函数决定引导方式，并将结构<code class="literal">struct bootinfo</code>
+           存储至内核内存。</td></tr><tr><td align="left"><code class="function">identify_cpu</code></td><td align="left">这个函数侦测CPU类型，将结果存放在变量
+            <code class="varname">_cpu</code>中。</td></tr><tr><td align="left"><code class="function">create_pagetables</code></td><td align="left">这个函数为分页表在内核内存空间顶部分配一块空间，并填写一定内容</td></tr></tbody></table></div><p>下一步是开启VME(如果CPU有这个功能):</p><pre class="programlisting">	testl	$CPUID_VME, R(_cpu_feature)
+	jz	1f
+	movl	%cr4, %eax
+	orl	$CR4_VME, %eax
+	movl	%eax, %cr4</pre><p>然后，启动分页模式:</p><pre class="programlisting">/* Now enable paging */
+	movl	R(_IdlePTD), %eax
+	movl	%eax,%cr3			/* load ptd addr into mmu */
+	movl	%cr0,%eax			/* get control word */
+	orl	$CR0_PE|CR0_PG,%eax		/* enable paging */
+	movl	%eax,%cr0			/* and let's page NOW! */</pre><p>由于分页模式已经启动，原先的实地址寻址方式随即失效。
+      随后三行代码用来跳转至虚拟地址:</p><pre class="programlisting">	pushl	$begin				/* jump to high virtualized address */
+	ret
+
+/* 现在跳转至KERNBASE，那里是操作系统内核被链接后真正的入口 */
+begin:</pre><p>函数<code class="function">init386()</code>被调用；随参数传递的是一个指针，
+     指向第一个空闲物理页。随后执行<code class="function">mi_startup()</code>。
+     <code class="function">init386</code>是一个与硬件系统相关的初始化函数，
+     <code class="function">mi_startup()</code>是个与硬件系统无关的函数
+     (前缀'mi_'表示Machine Independent，不依赖于机器)。
+     内核不再从<code class="function">mi_startup()</code>里返回；
+     调用这个函数后，内核完成引导:</p><pre class="programlisting"><code class="filename">sys/i386/i386/locore.s:</code>
+	movl	physfree, %esi
+	pushl	%esi		/* 送给init386()的第一个参数 */
+	call	_init386	/* 设置386芯片使之适应UNIX工作 */
+	call	_mi_startup	/* 自动配置硬件，挂接根文件系统，等 */
+	hlt		/* 不再返回到这里！ */</pre><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp63896016"></a>1.7.1. <code class="function">init386()</code></h3></div></div></div><p><code class="function">init386()</code>定义在
+        <code class="filename">sys/i386/i386/machdep.c</code>中，
+        它针对Intel 386芯片进行低级初始化。loader已将CPU切换至保护模式。
+        loader已经建立了最早的任务。</p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">每个"任务"都是与其它“任务”相对独立的执行环境。
+        任务之间可以分时切换，这为并发进程/线程的实现提供了必要基础。
+        对于Intel 80x86任务的描述，详见Intel公司关于80386 CPU及后续产品的资料，
+        或者在<a class="link" href="http://www.lib.tsinghua.edu.cn/" target="_top">清华大学图书馆</a>
+        馆藏记录中用"80386"作为关键词所查找到的系统结构方面的书目。</p></div><p>
+        在这个任务中，内核将继续工作。在讨论其代码前，
+        我将处理器对保护模式必须完成的一系列准备工作一并列出:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>初始化内核的可调整参数，这些参数由引导程序传来</p></li><li class="listitem"><p>准备GDT(全局描述符表)</p></li><li class="listitem"><p>准备IDT(中断描述符表)</p></li><li class="listitem"><p>初始化系统控制台</p></li><li class="listitem"><p>初始化DDB(内核的点调试器)，如果它被编译进内核的话</p></li><li class="listitem"><p>初始化TSS(任务状态段)</p></li><li class="listitem"><p>准备LDT(局部描述符表)</p></li><li class="listitem"><p>建立proc0(0号进程，即内核的进程)的pcb(进程控制块)</p></li></ul></div><a id="idp63933136" class="indexterm"></a><p><code class="function">init386()</code>首先初始化内核的可调整参数，
+        这些参数由引导程序传来。先设置环境指针(environment pointer, envp)调用，
+        再调用<code class="function">init_param1()</code>。
+        envp指针已由loader存放在结构<code class="literal">bootinfo</code>中:</p><pre class="programlisting"><code class="filename">sys/i386/i386/machdep.c:</code>
+		kern_envp = (caddr_t)bootinfo.bi_envp + KERNBASE;
+
+	/* 初始化基本可调整项,如hz等 */
+	init_param1();</pre><p><code class="function">init_param1()</code>定义在
+        <code class="filename">sys/kern/subr_param.c</code>之中。
+        这个文件里有一些sysctl项，还有两个函数，
+        <code class="function">init_param1()</code>和<code class="function">init_param2()</code>。
+        这两个函数从<code class="function">init386()</code>中调用:</p><pre class="programlisting"><code class="filename">sys/kern/subr_param.c</code>
+	hz = HZ;
+	TUNABLE_INT_FETCH("kern.hz", &amp;hz);</pre><p>TUNABLE_&lt;typename&gt;_FETCH用来获取环境变量的值:</p><pre class="programlisting"><code class="filename">/usr/src/sys/sys/kernel.h</code>
+#define	TUNABLE_INT_FETCH(path, var)	getenv_int((path), (var))
+</pre><p>Sysctl<code class="literal">kern.hz</code>是系统时钟频率。同时，
+        这些sysctl项被<code class="function">init_param1()</code>设定:
+        <code class="literal">kern.maxswzone,
+        kern.maxbcache, kern.maxtsiz, kern.dfldsiz, kern.maxdsiz, kern.dflssiz,
+        kern.maxssiz, kern.sgrowsiz</code>。</p><a id="idp63971024" class="indexterm"></a><p>然后<code class="function">init386()</code> 准备全局描述符表
+        (Global Descriptors Table, GDT)。在x86上每个任务都运行在自己的虚拟地址空间里，
+        这个空间由"段址:偏移量"的数对指定。举个例子，当前将要由处理器执行的指令在
+        CS:EIP，那么这条指令的线性虚拟地址就是<span class="quote">“<span class="quote">代码段虚拟段地址CS</span>”</span> + EIP。
+        为了简便，段起始于虚拟地址0，终止于界限4G字节。所以，在这个例子中，
+        指令的线性虚拟地址正是EIP的值。段寄存器，如CS、DS等是选择符，
+        即全局描述符表中的索引(更精确的说，索引并非选择符的全部，
+        而是选择符中的INDEX部分)。</p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">对于80386，
+        选择符有16位，INDEX部分是其中的高13位。</p></div><p>
+        FreeBSD的全局描述符表为每个CPU保存着15个选择符:</p><pre class="programlisting"><code class="filename">sys/i386/i386/machdep.c:</code>
+union descriptor gdt[NGDT * MAXCPU];	/* 全局描述符表 */
+
+<code class="filename">sys/i386/include/segments.h:</code>
+/*
+ * 全局描述符表(GDT)中的入口
+ */
+#define	GNULL_SEL	0	/* 空描述符 */
+#define	GCODE_SEL	1	/* 内核代码描述符 */
+#define	GDATA_SEL	2	/* 内核数据描述符 */
+#define	GPRIV_SEL	3	/* 对称多处理(SMP)每处理器专有数据 */
+#define	GPROC0_SEL	4	/* Task state process slot zero and up, 任务状态进程 */
+#define	GLDT_SEL	5	/* 每个进程的局部描述符表 */
+#define	GUSERLDT_SEL	6	/* 用户自定义的局部描述符表 */
+#define	GTGATE_SEL	7	/* 进程任务切换关口 */
+#define	GBIOSLOWMEM_SEL	8	/* BIOS低端内存访问(必须是这第8个入口) */
+#define	GPANIC_SEL	9	/* 会导致全系统异常中止工作的任务状态 */
+#define GBIOSCODE32_SEL	10	/* BIOS接口(32位代码) */
+#define GBIOSCODE16_SEL	11	/* BIOS接口(16位代码) */
+#define GBIOSDATA_SEL	12	/* BIOS接口(数据) */
+#define GBIOSUTIL_SEL	13	/* BIOS接口(工具) */
+#define GBIOSARGS_SEL	14	/* BIOS接口(自变量，参数) */</pre><p>请注意，这些#defines并非选择符本身，而只是选择符中的INDEX域，
+       因此它们正是全局描述符表中的索引。
+       例如，内核代码的选择符(GCODE_SEL)的值为0x08。</p><a id="idp63979472" class="indexterm"></a><p>下一步是初始化中断描述符表(Interrupt Descriptor Table, IDT)。
+      这张表在发生软件或硬件中断时会被处理器引用。例如，执行系统调用时，
+      用户应用程序提交<code class="literal">INT 0x80</code> 指令。这是一个软件中断，
+      处理器用索引值0x80在中断描述符表中查找记录。这个记录指向处理这个中断的例程。
+      在这个特定情形中，这是内核的系统调用关口。</p><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">Intel 80386支持“调用门”，可以使得用户程序只通过一条call指令
+      就调用内核中的例程。可是FreeBSD并未采用这种机制，
+      也许是因为使用软中断接口可免去动态链接的麻烦吧。另外还有一个附带的好处：
+      在仿真Linux时，当遇到FreeBSD内核不支持的而又并非关键性的系统调用时，
+      内核只会显示一些出错信息，这使得程序能够继续运行；
+      而不是在真正执行程序之前的初始化过程中就因为动态链接失败而不允许程序运行。</p></div><p>
+      中断描述符表最多可以有256 (0x100)条记录。内核分配NIDT条记录的内存给中断描述符表，
+      这里NIDT=256，是最大值：</p><pre class="programlisting"><code class="filename">sys/i386/i386/machdep.c:</code>
+static struct gate_descriptor idt0[NIDT];
+struct gate_descriptor *idt = &amp;idt0[0];	/* 中断描述符表 */
+</pre><p>每个中断都被设置一个合适的中断处理程序。
+        系统调用关口<code class="literal">INT 0x80</code>也是如此:</p><pre class="programlisting"><code class="filename">sys/i386/i386/machdep.c:</code>
+ 	setidt(0x80, &amp;IDTVEC(int0x80_syscall),
+			SDT_SYS386TGT, SEL_UPL, GSEL(GCODE_SEL, SEL_KPL));</pre><p>所以当一个用户应用程序提交<code class="literal">INT 0x80</code>指令时，
+        全系统的控制权会传递给函数<code class="function">_Xint0x80_syscall</code>，
+        这个函数在内核代码段中，将被以管理员权限执行。</p><p>然后，控制台和DDB(调试器)被初始化:</p><a id="idp63993936" class="indexterm"></a><pre class="programlisting"><code class="filename">sys/i386/i386/machdep.c:</code>
+	cninit();
+/* 以下代码可能因为未定义宏DDB而被跳过 */
+#ifdef DDB
+	kdb_init();
+	if (boothowto &amp; RB_KDB)
+		Debugger("Boot flags requested debugger");
+#endif</pre><p>任务状态段(TSS)是另一个x86保护模式中的数据结构。当发生任务切换时，
+       任务状态段用来让硬件存储任务现场信息。</p><p>局部描述符表(LDT)用来指向用户代码和数据。系统定义了几个选择符，
+       指向局部描述符表，它们是系统调用关口和用户代码、用户数据选择符:</p><pre class="programlisting"><code class="filename">/usr/include/machine/segments.h</code>
+#define	LSYS5CALLS_SEL	0	/* Intel BCS强制要求的 */
+#define	LSYS5SIGR_SEL	1
+#define	L43BSDCALLS_SEL	2	/* 尚无 */
+#define	LUCODE_SEL	3
+#define	LSOL26CALLS_SEL	4	/* Solaris &gt;=2.6版系统调用关口 */
+#define	LUDATA_SEL	5
+/* separate stack, es,fs,gs sels ? 分别的栈、es、fs、gs选择符？ */
+/* #define	LPOSIXCALLS_SEL	5*/	/* notyet, 尚无 */
+#define LBSDICALLS_SEL	16	/* BSDI system call gate, BSDI系统调用关口 */
+#define NLDT		(LBSDICALLS_SEL + 1)
+</pre><p>然后，proc0(0号进程，即内核所处的进程)的进程控制块(Process Control Block)
+     (<code class="literal">struct pcb</code>)结构被初始化。proc0是一个
+     <code class="literal">struct proc</code> 结构，描述了一个内核进程。
+     内核运行时，该进程总是存在，所以这个结构在内核中被定义为全局变量:</p><pre class="programlisting"><code class="filename">sys/kern/kern_init.c:</code>
+    struct	proc proc0;</pre><p>结构<code class="literal">struct pcb</code>是proc结构的一部分，
+     它定义在<code class="filename">/usr/include/machine/pcb.h</code>之中，
+     内含针对i386硬件结构专有的信息，如寄存器的值。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp64016336"></a>1.7.2. <code class="function">mi_startup()</code></h3></div></div></div><p>这个函数用冒泡排序算法，将所有系统初始化对象，然后逐个调用每个对象的入口:</p><pre class="programlisting"><code class="filename">sys/kern/init_main.c:</code>
+	for (sipp = sysinit; *sipp; sipp++) {
+
+		/* ... 省略 ... */
+
+		/* 调用函数 */
+		(*((*sipp)-&gt;func))((*sipp)-&gt;udata);
+		/* ... 省略 ... */
+	}</pre><p>尽管sysinit框架已经在《FreeBSD开发者手册》中有所描述，
+      我还是在这里讨论一下其内部原理。</p><a id="idp64023376" class="indexterm"></a><p>每个系统初始化对象(sysinit对象)通过调用宏建立。
+      让我们以<code class="literal">announce</code> sysinit对象为例。
+      这个对象打印版权信息:</p><pre class="programlisting"><code class="filename">sys/kern/init_main.c:</code>
+static void
+print_caddr_t(void *data __unused)
+{
+	printf("%s", (char *)data);
+}
+SYSINIT(announce, SI_SUB_COPYRIGHT, SI_ORDER_FIRST, print_caddr_t, copyright)</pre><p>这个对象的子系统标识是SI_SUB_COPYRIGHT(0x0800001)，
+      数值刚好排在SI_SUB_CONSOLE(0x0800000)后面。
+      所以，版权信息将在控制台初始化之后就被很早的打印出来。</p><p>让我们看一看宏<code class="literal">SYSINIT()</code>到底做了些什么。
+      它展开成宏<code class="literal">C_SYSINIT()</code>。
+      宏<code class="literal">C_SYSINIT()</code>然后展开成一个静态结构
+      <code class="literal">struct sysinit</code>。结构里申明里调用了另一个宏
+      <code class="literal">DATA_SET</code>:</p><pre class="programlisting"><code class="filename">/usr/include/sys/kernel.h:</code>
+      #define C_SYSINIT(uniquifier, subsystem, order, func, ident) \
+      static struct sysinit uniquifier ## _sys_init = { \ subsystem, \
+      order, \ func, \ ident \ }; \ DATA_SET(sysinit_set,uniquifier ##
+      _sys_init);
+
+#define	SYSINIT(uniquifier, subsystem, order, func, ident)	\
+	C_SYSINIT(uniquifier, subsystem, order,			\
+	(sysinit_cfunc_t)(sysinit_nfunc_t)func, (void *)ident)</pre><p>宏<code class="literal">DATA_SET()</code>展开成<code class="literal">MAKE_SET()</code>，
+      宏<code class="literal">MAKE_SET()</code>指向所有隐含的sysinit幻数:</p><pre class="programlisting"><code class="filename">/usr/include/linker_set.h</code>
+#define MAKE_SET(set, sym)						\
+	static void const * const __set_##set##_sym_##sym = &amp;sym;	\
+	__asm(".section .set." #set ",\"aw\"");				\
+	__asm(".long " #sym);						\
+	__asm(".previous")
+#endif
+#define TEXT_SET(set, sym) MAKE_SET(set, sym)
+#define DATA_SET(set, sym) MAKE_SET(set, sym)</pre><p>回到我们的例子中，经过宏的展开过程，将会产生如下声明:</p><pre class="programlisting">static struct sysinit announce_sys_init = {
+	SI_SUB_COPYRIGHT,
+	SI_ORDER_FIRST,
+	(sysinit_cfunc_t)(sysinit_nfunc_t)  print_caddr_t,
+	(void *) copyright
+};
+
+static void const *const __set_sysinit_set_sym_announce_sys_init =
+    &amp;announce_sys_init;
+__asm(".section .set.sysinit_set" ",\"aw\"");
+__asm(".long " "announce_sys_init");
+__asm(".previous");</pre><p>第一个<code class="literal">__asm</code>指令在内核可执行文件中建立一个ELF节(section)。
+      这发生在内核链接的时候。这一节将被命令为<code class="literal">.set.sysinit_set</code>。
+      这一节的内容是一个32位值――announce_sys_init结构的地址，这个结构正是第二个
+      <code class="literal">__asm</code>指令所定义的。第三个<code class="literal">__asm</code>指令标记节的结束。
+      如果前面有名字相同的节定义语句，节的内容(那个32位值)将被填加到已存在的节里，
+      这样就构造出了一个32位指针数组。</p><p>用<span class="application">objdump</span>察看一个内核二进制文件，
+      也许你会注意到里面有这么几个小的节:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>objdump -h /kernel</code></strong>
+  7 .set.cons_set 00000014  c03164c0  c03164c0  002154c0  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  8 .set.kbddriver_set 00000010  c03164d4  c03164d4  002154d4  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  9 .set.scrndr_set 00000024  c03164e4  c03164e4  002154e4  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 10 .set.scterm_set 0000000c  c0316508  c0316508  00215508  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 11 .set.sysctl_set 0000097c  c0316514  c0316514  00215514  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+ 12 .set.sysinit_set 00000664  c0316e90  c0316e90  00215e90  2**2
+                  CONTENTS, ALLOC, LOAD, DATA</pre><p>这一屏信息显示表明节.set.sysinit_set有0x664字节的大小，
+      所以<code class="literal">0x664/sizeof(void *)</code>个sysinit对象被编译进了内核。
+      其它节，如<code class="literal">.set.sysctl_set</code>表示其它链接器集合。</p><p>通过定义一个类型为<code class="literal">struct linker_set</code>的变量，
+      节<code class="literal">.set.sysinit_set</code>将被<span class="quote">“<span class="quote">收集</span>”</span>到那个变量里:</p><pre class="programlisting"><code class="filename">sys/kern/init_main.c:</code>
+      extern struct linker_set sysinit_set; /* XXX */</pre><p><code class="literal">struct linker_set</code>定义如下:</p><pre class="programlisting"><code class="filename">/usr/include/linker_set.h:</code>
+  struct linker_set {
+	int	ls_length;
+	void	*ls_items[1];		/* ls_length个项的数组, 以NULL结尾 */
+};</pre><div xmlns="" class="tip"><h3 class="admontitle">译者注: </h3><p xmlns="http://www.w3.org/1999/xhtml">实际上是说，
+      用C语言结构体linker_set来表达那个ELF节。</p></div><p>
+      第一项是sysinit对象的数量，第二项是一个以NULL结尾的数组，
+      数组中是指向那些对象的指针。</p><p>回到对<code class="function">mi_startup()</code>的讨论，
+      我们清楚了sysinit对象是如何被组织起来的。
+      函数<code class="function">mi_startup()</code>将它们排序，
+      并调用每一个对象。最后一个对象是系统调度器:</p><pre class="programlisting"><code class="filename">/usr/include/sys/kernel.h:</code>
+enum sysinit_sub_id {
+	SI_SUB_DUMMY		= 0x0000000,	/* 不被执行，仅供链接器使用 */
+	SI_SUB_DONE		= 0x0000001,	/* 已被处理*/
+	SI_SUB_CONSOLE		= 0x0800000,	/* 控制台*/
+	SI_SUB_COPYRIGHT	= 0x0800001,	/* 最早使用控制台的对象 */
+...
+	SI_SUB_RUN_SCHEDULER	= 0xfffffff	/* 调度器:不返回 */
+};</pre><p>系统调度器sysinit对象定义在文件<code class="filename">sys/vm/vm_glue.c</code>中，
+      这个对象的入口点是<code class="function">scheduler()</code>。
+      这个函数实际上是个无限循环，它表示那个进程标识(PID)为0的进程――swapper进程。
+      前面提到的proc0结构正是用来描述这个进程。</p><p>第一个用户进程是<span class="emphasis"><em>init</em></span>，
+      由sysinit对象<code class="literal">init</code>建立:</p><pre class="programlisting"><code class="filename">sys/kern/init_main.c:</code>
+static void
+create_init(const void *udata __unused)
+{
+	int error;
+	int s;
+
+	s = splhigh();
+	error = fork1(&amp;proc0, RFFDG | RFPROC, &amp;initproc);
+	if (error)
+		panic("cannot fork init: %d\n", error);
+	initproc-&gt;p_flag |= P_INMEM | P_SYSTEM;
+	cpu_set_fork_handler(initproc, start_init, NULL);
+	remrunqueue(initproc);
+	splx(s);
+}
+SYSINIT(init,SI_SUB_CREATE_INIT, SI_ORDER_FIRST, create_init, NULL)</pre><p><code class="function">create_init()</code>通过调用<code class="function">fork1()</code>
+    分配一个新的进程，但并不将其标记为可运行。当这个新进程被调度器调度执行时，
+    <code class="function">start_init()</code>将会被调用。
+    那个函数定义在<code class="filename">init_main.c</code>中。
+    它尝试装载并执行二进制代码<code class="filename">init</code>，
+    先尝试<code class="filename">/sbin/init</code>，然后是<code class="filename">/sbin/oinit</code>，
+    <code class="filename">/sbin/init.bak</code>，最后是<code class="filename">/stand/sysinstall</code>:</p><pre class="programlisting"><code class="filename">sys/kern/init_main.c:</code>
+static char init_path[MAXPATHLEN] =
+#ifdef	INIT_PATH
+    __XSTRING(INIT_PATH);
+#else
+    "/sbin/init:/sbin/oinit:/sbin/init.bak:/stand/sysinstall";
+#endif</pre></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="boot-loader.html">上一页</a> </td><td width="20%" align="center"><a accesskey="u" href="boot.html">上一级</a></td><td width="40%" align="right"> <a accesskey="n" href="locking.html">下一页</a></td></tr><tr><td width="40%" align="left" valign="top">1.6. <span class="application">loader</span>阶段 </td><td width="20%" align="center"><a accesskey="h" href="index.html">起始页</a></td><td width="40%" align="right" valign="top"> 第 2 章 内核中的锁</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>本文档和其它文档可从这里下载：
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a>.</small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>如果对于FreeBSD有问题，请先阅读
+    <a href="http://www.FreeBSD.org/docs.html">文档</a>，如不能解决再联系
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    关于本文档的问题请发信联系
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>

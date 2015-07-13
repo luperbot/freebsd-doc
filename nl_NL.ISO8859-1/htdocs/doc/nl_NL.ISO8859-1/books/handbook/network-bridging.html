@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>31.5. Bridging</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="FreeBSD handboek" /><link rel="up" href="advanced-networking.html" title="Hoofdstuk 31. Geavanceerde netwerken" /><link rel="prev" href="network-bluetooth.html" title="31.4. Bluetooth" /><link rel="next" href="network-aggregation.html" title="31.6. Verbindingsaggregatie en failover" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">31.5. Bridging</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="network-bluetooth.html">Terug</a> </td><th width="60%" align="center">Hoofdstuk 31. Geavanceerde netwerken</th><td width="20%" align="right"> <a accesskey="n" href="network-aggregation.html">Volgende</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="network-bridging"></a>31.5. Bridging</h2></div><div><span class="authorgroup">Geschreven door <span xmlns="http://www.w3.org/1999/xhtml" class="author"><span class="firstname">Andrew</span> <span class="surname">Thompson</span></span>. </span></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89688528"></a>31.5.1. Introductie</h3></div></div></div><a id="idp89689168" class="indexterm"></a><a id="idp89689680" class="indexterm"></a><p>Soms is het handig om één fysiek netwerk
+	(zoals een Ethernet-segment) in twee gescheiden netwerksegmenten
+	te verdelen zonder de noodzaak om een IP-subnet aan te maken en
+	een router te gebruiken om de segmenten met elkaar te verbinden.
+	Een apparaat dat twee netwerken op deze manier met elkaar
+	verbindt wordt een <span class="quote">&#8220;<span class="quote">bridge (brug)</span>&#8221;</span> genoemd.  Een
+	FreeBSD-systeem met twee netwerkkaarten kan als bridge
+	dienen.</p><p>De bridge werkt door de adressen van de MAC-laag
+	(Ethernetadressen) van de apparaten op elke netwerkinterface
+	te leren.  Het stuurt alleen verkeer tussen twee netwerken door
+	indien de bron en het doel zich op verschillende netwerken
+	bevinden.</p><p>In vele opzichten is een bridge als een Ethernet-switch met
+	erg weinig poorten.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89696080"></a>31.5.2. Situaties waarin bridging juist is</h3></div></div></div><p>Er zijn vandaag de dag veel situaties waarin een bridge
+	gebruikt wordt.</p><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89697104"></a>31.5.2.1. Netwerken verbinden</h4></div></div></div><p>Het basisgebruik van een bridge is het met elkaar
+	  verbinden van twee of meer netwerksegmenten.  Er zijn vele
+	  redenen om een hostgebaseerde bridge te gebruiken in plaats
+	  van simpele netwerkapparaten zoals kabelbeperkingen,
+	  firewalling of het verbinden van pseudonetwerken zoals een
+	  interface van een virtuële machine.  Een bridge kan ook
+	  een draadloze interface die in hostap-modus draait met een
+	  bedraad netwerk verbinden en als een toegangspunt
+	  dienen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89698256"></a>31.5.2.2. Filtering/Bandbreedtebeheersende firewall</h4></div></div></div><a id="idp89698896" class="indexterm"></a><a id="idp89699408" class="indexterm"></a><p>Een gebruikelijke situatie dient zich voor wanneer de
+	  functionaliteit van een firewall nodig is zonder routing of
+	  network address translation (NAT).</p><p>Een voorbeeld is een klein bedrijf dat via DSL of ISDN met
+	  hun internetprovider verbonden is.  Dit bedrijf heeft 13
+	  wereldwijd bereikbare IP-adressen van de internetprovider en
+	  10 PC's op hun netwerk.  In deze situatie is een firewall die
+	  op een router gebaseerd is lastig wegens
+	  subnet-problemen.</p><a id="idp89700688" class="indexterm"></a><a id="idp89701200" class="indexterm"></a><a id="idp89701712" class="indexterm"></a><p>Een firewall die op een bridge gebaseerd is kan ingesteld
+	  en net na de DSL- of ISDN-router geplaatst worden zonder dat
+	  er problemen met IP-nummers optreden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89702736"></a>31.5.2.3. Netwerktap</h4></div></div></div><p>Een bridge kan twee netwerksegmenten verbinden en kan
+	  gebruikt worden om alle Ethernetframes die tussen dezen
+	  voorbijkomen te inspecteren.  Dit kan òfwel vanuit het
+	  gebruik van <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bpf&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">bpf</span>(4)</span></a>/<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tcpdump&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">tcpdump</span>(1)</span></a> op de bridge-interface
+	  òfwel door een kopie van alle frames naar een extra
+	  interface (overspanpoort) te versturen.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89709648"></a>31.5.2.4. Laag 2 VPN</h4></div></div></div><p>Twee Ethernetnetwerken kunnen over een IP-verbinding
+	  verbonden worden door de netwerken naar een EtherIP-tunnel te
+	  bridgen of met een oplossing gebaseerd po <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=tap&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">tap</span>(4)</span></a> zoals
+	  OpenVPN.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89711568"></a>31.5.2.5. Laag 2 Redundancy</h4></div></div></div><p>Een netwerk kan met meerdere verbindingen verbonden worden
+	  en het Spanning Tree Protocol gebruiken om overbodige paden te
+	  blokkeren.  Een Ethernetnetwerk kan alleen juist functioneren
+	  indien er slechts één actief pad bestaat tussen
+	  twee apparaten, Spanning Tree zal lussen detecteren en de
+	  overbodige verbindingen in een geblokkeerde toestand zetten.
+	  Indien een van de actieve verbindingen faalt zal het protocol
+	  een andere boom berekenen en een van de geblokkeerde paden
+	  weer activeren om de verbindingen naar alle punten in het
+	  netwerk te herstellen.</p></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89712848"></a>31.5.3. De kernel instellen</h3></div></div></div><p>Deze sectie behandelt de bridges geïmplementeerd met
+	<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=if_bridge&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">if_bridge</span>(4)</span></a>, een stuurprogramma dat bridges met netgraph
+	implementeert is ook beschikbaar, zie voor meer informatie de
+	hulppagina <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ng_bridge&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">ng_bridge</span>(4)</span></a>.</p><p>Het bridge-stuurprogramma is een kernelmodule en zal
+	automatisch door <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> worden geladen wanneer er een
+	bridge-interface wordt aangemaakt.  Het is mogelijk om de bridge
+	in de kernel te compileren door
+	<code class="literal">device if_bridge</code> aan het
+	kernelinstellingenbestand toe te voegen.</p><p>Pakketfiltering kan met elk firewall-pakket worden gebruikt
+	dat via het raamwerk <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=pfil&amp;sektion=9"><span class="citerefentry"><span class="refentrytitle">pfil</span>(9)</span></a> aankoppelt.  De firewall kan
+	als een module worden geladen of in de kernel worden
+	gecompileerd.</p><p>De bridge kan als met <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=altq&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">altq</span>(4)</span></a> of <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=dummynet&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">dummynet</span>(4)</span></a> als
+	een verkeersregelaar worden gebruikt.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89720400"></a>31.5.4. De bridge inschakelen</h3></div></div></div><p>De bridge wordt aangemaakt door interfaces te klonen.  Om
+	een bridge aan te maken wordt <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ifconfig&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">ifconfig</span>(8)</span></a> gebruikt, indien
+	het bridge-stuurprogramma niet in de kernel aanwezig is zal het
+	automatisch worden geladen.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge create</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0</code></strong>
+bridge0: flags=8802&lt;BROADCAST,SIMPLEX,MULTICAST&gt; metric 0 mtu 1500
+        ether 96:3d:4b:f1:79:7a
+        id 00:00:00:00:00:00 priority 32768 hellotime 2 fwddelay 15
+        maxage 20 holdcnt 6 proto rstp maxaddr 100 timeout 1200
+        root id 00:00:00:00:00:00 priority 0 ifcost 0 port 0</pre><p>Een bridge-interface is aangemaakt en er is automatisch een
+	random gegenereerd Ethernetadres aan toegekend.  De parameters
+	<code class="literal">maxaddr</code> en <code class="literal">timeout</code> bepalen
+	hoeveel MAC-adressen de bridge in de doorstuurtabel houdt en
+	hoeveel seconden voordat elke regel wordt verwijderd nadat het
+	voor het laatst gezien is.  De andere parameters bepalen hoe
+	Spanning Tree werkt.</p><p>Voeg de netwerkinterfaces die lid zijn aan de bridge toe.
+	Om de bridge pakketten te laten doorsturen dienen alle
+	lidinterfaces en de bridge actief te zijn:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 addm fxp0 addm fxp1 up</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ifconfig fxp0 up</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ifconfig fxp1 up</code></strong></pre><p>De bridge stuurt nu Ethernet-frames door tussen
+	<code class="filename">fxp0</code> en <code class="filename">fxp1</code>.
+	De overeenkomstige configuratie in
+	<code class="filename">/etc/rc.conf</code> zodat de bridge tijdens het
+	opstarten wordt aangemaakt is:</p><pre class="programlisting">cloned_interfaces="bridge0"
+ifconfig_bridge0="addm fxp0 addm fxp1 up"
+ifconfig_fxp0="up"
+ifconfig_fxp1="up"</pre><p>Indien de bridge-gastheer een IP-adres nodig heeft dan is de
+	juiste plaats om dit in te stellen op de bridge-interface zelf
+	in plaats van op een van de lidinterfaces.  Dit kan statisch of
+	via DHCP worden ingesteld:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 inet 192.168.0.1/24</code></strong></pre><p>Het is ook mogelijk om een IPv6-adres aan een
+	bridge-interface toe te kennen.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89760720"></a>31.5.5. Firewalls gebruiken</h3></div></div></div><a id="idp89761360" class="indexterm"></a><p>Wanneer pakketten worden gefilterd, zullen gebridgede
+	pakketten het filter inbound op de vertrekkende interface
+	passeren, op de bridge-interface en outbound op de bestemde
+	interface.  Elke stap kan uitgezet worden.  Wanneer de richting
+	van het pakketverkeer belangrijk is, kan de firewall het beste
+	op de lidinterfaces draaien en niet op de bridge zelf.</p><p>De bridge heeft verschillende aanpasbare instellingen voor
+	het doorlaten van non-IP- en ARP-pakketten, en een laag 2
+	firewall met IPFW.  Zie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=if_bridge&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">if_bridge</span>(4)</span></a> voor meer
+	informatie.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89763536"></a>31.5.6. Opspannende boom</h3></div></div></div><p>Het bridge-stuurprogramma implementeert het Rapid Spanning
+	Tree Protocol (RSTP of 802.1w) met terugwaartse compatibiliteit
+	met het verouderde Spanning Tree Protocol (STP).  Spanning Tree
+	wordt gebruikt om lussen in een netwerktopologie te detecteren
+	en verwijderen.  RSTP biedt snellere convergentie naar een
+	opspannende boom dan het verouderde STP, het protocol wisselt
+	informatie met naburige switches uit om snel naar forwarding
+	over te gaan zonder lussen te creëren.  FreeBSD ondersteunt
+	RSTP en STP als opties, waarbij RSTP de standaard is.</p><p>Spanning Tree kan op lidinterfaces worden geactiveerd met
+	het commando <code class="literal">stp</code>.  Voor een bridge met
+	<code class="filename">fxp0</code> en <code class="filename">fxp1</code>
+	alle huidige interfaces, wordt STP met het volgende
+	geactiveerd:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 stp fxp0 stp fxp1</code></strong>
+bridge0: flags=8843&lt;UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST&gt; metric 0 mtu 1500
+        ether d6:cf:d5:a0:94:6d
+        id 00:01:02:4b:d4:50 priority 32768 hellotime 2 fwddelay 15
+        maxage 20 holdcnt 6 proto rstp maxaddr 100 timeout 1200
+        root id 00:01:02:4b:d4:50 priority 32768 ifcost 0 port 0
+        member: fxp0 flags=1c7&lt;LEARNING,DISCOVER,STP,AUTOEDGE,PTP,AUTOPTP&gt;
+                port 3 priority 128 path cost 200000 proto rstp
+                role designated state forwarding
+        member: fxp1 flags=1c7&lt;LEARNING,DISCOVER,STP,AUTOEDGE,PTP,AUTOPTP&gt;
+                port 4 priority 128 path cost 200000 proto rstp
+                role designated state forwarding</pre><p>De bridge heeft spanning tree ID
+	<code class="literal">00:01:02:4b:d4:50</code> en prioriteit
+	<code class="literal">32768</code>.  Aangezien het
+	<code class="literal">root id</code> hetzelfde is geeft dit aan dat dit de
+	hoofdbridge voor de boom is.</p><p>Een andere bridge in het netwerk heeft spanning tree ook
+	geactiveerd:</p><pre class="screen">bridge0: flags=8843&lt;UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST&gt; metric 0 mtu 1500
+        ether 96:3d:4b:f1:79:7a
+        id 00:13:d4:9a:06:7a priority 32768 hellotime 2 fwddelay 15
+        maxage 20 holdcnt 6 proto rstp maxaddr 100 timeout 1200
+        root id 00:01:02:4b:d4:50 priority 32768 ifcost 400000 port 4
+        member: fxp0 flags=1c7&lt;LEARNING,DISCOVER,STP,AUTOEDGE,PTP,AUTOPTP&gt;
+                port 4 priority 128 path cost 200000 proto rstp
+                role root state forwarding
+        member: fxp1 flags=1c7&lt;LEARNING,DISCOVER,STP,AUTOEDGE,PTP,AUTOPTP&gt;
+                port 5 priority 128 path cost 200000 proto rstp
+                role designated state forwarding</pre><p>De reegl <code class="literal">root id 00:01:02:4b:d4:50 priority 32768
+	  ifcost 400000 port 4</code> geeft aan dat de hoofdbridge
+	<code class="literal">00:01:02:4b:d4:50</code> is zoals boven en dat de
+	padkosten <code class="literal">400000</code> zijn vanaf deze bridge, het
+	pad naar de hoofdbridge gaat via <code class="literal">port 4</code>
+	welke <code class="filename">fxp0</code> is.</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89771984"></a>31.5.7. Geavanceerd bridgen</h3></div></div></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89772624"></a>31.5.7.1. Verkeersstromen reconstrueren</h4></div></div></div><p>De bridge ondersteunt monitormodus, waarin de pakketten
+	  worden verwijderd nadat ze door <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bpf&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">bpf</span>(4)</span></a> zijn verwerkt,
+	  en ze niet verder verwerkt of doorgestuurd worden.  Dit kan
+	  worden gebruikt om de invoer van twee of meer interfaces naar
+	  een enkele <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bpf&amp;sektion=4"><span class="citerefentry"><span class="refentrytitle">bpf</span>(4)</span></a>-stroom te multiplexen.  Dit is nuttig
+	  voor het reconstrueren van het verkeer voor netwerktaps welke
+	  de RX/TX-signalen over twee verschillende interfaces
+	  uitzenden.</p><p>Om de invoer van vier netwerkinterfaces als
+	  één stroom te lezen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 addm fxp0 addmfxp1 addm fxp2 addm fxp3 monitor up</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>tcpdump -i bridge0</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89781584"></a>31.5.7.2. SPAN poorten</h4></div></div></div><p>Van elk Ethernet-frame dat door de bridge wordt ontvangen
+	  wordt er een kopie naar de aangewezen SPAN-poort verstuurd.
+	  Het aantal geconfigureerde SPAN-poorten op een bridge is
+	  onbeperkt, indien een interface aangewezen is als SPAN-poort
+	  kan het niet ook als gewone bridgepoort gebruikt worden.  Dit
+	  is het nuttigste voor het passief afluisteren van een
+	  gebridged netwerk op een andere host die met een van de
+	  SPAN-poorten van de bridge verbonden is.</p><p>Om een kopie van alle frames naar de interface
+	  <code class="filename">fxp4</code> te versturen:</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 span fxp4</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89784400"></a>31.5.7.3. Privé-interfaces</h4></div></div></div><p>Een privé-interface stuurt geen verkeer door naar
+	  poorten die niet ook een privé-interface zijn.  Het
+	  verkeer wordt onvoorwaardelijk geblokkeerd, dus worden er
+	  geen Ethernetframes doorgestuurd, inclusief ARP.  Indien
+	  verkeer selectief dient te worden geblokkeerd dient er in
+	  plaats hiervan een firewall gebruikt te worden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89785552"></a>31.5.7.4. Klevende interfaces</h4></div></div></div><p>Indien een lidinterface van een bridge als klevend is
+	  gemarkeerd worden dynamisch geleerde adresregels als statisch
+	  behandelt wanneer ze in de doorstuurcache komen.  Klevende
+	  interfaces vallen nooit uit de cache en worden nooit vervangen,
+	  zelfs niet als het adres op een andere interface wordt gezien.
+	  Dit biedt het voordeel van statische adresregels zonder dat de
+	  doorstuurtabel van te voren gevuld hoeft te worden,
+	  cliënten die geleerd zijn op een bepaald segment van de
+	  bridge kunnen niet roamen naar een ander segment.</p><p>Een ander voorbeeld voor het gebruik van klevende adressen
+	  zou het combineren van de bridge met VLANs zijn om een router
+	  te creëren waar klantnetwerken geïsoleerd zijn
+	  zonder dat IP-adresruimte verspild wordt.  Neem aan dat
+	  <code class="systemitem">KlantA</code> op
+	  <code class="literal">vlan100</code> zit en <code class="systemitem">KlantB</code> op
+	  <code class="literal">vlan101</code>.  De bridge heeft het adres
+	  <code class="systemitem">192.168.0.1</code> en is tevens een
+	  internet-router.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 addm vlan100 sticky vlan100 addm vlan101 sticky vlan101</code></strong>
+<code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 inet 192.168.0.1/24</code></strong></pre><p>Beide cliënten zien <code class="systemitem">192.168.0.1</code> als hun standaard gateway
+	  en aangezien de bridge-cache kleverig is kunnen ze niet het
+	  MAC-adres van de andere klant spoofen om hun verkeer op te
+	  vangen.</p><p>Alle communicatie tussen de VLANs kan geblokkeerd worden
+	  door het gebruik van privé-interfaces (of een firewall):</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 private vlan100 private vlan101</code></strong></pre><p>De klanten zijn compleet geïsoleerd van elkaar, het
+	  volledige <code class="systemitem">/24</code> adresruimte kan
+	  zonder subnetten toegewezen worden.</p></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89794256"></a>31.5.7.5. Adresbeperkingen</h4></div></div></div><p>Het aantal unieke bron-MAC-adressen achter een interface
+	  kan beperkt zijn.  Wanneer de limiet bereikt is worden
+	  pakketten met een onbekend bronadres gedropt totdat een
+	  bestaande ingang in de host-cache vervalt of wordt
+	  verwijderd.</p><p>Het volgende voorbeeld stelt het maximum aantal
+	  Ethernetapparaten voor <code class="systemitem">KlantA</code> op
+	  <code class="literal">vlan100</code> in op 10.</p><pre class="screen"><code class="prompt">#</code> <strong class="userinput"><code>ifconfig bridge0 ifmaxaddr vlan100 10</code></strong></pre></div><div class="sect3"><div xmlns="" class="titlepage"><div><div><h4 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp89826384"></a>31.5.7.6. SNMP-monitoring</h4></div></div></div><p>De bridge-interface en STP-parameters kunnen gemonitord
+	  worden via het SNMP-daemon dat met het basis FreeBSD-systeem
+	  wordt meegeleverd.  De geëxporteerde bridge-MIBs houden
+	  zich aan de standaarden van de IETF zodat elke
+	  SNMP-cliënt of monitorpakket kan worden gebruikt om de
+	  gegevens te verzamelen.</p><p>Op de bridge-machine dient de regel
+	  <code class="literal">begemotSnmpdModulePath."bridge" =
+	  "/usr/lib/snmp_bridge.so"</code> van
+	  <code class="filename">/etc/snmp.config</code> geactiveerd te worden en
+	  het daemon <span class="application">bsnmpd</span> gestart te worden.
+	  Andere instellingen zoals gemeenschapsnamen en toegangslijsten
+	  dienen eventueel aangepast te worden.  Zie <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=bsnmpd&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">bsnmpd</span>(1)</span></a> en
+	  <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=snmp_bridge&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">snmp_bridge</span>(3)</span></a> voor meer informatie.</p><p>Het volgende voorbeeld gebruikt de software
+	  <span class="application">Net-SNMP</span> (<a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/net-snmp/pkg-descr">net-mgmt/net-snmp</a> om een bridge te
+	  ondervragen, de port <a xmlns="" class="package" href="http://www.freebsd.org/cgi/url.cgi?ports/net-mgmt/bsnmptools/pkg-descr">net-mgmt/bsnmptools</a> kan ook worden
+	  gebruikt.  Voeg de volgende regels toe aan
+	  <code class="filename">$HOME/.snmp/snmp.conf</code> op de
+	  SNMP-cliënt-host om de MIB-definities van de bridge in
+	  <span class="application">Net-SNMP</span> te importeren:</p><pre class="programlisting">mibdirs +/usr/share/snmp/mibs
+mibs +BRIDGE-MIB:RSTP-MIB:BEGEMOT-MIB:BEGEMOT-BRIDGE-MIB</pre><p>Om een enkele bridge via de IETF BRIDGE-MIB (RFC4188) te
+	  monitoren:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>snmpwalk -v 2c -c public bridge1.example.com mib-2.dot1dBridge</code></strong>
+BRIDGE-MIB::dot1dBaseBridgeAddress.0 = STRING: 66:fb:9b:6e:5c:44
+BRIDGE-MIB::dot1dBaseNumPorts.0 = INTEGER: 1 ports
+BRIDGE-MIB::dot1dStpTimeSinceTopologyChange.0 = Timeticks: (189959) 0:31:39.59 centi-seconds
+BRIDGE-MIB::dot1dStpTopChanges.0 = Counter32: 2
+BRIDGE-MIB::dot1dStpDesignatedRoot.0 = Hex-STRING: 80 00 00 01 02 4B D4 50
+...
+BRIDGE-MIB::dot1dStpPortState.3 = INTEGER: forwarding(5)
+BRIDGE-MIB::dot1dStpPortEnable.3 = INTEGER: enabled(1)
+BRIDGE-MIB::dot1dStpPortPathCost.3 = INTEGER: 200000
+BRIDGE-MIB::dot1dStpPortDesignatedRoot.3 = Hex-STRING: 80 00 00 01 02 4B D4 50
+BRIDGE-MIB::dot1dStpPortDesignatedCost.3 = INTEGER: 0
+BRIDGE-MIB::dot1dStpPortDesignatedBridge.3 = Hex-STRING: 80 00 00 01 02 4B D4 50
+BRIDGE-MIB::dot1dStpPortDesignatedPort.3 = Hex-STRING: 03 80
+BRIDGE-MIB::dot1dStpPortForwardTransitions.3 = Counter32: 1
+RSTP-MIB::dot1dStpVersion.0 = INTEGER: rstp(2)</pre><p>De waarde <code class="literal">dot1dStpTopChanges.0</code> is twee
+	  wat betekent dat de topologie van de STP-bridge twee maal
+	  veranderd is, een topologieverandering houdt in dat
+	  één of meerdere links in het netwerk zijn
+	  veranderd of hebben gefaald en dat er een nieuwe boom is
+	  berekend.  De waarde
+	  <code class="literal">dot1dStpTimeSinceTopologyChange.0</code> laat zien
+	  wanneer dit gebeurde.</p><p>Om meerdere bridge-interfaces te monitoren kan men het
+	  privé BEGEMOT-BRIDGE-MIB gebruiken:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>snmpwalk -v 2c -c public bridge1.example.com</code></strong>
+enterprises.fokus.begemot.begemotBridge
+BEGEMOT-BRIDGE-MIB::begemotBridgeBaseName."bridge0" = STRING: bridge0
+BEGEMOT-BRIDGE-MIB::begemotBridgeBaseName."bridge2" = STRING: bridge2
+BEGEMOT-BRIDGE-MIB::begemotBridgeBaseAddress."bridge0" = STRING: e:ce:3b:5a:9e:13
+BEGEMOT-BRIDGE-MIB::begemotBridgeBaseAddress."bridge2" = STRING: 12:5e:4d:74:d:fc
+BEGEMOT-BRIDGE-MIB::begemotBridgeBaseNumPorts."bridge0" = INTEGER: 1
+BEGEMOT-BRIDGE-MIB::begemotBridgeBaseNumPorts."bridge2" = INTEGER: 1
+...
+BEGEMOT-BRIDGE-MIB::begemotBridgeStpTimeSinceTopologyChange."bridge0" = Timeticks: (116927) 0:19:29.27 centi-seconds
+BEGEMOT-BRIDGE-MIB::begemotBridgeStpTimeSinceTopologyChange."bridge2" = Timeticks: (82773) 0:13:47.73 centi-seconds
+BEGEMOT-BRIDGE-MIB::begemotBridgeStpTopChanges."bridge0" = Counter32: 1
+BEGEMOT-BRIDGE-MIB::begemotBridgeStpTopChanges."bridge2" = Counter32: 1
+BEGEMOT-BRIDGE-MIB::begemotBridgeStpDesignatedRoot."bridge0" = Hex-STRING: 80 00 00 40 95 30 5E 31
+BEGEMOT-BRIDGE-MIB::begemotBridgeStpDesignatedRoot."bridge2" = Hex-STRING: 80 00 00 50 8B B8 C6 A9</pre><p>Om de bridge-interface die via de subboom
+	  <code class="literal">mib-2.dot1dBridge</code> wordt gemonitord te
+	  veranderen:</p><pre class="screen"><code class="prompt">%</code> <strong class="userinput"><code>snmpset -v 2c -c private bridge1.example.com</code></strong>
+BEGEMOT-BRIDGE-MIB::begemotBridgeDefaultBridgeIf.0 s bridge2</pre></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="network-bluetooth.html">Terug</a> </td><td width="20%" align="center"><a accesskey="u" href="advanced-networking.html">Omhoog</a></td><td width="40%" align="right"> <a accesskey="n" href="network-aggregation.html">Volgende</a></td></tr><tr><td width="40%" align="left" valign="top">31.4. Bluetooth </td><td width="20%" align="center"><a accesskey="h" href="index.html">Begin</a></td><td width="40%" align="right" valign="top"> 31.6. Verbindingsaggregatie en failover</td></tr></table></div><p xmlns="" align="center"><small>All FreeBSD documents are available for download
+    at <a href="http://ftp.FreeBSD.org/pub/FreeBSD/doc/">http://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="" align="center"><small>Questions that are not answered by the
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> may be
+    sent to &lt;<a href="mailto:freebsd-questions@FreeBSD.org">freebsd-questions@FreeBSD.org</a>&gt;.<br />
+    Send questions about this document to &lt;<a href="mailto:freebsd-doc@FreeBSD.org">freebsd-doc@FreeBSD.org</a>&gt;.</small></p></body></html>

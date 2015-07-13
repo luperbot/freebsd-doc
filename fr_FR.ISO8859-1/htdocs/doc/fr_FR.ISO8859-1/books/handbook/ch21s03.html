@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>21.3. Les goulots d'étranglement d'accès aux données</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><link rel="home" href="index.html" title="Manuel FreeBSD" /><link rel="up" href="vinum-vinum.html" title="Chapitre 21. Le gestionnaire de volume Vinum" /><link rel="prev" href="vinum-intro.html" title="21.2. Les disques sont trop petits" /><link rel="next" href="ch21s04.html" title="21.4. Intégrité des données" /><link rel="copyright" href="legalnotice.html" title="Copyright" /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">21.3. Les goulots d'étranglement d'accès aux
+      données</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="vinum-intro.html">Précédent</a> </td><th width="60%" align="center">Chapitre 21. Le gestionnaire de volume Vinum</th><td width="20%" align="right"> <a accesskey="n" href="ch21s04.html">Suivant</a></td></tr></table><hr /></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="idp81499088"></a>21.3. Les goulots d'étranglement d'accès aux
+      données</h2></div></div></div><p>Les systèmes modernes ont fréquemment besoin
+      d'accéder aux données d'une manière hautement
+      concourante.  Par exemple, d'importants serveurs FTP ou HTTP
+      peuvent supporter des milliers de sessions concourantes et avoir
+      de multiple connexions à 100 Mbit/s vers le monde
+      extérieur, et
+      cela bien au-delà du taux de transfert soutenu de la plupart des
+      disques.</p><p>Les disques actuels peuvent effectuer des transfert
+      séquentiels de données jusqu'à une vitesse de
+      70 MO/s, mais ce chiffre a peu d'importance dans un
+      environnement où plusieurs processus indépendants
+      accèdent à un disque, où l'on pourra n'atteindre
+      qu'une fraction de cette valeur.  Dans de tels cas il est plus
+      intéressant de voir le problème du point de vue du
+      sous-système des disques:
+      le paramètre important est la charge que provoque un transfert
+      sur le sous-système, en d'autres termes le temps d'occupation
+      du disque impliqué dans le transfert.</p><p>Dans n'importe quel transfert, le disque doit tout d'abord
+      positionner les têtes de lecture, attendre le passage du premier
+      secteur sous la tête de lecture, puis effectuer le transfert.
+      Ces actions peuvent être considérées comme
+      étant atomiques: cela n'a aucun sens de les interrompre.</p><p><a id="vinum-latency"></a>
+      Considérons un transfert typique d'environ 10 KO: la
+      génération actuelle de disques hautes performances peuvent
+      positionner leurs têtes en environ 3.5 ms.  Les disques les
+      plus véloces tournent à 15000 tr/minute, donc le
+      temps de latence moyen de rotation (un demi-tour) est de 2 ms.
+      A 70 MO/s, le transfert en lui-même prend environ
+      150 &#956;s, presque rien comparé au temps de positionnement.
+      Dans un tel cas, le taux de transfert effectif tombe à un peu
+      plus de 1 MO/s et est clairement hautement dépendant de la
+      taille du transfert.</p><p>La solution classique et évidente à ce goulot
+      d'étranglement est &#8220;plus de cylindres&#8221;:
+      plutôt que d'utiliser un gros disque, on utilise plusieurs
+      disques plus petits avec le même espace de stockage.
+      Chaque disque est en mesure d'effectuer un transfert
+      indépendamment des autres, aussi le taux de sortie augmente d'un
+      facteur proche du nombre de disques utilisés.</p><p>L'amélioration du taux réel de sortie est,
+      naturellement, inférieure au nombre de disques impliqués:
+      bien que chaque disque soit capable de transférer en
+      parallèle, il n'y a aucun
+      moyen de s'assurer que les requêtes sont distribuées
+      équitablement entre les disques.  Inévitablement
+      la charge d'un disque sera plus importante que celle d'un autre.</p><a id="idp81502288" class="indexterm"></a><a id="idp81503440" class="indexterm"></a><p>La répartition de la charge sur les disques dépend
+      fortement de la manière dont les données sont
+      partagées entre les disques.  Dans la discussion suivant, il
+      sera pratique de penser au stockage disque en tant qu'un grand
+      nombre de secteurs qui sont adressables par l'intermédiaire d'un
+      nombre, plutôt que comme les pages d'un livre.  La méthode
+      la plus évidente est de diviser le disque virtuel en groupes de
+      secteurs consécutifs de taille égale aux disques physiques
+      individuels et de les stocker de cette manière, plutôt que de
+      les prendre comme un gros livre et de le déchirer en
+      petites sections.  Cette méthode est appelée
+      <span class="emphasis"><em>concaténation</em></span> et a pour avantage que
+      les disques n'ont pas besoin d'avoir de rapport spécifique au
+      niveau de leur taille respective.  Cela fonctionne bien quand
+      l'accès au disque virtuel est réparti de façon
+      identique sur son espace d'adressage.  Quand l'accès est
+      limité à une petite
+      zone, l'amélioration est moins marquée.  <a class="xref" href="ch21s03.html#vinum-concat" title="Figure 21.1. Organisation par concaténation">Figure 21.1, « Organisation par concaténation »</a> décrit la séquence dans laquelle les
+      unités sont assignées dans une organisation par
+      concaténation.</p><p>
+      </p><div class="figure"><a id="vinum-concat"></a><div class="figure-title">Figure 21.1. Organisation par concaténation</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-concat.png" alt="Organisation par concaténation" /></div></div></div><p><br class="figure-break" />
+    </p><a id="idp81511888" class="indexterm"></a><a id="idp81513040" class="indexterm"></a><a id="idp81514192" class="indexterm"></a><a id="idp81514960" class="indexterm"></a><p>Une organisation alternative est de diviser l'espace
+      adressable en composants plus petits, de même taille et de les
+      stocker séquentiellement sur différents
+      périphériques.  Par exemple, les 256 premiers secteurs
+      peuvent être stockés sur le premier disque, les 256
+      secteurs suivants sur le disque suivant et ainsi de suite.
+      Après avoir atteint le dernier disque, le processus se
+      répète
+      jusqu'à ce que les disques soient pleins.  Cette organisation
+      est appelée <span class="emphasis"><em>striping</em></span> (découpage en
+      bande ou segmentation) ou <acronym class="acronym">RAID-0</acronym>
+
+    <a href="#ftn.idp81517136" class="footnote" id="idp81517136"><sup class="footnote">[12]</sup></a>.</p><p>La segmentation exige légèrement plus d'effort pour
+	localiser les données, et peut causer une charge additionnelle
+	d'E/S quand un transfert est réparti sur de multiples disques,
+	mais il peut également fournir une charge plus constante sur
+	les disques.  <a class="xref" href="ch21s03.html#vinum-striped" title="Figure 21.2. Organisation segmentée">Figure 21.2, « Organisation segmentée »</a> illustre l'ordre
+	dans lequel les unités de stockage sont assignées dans une
+	organisation segmentée.</p><p>
+      </p><div class="figure"><a id="vinum-striped"></a><div class="figure-title">Figure 21.2. Organisation segmentée</div><div class="figure-contents"><div class="mediaobject"><img src="vinum/vinum-striped.png" alt="Organisation segmentée" /></div></div></div><p><br class="figure-break" />
+    </p><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp81517136" class="footnote"><p><a href="#idp81517136" class="para"><sup class="para">[12] </sup></a><acronym class="acronym">RAID</acronym> signifie <span class="emphasis"><em>Redundant Array of
+	Inexpensive Disks</em></span> (réseau redondant de disques
+	bons marchés) et offre diverses améliorations de la
+	tolérance aux pannes, bien que le dernier terme soit
+	légèrement
+	trompeur: il ne fournit pas de redondance.</p></div></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="vinum-intro.html">Précédent</a> </td><td width="20%" align="center"><a accesskey="u" href="vinum-vinum.html">Niveau supérieur</a></td><td width="40%" align="right"> <a accesskey="n" href="ch21s04.html">Suivant</a></td></tr><tr><td width="40%" align="left" valign="top">21.2. Les disques sont trop petits </td><td width="20%" align="center"><a accesskey="h" href="index.html">Sommaire</a></td><td width="40%" align="right" valign="top"> 21.4. Intégrité des données</td></tr></table></div><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Ce document, ainsi que d'autres peut être téléchargé sur
+    <a href="ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/">ftp://ftp.FreeBSD.org/pub/FreeBSD/doc/</a></small></p><p xmlns="http://www.w3.org/TR/xhtml1/transitional" align="center"><small>Pour toutes questions à propos de FreeBSD, lisez la
+    <a href="http://www.FreeBSD.org/docs.html">documentation</a> avant de contacter
+    &lt;<a href="mailto:questions@FreeBSD.org">questions@FreeBSD.org</a>&gt;.<br></br>
+    Pour les questions sur cette documentation, contactez
+    &lt;<a href="mailto:doc@FreeBSD.org">doc@FreeBSD.org</a>&gt;.</small></p></body></html>
