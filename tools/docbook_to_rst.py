@@ -8,12 +8,14 @@ import os
 
 from subprocess import call
 
-def html_to_rst(file, root, single=False, encoding='UTF-8', html=True):
+def html_to_rst(file_name, root, single=False, encoding='UTF-8', html=True):
     original_format= 'html' if html else 'docbook'
-    if not file.endswith('.html'):
+    if not file_name.endswith('.html'):
         return
-    new_file = file[:-5] + '.rst'
-    file_path = "%s/%s" % (root, file)
+    if file_name.startswith('5xx') or file_name.startswith('4xx'):
+	return
+    new_file = file_name[:-5] + '.rst'
+    file_path = "%s/%s" % (root, file_name)
     if single:
         new_file_path = "%s.rst" % (root)
     else:
