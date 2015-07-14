@@ -71,3 +71,4 @@ if __name__ == '__main__':
         dir_path = sys.argv[1]
         create_htdocs(dir_path)
         convert_dir(dir_path)
+	print "Done converting."
