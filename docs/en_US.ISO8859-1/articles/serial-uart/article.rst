@@ -170,7 +170,7 @@ Table of Contents
 `1. The UART: What it is and how it works <#uart>`__
 `2. Configuring the ``sio`` driver <#sio>`__
 `3. Configuring the ``cy`` driver <#cy>`__
-`4. Configuring the ``si`` driver <#idp63241168>`__
+`4. Configuring the ``si`` driver <#idp62954704>`__
 
 .. raw:: html
 
@@ -2336,7 +2336,7 @@ a simple matter of:
 #. Rebuild and install the new kernel.
 
 #. Make the device nodes by typing (the following example assumes an
-   8-port board)`:sup:`[1]` <#ftn.idp63224144>`__:
+   8-port board)`:sup:`[1]` <#ftn.idp62929488>`__:
 
    .. code:: screen
 
@@ -2514,9 +2514,9 @@ Change the terminal type as appropriate. For modems, **``dialup``** or
 
 .. raw:: html
 
-   <div id="ftn.idp63224144" class="footnote">
+   <div id="ftn.idp62929488" class="footnote">
 
-`:sup:`[1]` <#idp63224144>`__\ You can omit this part if you are running
+`:sup:`[1]` <#idp62929488>`__\ You can omit this part if you are running
 FreeBSD?5.X with
 `devfs(5) <http://www.FreeBSD.org/cgi/man.cgi?query=devfs&sektion=5>`__.
 

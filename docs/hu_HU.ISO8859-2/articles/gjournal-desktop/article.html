@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-2"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>Naplózó UFS használata asztali számítógépeken</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="A naplózó állományrendszerek egy napló segítségével rögzítik az összes bennük lezajlott tranzakciót, ezzel igyekszenek megőrizni egy rendszeromlást vagy áramkimaradást követően a rajtuk tárolt adatok épségét. Noha még így is előfordulhat, hogy elveszítjük az adott pillanatban el nem mentett változtatásainkat, a naplózás viszont az állományrendszer számára tökéletes védelmet nyújt a rendszer szabálytalan leállása során keletkező sérülések ellen. Alkalmazása továbbá jelentős mértékben lerövidíti a helyreállításhoz szükséges ellenőrzés idejét. A FreeBSD alaprendszerben megtalálható UFS állományrendszer önmagában nem tartalmaz naplózást, azonban a FreeBSD 7.X változataiban már megjelent egy olyan GEOM-osztály, amellyel az állományrendszertől független módon ezt meg tudjuk valósítani. Ebben a cikkben bemutatjuk miként alakítsunk ki UFS alapú naplózást egy hétköznapi asztali számítógépen. Fordította: Páli Gábor, utolsó ellenőrzés: 2010.11.28." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="hu" class="article" lang="hu"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70197072"></a>Naplózó UFS használata asztali
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2" /><title>Naplózó UFS használata asztali számítógépeken</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="A naplózó állományrendszerek egy napló segítségével rögzítik az összes bennük lezajlott tranzakciót, ezzel igyekszenek megőrizni egy rendszeromlást vagy áramkimaradást követően a rajtuk tárolt adatok épségét. Noha még így is előfordulhat, hogy elveszítjük az adott pillanatban el nem mentett változtatásainkat, a naplózás viszont az állományrendszer számára tökéletes védelmet nyújt a rendszer szabálytalan leállása során keletkező sérülések ellen. Alkalmazása továbbá jelentős mértékben lerövidíti a helyreállításhoz szükséges ellenőrzés idejét. A FreeBSD alaprendszerben megtalálható UFS állományrendszer önmagában nem tartalmaz naplózást, azonban a FreeBSD 7.X változataiban már megjelent egy olyan GEOM-osztály, amellyel az állományrendszertől független módon ezt meg tudjuk valósítani. Ebben a cikkben bemutatjuk miként alakítsunk ki UFS alapú naplózást egy hétköznapi asztali számítógépen. Fordította: Páli Gábor, utolsó ellenőrzés: 2010.11.28." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="hu" class="article" lang="hu"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp69893072"></a>Naplózó UFS használata asztali
       számítógépeken</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="author"><h3 class="author"><span class="surname">Kiagias</span>, <span class="firstname">Manolis</span></h3><div class="affiliation"><div class="address"><p><code class="email">&lt;<a xmlns="" class="email" href="mailto:manolis@FreeBSD.org">manolis@FreeBSD.org</a>&gt;</code></p></div></div></div></div><div>Verzió: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><p xmlns="http://www.w3.org/1999/xhtml" class="copyright">Szerzői jog (c) 2008 Manolis Kiagias</p></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>A FreeBSD a FreeBSD Foundation
   bejegyzett védjegye.</p><p>A gyártók és terjesztők által
   használt megnevezések közül sok védjegy
@@ -192,7 +192,7 @@
 	naplóterület méretét, ha megszorozzuk
 	a memória méretet 3,3-mal.)</p></div><p>A naplózásról részleteiben a
       <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=gjournal&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">gjournal</span>(8)</span></a> man oldalon olvashatunk.</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="reserve-space"></a>3. A FreeBSD telepítése során
-      elvégzendő lépések</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70313936"></a>3.1. Lemezterület lefoglalása a
+      elvégzendő lépések</h2></div></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp70014160"></a>3.1. Lemezterület lefoglalása a
 	naplónak</h3></div></div></div><p>Az asztali számítógépekben
 	többnyire csupán egyetlen merevlemez
 	található, amelyen maga az operációs
@@ -318,7 +318,7 @@
 	következő táblázatban a
 	példában említett
 	konfigurációhoz vettük fel ezeket az
-	adatokat:</p><div class="table"><a id="idp70384848"></a><div class="table-title">1. táblázat - Partíciók és naplók</div><div class="table-contents"><table summary="Partíciók és naplók" width="100%" border="1"><colgroup><col /><col /><col /></colgroup><thead><tr><th>Partíció</th><th>Csatlakozási pont</th><th>Napló</th></tr></thead><tbody><tr><td>ad0s1d</td><td>/var</td><td>ad0s1h</td></tr><tr><td>ad0s1f</td><td>/usr</td><td>ad0s1g</td></tr></tbody></table></div></div><br class="table-break" /><p>Ezután a megszokott módon folytassuk a
+	adatokat:</p><div class="table"><a id="idp70080848"></a><div class="table-title">1. táblázat - Partíciók és naplók</div><div class="table-contents"><table summary="Partíciók és naplók" width="100%" border="1"><colgroup><col /><col /><col /></colgroup><thead><tr><th>Partíció</th><th>Csatlakozási pont</th><th>Napló</th></tr></thead><tbody><tr><td>ad0s1d</td><td>/var</td><td>ad0s1h</td></tr><tr><td>ad0s1f</td><td>/usr</td><td>ad0s1g</td></tr></tbody></table></div></div><br class="table-break" /><p>Ezután a megszokott módon folytassuk a
 	telepítést.  Javasoljuk azonban, hogy a
 	külső alkalmazásokat (csomagokat) addig
 	még ne tegyünk fel a rendszerünkre, amíg
@@ -486,14 +486,14 @@ options GEOM_JOURNAL # Ezt se felejtsük ki</pre><p>A <a class="link" href="../..
       felmerülő hibák kezelése</h2></div></div></div><p>Ebben a szakaszban a naplózás
       alkalmazásakor jelentkező gondokra vonatkozó
       gyakran ismételt kérdéseket foglaljuk
-      össze.</p><div class="qandaset"><a id="idp70568016"></a><dl><dt>5.1. <a href="#idp70568912">A rendszer folyamatosan összeomlik komolyabb
+      össze.</p><div class="qandaset"><a id="idp70268240"></a><dl><dt>5.1. <a href="#idp70269136">A rendszer folyamatosan összeomlik komolyabb
 	    lemezterhelés mellett.  Van ennek valamilyen köze
-	    a naplózáshoz?</a></dt><dt>5.2. <a href="#idp70583376">Valamit nem sikerült rendesen
+	    a naplózáshoz?</a></dt><dt>5.2. <a href="#idp70275280">Valamit nem sikerült rendesen
 	    beállítani a konfiguráció
 	    során, ezért most nem indul a rendszer.  Meg
-	    lehet valahogy javítani?</a></dt><dt>5.3. <a href="#idp70607824">Visszavonható a naplózás, vissza
+	    lehet valahogy javítani?</a></dt><dt>5.3. <a href="#idp70303824">Visszavonható a naplózás, vissza
 	    lehet valahogy térni a Soft Updates
-	    használatához?</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp70568912"></a><a id="kernel-panic"></a><p><strong>5.1.</strong></p></td><td align="left" valign="top"><p>A rendszer folyamatosan összeomlik komolyabb
+	    használatához?</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp70269136"></a><a id="kernel-panic"></a><p><strong>5.1.</strong></p></td><td align="left" valign="top"><p>A rendszer folyamatosan összeomlik komolyabb
 	    lemezterhelés mellett.  Van ennek valamilyen köze
 	    a naplózáshoz?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>A napló ilyenkor valószínűleg
 	    gyorsabban betelik, mint ahogy kiíródhatna a
@@ -505,7 +505,7 @@ options GEOM_JOURNAL # Ezt se felejtsük ki</pre><p>A <a class="link" href="../..
 	    nagyobb terhelés alatt vannak, akkor egy nagyobb
 	    területet kell hozzárendelnünk a
 	    naplóhoz.  Ezzel kapcsolatban lásd a <a class="link" href="#understanding-journaling" title="2. Naplózás FreeBSD alatt">Naplózás
-	    FreeBSD alatt</a> című szakaszt.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70583376"></a><a id="unable-boot"></a><p><strong>5.2.</strong></p></td><td align="left" valign="top"><p>Valamit nem sikerült rendesen
+	    FreeBSD alatt</a> című szakaszt.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70275280"></a><a id="unable-boot"></a><p><strong>5.2.</strong></p></td><td align="left" valign="top"><p>Valamit nem sikerült rendesen
 	    beállítani a konfiguráció
 	    során, ezért most nem indul a rendszer.  Meg
 	    lehet valahogy javítani?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Ilyenkor vagy elfelejtettük (vagy netalán
@@ -547,7 +547,7 @@ GEOM_JOURNAL: Journal ad0s1f clean.
 	    erről lenne szó, csatlakoztassuk kézzel a
 	    fennmaradó partíciókat és
 	    folytassuk a többfelhasználós mód
-	    indítását.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70607824"></a><a id="remove-journaling"></a><p><strong>5.3.</strong></p></td><td align="left" valign="top"><p>Visszavonható a naplózás, vissza
+	    indítását.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70303824"></a><a id="remove-journaling"></a><p><strong>5.3.</strong></p></td><td align="left" valign="top"><p>Visszavonható a naplózás, vissza
 	    lehet valahogy térni a Soft Updates
 	    használatához?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Hogyne.  A most következő módszer
 	    segítségével megfordítható

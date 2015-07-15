@@ -86,7 +86,7 @@ Output (may vary)
     F2    BSD
     F5    Disk 2
 
-``boot2`` `:sup:`[a]` <#ftn.idp63837648>`__
+``boot2`` `:sup:`[a]` <#ftn.idp63547088>`__
 .. code:: screen
 
     >>FreeBSD/i386 BOOT
@@ -120,9 +120,9 @@ kernel
 
 .. raw:: html
 
-   <div id="ftn.idp63837648" class="footnote">
+   <div id="ftn.idp63547088" class="footnote">
 
-`:sup:`[a]` <#idp63837648>`__\ This prompt will appear if the user
+`:sup:`[a]` <#idp63547088>`__\ This prompt will appear if the user
 presses a key just after selecting an OS to boot at the ``boot0`` stage.
 
 .. raw:: html

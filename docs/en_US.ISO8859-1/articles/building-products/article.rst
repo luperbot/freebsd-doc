@@ -181,7 +181,7 @@ Table of Contents
 `2. FreeBSD as a set of building blocks <#freebsd-intro>`__
 `3. Collaborating with FreeBSD <#freebsd-collaboration>`__
 `4. Conclusion <#conclusion>`__
-`Bibliography <#idp62296656>`__
+`Bibliography <#idp61949264>`__
 
 .. raw:: html
 
@@ -455,7 +455,7 @@ FreeBSD makes an excellent foundation on which to build products:
 
 -  FreeBSD source code is distributed under a liberal BSD license
    facilitating its adoption in commercial products
-   [`Mon2005 <#idp62429008>`__\ ] with minimum hassle.
+   [`Mon2005 <#idp62081616>`__\ ] with minimum hassle.
 -  The FreeBSD project has excellent engineering practices that can be
    leveraged.
 -  The project offers exceptional transparency into its workings,
@@ -463,14 +463,14 @@ FreeBSD makes an excellent foundation on which to build products:
    future.
 -  The culture of the FreeBSD project, carried over from the Computer
    Science Research Group at The University of California, Berkeley
-   [`McKu1999-1 <#idp62412496>`__\ ], fosters high-quality work. Some
+   [`McKu1999-1 <#idp62064976>`__\ ], fosters high-quality work. Some
    features in FreeBSD define the state of the art.
 
 .. raw:: html
 
    </div>
 
-[`GoldGab2005 <#idp62348112>`__\ ] examines the business reasons for
+[`GoldGab2005 <#idp62004816>`__\ ] examines the business reasons for
 using open-source in greater detail. For organizations, the benefits of
 using FreeBSD components in their products include a shorter time to
 market, lower development costs and lower development risks.
@@ -646,7 +646,7 @@ project. A selection of these are listed below:
 
    FreeBSD supports a number of filesystems, and its native UFS2
    filesystem supports soft updates, snapshots and very large filesystem
-   sizes (16TB per filesystem) [`McKu1999 <#idp62388944>`__\ ].
+   sizes (16TB per filesystem) [`McKu1999 <#idp62041424>`__\ ].
 
    FreeBSD's in-kernel GEOM
    (`geom(4) <http://www.FreeBSD.org/cgi/man.cgi?query=geom&sektion=4>`__)
@@ -751,11 +751,11 @@ FreeBSD does not have “corporate” committers. Individual committers are
 required to take responsibility for the changes they introduce to the
 code. The `FreeBSD Committer's
 guide <../../../../doc/en_US.ISO8859-1/articles/committers-guide>`__
-[`ComGuide <#idp62333136>`__\ ] documents the rules and responsibilities
+[`ComGuide <#idp61989840>`__\ ] documents the rules and responsibilities
 for committers.
 
 FreeBSD's project model is examined in detail in
-[`Nik2005 <#idp62438096>`__\ ].
+[`Nik2005 <#idp62098896>`__\ ].
 
 .. raw:: html
 
@@ -867,7 +867,7 @@ deadlines; FreeBSD is released when its code and documentation are
 ready.
 
 FreeBSD's release engineering processes are described in
-[`RelEngDoc <#idp62502608>`__\ ].
+[`RelEngDoc <#idp62150992>`__\ ].
 
 .. raw:: html
 
@@ -909,9 +909,9 @@ FreeBSD's release engineering processes are described in
    </div>
 
 Open-source projects like FreeBSD offer finished code of a very high
-quality [`Cov2005 <#idp62340560>`__\ ]. Previous studies have examined
+quality [`Cov2005 <#idp61997264>`__\ ]. Previous studies have examined
 the effect of source code availability on software development
-[`Com2004 <#idp62319568>`__\ ].
+[`Com2004 <#idp61963856>`__\ ].
 
 While access to quality source code can reduce the cost of initial
 development, in the long-term the costs of managing change begin to
@@ -930,7 +930,7 @@ goals and a transparent working style.
    writing there are many thousands of contributors from every populated
    continent in the world and over 300 individuals with write access to
    the project's source repositories.
--  The goals of the FreeBSD project are [`Hub1994 <#idp62370768>`__\ ]:
+-  The goals of the FreeBSD project are [`Hub1994 <#idp62027472>`__\ ]:
 
    .. raw:: html
 
@@ -998,15 +998,15 @@ monetary rewards entering the picture. The factors that motivate
 individuals are complex, ranging from altruism, to an interest in
 solving the kinds of problems that FreeBSD attempts to solve. In this
 environment, “elegance is never optional”
-[`Nor1993 <#idp62456528>`__\ ].
+[`Nor1993 <#idp62109008>`__\ ].
 
 The Long Term View.?FreeBSD traces its roots back nearly twenty years to
 the work of the Computer Science Research Group at the University of
-California Berkeley.`:sup:`[1]` <#ftn.idp62172624>`__ A number of the
+California Berkeley.`:sup:`[1]` <#ftn.idp61829328>`__ A number of the
 original CSRG developers remain associated with the project.
 
 The project values long-term perspectives
-[`Nor2001 <#idp62468688>`__\ ]. A frequent acronym encountered in the
+[`Nor2001 <#idp62121296>`__\ ]. A frequent acronym encountered in the
 project is DTRT, which stands for “Do The Right Thing”.
 
 Development Processes.?Computer programs are tools for communication: at
@@ -1019,7 +1019,7 @@ Formal specifications and design documents are seldom used in the
 project. Clear and well-written code and well-written change logs
 (`Figure?3, “A sample change log entry” <#fig-change-log>`__) are used
 in their place. FreeBSD development happens by “rough consensus and
-running code” [`Carp1996 <#idp62297680>`__\ ].
+running code” [`Carp1996 <#idp61950288>`__\ ].
 
 .. raw:: html
 
@@ -1223,7 +1223,7 @@ Get support effectively
     For less critical needs, you can ask for help on the `project
     mailing lists <http://lists.FreeBSD.org/mailman/listinfo>`__. A
     useful guide to follow when asking for help is given in
-    [`Ray2004 <#idp62493520>`__\ ].
+    [`Ray2004 <#idp62141904>`__\ ].
 
 Publicize your involvement
     You are not required to publicize your use of FreeBSD, but doing so
@@ -1524,9 +1524,9 @@ Murray Stokely. Copyright ? 2001. The FreeBSD Project.
 
 .. raw:: html
 
-   <div id="ftn.idp62172624" class="footnote">
+   <div id="ftn.idp61829328" class="footnote">
 
-`:sup:`[1]` <#idp62172624>`__\ FreeBSD's `source
+`:sup:`[1]` <#idp61829328>`__\ FreeBSD's `source
 repository <http://svnweb.freebsd.org/>`__ contains a history of the
 project since its inception, and there are `CDROMs
 available <http://www.mckusick.com/csrg/>`__ that contain earlier code

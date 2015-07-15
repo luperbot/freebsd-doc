@@ -48,7 +48,7 @@ Foreword
 Up until now, the FreeBSD project has released a number of described
 techniques to do different parts of work. However, a project model
 summarising how the project is structured is needed because of the
-increasing amount of project members. `:sup:`[1]` <#ftn.idp63679568>`__
+increasing amount of project members. `:sup:`[1]` <#ftn.idp63479120>`__
 This paper will provide such a project model and is donated to the
 FreeBSD Documentation project where it can evolve together with the
 project so that it can at any point in time reflect the way the project
@@ -104,9 +104,9 @@ document.
 
 .. raw:: html
 
-   <div id="ftn.idp63679568" class="footnote">
+   <div id="ftn.idp63479120" class="footnote">
 
-`:sup:`[1]` <#idp63679568>`__ This goes hand-in-hand with Brooks' law
+`:sup:`[1]` <#idp63479120>`__ This goes hand-in-hand with Brooks' law
 that “adding another person to a late project will make it later” since
 it will increase the communication needs `Brooks,
 1995 <bibliography.html#brooks>`__. A project model is a tool to reduce

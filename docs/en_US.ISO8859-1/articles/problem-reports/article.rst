@@ -185,7 +185,7 @@ Table of Contents
 `5. Follow-up <#pr-followup>`__
 `6. If There Are Problems <#pr-problems>`__
 `7. Further Reading <#pr-further>`__
-`Index <#idp62490960>`__
+`Index <#idp62142928>`__
 
 .. raw:: html
 
@@ -1587,7 +1587,7 @@ Index
 P
 ~
 
-problem reports, `Writing FreeBSD Problem Reports <#idp60841808>`__
+problem reports, `Writing FreeBSD Problem Reports <#idp60364240>`__
 
 .. raw:: html
 

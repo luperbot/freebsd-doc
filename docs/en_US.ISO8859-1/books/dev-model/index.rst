@@ -214,29 +214,29 @@ List of Figures
    </div>
 
 3.1. `The FreeBSD Project's
-structure <model-orgstruct.html#idp63797712>`__
+structure <model-orgstruct.html#idp63597136>`__
 3.2. `The FreeBSD Project's structure with committers in
-categories <model-orgstruct.html#idp63807824>`__
+categories <model-orgstruct.html#idp63607376>`__
 4.1. `J?rgenssen's model for change
-integration <methodology-model.html#idp63837008>`__
-4.2. `The FreeBSD release tree <release-branches.html#idp63890640>`__
-4.3. `The overall development model <model-summary.html#idp63920080>`__
-5.1. `Overview of official hats <official-hats.html#idp63973200>`__
+integration <methodology-model.html#idp63636432>`__
+4.2. `The FreeBSD release tree <release-branches.html#idp63682000>`__
+4.3. `The overall development model <model-summary.html#idp63711312>`__
+5.1. `Overview of official hats <official-hats.html#idp63772752>`__
 6.1. `Process summary: adding a new
-committer <model-processes.html#idp64174544>`__
+committer <model-processes.html#idp63953616>`__
 6.2. `Process summary: removing a
-committer <model-processes.html#idp64183120>`__
+committer <model-processes.html#idp63962192>`__
 6.3. `Process summary: A committer commits
-code <committing.html#idp64251856>`__
+code <committing.html#idp64022608>`__
 6.4. `Process summary: A contributor commits
-code <committing.html#idp64256080>`__
+code <committing.html#idp64026960>`__
 6.5. `Process summary: Core
-elections <process-core-election.html#idp64299216>`__
+elections <process-core-election.html#idp64070096>`__
 6.6. `J?rgenssen's model for change
-integration <model-maintenance.html#idp64368208>`__
-6.7. `Process summary: problem reporting <model-pr.html#idp64390992>`__
+integration <model-maintenance.html#idp64122576>`__
+6.7. `Process summary: problem reporting <model-pr.html#idp64157648>`__
 6.8. `Process summary: release
-engineering <process-release-engineering.html#idp64489680>`__
+engineering <process-release-engineering.html#idp64244048>`__
 8.1. `Number of ports added between 1996 and
 2005 <sub-projects.html#fig-ports>`__
 

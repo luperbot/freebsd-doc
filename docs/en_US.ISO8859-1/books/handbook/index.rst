@@ -685,7 +685,7 @@ Upper-level <install-post.html#network-configuration>`__
 3.58. `Network Configuration
 Lower-level <install-post.html#Network-configuration-cont>`__
 31.1. `PXE Booting Process with NFS Root
-Mount <network-diskless.html#idp89045200>`__
+Mount <network-diskless.html#idp88893776>`__
 
 .. raw:: html
 
@@ -705,21 +705,21 @@ List of Tables
 
    </div>
 
-2.1. `Partitioning Schemes <bsdinstall-partitioning.html#idp67944272>`__
-3.1. `Sample Device Inventory <install-pre.html#idp68396880>`__
+2.1. `Partitioning Schemes <bsdinstall-partitioning.html#idp67583952>`__
+3.1. `Sample Device Inventory <install-pre.html#idp68048848>`__
 3.2. `Partition Layout for First
-Disk <install-steps.html#idp68815056>`__
+Disk <install-steps.html#idp68610384>`__
 3.3. `Partition Layout for Subsequent
-Disks <install-steps.html#idp68865104>`__
+Disks <install-steps.html#idp68631760>`__
 3.4. `FreeBSD ISO Image Names and
-Meanings <install-diff-media.html#idp69655376>`__
+Meanings <install-diff-media.html#idp69438544>`__
 4.1. `Utilities for Managing User
 Accounts <users-synopsis.html#users-modifying-utilities>`__
-4.2. `UNIX? Permissions <permissions.html#idp70113360>`__
+4.2. `UNIX? Permissions <permissions.html#idp69900624>`__
 4.3. `Disk Device Names <disk-organization.html#disks-naming>`__
 4.4. `Common Environment Variables <shells.html#shell-env-vars>`__
 6.1. `XDM Configuration Files <x-xdm.html#xdm-config-files>`__
-8.1. `Common Error Messages <sound-setup.html#idp72443984>`__
+8.1. `Common Error Messages <sound-setup.html#idp72489296>`__
 10.1. `Output PDLs <printing-pdls.html#print-pdls-ps-to-other-tbl>`__
 13.1. `Loader Built-In
 Commands <boot-introduction.html#boot-loader-commands>`__
@@ -742,14 +742,14 @@ Collection <using-localization.html#locale-console>`__
 26.2. `DB-25 to DB-25 Null-Modem Cable <serial.html#nullmodem-db25>`__
 26.3. `DB-9 to DB-9 Null-Modem Cable <serial.html#nullmodem-db9>`__
 26.4. `DB-9 to DB-25 Null-Modem Cable <serial.html#nullmodem-db9-25>`__
-29.1. `NIS Terminology <network-nis.html#idp84973008>`__
-29.2. `Additional Users <network-nis.html#idp85215056>`__
-29.3. `Additional Systems <network-nis.html#idp85239376>`__
-29.4. `DNS Terminology <network-dns.html#idp85573584>`__
+29.1. `NIS Terminology <network-nis.html#idp84887120>`__
+29.2. `Additional Users <network-nis.html#idp85125072>`__
+29.3. `Additional Systems <network-nis.html#idp85149520>`__
+29.4. `DNS Terminology <network-dns.html#idp85475408>`__
 30.1. `Useful ``pfctl`` Options <firewalls-pf.html#pfctl>`__
 31.1. `Commonly Seen Routing Table
 Flags <network-routing.html#routeflags>`__
-31.2. `Station Capability Codes <network-wireless.html#idp87883472>`__
+31.2. `Station Capability Codes <network-wireless.html#idp87785296>`__
 31.3. `Reserved IPv6 Addresses <network-ipv6.html#reservedip6>`__
 
 .. raw:: html
@@ -773,34 +773,34 @@ List of Examples
 2.1. `Creating Traditional Split File System
 Partitions <bsdinstall-partitioning.html#bsdinstall-part-manual-splitfs>`__
 3.1. `Using an Existing Partition
-Unchanged <install-pre.html#idp68463952>`__
-3.2. `Shrinking an Existing Partition <install-pre.html#idp68468304>`__
+Unchanged <install-pre.html#idp68091344>`__
+3.2. `Shrinking an Existing Partition <install-pre.html#idp68099920>`__
 4.1. `Install a Program As the
-Superuser <users-synopsis.html#idp69913424>`__
+Superuser <users-synopsis.html#idp69696592>`__
 4.2. `Adding a User on
 FreeBSD <users-synopsis.html#users-modifying-adduser>`__
 4.3. ```rmuser`` Interactive Account
-Removal <users-synopsis.html#idp69980496>`__
+Removal <users-synopsis.html#idp69771856>`__
 4.4. `Using ``chpass`` as
 Superuser <users-synopsis.html#users-modifying-chpass-su>`__
 4.5. `Using ``chpass`` as Regular
 User <users-synopsis.html#users-modifying-chpass-ru>`__
-4.6. `Changing Your Password <users-synopsis.html#idp70013520>`__
+4.6. `Changing Your Password <users-synopsis.html#idp69808976>`__
 4.7. `Changing Another User's Password as the
-Superuser <users-synopsis.html#idp70016464>`__
-4.8. `Adding a Group Using pw(8) <users-synopsis.html#idp70056528>`__
+Superuser <users-synopsis.html#idp69811920>`__
+4.8. `Adding a Group Using pw(8) <users-synopsis.html#idp69843664>`__
 4.9. `Adding User Accounts to a New Group Using
-pw(8) <users-synopsis.html#idp70067152>`__
+pw(8) <users-synopsis.html#idp69862480>`__
 4.10. `Adding a New Member to a Group Using
-pw(8) <users-synopsis.html#idp70074576>`__
+pw(8) <users-synopsis.html#idp69870032>`__
 4.11. `Using id(1) to Determine Group
-Membership <users-synopsis.html#idp70078672>`__
+Membership <users-synopsis.html#idp69874000>`__
 4.12. `Sample Disk, Slice, and Partition
 Names <disk-organization.html#basics-disk-slice-part>`__
 4.13. `Conceptual Model of a
 Disk <disk-organization.html#basics-concept-disk-model>`__
 12.1. `Sample Log Server
-Configuration <configtuning-syslog.html#idp74570192>`__
+Configuration <configtuning-syslog.html#idp74455632>`__
 12.2. `Creating a Swap File on FreeBSD?10.\ *``X``* and
 Later <adding-swap-space.html#swapfile-10-and-later>`__
 12.3. `Creating a Swap File on FreeBSD?9.\ *``X``* and
@@ -811,35 +811,35 @@ Screenshot <boot-introduction.html#boot-boot0-example>`__
 Screenshot <boot-introduction.html#boot-boot2-example>`__
 13.3. `Configuring an Insecure Console in
 ``/etc/ttys`` <boot-introduction.html#boot-insecure-console>`__
-14.1. `Create a Secure Tunnel for SMTP <openssh.html#idp76396752>`__
-14.2. `Secure Access of a POP3 Server <openssh.html#idp76401360>`__
-14.3. `Bypassing a Firewall <openssh.html#idp76407760>`__
+14.1. `Create a Secure Tunnel for SMTP <openssh.html#idp76323152>`__
+14.2. `Secure Access of a POP3 Server <openssh.html#idp76331984>`__
+14.3. `Bypassing a Firewall <openssh.html#idp76342480>`__
 15.1. `mergemaster(8) on Untrusted
 Jail <jails-ezjail.html#jails-ezjail-update-mergemaster-untrusted>`__
 15.2. `mergemaster(8) on Trusted
 Jail <jails-ezjail.html#jails-ezjail-update-mergemaster-trusted>`__
 15.3. `Running BIND in a
 Jail <jails-ezjail.html#jails-ezjail-example-bind-steps>`__
-18.1. `Using ``dump`` over ssh <backup-basics.html#idp78713552>`__
+18.1. `Using ``dump`` over ssh <backup-basics.html#idp78644048>`__
 18.2. `Using ``dump`` over ssh with ``RSH``
-Set <backup-basics.html#idp78717008>`__
+Set <backup-basics.html#idp78647504>`__
 18.3. `Backing Up the Current Directory with
-``tar`` <backup-basics.html#idp78729808>`__
+``tar`` <backup-basics.html#idp78660432>`__
 18.4. `Restoring Up the Current Directory with
-``tar`` <backup-basics.html#idp78732880>`__
+``tar`` <backup-basics.html#idp78663504>`__
 18.5. `Using\ ``ls`` and ``cpio`` to Make a Recursive Backup of the
-Current Directory <backup-basics.html#idp78741456>`__
+Current Directory <backup-basics.html#idp78672080>`__
 18.6. `Backing Up the Current Directory with
-``pax`` <backup-basics.html#idp78764752>`__
+``pax`` <backup-basics.html#idp78687056>`__
 19.1. `Labeling Partitions on the Boot
-Disk <geom-glabel.html#idp79883984>`__
+Disk <geom-glabel.html#idp79818704>`__
 26.1. `Configuring Terminal Entries <term.html#ex-etc-ttys>`__
 29.1. `Reloading the inetd Configuration
 File <network-inetd.html#network-inetd-reread>`__
-29.2. `Mounting an Export with amd <network-nfs.html#idp84873424>`__
+29.2. `Mounting an Export with amd <network-nfs.html#idp84787664>`__
 29.3. `Mounting an Export with
-autofs(5) <network-nfs.html#idp84923856>`__
-29.4. `Sample ``/etc/ntp.conf`` <network-ntp.html#idp86287312>`__
+autofs(5) <network-nfs.html#idp84838096>`__
+29.4. `Sample ``/etc/ntp.conf`` <network-ntp.html#idp86213712>`__
 31.1. `LACP Aggregation with a Cisco?
 Switch <network-aggregation.html#networking-lacp-aggregation-cisco>`__
 31.2. `Failover

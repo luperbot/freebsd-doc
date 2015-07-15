@@ -162,7 +162,7 @@ more of his changes, he may be writing another change.
 
 As each commit represents an increment, this is a massively incremental
 model. The commits are in fact so frequent that during one year
-`:sup:`[3]` <#ftn.idp63849040>`__ , 85427 commits were made, making a
+`:sup:`[3]` <#ftn.idp63648592>`__ , 85427 commits were made, making a
 daily average of 233 commits.
 
 Within the “code” bracket in J?rgensen's figure, each programmer has his
@@ -192,7 +192,7 @@ changes can be committed directly to the -STABLE branch.
 In addition to many people working on the project, there are many
 related projects to the FreeBSD Project. These are either projects
 developing brand new features, sub-projects or projects whose outcome is
-incorporated into FreeBSD `:sup:`[4]` <#ftn.idp63875920>`__. These
+incorporated into FreeBSD `:sup:`[4]` <#ftn.idp63671248>`__. These
 projects fit into the FreeBSD Project just like regular development
 efforts: they produce code that is integrated with the FreeBSD Project.
 However, some of them (like Ports and Documentation) have the privilege
@@ -201,7 +201,7 @@ and -STABLE.
 
 There is no standards to how design should be done, nor is design
 collected in a centralised repository. The main design is that of
-4.4BSD. `:sup:`[5]` <#ftn.idp63878480>`__ As design is a part of the
+4.4BSD. `:sup:`[5]` <#ftn.idp63673936>`__ As design is a part of the
 “Code” bracket in J?rgenssen's model, it is up to every developer or
 sub-project how this should be done. Even if the design should be stored
 in a central repository, the output from the design stages would be of
@@ -222,9 +222,9 @@ each other rather than to dictate interfacing.
 
 .. raw:: html
 
-   <div id="ftn.idp63849040" class="footnote">
+   <div id="ftn.idp63648592" class="footnote">
 
-`:sup:`[3]` <#idp63849040>`__ The period from January 1st, 2004 to
+`:sup:`[3]` <#idp63648592>`__ The period from January 1st, 2004 to
 December 31st, 2004 was examined to find this number.
 
 .. raw:: html
@@ -233,9 +233,9 @@ December 31st, 2004 was examined to find this number.
 
 .. raw:: html
 
-   <div id="ftn.idp63875920" class="footnote">
+   <div id="ftn.idp63671248" class="footnote">
 
-`:sup:`[4]` <#idp63875920>`__ For instance, the development of the
+`:sup:`[4]` <#idp63671248>`__ For instance, the development of the
 Bluetooth stack started as a sub-project until it was deemed stable
 enough to be merged into the -CURRENT branch. Now it is a part of the
 core FreeBSD system.
@@ -246,9 +246,9 @@ core FreeBSD system.
 
 .. raw:: html
 
-   <div id="ftn.idp63878480" class="footnote">
+   <div id="ftn.idp63673936" class="footnote">
 
-`:sup:`[5]` <#idp63878480>`__ According to Kirk McKusick, after 20 years
+`:sup:`[5]` <#idp63673936>`__ According to Kirk McKusick, after 20 years
 of developing UNIX operating systems, the interfaces are for the most
 part figured out. There is therefore no need for much design. However,
 new applications of the system and new hardware leads to some

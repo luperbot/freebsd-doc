@@ -54,7 +54,7 @@ designated maintainers. Others have de-facto maintainers, and some parts
 of the system do not have maintainers. The maintainer is usually a
 person from the sub-project that wrote and integrated the code, or
 someone who has ported it from the platform it was written for.
-`:sup:`[10]` <#ftn.idp64354384>`__ The maintainer's job is to make sure
+`:sup:`[10]` <#ftn.idp64117072>`__ The maintainer's job is to make sure
 the code is in sync with the project the code comes from if it is
 contributed code, and apply patches submitted by the community or write
 fixes to issues that are discovered.
@@ -132,9 +132,9 @@ through or resolved.
 
 .. raw:: html
 
-   <div id="ftn.idp64354384" class="footnote">
+   <div id="ftn.idp64117072" class="footnote">
 
-`:sup:`[10]` <#idp64354384>`__ sendmail and named are examples of code
+`:sup:`[10]` <#idp64117072>`__ sendmail and named are examples of code
 that has been merged from other platforms.
 
 .. raw:: html

@@ -146,7 +146,7 @@ individually overridden at boot-time or run-time in
 and ``/boot/defaults/loader.conf`` for more details and some hints.
 
 In older releases, the system will auto-tune ``maxusers`` if it is set
-to ``0``. `:sup:`[2]` <#ftn.idp74837584>`__. When setting this option,
+to ``0``. `:sup:`[2]` <#ftn.idp74723152>`__. When setting this option,
 set ``maxusers`` to at least ``4``, especially if the system runs Xorg
 or is used to compile software. The most important table set by
 ``maxusers`` is the maximum number of processes, which is set to
@@ -554,9 +554,9 @@ should be visible and more memory should be active.
 
 .. raw:: html
 
-   <div id="ftn.idp74837584" class="footnote">
+   <div id="ftn.idp74723152" class="footnote">
 
-`:sup:`[2]` <#idp74837584>`__\ The auto-tuning algorithm sets
+`:sup:`[2]` <#idp74723152>`__\ The auto-tuning algorithm sets
 ``maxusers`` equal to the amount of memory in the system, with a minimum
 of ``32``, and a maximum of ``384``.
 

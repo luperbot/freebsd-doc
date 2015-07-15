@@ -288,9 +288,9 @@ List of Tables
 
    </div>
 
-5.1. `Package Naming Examples <makefile-naming.html#idp64829648>`__
+5.1. `Package Naming Examples <makefile-naming.html#idp64457040>`__
 5.2. `Examples of ``DISTVERSION`` and the Derived
-``PORTVERSION`` <makefile-distfiles.html#idp67716304>`__
+``PORTVERSION`` <makefile-distfiles.html#idp67343696>`__
 5.3. `Shortcuts for ``MASTER_SITE_*``
 Macros <makefile-distfiles.html#makefile-master_sites-shortcut>`__
 5.4. `Magic ``MASTER_SITES``
@@ -466,7 +466,7 @@ Implemented <plist-keywords.html#plist-keywords-sample-example>`__
 Perl <testing-poudriere.html#testing-poudriere-sets-perl>`__
 12.1. `How to Avoid Using
 ``.error`` <dads-dot-error.html#dot-error-breaks-index>`__
-15.1. `Typical Use <uses.html#idp71950288>`__
+15.1. `Typical Use <uses.html#idp71598288>`__
 
 .. raw:: html
 

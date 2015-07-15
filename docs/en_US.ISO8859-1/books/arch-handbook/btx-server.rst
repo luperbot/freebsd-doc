@@ -367,7 +367,7 @@ structures:
 
 -  The GDT (Global Descriptor Table) is set up. Entries (descriptors)
    are provided for supervisor code and data, user code and data, and
-   real-mode code and data. `:sup:`[9]` <#ftn.idp64853712>`__
+   real-mode code and data. `:sup:`[9]` <#ftn.idp64534352>`__
 
 .. raw:: html
 
@@ -888,9 +888,9 @@ addressed is ``0xa000+0x2000=0xc000``.
 
 .. raw:: html
 
-   <div id="ftn.idp64853712" class="footnote">
+   <div id="ftn.idp64534352" class="footnote">
 
-`:sup:`[9]` <#idp64853712>`__\ Real-mode code and data are necessary
+`:sup:`[9]` <#idp64534352>`__\ Real-mode code and data are necessary
 when switching back to real mode from protected mode, as suggested by
 the Intel manuals.
 

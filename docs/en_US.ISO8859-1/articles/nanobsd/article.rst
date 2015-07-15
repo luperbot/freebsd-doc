@@ -159,7 +159,7 @@ Table of Contents
 
 `1. Introduction to NanoBSD <#intro>`__
 `2. NanoBSD Howto <#howto>`__
-`Index <#idp62098768>`__
+`Index <#idp61861328>`__
 
 .. raw:: html
 

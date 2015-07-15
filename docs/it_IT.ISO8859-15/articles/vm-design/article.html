@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Elementi di progettazione del sistema di VM di FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Il titolo è in realtà solo un modo complicato per dire che cercherò di descrivere l'intera enchilada della memoria virtuale (VM), sperando di farlo in una maniera che chiunque possa seguire. Nell'ultimo anno mi sono concentrato su un certo numero di sottosistemi principali del kernel in FreeBSD, trovando quelli della VM (la memoria virtuale) e dello Swap i più interessanti, e considerando quello di NFS un lavoretto necessario. Ho riscritto solo piccole porzioni di quel codice. Nell'arena della VM la sola grossa riscrittura che ho affrontato è stata quella del sottosistema di swap. La maggior parte del mio lavoro è stato di pulizia e mantenimento, con solo alcune moderate riscritture di codice e nessuna correzione rilevante a livello algoritmico nel sottosistema della VM. Il nocciolo della base teorica del sottosistema rimane immutato ed un bel po' del merito per gli sforzi di modernizzazione negli ultimi anni appartiene a John Dyson e David Greenman. Poiché non sono uno storico come Kirk non tenterò di marcare tutte le varie caratteristiche con i nomi delle relative persone, perché sbaglierei invariabilmente. Traduzione a cura di Gabriele Renzi surrender_it@yahoo.it." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="it" class="article" lang="it"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp69044304"></a>Elementi di progettazione del sistema di VM di FreeBSD</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></h3><div class="affiliation"><div class="address"><p><br />
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Elementi di progettazione del sistema di VM di FreeBSD</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="Il titolo è in realtà solo un modo complicato per dire che cercherò di descrivere l'intera enchilada della memoria virtuale (VM), sperando di farlo in una maniera che chiunque possa seguire. Nell'ultimo anno mi sono concentrato su un certo numero di sottosistemi principali del kernel in FreeBSD, trovando quelli della VM (la memoria virtuale) e dello Swap i più interessanti, e considerando quello di NFS un lavoretto necessario. Ho riscritto solo piccole porzioni di quel codice. Nell'arena della VM la sola grossa riscrittura che ho affrontato è stata quella del sottosistema di swap. La maggior parte del mio lavoro è stato di pulizia e mantenimento, con solo alcune moderate riscritture di codice e nessuna correzione rilevante a livello algoritmico nel sottosistema della VM. Il nocciolo della base teorica del sottosistema rimane immutato ed un bel po' del merito per gli sforzi di modernizzazione negli ultimi anni appartiene a John Dyson e David Greenman. Poiché non sono uno storico come Kirk non tenterò di marcare tutte le varie caratteristiche con i nomi delle relative persone, perché sbaglierei invariabilmente. Traduzione a cura di Gabriele Renzi surrender_it@yahoo.it." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="it" class="article" lang="it"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp69523024"></a>Elementi di progettazione del sistema di VM di FreeBSD</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></h3><div class="affiliation"><div class="address"><p><br />
             <code class="email">&lt;<a xmlns="" class="email" href="mailto:dillon@apollo.backplane.com">dillon@apollo.backplane.com</a>&gt;</code><br />
           </p></div></div></div></div></div><div>Revisione: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD è un marchio registrato della
   FreeBSD Foundation.</p><p>Linux è un marchio registrato di
@@ -108,7 +108,7 @@
       Il codice del programma e i dati del programma sono effettivamente
       un singolo file mappato in memoria (il file binario che è stato
       eseguito), ma il codice di programma è di sola lettura mentre i
-      dati del programma sono copy-on-write <a href="#ftn.idp70182992" class="footnote" id="idp70182992"><sup class="footnote">[1]</sup></a>.  Il BSS del programma è solamente una zona di memoria
+      dati del programma sono copy-on-write <a href="#ftn.idp69961168" class="footnote" id="idp69961168"><sup class="footnote">[1]</sup></a>.  Il BSS del programma è solamente una zona di memoria
       allocata e riempita con degli zero su richiesta, detta in inglese
       <span class="quote">«<span class="quote">demand zero page fill</span>»</span>.
       Nello spazio di indirizzamento possono essere mappati anche file
@@ -153,7 +153,7 @@
       Un livello copy-on-write viene messo sopra questo per mantenere quelle
       pagine che sono state copiate dal file originale.
       Se il programma modifica una pagina di dati appartenente al file originale
-      il sistema dell VM prende un page fault <a href="#ftn.idp70200144" class="footnote" id="idp70200144"><sup class="footnote">[2]</sup></a> e fa una copia della pagina nel livello più alto.
+      il sistema dell VM prende un page fault <a href="#ftn.idp69970128" class="footnote" id="idp69970128"><sup class="footnote">[2]</sup></a> e fa una copia della pagina nel livello più alto.
       Quando un processo effettua una fork, vengono aggiunti altri livelli di
       Oggetti VM.  Tutto questo potrebbe avere un po' più senso con un
       semplice esempio.
@@ -164,7 +164,7 @@
       A:</p><div class="mediaobject"><img src="fig1.png" alt="Un'immagine" /></div><p>A rappresenta il file-le pagine possono essere
       spostate dentro e fuori dal mezzo fisico del file se necessario.
       Copiare il file dal disco è sensato per un programma,
-      ma di certo non vogliamo effettuare il page out <a href="#ftn.idp70218704" class="footnote" id="idp70218704"><sup class="footnote">[3]</sup></a> e sovrascrivere l'eseguibile.
+      ma di certo non vogliamo effettuare il page out <a href="#ftn.idp69992784" class="footnote" id="idp69992784"><sup class="footnote">[3]</sup></a> e sovrascrivere l'eseguibile.
       Il sistema della VM crea dunque un secondo livello, B, che verrà
       copiato fisicamente dallo spazio di swap:</p><div class="mediaobject"><img src="fig2.png" /></div><p>Dopo questo, nella prima scrittura verso una pagina, viene creata una
       nuova pagina in B, ed il suo contenuto viene inizializzato con i dati di
@@ -360,7 +360,7 @@
       essere riattivate da un VM fault ad un costo relativamente basso.
       Ad ogni modo, le pagine nella coda di cache vengono considerate
       <span class="quote">«<span class="quote">immediatamente liberabili</span>»</span> e verranno riutilizzate con un
-      metodo LRU (least-recently used <a href="#ftn.idp70287824" class="footnote" id="idp70287824"><sup class="footnote">[4]</sup></a>) quando il sistema avrà bisogno di allocare nuova
+      metodo LRU (least-recently used <a href="#ftn.idp70061904" class="footnote" id="idp70061904"><sup class="footnote">[4]</sup></a>) quando il sistema avrà bisogno di allocare nuova
       memoria.</p><p>È importante notare che il sistema della VM di FreeBSD tenta
       di separare pagine pulite e sporche per l'espressa ragione di evitare
       scritture non necessarie di pagine sporche (che divorano banda di I/O), e
@@ -467,7 +467,7 @@
       virtuale possono finire con l'occupare la stessa pagina nella cache del
       processore-portando all'eliminazione prematura di dati
       immagazzinabili in cache e riducendo le prestazioni della cache.
-      Ciò è vero anche con cache set-associative <a href="#ftn.idp70327888" class="footnote" id="idp70327888"><sup class="footnote">[5]</sup></a> a molte vie (anche se l'effetto viene in qualche maniera
+      Ciò è vero anche con cache set-associative <a href="#ftn.idp70098000" class="footnote" id="idp70098000"><sup class="footnote">[5]</sup></a> a molte vie (anche se l'effetto viene in qualche maniera
       mitigato).</p><p>Il codice di allocazione della memoria di FreeBSD implementa
       le ottimizizzazioni di colorazione delle pagine, ciò significa che
       il codice di allocazione della memoria cercherà di trovare delle
@@ -493,22 +493,22 @@
       poter rimpiazzare in maniera relativamente pulita grosse sezioni di
       codice.  Ci sono stati un gran numero di miglioramenti al sistema della
       VM di FreeBSD negli ultimi anni, ed il lavoro prosegue.</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="allen-briggs-qa"></a>9. Sessione Bonus di Domande e Risposte di Allen Briggs
-      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></h2></div></div></div><div class="qandaset"><a id="idp70337360"></a><dl><dt>9.1. <a href="#idp70337616">Cos'è «l'algoritmo di interleaving» a cui
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></h2></div></div></div><div class="qandaset"><a id="idp70107344"></a><dl><dt>9.1. <a href="#idp70107600">Cos'è «l'algoritmo di interleaving» a cui
             fai riferimento nell'elenco delle debolezze della gestione dello
-            swap in FreeBSD 3.X ?</a></dt><dt>9.2. <a href="#idp70363856">Non ho capito questo:</a></dt><dt>9.3. <a href="#idp70380624"> Nell'esempio di ls(1) / vmstat 1,
+            swap in FreeBSD 3.X ?</a></dt><dt>9.2. <a href="#idp70133840">Non ho capito questo:</a></dt><dt>9.3. <a href="#idp70150608"> Nell'esempio di ls(1) / vmstat 1,
             alcuni dei page fault non potrebbero essere data page faults
             (COW da file eseguibili a pagine private)?  Cioè, io mi
             aspetterei che i page fault fossero degli zero-fill e dei dati di
             programma.  O si implica che FreeBSD effettui il pre-COW per i dati
-            di programma?</a></dt><dt>9.4. <a href="#idp70397648">Nella sezione sull'ottimizzazione della tabella delle pagine,
+            di programma?</a></dt><dt>9.4. <a href="#idp70167632">Nella sezione sull'ottimizzazione della tabella delle pagine,
             potresti fornire maggiori dettagli su pv_entry e
             vm_page (forse vm_page dovrebbe essere
             vm_pmap-come in 4.4, cf. pp. 180-181 di
             McKusick, Bostic, Karel, Quarterman)?  Specificamente, che tipo di
             operazioni/reazioni richiederebbero la scansione delle
-            mappature?</a></dt><dt>9.5. <a href="#idp70447952">Infine, nella sezione sulla colorazione delle pagine, potrebbe
+            mappature?</a></dt><dt>9.5. <a href="#idp70209744">Infine, nella sezione sulla colorazione delle pagine, potrebbe
             esser d'aiuto avere qualche descrizione in più di quello che
-            intendi.  Non sono riuscito a seguire molto bene.</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp70337616"></a><a id="idp70338512"></a><p><strong>9.1.</strong></p></td><td align="left" valign="top"><p>Cos'è <span class="quote">«<span class="quote">l'algoritmo di interleaving</span>»</span> a cui
+            intendi.  Non sono riuscito a seguire molto bene.</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp70107600"></a><a id="idp70108496"></a><p><strong>9.1.</strong></p></td><td align="left" valign="top"><p>Cos'è <span class="quote">«<span class="quote">l'algoritmo di interleaving</span>»</span> a cui
             fai riferimento nell'elenco delle debolezze della gestione dello
             swap in FreeBSD 3.X ?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>FreeBSD usa un intervallo tra zone di swap fissato, con un
             valore predefinito di 4.  Questo significa che FreeBSD riserva
@@ -555,7 +555,7 @@
             memoria grazie all'uso di una mappa di bit (un bit per blocco)
             invece di una lista collegata di nodi.  L'uso di un albero radicato
             invece di una lista sequenziale ci fornisce una performance quasi
-            O(1) qualunque sia il livello di frammentazione dell'albero.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70363856"></a><a id="idp70364880"></a><p><strong>9.2.</strong></p></td><td align="left" valign="top"><p>Non ho capito questo:</p><div class="blockquote"><blockquote class="blockquote"><p>È importante notare che il sistema della VM di FreeBSD
+            O(1) qualunque sia il livello di frammentazione dell'albero.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70133840"></a><a id="idp70134864"></a><p><strong>9.2.</strong></p></td><td align="left" valign="top"><p>Non ho capito questo:</p><div class="blockquote"><blockquote class="blockquote"><p>È importante notare che il sistema della VM di FreeBSD
               tenta di separare pagine pulite e sporche per l'espressa ragione di
               evitare scritture non necessarie di pagine sporche (che divorano
               banda di I/O), e non sposta le pagine tra le varie code
@@ -576,7 +576,7 @@
             (code della cache), ne cercherà di disattivare le pagine
             (coda pagine attive -&gt; coda pagine inattive) quando il sistema non
             è sotto sforzo, anche se non vengono effettivamente
-            usate.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70380624"></a><a id="idp70381648"></a><p><strong>9.3.</strong></p></td><td align="left" valign="top"><p> Nell'esempio di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> / <code class="command">vmstat 1</code>,
+            usate.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70150608"></a><a id="idp70151632"></a><p><strong>9.3.</strong></p></td><td align="left" valign="top"><p> Nell'esempio di <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> / <code class="command">vmstat 1</code>,
             alcuni dei page fault non potrebbero essere data page faults
             (COW da file eseguibili a pagine private)?  Cioè, io mi
             aspetterei che i page fault fossero degli zero-fill e dei dati di
@@ -588,7 +588,7 @@
             presenti nella cache.  E infatti li tratto insieme.  FreeBSD non
             effettua preventivamentela copia dei dati di programma o lo
             zero-fill, <span class="emphasis"><em>effettua</em></span> la mappatura preventiva
-            delle pagine che sono presenti nella sua cache.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70397648"></a><a id="idp70397904"></a><p><strong>9.4.</strong></p></td><td align="left" valign="top"><p>Nella sezione sull'ottimizzazione della tabella delle pagine,
+            delle pagine che sono presenti nella sua cache.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70167632"></a><a id="idp70167888"></a><p><strong>9.4.</strong></p></td><td align="left" valign="top"><p>Nella sezione sull'ottimizzazione della tabella delle pagine,
             potresti fornire maggiori dettagli su <code class="literal">pv_entry</code> e
             <code class="literal">vm_page</code> (forse vm_page dovrebbe essere
             <code class="literal">vm_pmap</code>-come in 4.4, cf. pp. 180-181 di
@@ -655,7 +655,7 @@
             memoria finisca per essere più o meno lo stesso, fornendo a
             FreeBSD un vantaggio algoritmico con la capacità di
             eliminare completamente le tabelle delle pagine con un
-            sovraccarico prestazionale minimo.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70447952"></a><a id="idp70448848"></a><p><strong>9.5.</strong></p></td><td align="left" valign="top"><p>Infine, nella sezione sulla colorazione delle pagine, potrebbe
+            sovraccarico prestazionale minimo.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp70209744"></a><a id="idp70210768"></a><p><strong>9.5.</strong></p></td><td align="left" valign="top"><p>Infine, nella sezione sulla colorazione delle pagine, potrebbe
             esser d'aiuto avere qualche descrizione in più di quello che
             intendi.  Non sono riuscito a seguire molto bene.</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Sai come funziona una memoria cache hardware L1?  Spiego:
             Considera una macchina con 16MB di memoria principale ma solo 128K
@@ -680,7 +680,7 @@
             <span class="emphasis"><em>estremamente</em></span> importante che la maggior parte
             degli accessi del processore alla memoria vengano dalla cache L1,
             poiché la cache L1 opera alla stessa frequenza del
-            processore.  Nel momento in cui si ha un miss <a href="#ftn.idp70462672" class="footnote" id="idp70462672"><sup class="footnote">[6]</sup></a> nella cache L1 si deveandare a cercare nella cache L2 o
+            processore.  Nel momento in cui si ha un miss <a href="#ftn.idp70224464" class="footnote" id="idp70224464"><sup class="footnote">[6]</sup></a> nella cache L1 si deveandare a cercare nella cache L2 o
             nella memoria principale, il processore andrà in stallo, e
             potenzialmente potrà sedersi a girarsi i pollici per un tempo
             equivalente a <span class="emphasis"><em>centinaia</em></span> di istruzioni
@@ -731,19 +731,19 @@
             pagine di memoria fisica veramente contigue a pagine di memoria
             virtuale contigue, deve solo assicurarsi che siano assegnate pagine
             contigue dal punto di vista delle prestazioni/operazioni della
-            cache.</p></td></tr></tbody></table></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp70182992" class="footnote"><p><a href="#idp70182992" class="para"><sup class="para">[1] </sup></a>I dati copy on write sono dati che vengono copiati solo al momento
-          della loro effettiva modifica</p></div><div id="ftn.idp70200144" class="footnote"><p><a href="#idp70200144" class="para"><sup class="para">[2] </sup></a>Un page fault, o <span class="quote">«<span class="quote">mancanza di pagina</span>»</span>,
+            cache.</p></td></tr></tbody></table></div></div><div class="footnotes"><br /><hr class="footnote-hr" /><div id="ftn.idp69961168" class="footnote"><p><a href="#idp69961168" class="para"><sup class="para">[1] </sup></a>I dati copy on write sono dati che vengono copiati solo al momento
+          della loro effettiva modifica</p></div><div id="ftn.idp69970128" class="footnote"><p><a href="#idp69970128" class="para"><sup class="para">[2] </sup></a>Un page fault, o <span class="quote">«<span class="quote">mancanza di pagina</span>»</span>,
           corrisponde ad una mancanza di una determinata pagina di memoria a un
           certo livello, ed alla necessità di copiarla da un livello
           più lento.  Ad esempio se una pagina di memoria è stata
           spostata dalla memoria fisica allo spazio di swap su disco, e viene
           richiamata, si genera un page fault e la pagina viene di nuovo copiata
-          in ram.</p></div><div id="ftn.idp70218704" class="footnote"><p><a href="#idp70218704" class="para"><sup class="para">[3] </sup></a>La copia dalla memoria al disco, l'opposto del page in, la
-          mappatura in memoria.</p></div><div id="ftn.idp70287824" class="footnote"><p><a href="#idp70287824" class="para"><sup class="para">[4] </sup></a>Usate meno recentemente.  Le pagine che non vengono usate da molto
+          in ram.</p></div><div id="ftn.idp69992784" class="footnote"><p><a href="#idp69992784" class="para"><sup class="para">[3] </sup></a>La copia dalla memoria al disco, l'opposto del page in, la
+          mappatura in memoria.</p></div><div id="ftn.idp70061904" class="footnote"><p><a href="#idp70061904" class="para"><sup class="para">[4] </sup></a>Usate meno recentemente.  Le pagine che non vengono usate da molto
           tempo probabilmente non saranno necessarie a breve, e possono essere
-          liberate.</p></div><div id="ftn.idp70327888" class="footnote"><p><a href="#idp70327888" class="para"><sup class="para">[5] </sup></a>set-associative sta per associative all'interno di un insieme, in
+          liberate.</p></div><div id="ftn.idp70098000" class="footnote"><p><a href="#idp70098000" class="para"><sup class="para">[5] </sup></a>set-associative sta per associative all'interno di un insieme, in
           quanto c'è un insieme di blocchi della cache nei quale puo
-          essere mappato un elemento della memoria fisica.</p></div><div id="ftn.idp70462672" class="footnote"><p><a href="#idp70462672" class="para"><sup class="para">[6] </sup></a>Un miss nella cache è equivalente a un page fault per
+          essere mappato un elemento della memoria fisica.</p></div><div id="ftn.idp70224464" class="footnote"><p><a href="#idp70224464" class="para"><sup class="para">[6] </sup></a>Un miss nella cache è equivalente a un page fault per
                 la memoria fisica, ed allo stesso modo implica un accesso a
                 dispositivi molto più lenti, da L1 a L2 come da RAM a
                 disco.</p></div></div></div></body></html>

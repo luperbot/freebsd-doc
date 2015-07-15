@@ -1210,7 +1210,7 @@ freebsd-core
 
     An editorial digest of the messages to this list might be posted to
     the FreeBSD website every few months as part of the Status Reports
-    `:sup:`[3]` <#ftn.idp90874832>`__. Past reports are archived.
+    `:sup:`[3]` <#ftn.idp90760272>`__. Past reports are archived.
 
 `freebsd-wireless <http://lists.FreeBSD.org/mailman/listinfo/freebsd-wireless>`__
     *Discussions of 802.11 stack, tools device driver development*
@@ -1356,9 +1356,9 @@ will be converted to plain text.
 
 .. raw:: html
 
-   <div id="ftn.idp90874832" class="footnote">
+   <div id="ftn.idp90760272" class="footnote">
 
-`:sup:`[3]` <#idp90874832>`__\ ``http://www.freebsd.org/news/status/``
+`:sup:`[3]` <#idp90760272>`__\ ``http://www.freebsd.org/news/status/``
 
 .. raw:: html
 

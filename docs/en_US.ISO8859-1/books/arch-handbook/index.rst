@@ -354,8 +354,8 @@ List of Figures
 1.30. ```sys/boot/i386/btx/btx/btx.S`` <btx-server.html#btx-tss>`__
 1.31. ```sys/boot/i386/btx/btx/btx.S`` <btx-server.html#btx-prot>`__
 1.32. ```sys/boot/i386/btx/btx/btx.S`` <btx-server.html#btx-end>`__
-14.1. `*driver\_t* Implementation <newbus-api.html#idp73196240>`__
-14.2. `Device States *device\_state\_t* <newbus-api.html#idp73198800>`__
+14.1. `*driver\_t* Implementation <newbus-api.html#idp72930256>`__
+14.2. `Device States *device\_state\_t* <newbus-api.html#idp72932816>`__
 
 .. raw:: html
 
@@ -375,8 +375,8 @@ List of Tables
 
    </div>
 
-2.1. `Mutex List <locking.html#idp67658960>`__
-2.2. `Shared Exclusive Lock List <locking-sx.html#idp67768272>`__
+2.1. `Mutex List <locking.html#idp67351888>`__
+2.2. `Shared Exclusive Lock List <locking-sx.html#idp67461200>`__
 
 .. raw:: html
 
@@ -396,13 +396,13 @@ List of Examples
 
    </div>
 
-5.1. `Example of a ``SYSINIT()`` <sysinit-using.html#idp68138192>`__
+5.1. `Example of a ``SYSINIT()`` <sysinit-using.html#idp67814736>`__
 5.2. `Example of Adjusting ``SYSINIT()``
-Order <sysinit-using.html#idp68141520>`__
-5.3. `Example of a ``SYSUNINIT()`` <sysinit-using.html#idp68144976>`__
+Order <sysinit-using.html#idp67818192>`__
+5.3. `Example of a ``SYSUNINIT()`` <sysinit-using.html#idp67821648>`__
 9.1. `Example of a Sample Echo Pseudo-Device Driver for
-FreeBSD?10.X <driverbasics-char.html#idp72083536>`__
-14.1. `Newbus Methods <newbus-overview.html#idp73157840>`__
+FreeBSD?10.X <driverbasics-char.html#idp71780688>`__
+14.1. `Newbus Methods <newbus-overview.html#idp72891856>`__
 
 .. raw:: html
 

@@ -227,7 +227,7 @@ Table of Contents
 
 The development of FreeBSD is a very open process. FreeBSD is comprised
 of contributions from thousands of people around the world. The FreeBSD
-Project provides Subversion `:sup:`[1]` <#ftn.idp61818704>`__ access to
+Project provides Subversion `:sup:`[1]` <#ftn.idp61532112>`__ access to
 the general public so that others can have access to log messages, diffs
 (patches) between development branches, and other productivity
 enhancements that formal source code management provides. This has been
@@ -237,10 +237,10 @@ access to the main repository was opened up to everyone on the Internet.
 Therefore only a “select” group of nearly 300 people are given write
 access to the Subversion repository. These
 `committers <../../../../doc/en_US.ISO8859-1/articles/contributors/article.html#staff-committers>`__
-`:sup:`[2]` <#ftn.idp61824592>`__ are usually the people who do the bulk
+`:sup:`[2]` <#ftn.idp61546320>`__ are usually the people who do the bulk
 of FreeBSD development. An elected `Core
 Team <../../../../administration.html#t-core>`__
-`:sup:`[3]` <#ftn.idp61837392>`__ of developers provide some level of
+`:sup:`[3]` <#ftn.idp61550800>`__ of developers provide some level of
 direction over the project.
 
 The rapid pace of ``FreeBSD`` development makes the main development
@@ -274,7 +274,7 @@ automatically by the FreeBSD Project build machines and made available
 for download from ``ftp://ftp.FreeBSD.org/pub/FreeBSD/snapshots/``. The
 widespread availability of binary release snapshots, and the tendency of
 our user community to keep up with -STABLE development with Subversion
-and “``make`` ``buildworld``” `:sup:`[4]` <#ftn.idp61867600>`__ helps to
+and “``make`` ``buildworld``” `:sup:`[4]` <#ftn.idp61572816>`__ helps to
 keep FreeBSD-STABLE in a very reliable condition even before the quality
 assurance activities ramp up pending a major release.
 
@@ -787,7 +787,7 @@ stable/current branch):
 
 Sysinstall should be updated to note the number of available ports and
 the amount of disk space required for the Ports Collection.
-`:sup:`[5]` <#ftn.idp62141520>`__ This information is currently kept in
+`:sup:`[5]` <#ftn.idp61855056>`__ This information is currently kept in
 ``src/usr.sbin/sysinstall/dist.c``.
 
 After the release has been built, a number of files should be updated to
@@ -1546,7 +1546,7 @@ The FreeBSD system installation and configuration tool,
 `sysinstall(8) <http://www.FreeBSD.org/cgi/man.cgi?query=sysinstall&sektion=8>`__,
 can be scripted to provide automated installs for large sites. This
 functionality can be used in conjunction with Intel? PXE
-`:sup:`[6]` <#ftn.idp62462160>`__ to bootstrap systems from the network.
+`:sup:`[6]` <#ftn.idp62167504>`__ to bootstrap systems from the network.
 
 .. raw:: html
 
@@ -1724,10 +1724,10 @@ development community. I would also like to thank Rodney Grimes
 ``<rgrimes@FreeBSD.org>``, Poul-Henning Kamp ``<phk@FreeBSD.org>``, and
 others who worked on the release engineering tools in the very early
 days of FreeBSD. This article was influenced by release engineering
-documents from the CSRG `:sup:`[7]` <#ftn.idp62532816>`__ , the NetBSD
-Project , `:sup:`[8]` <#ftn.idp62536528>`__ , and John Baldwin's
+documents from the CSRG `:sup:`[7]` <#ftn.idp62242128>`__ , the NetBSD
+Project , `:sup:`[8]` <#ftn.idp62245968>`__ , and John Baldwin's
 proposed release engineering process notes.
-`:sup:`[9]` <#ftn.idp62539728>`__
+`:sup:`[9]` <#ftn.idp62249040>`__
 
 .. raw:: html
 
@@ -1741,9 +1741,9 @@ proposed release engineering process notes.
 
 .. raw:: html
 
-   <div id="ftn.idp61818704" class="footnote">
+   <div id="ftn.idp61532112" class="footnote">
 
-`:sup:`[1]` <#idp61818704>`__ Subversion,
+`:sup:`[1]` <#idp61532112>`__ Subversion,
 ``http://subversion.apache.org``
 
 .. raw:: html
@@ -1752,9 +1752,9 @@ proposed release engineering process notes.
 
 .. raw:: html
 
-   <div id="ftn.idp61824592" class="footnote">
+   <div id="ftn.idp61546320" class="footnote">
 
-`:sup:`[2]` <#idp61824592>`__ `FreeBSD
+`:sup:`[2]` <#idp61546320>`__ `FreeBSD
 committers <../../../../doc/en_US.ISO8859-1/articles/contributors/article.html#staff-committers>`__
 
 .. raw:: html
@@ -1763,9 +1763,9 @@ committers <../../../../doc/en_US.ISO8859-1/articles/contributors/article.html#s
 
 .. raw:: html
 
-   <div id="ftn.idp61837392" class="footnote">
+   <div id="ftn.idp61550800" class="footnote">
 
-`:sup:`[3]` <#idp61837392>`__ `FreeBSD Core
+`:sup:`[3]` <#idp61550800>`__ `FreeBSD Core
 Team <../../../../administration.html#t-core>`__
 
 .. raw:: html
@@ -1774,9 +1774,9 @@ Team <../../../../administration.html#t-core>`__
 
 .. raw:: html
 
-   <div id="ftn.idp61867600" class="footnote">
+   <div id="ftn.idp61572816" class="footnote">
 
-`:sup:`[4]` <#idp61867600>`__ `Rebuilding
+`:sup:`[4]` <#idp61572816>`__ `Rebuilding
 "world" <../../../../doc/en_US.ISO8859-1/books/handbook/makeworld.html>`__
 
 .. raw:: html
@@ -1785,9 +1785,9 @@ Team <../../../../administration.html#t-core>`__
 
 .. raw:: html
 
-   <div id="ftn.idp62141520" class="footnote">
+   <div id="ftn.idp61855056" class="footnote">
 
-`:sup:`[5]` <#idp62141520>`__ FreeBSD Ports Collection
+`:sup:`[5]` <#idp61855056>`__ FreeBSD Ports Collection
 ``http://www.FreeBSD.org/ports``
 
 .. raw:: html
@@ -1796,9 +1796,9 @@ Team <../../../../administration.html#t-core>`__
 
 .. raw:: html
 
-   <div id="ftn.idp62462160" class="footnote">
+   <div id="ftn.idp62167504" class="footnote">
 
-`:sup:`[6]` <#idp62462160>`__
+`:sup:`[6]` <#idp62167504>`__
 ``../../../../doc/en_US.ISO8859-1/books/handbook/network-pxe-nfs.html``
 
 .. raw:: html
@@ -1807,9 +1807,9 @@ Team <../../../../administration.html#t-core>`__
 
 .. raw:: html
 
-   <div id="ftn.idp62532816" class="footnote">
+   <div id="ftn.idp62242128" class="footnote">
 
-`:sup:`[7]` <#idp62532816>`__ Marshall Kirk McKusick, Michael J. Karels,
+`:sup:`[7]` <#idp62242128>`__ Marshall Kirk McKusick, Michael J. Karels,
 and Keith Bostic: `*The Release Engineering of
 4.3BSD* <http://docs.FreeBSD.org/44doc/papers/releng.html>`__
 
@@ -1819,9 +1819,9 @@ and Keith Bostic: `*The Release Engineering of
 
 .. raw:: html
 
-   <div id="ftn.idp62536528" class="footnote">
+   <div id="ftn.idp62245968" class="footnote">
 
-`:sup:`[8]` <#idp62536528>`__ NetBSD Developer Documentation: Release
+`:sup:`[8]` <#idp62245968>`__ NetBSD Developer Documentation: Release
 Engineering ``http://www.NetBSD.org/developers/releng/index.html``
 
 .. raw:: html
@@ -1830,9 +1830,9 @@ Engineering ``http://www.NetBSD.org/developers/releng/index.html``
 
 .. raw:: html
 
-   <div id="ftn.idp62539728" class="footnote">
+   <div id="ftn.idp62249040" class="footnote">
 
-`:sup:`[9]` <#idp62539728>`__ John Baldwin's FreeBSD Release Engineering
+`:sup:`[9]` <#idp62249040>`__ John Baldwin's FreeBSD Release Engineering
 Proposal ``http://people.FreeBSD.org/~jhb/docs/releng.txt``
 
 .. raw:: html

@@ -268,7 +268,7 @@ interrupted.
 
 ``SIGKILL`` can not be ignored by a process. Sending a ``SIGKILL`` to a
 process will usually stop that process there and then.
-`:sup:`[1]` <#ftn.idp70673104>`__.
+`:sup:`[1]` <#ftn.idp70574928>`__.
 
 Other commonly used signals are ``SIGHUP``, ``SIGUSR1``, and
 ``SIGUSR2``. Since these are general purpose signals, different
@@ -393,9 +393,9 @@ arguments to
 
 .. raw:: html
 
-   <div id="ftn.idp70673104" class="footnote">
+   <div id="ftn.idp70574928" class="footnote">
 
-`:sup:`[1]` <#idp70673104>`__\ There are a few tasks that can not be
+`:sup:`[1]` <#idp70574928>`__\ There are a few tasks that can not be
 interrupted. For example, if the process is trying to read from a file
 that is on another computer on the network, and the other computer is
 unavailable, the process is said to be “uninterruptible”. Eventually the

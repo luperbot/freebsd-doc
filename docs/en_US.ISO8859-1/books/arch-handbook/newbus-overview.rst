@@ -231,7 +231,7 @@ notification.
 The second, more complex interface is *“bus”*. This interface contains
 methods suitable for devices which have children, including methods to
 access bus specific per-device information
-`:sup:`[10]` <#ftn.idp73166544>`__, event notification
+`:sup:`[10]` <#ftn.idp72900560>`__, event notification
 (*``child_detached``*, *``driver_added``*) and resource management
 (*``alloc_resource``*, *``activate_resource``*,
 *``deactivate_resource``*, *``release_resource``*).
@@ -260,9 +260,9 @@ device.
 
 .. raw:: html
 
-   <div id="ftn.idp73166544" class="footnote">
+   <div id="ftn.idp72900560" class="footnote">
 
-`:sup:`[10]` <#idp73166544>`__\ `bus\_generic\_read\_ivar(9) <http://www.FreeBSD.org/cgi/man.cgi?query=bus_generic_read_ivar&sektion=9>`__
+`:sup:`[10]` <#idp72900560>`__\ `bus\_generic\_read\_ivar(9) <http://www.FreeBSD.org/cgi/man.cgi?query=bus_generic_read_ivar&sektion=9>`__
 and
 `bus\_generic\_write\_ivar(9) <http://www.FreeBSD.org/cgi/man.cgi?query=bus_generic_write_ivar&sektion=9>`__
 

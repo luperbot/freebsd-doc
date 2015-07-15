@@ -126,7 +126,7 @@ Makefiles are typically kept in the same directory as the source they
 apply to, and can be called ``makefile``, ``Makefile`` or ``MAKEFILE``.
 Most programmers use the name ``Makefile``, as this puts it near the top
 of a directory listing, where it can easily be seen.
-`:sup:`[5]` <#ftn.idp64664400>`__
+`:sup:`[5]` <#ftn.idp64345168>`__
 
 .. raw:: html
 
@@ -499,9 +499,9 @@ select make from the menu (or in Emacs, do **``C-h       i``**).
 
 .. raw:: html
 
-   <div id="ftn.idp64664400" class="footnote">
+   <div id="ftn.idp64345168" class="footnote">
 
-`:sup:`[5]` <#idp64664400>`__\ They do not use the ``MAKEFILE`` form as
+`:sup:`[5]` <#idp64345168>`__\ They do not use the ``MAKEFILE`` form as
 block capitals are often used for documentation files like ``README``.
 
 .. raw:: html

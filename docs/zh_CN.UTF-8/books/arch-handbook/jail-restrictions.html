@@ -3,7 +3,7 @@
       通常，这些约束只对被囚禁的程序有效。如果这些程序试图突破这些约束，
       相关的函数将出错返回。例如:</p><pre class="programlisting">
 if (jailed(td-&gt;td_ucred))
-    return EPERM;</pre><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67324112"></a>4.2.1. SysV进程间通信(IPC)</h3></div></div></div><a id="idp67324752" class="indexterm"></a><p>System V 进程间通信 (IPC) 是通过消息实现的。
+    return EPERM;</pre><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67279184"></a>4.2.1. SysV进程间通信(IPC)</h3></div></div></div><a id="idp67279824" class="indexterm"></a><p>System V 进程间通信 (IPC) 是通过消息实现的。
         每个进程都可以向其它进程发送消息， 告诉对方该做什么。
         处理消息的函数是： <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=msgctl&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">msgctl</span>(3)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=msgget&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">msgget</span>(3)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=msgsnd&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">msgsnd</span>(3)</span></a> 和
                 <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=msgrcv&amp;sektion=3"><span class="citerefentry"><span class="refentrytitle">msgrcv</span>(3)</span></a>。前面已经提到，一些 sysctl 开关可以影响 <span class="application">jail</span> 的行为，
@@ -17,20 +17,20 @@ if (jailed(td-&gt;td_ucred))
                      <code class="literal">msgsnd</code>向一个进程发送一条消息。</p></li><li class="listitem"><p><code class="literal">msgrcv(msgid, msgp, msgsz, msgtyp, msgflg)</code>:
            进程用这个函数接收消息。</p></li></ul></div><p>在这些函数对应的系统调用的代码中，都有这样一个条件判断：</p><pre class="programlisting"><code class="filename">/usr/src/sys/kern/sysv_msg.c</code>:
 if (!jail_sysvipc_allowed &amp;&amp; jailed(td-&gt;td_ucred))
-    return (ENOSYS);</pre><a id="idp67336400" class="indexterm"></a><p>信号量系统调用使得进程可以通过一系列原子操作实现同步。
+    return (ENOSYS);</pre><a id="idp67295696" class="indexterm"></a><p>信号量系统调用使得进程可以通过一系列原子操作实现同步。
          信号量为进程锁定资源提供了又一种途径。
          然而，进程将为正在被使用的信号量进入等待状态，一直休眠到资源被释放。
          在<span class="application">jail</span>中如下的信号量系统调用将会失效: <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=semget&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">semget</span>(2)</span></a>, <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=semctl&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">semctl</span>(2)</span></a>
          和<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=semop&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">semop</span>(2)</span></a>。</p><p><code class="filename">/usr/src/sys/kern/sysv_sem.c</code>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">semctl(semid, num, cmd, ...)</code>:
             <code class="literal">semctl</code>对在信号量队列中用<code class="literal">semid</code>标识的信号量执行<code class="literal">cmd</code>指定的命令。</p></li><li class="listitem"><p><code class="literal">semget(key, nsems, flag)</code>:
             <code class="literal">semget</code>建立一个对应于<code class="literal">key</code>的信号量数组。</p><p><code class="literal">参数key和flag与他们在msgget()的意义相同。</code></p></li><li class="listitem"><p><code class="literal">setop(semid, array, nops)</code>:
-          <code class="literal">semop</code>对semid标识的信号量完成一组由array所指定的操作。</p></li></ul></div><a id="idp67354704" class="indexterm"></a><p>System V IPC使进程间可以共享内存。进程之间可以通过它们虚拟地址空间
+          <code class="literal">semop</code>对semid标识的信号量完成一组由array所指定的操作。</p></li></ul></div><a id="idp67314000" class="indexterm"></a><p>System V IPC使进程间可以共享内存。进程之间可以通过它们虚拟地址空间
          的共享部分以及相关数据读写操作直接通讯。这些系统调用在被监禁的环境中将会失效:
                   <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=shmdt&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">shmdt</span>(2)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=shmat&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">shmat</span>(2)</span></a>、<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=shmctl&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">shmctl</span>(2)</span></a>和<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=shmget&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">shmget</span>(2)</span></a></p><p><code class="filename">/usr/src/sys/kern/sysv_shm.c</code>:</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="literal">shmctl(shmid, cmd, buf)</code>:
         <code class="literal">shmctl</code>对<code class="literal">id</code>标识的共享内存区域做各种各样的控制。</p></li><li class="listitem"><p><code class="literal">shmget(key, size, flag)</code>:
         <code class="literal">shmget</code>建立/打开<code class="literal">size</code>字节的共享内存区域。</p></li><li class="listitem"><p><code class="literal">shmat(shmid, addr, flag)</code>:
         <code class="literal">shmat</code>将<code class="literal">shmid</code>标识的共享内存区域指派到进程的地址空间里。</p></li><li class="listitem"><p><code class="literal">shmdt(addr)</code>:
-        <code class="literal">shmdt</code>取消共享内存区域的地址指派。</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67365712"></a>4.2.2. 套接字</h3></div></div></div><a id="idp67366352" class="indexterm"></a><p><span class="application">Jail</span>以一种特殊的方式处理<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=socket&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">socket</span>(2)</span></a>系统调用和相关的低级套接字函数。
+        <code class="literal">shmdt</code>取消共享内存区域的地址指派。</p></li></ul></div></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67324880"></a>4.2.2. 套接字</h3></div></div></div><a id="idp67325520" class="indexterm"></a><p><span class="application">Jail</span>以一种特殊的方式处理<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=socket&amp;sektion=2"><span class="citerefentry"><span class="refentrytitle">socket</span>(2)</span></a>系统调用和相关的低级套接字函数。
          为了决定一个套接字是否允许被创建，它先检查sysctl项
                  <code class="literal">security.jail.socket_unixiproute_only</code>是否被设置为1。
          如果被设为1，套接字建立时将只能指定这些协议族：
@@ -49,8 +49,8 @@ socreate(int dom, struct socket **aso, int type, int proto,
         return (EPROTONOSUPPORT);
     }
 ...
-}</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67379792"></a>4.2.3. Berkeley包过滤器</h3></div></div></div><a id="idp67380432" class="indexterm"></a><a id="idp67380944" class="indexterm"></a><p><span class="application">Berkeley包过滤器</span>提供了一个与协议无关的，直接通向数据链路层的低级接口。
-        现在<span class="application">BPF</span>是否可以在监禁的环境中被使用是通过<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devfs</span>(8)</span></a>来控制的。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67383376"></a>4.2.4. 网络协议</h3></div></div></div><a id="idp67384016" class="indexterm"></a><p>网络协议TCP, UDP, IP和ICMP很常见。IP和ICMP处于同一协议层次：第二层，
+}</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67330768"></a>4.2.3. Berkeley包过滤器</h3></div></div></div><a id="idp67331408" class="indexterm"></a><a id="idp67331920" class="indexterm"></a><p><span class="application">Berkeley包过滤器</span>提供了一个与协议无关的，直接通向数据链路层的低级接口。
+        现在<span class="application">BPF</span>是否可以在监禁的环境中被使用是通过<a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=devfs&amp;sektion=8"><span class="citerefentry"><span class="refentrytitle">devfs</span>(8)</span></a>来控制的。</p></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67334352"></a>4.2.4. 网络协议</h3></div></div></div><a id="idp67339216" class="indexterm"></a><p>网络协议TCP, UDP, IP和ICMP很常见。IP和ICMP处于同一协议层次：第二层，
         网络层。当参数<code class="literal">nam</code>被设置时，
         有一些限制措施会防止被囚禁的程序绑定到一些网络接口上。
                 <code class="literal">nam</code>是一个指向<code class="literal">sockaddr</code>结构体的指针，
@@ -123,7 +123,7 @@ prison_ip(struct ucred *cred, int flag, u_int32_t *ip)
     if (cred-&gt;cr_prison-&gt;pr_ip != tmp)
         return (1);
     return (0);
-}</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67392592"></a>4.2.5. 文件系统</h3></div></div></div><a id="idp67393232" class="indexterm"></a><p>如果完全级别大于0，即便是<span class="application">jail</span>里面的<code class="literal">root</code>，
+}</pre></div><div class="sect2"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp67347792"></a>4.2.5. 文件系统</h3></div></div></div><a id="idp67348432" class="indexterm"></a><p>如果完全级别大于0，即便是<span class="application">jail</span>里面的<code class="literal">root</code>，
         也不允许在Jail中取消或更改文件标志，如“不可修改”、“只可添加”、“不可删除”标志。</p><pre class="programlisting"><code class="filename">/usr/src/sys/ufs/ufs/ufs_vnops.c:</code>
 static int
 ufs_setattr(ap)

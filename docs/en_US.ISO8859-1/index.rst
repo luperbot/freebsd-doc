@@ -9,10 +9,18 @@ Welcome to FreeBSD's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :glob:
 
    htdocs/*
+
+
+Articles and Books:
+
+.. toctree::
+   :maxdepth: 3
+   :glob:
+
    articles/*
    books/*
    captions/*
@@ -20,10 +28,5 @@ Contents:
    share/*
    slides/*
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 

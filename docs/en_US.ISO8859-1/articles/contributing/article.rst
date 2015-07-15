@@ -174,7 +174,7 @@ Table of Contents
 `1. What Is Needed <#contrib-what>`__
 `2. How to Contribute <#contrib-how>`__
 `3. Contributing to ports <#ports-contributing>`__
-`Index <#idp62484688>`__
+`Index <#idp62128464>`__
 
 .. raw:: html
 
@@ -2089,7 +2089,7 @@ Index
 C
 ~
 
-contributing, `Contributing to FreeBSD <#idp60664784>`__
+contributing, `Contributing to FreeBSD <#idp60380752>`__
 
 .. raw:: html
 
@@ -2102,10 +2102,10 @@ contributing, `Contributing to FreeBSD <#idp60664784>`__
 D
 ~
 
-diff, `Changes to Existing Source Code <#idp61966928>`__
+diff, `Changes to Existing Source Code <#idp61635408>`__
 documentation submissions, `Changes to the
-Documentation <#idp61956048>`__
-donations, `Donating Hardware <#idp62070992>`__
+Documentation <#idp61628624>`__
+donations, `Donating Hardware <#idp61735376>`__
 
 .. raw:: html
 
@@ -2118,7 +2118,7 @@ donations, `Donating Hardware <#idp62070992>`__
 F
 ~
 
-FreeBSD-CURRENT, `Changes to Existing Source Code <#idp61966928>`__
+FreeBSD-CURRENT, `Changes to Existing Source Code <#idp61635408>`__
 
 .. raw:: html
 
@@ -2132,7 +2132,7 @@ P
 ~
 
 problem reports database, `Work through the PR
-Database <#idp61875408>`__
+Database <#idp61552080>`__
 
 .. raw:: html
 

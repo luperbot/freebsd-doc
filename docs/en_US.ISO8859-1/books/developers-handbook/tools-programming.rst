@@ -314,7 +314,7 @@ file (or files) using an editor. You then run the compiler and see if it
 accepts your program. If it did not compile, grit your teeth and go back
 to the editor; if it did compile and gave you a program, you can run it
 either at a shell command prompt or in a debugger to see if it works
-properly. `:sup:`[1]` <#ftn.idp64109520>`__
+properly. `:sup:`[1]` <#ftn.idp63814864>`__
 
 Obviously, this is not quite as direct as using an interpreter. However
 it allows you to do a lot of things which are very difficult or even
@@ -348,9 +348,9 @@ Emacs as a Development Environment” <emacs.html>`__.
 
 .. raw:: html
 
-   <div id="ftn.idp64109520" class="footnote">
+   <div id="ftn.idp63814864" class="footnote">
 
-`:sup:`[1]` <#idp64109520>`__\ If you run it in the shell, you may get a
+`:sup:`[1]` <#idp63814864>`__\ If you run it in the shell, you may get a
 core dump.
 
 .. raw:: html

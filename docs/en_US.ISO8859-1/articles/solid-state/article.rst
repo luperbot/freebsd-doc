@@ -256,7 +256,7 @@ Table of Contents
 `1. Solid State Disk Devices <#intro>`__
 `2. Kernel Options <#kernel>`__
 `3. The ``rc`` Subsystem and Read-Only Filesystems <#ro-fs>`__
-`4. Building a File System from Scratch <#idp61842384>`__
+`4. Building a File System from Scratch <#idp61543504>`__
 `5. System Strategies for Small and Read Only
 Environments <#strategies>`__
 

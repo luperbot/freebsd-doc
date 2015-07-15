@@ -170,14 +170,14 @@ Table of Contents
 
    </div>
 
-`1. Introduction <#idp61753296>`__
-`2. How to subscribe to FreeBSD-questions <#idp61766736>`__
-`3. How to unsubscribe from FreeBSD-questions <#idp61790160>`__
-`4. Should I ask ``-questions`` or ``-hackers``? <#idp61816400>`__
-`5. Before submitting a question <#idp61839824>`__
-`6. How to submit a question <#idp61873104>`__
-`7. How to follow up to a question <#idp61986128>`__
-`8. How to answer a question <#idp62005200>`__
+`1. Introduction <#idp61450832>`__
+`2. How to subscribe to FreeBSD-questions <#idp61472592>`__
+`3. How to unsubscribe from FreeBSD-questions <#idp61487824>`__
+`4. Should I ask ``-questions`` or ``-hackers``? <#idp61514064>`__
+`5. Before submitting a question <#idp61537488>`__
+`6. How to submit a question <#idp61570768>`__
+`7. How to follow up to a question <#idp61691984>`__
+`8. How to answer a question <#idp61711056>`__
 
 .. raw:: html
 

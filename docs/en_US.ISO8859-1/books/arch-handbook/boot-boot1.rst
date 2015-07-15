@@ -76,7 +76,7 @@ address ``0x7c00``. We can conceptually think of these disk sectors as
 containing the files ``boot0`` and ``boot1``, respectively, but in
 reality this is not entirely true for ``boot1``. Strictly speaking,
 unlike ``boot0``, ``boot1`` is not part of the boot blocks
-`:sup:`[3]` <#ftn.idp64308688>`__. Instead, a single, full-blown file,
+`:sup:`[3]` <#ftn.idp64013904>`__. Instead, a single, full-blown file,
 ``boot`` (``/boot/boot``), is what ultimately is written to disk. This
 file is a combination of ``boot1``, ``boot2`` and the ``Boot Extender``
 (or BTX). This single file is greater in size than a single sector
@@ -176,7 +176,7 @@ discussed shortly.
 
 Next comes a loop that looks for the FreeBSD slice. Although ``boot0``
 loaded ``boot1`` from the FreeBSD slice, no information was passed to it
-about this `:sup:`[4]` <#ftn.idp64364368>`__, so ``boot1`` must rescan
+about this `:sup:`[4]` <#ftn.idp64073808>`__, so ``boot1`` must rescan
 the partition table to find where the FreeBSD slice starts. Therefore it
 rereads the MBR:
 
@@ -302,7 +302,7 @@ Figure?1.15.?\ ``sys/boot/i386/boot2/boot1.S``
    </div>
 
 Recall that ``%si`` points to the fake partition. The word
-`:sup:`[5]` <#ftn.idp64428368>`__ at offset ``0x8`` is copied to
+`:sup:`[5]` <#ftn.idp64133712>`__ at offset ``0x8`` is copied to
 register ``%ax`` and word at offset ``0xa`` to ``%cx``. They are
 interpreted by the BIOS as the lower 4-byte value denoting the LBA to be
 read (the upper four bytes are assumed to be zero). Register ``%bx``
@@ -490,7 +490,7 @@ So ``boot1`` occupies exactly the first 512 bytes of ``boot`` and,
 because ``boot`` is written to the first sector of the FreeBSD slice,
 ``boot1`` fits exactly in this first sector. Because ``nread`` reads the
 first 16 sectors of the FreeBSD slice, it effectively reads the entire
-``boot`` file `:sup:`[6]` <#ftn.idp64537680>`__. We will see more
+``boot`` file `:sup:`[6]` <#ftn.idp64238928>`__. We will see more
 details about how ``boot`` is formed from ``boot1`` and ``boot2`` in the
 next section.
 
@@ -499,7 +499,7 @@ buffer to hold the sectors read. This address is conveniently chosen.
 Indeed, because ``boot1`` belongs to the first 512 bytes, it ends up in
 the address range ``0x8c00``-``0x8dff``. The 512 bytes that follows
 (range ``0x8e00``-``0x8fff``) is used to store the *bsdlabel*
-`:sup:`[7]` <#ftn.idp64561616>`__.
+`:sup:`[7]` <#ftn.idp64262864>`__.
 
 Starting at address ``0x9000`` is the beginning of the BTX server, and
 immediately following is the ``boot2`` client. The BTX server acts as a
@@ -513,7 +513,7 @@ starting at ``0xa000``. We explore this in detail in the following
 section.
 
 The last code block of ``boot1`` enables access to memory above 1MB
-`:sup:`[8]` <#ftn.idp64578896>`__ and concludes with a jump to the
+`:sup:`[8]` <#ftn.idp64280144>`__ and concludes with a jump to the
 starting point of the BTX server:
 
 .. raw:: html
@@ -575,9 +575,9 @@ Note that right before the jump, interrupts are enabled.
 
 .. raw:: html
 
-   <div id="ftn.idp64308688" class="footnote">
+   <div id="ftn.idp64013904" class="footnote">
 
-`:sup:`[3]` <#idp64308688>`__\ There is a file ``/boot/boot1``, but it
+`:sup:`[3]` <#idp64013904>`__\ There is a file ``/boot/boot1``, but it
 is not the written to the beginning of the FreeBSD slice. Instead, it is
 concatenated with ``boot2`` to form ``boot``, which *is* written to the
 beginning of the FreeBSD slice and read at boot time.
@@ -588,9 +588,9 @@ beginning of the FreeBSD slice and read at boot time.
 
 .. raw:: html
 
-   <div id="ftn.idp64364368" class="footnote">
+   <div id="ftn.idp64073808" class="footnote">
 
-`:sup:`[4]` <#idp64364368>`__\ Actually we did pass a pointer to the
+`:sup:`[4]` <#idp64073808>`__\ Actually we did pass a pointer to the
 slice entry in register ``%si``. However, ``boot1`` does not assume that
 it was loaded by ``boot0`` (perhaps some other MBR loaded it, and did
 not pass this information), so it assumes nothing.
@@ -601,9 +601,9 @@ not pass this information), so it assumes nothing.
 
 .. raw:: html
 
-   <div id="ftn.idp64428368" class="footnote">
+   <div id="ftn.idp64133712" class="footnote">
 
-`:sup:`[5]` <#idp64428368>`__\ In the context of 16-bit real mode, a
+`:sup:`[5]` <#idp64133712>`__\ In the context of 16-bit real mode, a
 word is 2 bytes.
 
 .. raw:: html
@@ -612,9 +612,9 @@ word is 2 bytes.
 
 .. raw:: html
 
-   <div id="ftn.idp64537680" class="footnote">
+   <div id="ftn.idp64238928" class="footnote">
 
-`:sup:`[6]` <#idp64537680>`__\ 512\*16=8192 bytes, exactly the size of
+`:sup:`[6]` <#idp64238928>`__\ 512\*16=8192 bytes, exactly the size of
 ``boot``
 
 .. raw:: html
@@ -623,9 +623,9 @@ word is 2 bytes.
 
 .. raw:: html
 
-   <div id="ftn.idp64561616" class="footnote">
+   <div id="ftn.idp64262864" class="footnote">
 
-`:sup:`[7]` <#idp64561616>`__\ Historically known as “disklabel”. If you
+`:sup:`[7]` <#idp64262864>`__\ Historically known as “disklabel”. If you
 ever wondered where FreeBSD stored this information, it is in this
 region. See
 `bsdlabel(8) <http://www.FreeBSD.org/cgi/man.cgi?query=bsdlabel&sektion=8>`__
@@ -636,9 +636,9 @@ region. See
 
 .. raw:: html
 
-   <div id="ftn.idp64578896" class="footnote">
+   <div id="ftn.idp64280144" class="footnote">
 
-`:sup:`[8]` <#idp64578896>`__\ This is necessary for legacy reasons.
+`:sup:`[8]` <#idp64280144>`__\ This is necessary for legacy reasons.
 Interested readers should see http://en.wikipedia.org/wiki/A20_line.
 
 .. raw:: html

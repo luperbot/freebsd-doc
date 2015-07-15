@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Design elements of the FreeBSD VM system</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="The title is really just a fancy way of saying that I am going to attempt to describe the whole VM enchilada, hopefully in a way that everyone can follow. For the last year I have concentrated on a number of major kernel subsystems within FreeBSD, with the VM and Swap subsystems being the most interesting and NFS being a necessary chore. I rewrote only small portions of the code. In the VM arena the only major rewrite I have done is to the swap subsystem. Most of my work was cleanup and maintenance, with only moderate code rewriting and no major algorithmic adjustments within the VM subsystem. The bulk of the VM subsystem's theoretical base remains unchanged and a lot of the credit for the modernization effort in the last few years belongs to John Dyson and David Greenman. Not being a historian like Kirk I will not attempt to tag all the various features with peoples names, since I will invariably get it wrong." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="en" class="article" lang="en"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp60687696"></a>Design elements of the FreeBSD VM system</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></h3><div class="affiliation"><div class="address"><p><br />
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><title>Design elements of the FreeBSD VM system</title><link rel="stylesheet" type="text/css" href="docbook.css" /><link rev="made" href="mailto:doc@FreeBSD.org" /><meta name="generator" content="DocBook XSL Stylesheets V1.78.1" /><meta name="description" content="The title is really just a fancy way of saying that I am going to attempt to describe the whole VM enchilada, hopefully in a way that everyone can follow. For the last year I have concentrated on a number of major kernel subsystems within FreeBSD, with the VM and Swap subsystems being the most interesting and NFS being a necessary chore. I rewrote only small portions of the code. In the VM arena the only major rewrite I have done is to the swap subsystem. Most of my work was cleanup and maintenance, with only moderate code rewriting and no major algorithmic adjustments within the VM subsystem. The bulk of the VM subsystem's theoretical base remains unchanged and a lot of the credit for the modernization effort in the last few years belongs to John Dyson and David Greenman. Not being a historian like Kirk I will not attempt to tag all the various features with peoples names, since I will invariably get it wrong." /><script xmlns="" type="text/javascript" src="/layout/js/google.js"></script></head><body><div xml:lang="en" class="article" lang="en"><div xmlns="" class="titlepage"><div><div><h1 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="idp60436432"></a>Design elements of the FreeBSD VM system</h1></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="authorgroup"><div class="author"><h3 class="author"><span class="firstname">Matthew</span> <span class="surname">Dillon</span></h3><div class="affiliation"><div class="address"><p><br />
 	    <code class="email">&lt;<a xmlns="" class="email" href="mailto:dillon@apollo.backplane.com">dillon@apollo.backplane.com</a>&gt;</code><br />
 	  </p></div></div></div></div></div><div>Revision: <a href="https://svnweb.freebsd.org/changeset/doc/"><span class="svnref"></span></a></div><div><div xmlns="http://www.w3.org/1999/xhtml" class="legalnotice"><a id="trademarks"></a><p>FreeBSD is a registered trademark of
   the FreeBSD Foundation.</p><p>Linux is a registered trademark of
@@ -373,24 +373,24 @@
       relatively cleanly replace large sections of the code.  There have been a
       number of improvements to the FreeBSD VM system in the last several
       years, and work is ongoing.</p></div><div class="sect1"><div xmlns="" class="titlepage"><div><div><h2 xmlns="http://www.w3.org/1999/xhtml" class="title" style="clear: both"><a id="allen-briggs-qa"></a>9. Bonus QA session by Allen Briggs
-      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></h2></div></div></div><div class="qandaset"><a id="idp62010960"></a><dl><dt>9.1. <a href="#idp62011600">What is &#8220;the interleaving algorithm&#8221; that you
+      <code class="email">&lt;<a xmlns="" class="email" href="mailto:briggs@ninthwonder.com">briggs@ninthwonder.com</a>&gt;</code></h2></div></div></div><div class="qandaset"><a id="idp61667152"></a><dl><dt>9.1. <a href="#idp61667792">What is &#8220;the interleaving algorithm&#8221; that you
 	    refer to in your listing of the ills of the FreeBSD 3.X swap
-	    arrangements?</a></dt><dt>9.2. <a href="#idp62040656">How is the separation of clean and dirty (inactive) pages
+	    arrangements?</a></dt><dt>9.2. <a href="#idp61696720">How is the separation of clean and dirty (inactive) pages
 	    related to the situation where you see low cache queue counts and
 	    high active queue counts in systat -vm?  Do the
 	    systat stats roll the active and dirty pages together for the
-	    active queue count?</a></dt><dt>9.3. <a href="#idp62053712"> In the ls(1) / vmstat 1 example,
+	    active queue count?</a></dt><dt>9.3. <a href="#idp61718096"> In the ls(1) / vmstat 1 example,
 	    would not some of the page faults be data page faults (COW from
 	    executable file to private page)?  I.e., I would expect the page
 	    faults to be some zero-fill and some program data.  Or are you
-	    implying that FreeBSD does do pre-COW for the program data?</a></dt><dt>9.4. <a href="#idp62069200">In your section on page table optimizations, can you give a
+	    implying that FreeBSD does do pre-COW for the program data?</a></dt><dt>9.4. <a href="#idp61725392">In your section on page table optimizations, can you give a
 	    little more detail about pv_entry and
 	    vm_page (or should vm_page be
 	    vm_pmap&#8212;as in 4.4, cf. pp. 180-181 of
 	    McKusick, Bostic, Karel, Quarterman)?  Specifically, what kind of
-	    operation/reaction would require scanning the mappings?</a></dt><dt>9.5. <a href="#idp62118736">Finally, in the page coloring section, it might help to have a
+	    operation/reaction would require scanning the mappings?</a></dt><dt>9.5. <a href="#idp61770704">Finally, in the page coloring section, it might help to have a
 	    little more description of what you mean here.  I did not quite
-	    follow it.</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp62011600"></a><a id="idp62012496"></a><p><strong>9.1.</strong></p></td><td align="left" valign="top"><p>What is <span class="quote">&#8220;<span class="quote">the interleaving algorithm</span>&#8221;</span> that you
+	    follow it.</a></dt></dl><table border="0" style="width: 100%;"><colgroup><col align="left" width="1%" /><col /></colgroup><tbody><tr class="question"><td align="left" valign="top"><a id="idp61667792"></a><a id="idp61668688"></a><p><strong>9.1.</strong></p></td><td align="left" valign="top"><p>What is <span class="quote">&#8220;<span class="quote">the interleaving algorithm</span>&#8221;</span> that you
 	    refer to in your listing of the ills of the FreeBSD 3.X swap
 	    arrangements?</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>FreeBSD uses a fixed swap interleave which defaults to 4.  This
 	    means that FreeBSD reserves space for four swap areas even if you
@@ -428,7 +428,7 @@
 	    memory due to the use of a bitmap (one bit per block) instead of a
 	    linked list of nodes.  The use of a radix tree instead of a
 	    sequential list gives us nearly O(1) performance no matter how
-	    fragmented the tree becomes.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp62040656"></a><a id="idp62041680"></a><p><strong>9.2.</strong></p></td><td align="left" valign="top"><p>How is the separation of clean and dirty (inactive) pages
+	    fragmented the tree becomes.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp61696720"></a><a id="idp61697744"></a><p><strong>9.2.</strong></p></td><td align="left" valign="top"><p>How is the separation of clean and dirty (inactive) pages
 	    related to the situation where you see low cache queue counts and
 	    high active queue counts in <code class="command">systat -vm</code>?  Do the
 	    systat stats roll the active and dirty pages together for the
@@ -446,7 +446,7 @@
 	    separate out dirty pages (inactive queue) from clean pages (cache
 	    queue) when the system is not being stressed, nor will it try to
 	    deactivate pages (active queue -&gt; inactive queue) when the system
-	    is not being stressed, even if they are not being used.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp62053712"></a><a id="idp62054736"></a><p><strong>9.3.</strong></p></td><td align="left" valign="top"><p> In the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> / <code class="command">vmstat 1</code> example,
+	    is not being stressed, even if they are not being used.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp61718096"></a><a id="idp61719120"></a><p><strong>9.3.</strong></p></td><td align="left" valign="top"><p> In the <a class="citerefentry" href="http://www.FreeBSD.org/cgi/man.cgi?query=ls&amp;sektion=1"><span class="citerefentry"><span class="refentrytitle">ls</span>(1)</span></a> / <code class="command">vmstat 1</code> example,
 	    would not some of the page faults be data page faults (COW from
 	    executable file to private page)?  I.e., I would expect the page
 	    faults to be some zero-fill and some program data.  Or are you
@@ -455,7 +455,7 @@
 	    is almost certainly already in the cache.  I am indeed lumping the
 	    two together.  FreeBSD does not pre-COW program data or zero-fill,
 	    but it <span class="emphasis"><em>does</em></span> pre-map pages that exist in its
-	    cache.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp62069200"></a><a id="idp62070096"></a><p><strong>9.4.</strong></p></td><td align="left" valign="top"><p>In your section on page table optimizations, can you give a
+	    cache.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp61725392"></a><a id="idp61726288"></a><p><strong>9.4.</strong></p></td><td align="left" valign="top"><p>In your section on page table optimizations, can you give a
 	    little more detail about <code class="literal">pv_entry</code> and
 	    <code class="literal">vm_page</code> (or should vm_page be
 	    <code class="literal">vm_pmap</code>&#8212;as in 4.4, cf. pp. 180-181 of
@@ -510,7 +510,7 @@
 	    actually-mapped pte.  I think memory utilization winds up being
 	    about the same, giving FreeBSD an algorithmic advantage with its
 	    ability to throw away page tables at will with very low
-	    overhead.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp62118736"></a><a id="idp62119760"></a><p><strong>9.5.</strong></p></td><td align="left" valign="top"><p>Finally, in the page coloring section, it might help to have a
+	    overhead.</p></td></tr><tr class="question"><td align="left" valign="top"><a id="idp61770704"></a><a id="idp61771728"></a><p><strong>9.5.</strong></p></td><td align="left" valign="top"><p>Finally, in the page coloring section, it might help to have a
 	    little more description of what you mean here.  I did not quite
 	    follow it.</p></td></tr><tr class="answer"><td align="left" valign="top"></td><td align="left" valign="top"><p>Do you know how an L1 hardware memory cache works?  I will
 	    explain: Consider a machine with 16MB of main memory but only 128K

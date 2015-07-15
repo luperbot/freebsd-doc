@@ -94,7 +94,7 @@ expected. This second verification form may be regarded as structural
 verification. Although the sub-projects themselves may write formal
 tests such as unit tests, these are usually not collected by the main
 project and are usually removed before the code is committed to the
-current branch. `:sup:`[9]` <#ftn.idp64343376>`__
+current branch. `:sup:`[9]` <#ftn.idp64110160>`__
 
 .. raw:: html
 
@@ -104,9 +104,9 @@ current branch. `:sup:`[9]` <#ftn.idp64343376>`__
 
 .. raw:: html
 
-   <div id="ftn.idp64343376" class="footnote">
+   <div id="ftn.idp64110160" class="footnote">
 
-`:sup:`[9]` <#idp64343376>`__ More and more tests are however performed
+`:sup:`[9]` <#idp64110160>`__ More and more tests are however performed
 when building the system (“make world”). These tests are however a very
 new addition and no systematic framework for these tests have yet been
 created.

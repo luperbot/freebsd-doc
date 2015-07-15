@@ -299,7 +299,7 @@ however there are one or two points worth mentioning.
              
 
    and then you can edit the file in your Emacs!
-   `:sup:`[6]` <#ftn.idp65188688>`__
+   `:sup:`[6]` <#ftn.idp64898000>`__
 
 .. raw:: html
 
@@ -731,9 +731,9 @@ that adds ``auto-indent``).
 
 .. raw:: html
 
-   <div id="ftn.idp65188688" class="footnote">
+   <div id="ftn.idp64898000" class="footnote">
 
-`:sup:`[6]` <#idp65188688>`__\ Many Emacs users set their ``EDITOR``
+`:sup:`[6]` <#idp64898000>`__\ Many Emacs users set their ``EDITOR``
 environment to ``emacsclient`` so this happens every time they need to
 edit a file.
 

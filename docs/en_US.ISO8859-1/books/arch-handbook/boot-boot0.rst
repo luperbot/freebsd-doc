@@ -54,7 +54,7 @@ control. The task of ``boot0`` is quite simple: scan the partition table
 and let the user choose which partition to boot from. The Partition
 Table is a special, standard data structure embedded in the MBR (hence
 embedded in ``boot0``) describing the four standard PC “partitions”
-`:sup:`[1]` <#ftn.idp63918032>`__. ``boot0`` resides in the filesystem
+`:sup:`[1]` <#ftn.idp63627344>`__. ``boot0`` resides in the filesystem
 as ``/boot/boot0``. It is a small 512-byte file, and it is exactly what
 FreeBSD's installation procedure wrote to the hard disk's MBR if you
 chose the “bootmanager” option at installation time. Indeed, ``boot0``
@@ -215,7 +215,7 @@ Figure?1.2.?\ ``sys/boot/i386/boot0/boot0.S``
 This first block of code is the entry point of the program. It is where
 the BIOS transfers control. First, it makes sure that the string
 operations autoincrement its pointer operands (the ``cld`` instruction)
-`:sup:`[2]` <#ftn.idp64032592>`__. Then, as it makes no assumption about
+`:sup:`[2]` <#ftn.idp63741904>`__. Then, as it makes no assumption about
 the state of the segment registers, it initializes them. Finally, it
 sets the stack pointer register (``%sp``) to address ``0x7c00``, so we
 have a working stack.
@@ -688,9 +688,9 @@ next stage (the just-read block) is started.
 
 .. raw:: html
 
-   <div id="ftn.idp63918032" class="footnote">
+   <div id="ftn.idp63627344" class="footnote">
 
-`:sup:`[1]` <#idp63918032>`__\ http://en.wikipedia.org/wiki/Master_boot_record
+`:sup:`[1]` <#idp63627344>`__\ http://en.wikipedia.org/wiki/Master_boot_record
 
 .. raw:: html
 
@@ -698,9 +698,9 @@ next stage (the just-read block) is started.
 
 .. raw:: html
 
-   <div id="ftn.idp64032592" class="footnote">
+   <div id="ftn.idp63741904" class="footnote">
 
-`:sup:`[2]` <#idp64032592>`__\ When in doubt, we refer the reader to the
+`:sup:`[2]` <#idp63741904>`__\ When in doubt, we refer the reader to the
 official Intel manuals, which describe the exact semantics for each
 instruction:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html.

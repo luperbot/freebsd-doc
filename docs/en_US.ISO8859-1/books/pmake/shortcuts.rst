@@ -185,7 +185,7 @@ this:
     $(OBJS)         : defs.h
 
 The transformation rule I gave above takes the place of the 6 lines
-`:sup:`[1]` <#ftn.idp64834256>`__:
+`:sup:`[1]` <#ftn.idp64572240>`__:
 
 .. code:: programlisting
 
@@ -382,9 +382,9 @@ Gods* <gods.html>`__).
 
 .. raw:: html
 
-   <div id="ftn.idp64834256" class="footnote">
+   <div id="ftn.idp64572240" class="footnote">
 
-`:sup:`[1]` <#idp64834256>`__\ This is also somewhat cleaner, I think,
+`:sup:`[1]` <#idp64572240>`__\ This is also somewhat cleaner, I think,
 than the dynamic source solution presented in `Section?2.6, “Writing and
 Debugging a Makefile” <writeanddebug.html>`__.
 

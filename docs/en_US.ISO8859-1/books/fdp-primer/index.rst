@@ -269,134 +269,134 @@ List of Examples
 
    </div>
 
-1. `A Sample Example <preface-notes.html#idp63775056>`__
+1. `A Sample Example <preface-notes.html#idp63435344>`__
 7.1. `Using an Element (Start and End
-Tags) <xml-primer-elements.html#idp65007440>`__
+Tags) <xml-primer-elements.html#idp64630736>`__
 7.2. `Using an Element Without
-Content <xml-primer-elements.html#idp65028816>`__
+Content <xml-primer-elements.html#idp64680784>`__
 7.3. `Elements Within Elements;
-``em`` <xml-primer-elements.html#idp65052496>`__
+``em`` <xml-primer-elements.html#idp64700368>`__
 7.4. `Using an Element with an
-Attribute <xml-primer-elements.html#idp65103696>`__
+Attribute <xml-primer-elements.html#idp64751696>`__
 7.5. `Single Quotes Around
-Attributes <xml-primer-elements.html#idp65122000>`__
-7.6. `XML Generic Comment <xml-primer-comments.html#idp67613648>`__
-7.7. `Erroneous XML Comments <xml-primer-comments.html#idp67618256>`__
+Attributes <xml-primer-elements.html#idp64770000>`__
+7.6. `XML Generic Comment <xml-primer-comments.html#idp67224656>`__
+7.7. `Erroneous XML Comments <xml-primer-comments.html#idp67233488>`__
 7.8. `Defining General
-Entities <xml-primer-entities.html#idp67652176>`__
+Entities <xml-primer-entities.html#idp67259088>`__
 7.9. `Defining Parameter
-Entities <xml-primer-entities.html#idp67664208>`__
+Entities <xml-primer-entities.html#idp67275216>`__
 7.10. `Using General Entities to Include
-Files <xml-primer-include.html#idp67717456>`__
+Files <xml-primer-include.html#idp67349072>`__
 7.11. `Using Parameter Entities to Include
-Files <xml-primer-include.html#idp67728848>`__
+Files <xml-primer-include.html#idp67364560>`__
 7.12. `Structure of a Marked
-Section <xml-primer-marked-sections.html#idp67782864>`__
+Section <xml-primer-marked-sections.html#idp67406160>`__
 7.13. `Using a ``CDATA`` Marked
-Section <xml-primer-marked-sections.html#idp67805392>`__
+Section <xml-primer-marked-sections.html#idp67432912>`__
 7.14. `Using ``INCLUDE`` and ``IGNORE`` in Marked
-Sections <xml-primer-marked-sections.html#idp67839312>`__
+Sections <xml-primer-marked-sections.html#idp67450320>`__
 7.15. `Using a Parameter Entity to Control a Marked
-Section <xml-primer-marked-sections.html#idp67844944>`__
+Section <xml-primer-marked-sections.html#idp67468368>`__
 8.1. `Normal XHTML Document
-Structure <xhtml-markup-sectional-elements.html#idp67881040>`__
+Structure <xhtml-markup-sectional-elements.html#idp67504464>`__
 8.2. ```h1``, ``h2``, and Other Header
-Tags <xhtml-markup-block-elements.html#idp67899088>`__
-8.3. ```p`` <xhtml-markup-block-elements.html#idp67909072>`__
-8.4. ```blockquote`` <xhtml-markup-block-elements.html#idp67912784>`__
+Tags <xhtml-markup-block-elements.html#idp67522512>`__
+8.3. ```p`` <xhtml-markup-block-elements.html#idp67536464>`__
+8.4. ```blockquote`` <xhtml-markup-block-elements.html#idp67540304>`__
 8.5. ```ul`` and
-``ol`` <xhtml-markup-block-elements.html#idp67926352>`__
+``ol`` <xhtml-markup-block-elements.html#idp67553872>`__
 8.6. `Definition Lists with
-``dl`` <xhtml-markup-block-elements.html#idp67946192>`__
-8.7. ```pre`` <xhtml-markup-block-elements.html#idp67972816>`__
+``dl`` <xhtml-markup-block-elements.html#idp67569616>`__
+8.7. ```pre`` <xhtml-markup-block-elements.html#idp67596112>`__
 8.8. `Simple Use of
-``table`` <xhtml-markup-block-elements.html#idp67981392>`__
+``table`` <xhtml-markup-block-elements.html#idp67608784>`__
 8.9. `Using
-``rowspan`` <xhtml-markup-block-elements.html#idp67996752>`__
+``rowspan`` <xhtml-markup-block-elements.html#idp67624272>`__
 8.10. `Using
-``colspan`` <xhtml-markup-block-elements.html#idp68005712>`__
+``colspan`` <xhtml-markup-block-elements.html#idp67633232>`__
 8.11. `Using ``rowspan`` and ``colspan``
-Together <xhtml-markup-block-elements.html#idp68022992>`__
+Together <xhtml-markup-block-elements.html#idp67646288>`__
 8.12. ```em`` and
-``strong`` <xhtml-markup-inline-elements.html#idp68054224>`__
-8.13. ```tt`` <xhtml-markup-inline-elements.html#idp68061136>`__
+``strong`` <xhtml-markup-inline-elements.html#idp67681616>`__
+8.13. ```tt`` <xhtml-markup-inline-elements.html#idp67688528>`__
 8.14. `Using
-``<a href="...">`` <xhtml-markup-inline-elements.html#idp68069200>`__
+``<a href="...">`` <xhtml-markup-inline-elements.html#idp67696592>`__
 8.15. `Creating an
-Anchor <xhtml-markup-inline-elements.html#idp68080720>`__
+Anchor <xhtml-markup-inline-elements.html#idp67704016>`__
 8.16. `Linking to a Named Part of a Different
-Document <xhtml-markup-inline-elements.html#idp68085584>`__
+Document <xhtml-markup-inline-elements.html#idp67709008>`__
 8.17. `Linking to a Named Part of the Same
-Document <xhtml-markup-inline-elements.html#idp68091984>`__
+Document <xhtml-markup-inline-elements.html#idp67715280>`__
 9.1. `Boilerplate ``book`` with
-``info`` <docbook-markup-document-structure.html#idp68245584>`__
+``info`` <docbook-markup-document-structure.html#idp67864784>`__
 9.2. `Boilerplate ``article`` with
-``info`` <docbook-markup-document-structure.html#idp68267728>`__
+``info`` <docbook-markup-document-structure.html#idp67895248>`__
 9.3. `A Simple
-Chapter <docbook-markup-document-structure.html#idp68298192>`__
+Chapter <docbook-markup-document-structure.html#idp67921616>`__
 9.4. `Empty
-Chapters <docbook-markup-document-structure.html#idp68314320>`__
+Chapters <docbook-markup-document-structure.html#idp67925328>`__
 9.5. `Sections in
-Chapters <docbook-markup-document-structure.html#idp68322768>`__
-9.6. ```para`` <docbook-markup-block-elements.html#idp68364368>`__
-9.7. ```blockquote`` <docbook-markup-block-elements.html#idp68377680>`__
+Chapters <docbook-markup-document-structure.html#idp67946064>`__
+9.6. ```para`` <docbook-markup-block-elements.html#idp67991888>`__
+9.7. ```blockquote`` <docbook-markup-block-elements.html#idp67996880>`__
 9.8. ```tip`` and
-``important`` <docbook-markup-block-elements.html#idp68419152>`__
-9.9. ```example`` <docbook-markup-block-elements.html#idp68429008>`__
-9.10. ` <docbook-markup-block-elements.html#idp68451536>`__
+``important`` <docbook-markup-block-elements.html#idp68021968>`__
+9.9. ```example`` <docbook-markup-block-elements.html#idp68036048>`__
+9.10. ` <docbook-markup-block-elements.html#idp68042064>`__
 9.11. ```itemizedlist`` and
-``orderedlist`` <docbook-markup-block-elements.html#idp68460624>`__
+``orderedlist`` <docbook-markup-block-elements.html#idp68059344>`__
 9.12.
 ```variablelist`` <docbook-markup-block-elements.html#docbook-markup-variablelist-example>`__
-9.13. ```procedure`` <docbook-markup-block-elements.html#idp68506960>`__
+9.13. ```procedure`` <docbook-markup-block-elements.html#idp68105680>`__
 9.14.
-```programlisting`` <docbook-markup-block-elements.html#idp68539856>`__
+```programlisting`` <docbook-markup-block-elements.html#idp68142672>`__
 9.15. ```co`` and
-``calloutlist`` <docbook-markup-block-elements.html#idp68556368>`__
+``calloutlist`` <docbook-markup-block-elements.html#idp68163280>`__
 9.16.
-```informaltable`` <docbook-markup-block-elements.html#idp68596816>`__
+```informaltable`` <docbook-markup-block-elements.html#idp68199760>`__
 9.17. `Tables Where
-``frame="none"`` <docbook-markup-block-elements.html#idp68625104>`__
+``frame="none"`` <docbook-markup-block-elements.html#idp68228048>`__
 9.18. ```screen``, ``prompt``, and
-``userinput`` <docbook-markup-block-elements.html#idp68649296>`__
-9.19. ```emphasis`` <docbook-markup-inline-elements.html#idp68689744>`__
-9.20. `Acronyms <docbook-markup-inline-elements.html#idp68701264>`__
-9.21. `Quotations <docbook-markup-inline-elements.html#idp68714832>`__
+``userinput`` <docbook-markup-block-elements.html#idp68260432>`__
+9.19. ```emphasis`` <docbook-markup-inline-elements.html#idp68284368>`__
+9.20. `Acronyms <docbook-markup-inline-elements.html#idp68299984>`__
+9.21. `Quotations <docbook-markup-inline-elements.html#idp68317776>`__
 9.22. `Keys, Mouse Buttons, and
-Combinations <docbook-markup-inline-elements.html#idp68727888>`__
+Combinations <docbook-markup-inline-elements.html#idp68334800>`__
 9.23. `Applications, Commands, and
-Options <docbook-markup-inline-elements.html#idp68772432>`__
-9.24. ```filename`` <docbook-markup-inline-elements.html#idp68818128>`__
+Options <docbook-markup-inline-elements.html#idp68383568>`__
+9.24. ```filename`` <docbook-markup-inline-elements.html#idp68425168>`__
 9.25. ```package``
-Tag <docbook-markup-inline-elements.html#idp68869072>`__
+Tag <docbook-markup-inline-elements.html#idp68451536>`__
 9.26. ```systemitem`` and
-Classes <docbook-markup-inline-elements.html#idp68907216>`__
+Classes <docbook-markup-inline-elements.html#idp68481360>`__
 9.27. ```email`` with a
-Hyperlink <docbook-markup-inline-elements.html#idp68951760>`__
+Hyperlink <docbook-markup-inline-elements.html#idp68521808>`__
 9.28. ```email`` Without a
-Hyperlink <docbook-markup-inline-elements.html#idp68961872>`__
+Hyperlink <docbook-markup-inline-elements.html#idp68544208>`__
 9.29. ```buildtarget`` and
-``varname`` <docbook-markup-inline-elements.html#idp68973776>`__
-9.30. ```literal`` <docbook-markup-inline-elements.html#idp69004752>`__
+``varname`` <docbook-markup-inline-elements.html#idp68560336>`__
+9.30. ```literal`` <docbook-markup-inline-elements.html#idp68591184>`__
 9.31.
-```replaceable`` <docbook-markup-inline-elements.html#idp69012176>`__
+```replaceable`` <docbook-markup-inline-elements.html#idp68598608>`__
 9.32.
-```guibutton`` <docbook-markup-inline-elements.html#idp69039824>`__
+```guibutton`` <docbook-markup-inline-elements.html#idp68626384>`__
 9.33.
-```errorname`` <docbook-markup-inline-elements.html#idp69046224>`__
+```errorname`` <docbook-markup-inline-elements.html#idp68632656>`__
 9.34. ```xml:id`` on Chapters and
-Sections <docbook-markup-links.html#idp69162704>`__
-9.35. ```anchor`` <docbook-markup-links.html#idp69173456>`__
-9.36. `Using ``xref`` <docbook-markup-links.html#idp69179088>`__
-9.37. `Using ``link`` <docbook-markup-links.html#idp69206352>`__
+Sections <docbook-markup-links.html#idp68749264>`__
+9.35. ```anchor`` <docbook-markup-links.html#idp68760016>`__
+9.36. `Using ``xref`` <docbook-markup-links.html#idp68765648>`__
+9.37. `Using ``link`` <docbook-markup-links.html#idp68792912>`__
 9.38. ```link`` to a FreeBSD Documentation Web
-Page <docbook-markup-links.html#idp69224016>`__
+Page <docbook-markup-links.html#idp68806352>`__
 9.39. ```link`` to a FreeBSD Web
-Page <docbook-markup-links.html#idp69237968>`__
+Page <docbook-markup-links.html#idp68865488>`__
 9.40. ```ulink`` to an External Web
-Page <docbook-markup-links.html#idp69259472>`__
-A.1. `DocBook ``book`` <examples.html#idp69664976>`__
-A.2. `DocBook ``article`` <examples-docbook-article.html#idp69704784>`__
+Page <docbook-markup-links.html#idp68870480>`__
+A.1. `DocBook ``book`` <examples.html#idp69292368>`__
+A.2. `DocBook ``article`` <examples-docbook-article.html#idp69332304>`__
 
 .. raw:: html
 

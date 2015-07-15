@@ -113,7 +113,7 @@ not considered "really released" until a `PGP <tool-pgp.html>`__-signed
 message stating exactly that, is sent to the mailing list
 freebsd-announce; anything labelled as a "release" before that may well
 be in-process and subject to change before the PGP-signed message is
-sent. `:sup:`[11]` <#ftn.idp64465360>`__.
+sent. `:sup:`[11]` <#ftn.idp64228048>`__.
 
 The releases of the -CURRENT-branch (that is, all releases that end with
 “.0”) are very similar, but with twice as long timeframe. It starts 8
@@ -197,9 +197,9 @@ enough to be released.
 
 .. raw:: html
 
-   <div id="ftn.idp64465360" class="footnote">
+   <div id="ftn.idp64228048" class="footnote">
 
-`:sup:`[11]` <#idp64465360>`__ Many commercial vendors use these images
+`:sup:`[11]` <#idp64228048>`__ Many commercial vendors use these images
 to create CD-ROMs that are sold in retail outlets.
 
 .. raw:: html

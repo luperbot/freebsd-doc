@@ -113,7 +113,7 @@ mailing list <http://lists.FreeBSD.org/mailman/listinfo/freebsd-doc>`__.
 
 DocBook was originally developed by HaL Computer Systems and O'Reilly &
 Associates to be a Document Type Definition (DTD) for writing technical
-documentation `:sup:`[1]` <#ftn.idp68103888>`__. Since 1998 it is
+documentation `:sup:`[1]` <#ftn.idp67727184>`__. Since 1998 it is
 maintained by the `DocBook Technical
 Committee <http://www.oasis-open.org/committees/tc_home.php?wg_abbrev=docbook>`__.
 As such, and unlike LinuxDoc and XHTML, DocBook is very heavily oriented
@@ -170,9 +170,9 @@ break (and other processing) when it is encountered.
 
 .. raw:: html
 
-   <div id="ftn.idp68103888" class="footnote">
+   <div id="ftn.idp67727184" class="footnote">
 
-`:sup:`[1]` <#idp68103888>`__\ A short history can be found under
+`:sup:`[1]` <#idp67727184>`__\ A short history can be found under
 http://www.oasis-open.org/docbook/intro.shtml#d0e41.
 
 .. raw:: html

@@ -278,7 +278,7 @@ List of Examples
 
    </div>
 
-2.1. `A sample ``.emacs`` file <emacs.html#idp65192528>`__
+2.1. `A sample ``.emacs`` file <emacs.html#idp64901968>`__
 
 .. raw:: html
 

@@ -120,12 +120,12 @@ not until 5-STABLE is forked that the development branch will be branded
 A “minor release” is made from the -CURRENT branch following a major
 release, or from the -STABLE branch.
 
-Following and including, 4.3-RELEASE`:sup:`[6]` <#ftn.idp63900624>`__,
+Following and including, 4.3-RELEASE`:sup:`[6]` <#ftn.idp63700176>`__,
 when a minor release has been made, it becomes a “security branch”. This
 is meant for organisations that do not want to follow the -STABLE branch
 and the potential new/changed features it offers, but instead require an
 absolutely stable environment, only updating to implement security
-updates. `:sup:`[7]` <#ftn.idp63912144>`__
+updates. `:sup:`[7]` <#ftn.idp63703376>`__
 
 Each update to a security branch is called a “patchlevel”. For every
 security enhancement that is done, the patchlevel number is increased,
@@ -142,9 +142,9 @@ from a security branch. An example of this is 4.6.2-RELEASE.
 
 .. raw:: html
 
-   <div id="ftn.idp63900624" class="footnote">
+   <div id="ftn.idp63700176" class="footnote">
 
-`:sup:`[6]` <#idp63900624>`__ The first release this actually happened
+`:sup:`[6]` <#idp63700176>`__ The first release this actually happened
 for was 4.5-RELEASE, but security branches were at the same time created
 for 4.3-RELEASE and 4.4-RELEASE.
 
@@ -154,9 +154,9 @@ for 4.3-RELEASE and 4.4-RELEASE.
 
 .. raw:: html
 
-   <div id="ftn.idp63912144" class="footnote">
+   <div id="ftn.idp63703376" class="footnote">
 
-`:sup:`[7]` <#idp63912144>`__ There is a terminology overlap with
+`:sup:`[7]` <#idp63703376>`__ There is a terminology overlap with
 respect to the word "stable", which leads to some confusion. The -STABLE
 branch is still a development branch, whose goal is to be useful for
 most people. If it is never acceptable for a system to get changes that

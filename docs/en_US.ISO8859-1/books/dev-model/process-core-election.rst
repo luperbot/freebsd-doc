@@ -49,7 +49,7 @@ Chapter?6.?Processes
    </div>
 
 Core elections are held at least every two years.
-`:sup:`[8]` <#ftn.idp64286416>`__ Nine core members are elected. New
+`:sup:`[8]` <#ftn.idp64048976>`__ Nine core members are elected. New
 elections are held if the number of core members drops below seven. New
 elections can also be held should at least 1/3 of the active committers
 demand this.
@@ -156,9 +156,9 @@ Hats in core elections are:
 
 .. raw:: html
 
-   <div id="ftn.idp64286416" class="footnote">
+   <div id="ftn.idp64048976" class="footnote">
 
-`:sup:`[8]` <#idp64286416>`__\ The first Core election was held
+`:sup:`[8]` <#idp64048976>`__\ The first Core election was held
 September 2000
 
 .. raw:: html

@@ -172,7 +172,7 @@ Server <#printing-cups-configuring-server>`__
 Server <#printing-cups-configuring-printers>`__
 `5. Configuring CUPS Clients <#printing-cups-clients>`__
 `6. CUPS Troubleshooting <#printing-cups-troubleshooting>`__
-`Index <#idp62001360>`__
+`Index <#idp61714768>`__
 
 .. raw:: html
 
