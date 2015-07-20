@@ -1,0 +1,209 @@
+==============================================
+4. Ein Dateisystem von Grund auf neu erstellen
+==============================================
+
+.. raw:: html
+
+   <div class="navheader">
+
+4. Ein Dateisystem von Grund auf neu erstellen
+`Zur?ck <ro-fs.html>`__?
+?
+?\ `Weiter <strategies.html>`__
+
+--------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="sect1">
+
+.. raw:: html
+
+   <div class="titlepage" xmlns="">
+
+.. raw:: html
+
+   <div>
+
+.. raw:: html
+
+   <div>
+
+4. Ein Dateisystem von Grund auf neu erstellen
+----------------------------------------------
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+Wenn ATA-kompatible Compact-Flash-Karten von FreeBSD als normale
+IDE-Festplatten erkannt werden, k?nnten Sie theoretisch FreeBSD aus dem
+Netzwerk mittels der Kern- und mfsroot-Floppies oder einer CD
+installieren.
+
+Jedoch kann selbst eine kleine Installation von FreeBSD durch die
+normale Installationsprozedur ein System erzeugen, dass gr?sser als
+200?MB ist. Da die meisten Leute kleinere Flash-Speichermedien einsetzen
+(128?MB wird hier als gross angesehen - 32 oder sogar 16?MB sind
+gebr?uchlich) ist eine gew?hnliche Installation mit normalen Methoden
+nicht m?glich, da es einfach nicht genug freien Plattenplatz gibt,
+selbst f?r die kleinste Installationsart.
+
+Der einfachste Weg, diese Speicherlimitierung zu umgehen, ist, FreeBSD
+auf konventionelle Weise auf eine normale Festplatte zu installieren.
+Nachdem die Installation abgeschlossen wurde, k?rzen Sie das
+Betriebssystem auf das n?tigste, bis Sie eine Gr?sse erreicht hat, die
+auf das Flash-Medium passt und benutzen Sie dann tar auf dem gesamten
+Dateisystem. Die folgenden Schritte werden Sie durch den Prozess der
+Vorbereitung eines Flash-Mediums f?r ihr getartes Dateisystem f?hren.
+Beachten Sie, dass Operationen wie Partitionierung, Benennung,
+Erstellung von Dateisystemen, etc. von Hand durchgef?hrt werden m?ssen,
+da eine normale Installation nicht m?glich ist. Zus?tzlich zu den Kern-
+und mfsroot-Disketten ben?tigen Sie auch die fixit-Floppy.
+
+.. raw:: html
+
+   <div class="procedure">
+
+#. **Partitionierung Ihrer Flash-Medien**
+
+   W?hlen Sie nach dem Starten der Kern- und mfsroot-Disketten,
+   ``custom`` aus dem Installationsmen?. In diesem Men? w?hlen Sie dann
+   ``partition`` aus. Dort sollten Sie alle bestehenden Partitionen mit
+   Hilfe der Taste **d** l?schen. Nachdem alle bestehenden Partitionen
+   gel?scht wurden, erstellen Sie mittels der Taste **c** eine Partition
+   und akzeptieren Sie den Standardwert f?r die Gr?sse der Partition.
+   Wenn Sie nach dem Typ der Partition gefragt werden, stellen Sie
+   sicher, dass der Wert auf ``165`` eingestellt ist. Schreiben Sie
+   jetzt diese Partitionstabelle auf die Platte durch bet?tigen der
+   Taste **w** (dies ist die versteckte Option auf diesem Bildschirm).
+   Wenn Sie eine ATA-kompatible Compact Flash-Karte verwenden, sollten
+   Sie den FreeBSD Bootmanager ausw?hlen. Dr?cken Sie nun die Taste
+   **q**, um das Partitionsmen? zu verlassen. Sie werden das Men? des
+   Bootmanagers noch ein weiteres Mal gezeigt bekommt. In diesem Fall
+   wiederholen Sie die Auswahl von vorher.
+
+#. **Anlegen von Dateisystemen auf Ihrem Flashspeicher-Ger?t**
+
+   Verlassen Sie das Installationsmen? und w?hlen Sie aus dem
+   Hauptinstallationsmen? die Option ``fixit``. In der fixit-Umgebung
+   angelangt, geben Sie den folgenden Befehl ein:
+
+   .. code:: screen
+
+       # disklabel -e /dev/ad0c
+
+   Zu diesem Zeitpunkt sollten Sie sich im vi-Editor unter der
+   Herrschaft des disklabel-Kommandos befinden. Als n?chstes m?ssen Sie
+   die eine ``a:``-Zeile an das Ende der Datei hinzuf?gen. Diese
+   ``a:``-Zeile sollte wie folgt aussehen:
+
+   .. code:: programlisting
+
+       a:      123456  0       4.2BSD  0       0
+
+   Wobei *``123456``* eine Zahl darstellt, die exakt der gleichen Zahl
+   in der bestehenden Zeile mit dem ``c:``-Eintrag entspricht. Sie
+   kopieren quasi die bestehende Zeile ``c:`` als eine neue Zeile ``a:``
+   und stellen sicher, dass fstype ``4.2BSD`` entspricht. Speichern Sie
+   die Datei und verlassen Sie den Editor.
+
+   .. code:: screen
+
+       # disklabel -B -r /dev/ad0c
+       # newfs /dev/ad0a
+
+#. **Schreiben des Dateisystems auf Ihr Flash-Medium**
+
+   H?ngen Sie das neu erstellte Flash-Medium ein:
+
+   .. code:: screen
+
+       # mount /dev/ad0a /flash
+
+   Verbinden Sie diese Maschine mit dem Netzwerk, um die tar-Datei zu
+   ?bertragen und extrahieren Sie es auf das Dateisystem des
+   Flash-Mediums. Ein Beispiel dazu w?re folgendes:
+
+   .. code:: screen
+
+       # ifconfig xl0 192.168.0.10 netmask 255.255.255.0
+       # route add default 192.168.0.1
+
+   Jetzt da die Maschine ans Netzwerk angeschlossen ist, kopieren Sie
+   die tar-Datei. An diesem Punkt werden Sie m?glicherweise mit einem
+   Dilemma konfrontiert - sollte Ihr Flash-Speicher beispielsweise
+   128?MB gross sein und Ihre tar-Datei gr?sser als 64?MB, k?nnen Sie
+   ihre tar-Datei auf dem Flash-Speicher nicht entpacken - Ihnen wird
+   vorher der Speicherplatz ausgehen. Eine L?sung f?r dieses Problem,
+   sofern Sie FTP verwenden, ist, dass Sie die Datei entpacken k?nnen,
+   w?hrend es von FTP ?bertragen wird. Wenn Sie die ?bertragung auf
+   diese Weise durchf?hren, haben Sie niemals die tar-Datei und deren
+   Inhalt zur gleichen Zeit auf Ihrem Medium:
+
+   .. code:: screen
+
+       ftp> get tarfile.tar "| tar xvf -"
+
+   Sollte Ihre tar-Datei gezippt sein, k?nnen Sie dies ebenso
+   bewerkstelligen:
+
+   .. code:: screen
+
+       ftp> get tarfile.tar "| zcat | tar xvf -"
+
+   Nachdem der Inhalt Ihrer tar-Datei auf dem Dateisystem des
+   Flash-Mediums abgelegt wurden, k?nnen Sie den Flash-Speicher
+   aush?ngen und neu starten:
+
+   .. code:: screen
+
+       # cd /
+       # umount /flash
+       # exit
+
+   In der Annahme, dass Sie Ihr Dateisystem richtig konfiguriert haben,
+   als es noch auf der gew?hnlichen Festplatte gebaut wurde (mit Ihren
+   Nur-Lese-Dateisystemen und den n?tigen Optionen im Kernel), sollten
+   Sie nun erfolgreich von Ihrem FreeBSD Embedded-System starten k?nnen.
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   </div>
+
+.. raw:: html
+
+   <div class="navfooter">
+
+--------------
+
++-------------------------------------------------------+-------------------------------+-----------------------------------------------------------+
+| `Zur?ck <ro-fs.html>`__?                              | ?                             | ?\ `Weiter <strategies.html>`__                           |
++-------------------------------------------------------+-------------------------------+-----------------------------------------------------------+
+| 3. Die ``rc``-Subsysteme und nur-Lese Dateisysteme?   | `Zum Anfang <index.html>`__   | ?5. Systemstrategien f?r kleine und Nur-Lese-Umgebungen   |
++-------------------------------------------------------+-------------------------------+-----------------------------------------------------------+
+
+.. raw:: html
+
+   </div>
+
+| Wenn Sie Fragen zu FreeBSD haben, schicken Sie eine E-Mail an
+  <de-bsd-questions@de.FreeBSD.org\ >.
+|  Wenn Sie Fragen zu dieser Dokumentation haben, schicken Sie eine
+  E-Mail an <de-bsd-translators@de.FreeBSD.org\ >.
